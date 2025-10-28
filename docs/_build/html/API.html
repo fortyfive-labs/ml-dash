@@ -1,0 +1,1678 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" />
+
+    <!-- Generated with Sphinx 7.1.2 and Furo 2024.08.06 -->
+        <title>ML-Dash API Documentation - ML-Dash</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=362ab14a" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">ML-Dash</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><div class="sidebar-scroll"><a class="sidebar-brand" href="index.html">
+    
+    <div class="sidebar-logo-container" style="margin: .5rem auto .5rem auto">
+        <img class="sidebar-logo only-light" src="_static/logo/logo_light.png" alt="Light Logo"/>
+        <img class="sidebar-logo only-dark" src="_static/logo/logo_light.png" alt="Dark Logo"/>
+    </div>
+    <!--adding this here-->
+    <span class="sidebar-brand-text" style="display: flex; justify-content: space-between; align-items: baseline;">
+        <code style="font-size: 1.2em; font-style: bold;
+        background-clip: text; color: transparent;
+        background-image: linear-gradient(to right, rgb(0,140,220), rgb(226,213,79), rgb(210,0,12))">ML-Dash</code>
+        <code style="font-size: 0.5em">v0.1.0</code>
+    </span>
+    <!--<span class="sidebar-brand-text" style="display: flex">-->
+    <!--    <code style="font-size: 1.1em">Documentation</code>-->
+    <!--</span>-->
+</a>
+
+<div style="padding: 0 18px; display: flex; gap: 0.5em">
+    <a class="github-button" href="https://github.com/fortyfive-labs/ml-dash/subscription"
+       data-color-scheme="no-preference: light; light: light; dark: dark;" data-size="large" data-show-count="true"
+       aria-label="Watch fortyfive-labs/ml-dash on GitHub">Watch</a>
+    <a class="github-button" href="https://github.com/fortyfive-labs/ml-dash" data-color-scheme="no-preference: light; light: light; dark: dark;"
+       data-icon="octicon-star" data-size="large" data-show-count="true" aria-label="Star fortyfive-labs/ml-dash on GitHub">Stars</a>
+</div>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-tree">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/fortyfive-labs/ml-dash/issues">Report Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CHANGE_LOG.html">CHANGE LOG</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/ml_dash.html">ml_dash — Core Logger</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/types.html">ml_dash.types — Type Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/client.html">ml_dash.client — HTTP Client</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/cache.html">ml_dash.cache — Local Caching</a></li>
+</ul>
+
+</div>
+</div>
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="https://github.com/fortyfive-labs/ml-dash/blob/main/ml-dash/docs/API.md?plain=true" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div><div class="edit-this-page">
+  <a class="muted-link" href="https://github.com/fortyfive-labs/ml-dash/edit/main/ml-dash/docs/API.md" title="Edit this page">
+    <svg><use href="#svg-pencil"></use></svg>
+    <span class="visually-hidden">Edit this page</span>
+  </a>
+</div><div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="ml-dash-api-documentation">
+<h1>ML-Dash API Documentation<a class="headerlink" href="#ml-dash-api-documentation" title="Permalink to this heading">¶</a></h1>
+<p><strong>Version:</strong> 0.1.0</p>
+<p>ML-Dash is a minimal, local-first experiment tracking library for machine learning. It provides a simple API to log parameters, metrics, files, and logs during your ML experiments.</p>
+<section id="table-of-contents">
+<h2>Table of Contents<a class="headerlink" href="#table-of-contents" title="Permalink to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><a class="reference internal" href="#installation"><span class="xref myst">Installation</span></a></p></li>
+<li><p><a class="reference internal" href="#quick-start"><span class="xref myst">Quick Start</span></a></p></li>
+<li><p><a class="reference internal" href="#core-concepts"><span class="xref myst">Core Concepts</span></a></p></li>
+<li><p><a class="reference internal" href="#api-reference"><span class="xref myst">API Reference</span></a></p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#experiment"><span class="xref myst">Experiment</span></a></p></li>
+<li><p><a class="reference internal" href="#parameters"><span class="xref myst">Parameters</span></a></p></li>
+<li><p><a class="reference internal" href="#metrics"><span class="xref myst">Metrics</span></a></p></li>
+<li><p><a class="reference internal" href="#logs"><span class="xref myst">Logs</span></a></p></li>
+<li><p><a class="reference internal" href="#files"><span class="xref myst">Files</span></a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#usage-patterns"><span class="xref myst">Usage Patterns</span></a></p></li>
+<li><p><a class="reference internal" href="#examples"><span class="xref myst">Examples</span></a></p></li>
+<li><p><a class="reference internal" href="#remote-backend"><span class="xref myst">Remote Backend</span></a></p></li>
+<li><p><a class="reference internal" href="#best-practices"><span class="xref myst">Best Practices</span></a></p></li>
+</ol>
+</section>
+<hr class="docutils" />
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Using pip</span>
+pip<span class="w"> </span>install<span class="w"> </span>-i<span class="w"> </span>https://test.pypi.org/simple/<span class="w"> </span>ml-dash-beta
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this heading">¶</a></h2>
+<section id="basic-example">
+<h3>Basic Example<a class="headerlink" href="#basic-example" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+
+<span class="c1"># Create an experiment</span>
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>  <span class="c1"># Your username or team</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;my-project&quot;</span><span class="p">,</span>  <span class="c1"># Project name</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;experiment-1&quot;</span>  <span class="c1"># Experiment name</span>
+<span class="p">)</span>
+
+<span class="c1"># Start tracking</span>
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Log parameters</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+        <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Log metrics</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span>
+            <span class="n">loss</span><span class="o">=</span><span class="mf">0.5</span> <span class="o">-</span> <span class="n">epoch</span> <span class="o">*</span> <span class="mf">0.01</span><span class="p">,</span>
+            <span class="n">accuracy</span><span class="o">=</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">epoch</span> <span class="o">*</span> <span class="mf">0.005</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Log messages</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Training completed!&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Save files</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">({</span><span class="s2">&quot;final&quot;</span><span class="p">:</span> <span class="s2">&quot;results&quot;</span><span class="p">},</span> <span class="s2">&quot;results.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This creates a local directory structure:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>.ml-dash/
+└── alice/
+    └── my-project/
+        └── experiment-1/
+            ├── .ml-dash.meta.json
+            ├── parameters.jsonl
+            ├── metrics.jsonl
+            ├── logs.jsonl
+            └── files/
+                └── results.json
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="core-concepts">
+<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Permalink to this heading">¶</a></h2>
+<section id="namespace">
+<h3>1. <strong>Namespace</strong><a class="headerlink" href="#namespace" title="Permalink to this heading">¶</a></h3>
+<p>Your username or organization (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;alice&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;research-team&quot;</span></code>)</p>
+</section>
+<section id="workspace">
+<h3>2. <strong>Workspace</strong><a class="headerlink" href="#workspace" title="Permalink to this heading">¶</a></h3>
+<p>Project or research area (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;image-classification&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;nlp-experiments&quot;</span></code>)</p>
+</section>
+<section id="prefix">
+<h3>3. <strong>Prefix</strong><a class="headerlink" href="#prefix" title="Permalink to this heading">¶</a></h3>
+<p>Unique experiment name (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;resnet50-run-001&quot;</span></code>)</p>
+</section>
+<section id="directory-optional">
+<h3>4. <strong>Directory</strong> (Optional)<a class="headerlink" href="#directory-optional" title="Permalink to this heading">¶</a></h3>
+<p>Hierarchical organization within workspace (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;models/resnet/cifar10&quot;</span></code>)</p>
+</section>
+<section id="local-first">
+<h3>5. <strong>Local-First</strong><a class="headerlink" href="#local-first" title="Permalink to this heading">¶</a></h3>
+<p>Everything is saved locally by default. Remote sync is optional.</p>
+</section>
+<section id="append-only">
+<h3>6. <strong>Append-Only</strong><a class="headerlink" href="#append-only" title="Permalink to this heading">¶</a></h3>
+<p>All data is written in append-only JSONL format for crash safety.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="api-reference">
+<h2>API Reference<a class="headerlink" href="#api-reference" title="Permalink to this heading">¶</a></h2>
+<section id="experiment">
+<h3>Experiment<a class="headerlink" href="#experiment" title="Permalink to this heading">¶</a></h3>
+<p>The main class for experiment tracking.</p>
+<section id="constructor">
+<h4>Constructor<a class="headerlink" href="#constructor" title="Permalink to this heading">¶</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>              <span class="c1"># Required: User/team namespace</span>
+    <span class="n">workspace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>              <span class="c1"># Required: Project workspace</span>
+    <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>                 <span class="c1"># Required: Experiment name</span>
+    <span class="n">remote</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>          <span class="c1"># Optional: Remote server URL</span>
+    <span class="n">local_root</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.ml-dash&quot;</span><span class="p">,</span>  <span class="c1"># Local storage directory</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>       <span class="c1"># Optional: Subdirectory path</span>
+    <span class="n">readme</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>          <span class="c1"># Optional: Description</span>
+    <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>   <span class="c1"># Optional: Server experiment ID</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;vision&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;resnet-experiment&quot;</span><span class="p">,</span>
+    <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;image-classification/cifar10&quot;</span><span class="p">,</span>
+    <span class="n">readme</span><span class="o">=</span><span class="s2">&quot;ResNet50 transfer learning on CIFAR-10&quot;</span><span class="p">,</span>
+    <span class="n">remote</span><span class="o">=</span><span class="s2">&quot;http://localhost:4000&quot;</span>  <span class="c1"># Optional remote server</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="methods">
+<h4>Methods<a class="headerlink" href="#methods" title="Permalink to this heading">¶</a></h4>
+<section id="run-func-none">
+<h5><code class="docutils literal notranslate"><span class="pre">run(func=None)</span></code><a class="headerlink" href="#run-func-none" title="Permalink to this heading">¶</a></h5>
+<p>Mark experiment as running. Supports 3 patterns:</p>
+<p><strong>Pattern 1: Direct Call</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="c1"># ... your training code ...</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">complete</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Pattern 2: Context Manager (Recommended)</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># ... your training code ...</span>
+    <span class="c1"># Automatically calls complete() on success</span>
+    <span class="c1"># Automatically calls fail() on exception</span>
+</pre></div>
+</div>
+<p><strong>Pattern 3: Decorator</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@exp</span><span class="o">.</span><span class="n">run</span>
+<span class="k">def</span> <span class="nf">train</span><span class="p">():</span>
+    <span class="c1"># ... your training code ...</span>
+
+<span class="n">train</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="complete">
+<h5><code class="docutils literal notranslate"><span class="pre">complete()</span></code><a class="headerlink" href="#complete" title="Permalink to this heading">¶</a></h5>
+<p>Mark experiment as completed.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">complete</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="fail-error-str">
+<h5><code class="docutils literal notranslate"><span class="pre">fail(error:</span> <span class="pre">str)</span></code><a class="headerlink" href="#fail-error-str" title="Permalink to this heading">¶</a></h5>
+<p>Mark experiment as failed with error message.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="c1"># training code</span>
+<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">fail</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+    <span class="k">raise</span>
+</pre></div>
+</div>
+</section>
+<section id="logging-convenience-methods">
+<h5>Logging Convenience Methods<a class="headerlink" href="#logging-convenience-methods" title="Permalink to this heading">¶</a></h5>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>      <span class="c1"># Log info message</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>   <span class="c1"># Log warning message</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>     <span class="c1"># Log error message</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>     <span class="c1"># Log debug message</span>
+</pre></div>
+</div>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Epoch completed&quot;</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="mf">0.85</span><span class="p">)</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Memory usage high&quot;</span><span class="p">,</span> <span class="n">usage_gb</span><span class="o">=</span><span class="mf">15.2</span><span class="p">)</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Training failed&quot;</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="s2">&quot;CUDA out of memory&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="properties">
+<h4>Properties<a class="headerlink" href="#properties" title="Permalink to this heading">¶</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">namespace</span>      <span class="c1"># str: Namespace</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">workspace</span>      <span class="c1"># str: Workspace</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">prefix</span>         <span class="c1"># str: Experiment prefix</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">directory</span>      <span class="c1"># str | None: Directory path</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">remote</span>         <span class="c1"># str | None: Remote server URL</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">experiment_id</span>  <span class="c1"># str | None: Server experiment ID</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">run_id</span>         <span class="c1"># str | None: Server run ID</span>
+</pre></div>
+</div>
+</section>
+<section id="components">
+<h4>Components<a class="headerlink" href="#components" title="Permalink to this heading">¶</a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">params</span>    <span class="c1"># ParameterManager</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">metrics</span>   <span class="c1"># MetricsLogger</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span>     <span class="c1"># FileManager</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span>      <span class="c1"># LogManager</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this heading">¶</a></h3>
+<p>Manages experiment parameters (hyperparameters, config, etc.)</p>
+<section id="id1">
+<h4>Methods<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h4>
+<section id="set-kwargs">
+<h5><code class="docutils literal notranslate"><span class="pre">set(**kwargs)</span></code><a class="headerlink" href="#set-kwargs" title="Permalink to this heading">¶</a></h5>
+<p>Set parameters (replaces existing).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;adam&quot;</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;layers&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="s2">&quot;dropout&quot;</span><span class="p">:</span> <span class="mf">0.2</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="extend-kwargs">
+<h5><code class="docutils literal notranslate"><span class="pre">extend(**kwargs)</span></code><a class="headerlink" href="#extend-kwargs" title="Permalink to this heading">¶</a></h5>
+<p>Extend parameters (deep merge with existing).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># First call</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;layers&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">})</span>
+
+<span class="c1"># Extend (merges with existing)</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;dropout&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">})</span>
+
+<span class="c1"># Result: {&quot;model&quot;: {&quot;layers&quot;: 50, &quot;dropout&quot;: 0.2}}</span>
+</pre></div>
+</div>
+</section>
+<section id="update-key-str-value-any">
+<h5><code class="docutils literal notranslate"><span class="pre">update(key:</span> <span class="pre">str,</span> <span class="pre">value:</span> <span class="pre">Any)</span></code><a class="headerlink" href="#update-key-str-value-any" title="Permalink to this heading">¶</a></h5>
+<p>Update a single parameter (supports dot notation).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;model.layers&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;learning_rate&quot;</span><span class="p">,</span> <span class="mf">0.0001</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="read-dict">
+<h5><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">dict</span></code><a class="headerlink" href="#read-dict" title="Permalink to this heading">¶</a></h5>
+<p>Read current parameters.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">params</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;learning_rate&quot;</span><span class="p">])</span>  <span class="c1"># 0.001</span>
+</pre></div>
+</div>
+</section>
+<section id="log-kwargs">
+<h5><code class="docutils literal notranslate"><span class="pre">log(**kwargs)</span></code><a class="headerlink" href="#log-kwargs" title="Permalink to this heading">¶</a></h5>
+<p>Alias for <code class="docutils literal notranslate"><span class="pre">set()</span></code> (for API consistency).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">64</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="metrics">
+<h3>Metrics<a class="headerlink" href="#metrics" title="Permalink to this heading">¶</a></h3>
+<p>Logs time-series metrics with optional namespacing.</p>
+<section id="id2">
+<h4>Methods<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h4>
+<section id="log-step-none-metrics">
+<h5><code class="docutils literal notranslate"><span class="pre">log(step=None,</span> <span class="pre">**metrics)</span></code><a class="headerlink" href="#log-step-none-metrics" title="Permalink to this heading">¶</a></h5>
+<p>Log metrics immediately.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Simple logging</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+
+<span class="c1"># Multiple metrics at once</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+    <span class="n">step</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">train_loss</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+    <span class="n">val_loss</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+    <span class="n">train_acc</span><span class="o">=</span><span class="mf">0.85</span><span class="p">,</span>
+    <span class="n">val_acc</span><span class="o">=</span><span class="mf">0.82</span>
+<span class="p">)</span>
+
+<span class="c1"># Without step (uses timestamp only)</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">gpu_memory</span><span class="o">=</span><span class="mf">8.5</span><span class="p">,</span> <span class="n">cpu_usage</span><span class="o">=</span><span class="mf">45.2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="collect-step-none-metrics">
+<h5><code class="docutils literal notranslate"><span class="pre">collect(step=None,</span> <span class="pre">**metrics)</span></code><a class="headerlink" href="#collect-step-none-metrics" title="Permalink to this heading">¶</a></h5>
+<p>Collect metrics for later aggregation (useful for batch-level logging).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">:</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">train_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+
+    <span class="c1"># Collect batch metrics (not logged yet)</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">acc</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+<span class="c1"># Aggregate and log after epoch</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="flush-aggregation-mean-step-none-additional-metrics">
+<h5><code class="docutils literal notranslate"><span class="pre">flush(_aggregation=&quot;mean&quot;,</span> <span class="pre">step=None,</span> <span class="pre">**additional_metrics)</span></code><a class="headerlink" href="#flush-aggregation-mean-step-none-additional-metrics" title="Permalink to this heading">¶</a></h5>
+<p>Flush collected metrics with aggregation.</p>
+<p><strong>Aggregation methods:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;mean&quot;</span></code> - Average of collected values (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;sum&quot;</span></code> - Sum of collected values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;min&quot;</span></code> - Minimum value</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;max&quot;</span></code> - Maximum value</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;last&quot;</span></code> - Last value</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Collect during training</span>
+<span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">batches</span><span class="p">:</span>
+    <span class="n">metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">acc</span><span class="p">)</span>
+
+<span class="c1"># Flush with mean aggregation</span>
+<span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="n">lr</span><span class="p">)</span>
+
+<span class="c1"># Flush with max aggregation</span>
+<span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;max&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="namespacing-call-namespace-str">
+<h5>Namespacing: <code class="docutils literal notranslate"><span class="pre">__call__(namespace:</span> <span class="pre">str)</span></code><a class="headerlink" href="#namespacing-call-namespace-str" title="Permalink to this heading">¶</a></h5>
+<p>Create a namespaced metrics logger.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create namespaced loggers</span>
+<span class="n">train_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+<span class="n">val_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+
+<span class="c1"># Log to different namespaces</span>
+<span class="n">train_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+<span class="n">val_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
+
+<span class="c1"># Results in metrics named: &quot;train.loss&quot;, &quot;train.accuracy&quot;, &quot;val.loss&quot;, &quot;val.accuracy&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="read-list">
+<h5><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code><a class="headerlink" href="#read-list" title="Permalink to this heading">¶</a></h5>
+<p>Read all logged metrics.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">metrics_data</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">metrics_data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;step&quot;</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;metrics&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="logs">
+<h3>Logs<a class="headerlink" href="#logs" title="Permalink to this heading">¶</a></h3>
+<p>Structured text logging with levels and context.</p>
+<section id="id3">
+<h4>Methods<a class="headerlink" href="#id3" title="Permalink to this heading">¶</a></h4>
+<section id="log-message-str-level-str-info-context">
+<h5><code class="docutils literal notranslate"><span class="pre">log(message:</span> <span class="pre">str,</span> <span class="pre">level:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">&quot;INFO&quot;,</span> <span class="pre">**context)</span></code><a class="headerlink" href="#log-message-str-level-str-info-context" title="Permalink to this heading">¶</a></h5>
+<p>Log a message with level and context.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Training started&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="level-specific-methods">
+<h5>Level-Specific Methods<a class="headerlink" href="#level-specific-methods" title="Permalink to this heading">¶</a></h5>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>       <span class="c1"># INFO level</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>    <span class="c1"># WARNING level</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>      <span class="c1"># ERROR level</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>      <span class="c1"># DEBUG level</span>
+</pre></div>
+</div>
+<p><strong>Examples:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Info log</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Epoch started&quot;</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">batches</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+
+<span class="c1"># Warning log</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;High memory usage&quot;</span><span class="p">,</span> <span class="n">memory_gb</span><span class="o">=</span><span class="mf">14.5</span><span class="p">,</span> <span class="n">threshold_gb</span><span class="o">=</span><span class="mf">16.0</span><span class="p">)</span>
+
+<span class="c1"># Error log</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Training failed&quot;</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="s2">&quot;CUDA OOM&quot;</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+
+<span class="c1"># Debug log</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Gradient norm&quot;</span><span class="p">,</span> <span class="n">grad_norm</span><span class="o">=</span><span class="mf">2.3</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="id4">
+<h5><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code><a class="headerlink" href="#id4" title="Permalink to this heading">¶</a></h5>
+<p>Read all logs.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">logs</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">log_entry</span> <span class="ow">in</span> <span class="n">logs</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">log_entry</span><span class="p">[</span><span class="s1">&#39;level&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">log_entry</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s1">&#39;context&#39;</span> <span class="ow">in</span> <span class="n">log_entry</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Context: </span><span class="si">{</span><span class="n">log_entry</span><span class="p">[</span><span class="s1">&#39;context&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="files">
+<h3>Files<a class="headerlink" href="#files" title="Permalink to this heading">¶</a></h3>
+<p>Manages file storage with auto-format detection.</p>
+<section id="id5">
+<h4>Methods<a class="headerlink" href="#id5" title="Permalink to this heading">¶</a></h4>
+<section id="save-data-any-filename-str">
+<h5><code class="docutils literal notranslate"><span class="pre">save(data:</span> <span class="pre">Any,</span> <span class="pre">filename:</span> <span class="pre">str)</span></code><a class="headerlink" href="#save-data-any-filename-str" title="Permalink to this heading">¶</a></h5>
+<p>Save data with automatic format detection.</p>
+<p><strong>Supported formats:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.json</span></code> - JSON files</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.pkl</span></code>, <code class="docutils literal notranslate"><span class="pre">.pickle</span></code> - Pickle files</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.pt</span></code>, <code class="docutils literal notranslate"><span class="pre">.pth</span></code> - PyTorch tensors/models</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.npy</span></code>, <code class="docutils literal notranslate"><span class="pre">.npz</span></code> - NumPy arrays</p></li>
+<li><p>Other extensions - Raw bytes or fallback to pickle</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># JSON</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">({</span><span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]},</span> <span class="s2">&quot;results.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># PyTorch model</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s2">&quot;model.pt&quot;</span><span class="p">)</span>
+
+<span class="c1"># NumPy array</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">numpy_array</span><span class="p">,</span> <span class="s2">&quot;embeddings.npy&quot;</span><span class="p">)</span>
+
+<span class="c1"># Pickle</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">custom_object</span><span class="p">,</span> <span class="s2">&quot;object.pkl&quot;</span><span class="p">)</span>
+
+<span class="c1"># Raw bytes</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;binary data&quot;</span><span class="p">,</span> <span class="s2">&quot;data.bin&quot;</span><span class="p">)</span>
+
+<span class="c1"># Text</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;text content&quot;</span><span class="p">,</span> <span class="s2">&quot;notes.txt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="save-pkl-data-any-filename-str">
+<h5><code class="docutils literal notranslate"><span class="pre">save_pkl(data:</span> <span class="pre">Any,</span> <span class="pre">filename:</span> <span class="pre">str)</span></code><a class="headerlink" href="#save-pkl-data-any-filename-str" title="Permalink to this heading">¶</a></h5>
+<p>Save as pickle (automatically adds .pkl extension).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save_pkl</span><span class="p">(</span><span class="n">complex_object</span><span class="p">,</span> <span class="s2">&quot;checkpoint&quot;</span><span class="p">)</span>
+<span class="c1"># Saves as &quot;checkpoint.pkl&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="load-filename-str-any">
+<h5><code class="docutils literal notranslate"><span class="pre">load(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">Any</span></code><a class="headerlink" href="#load-filename-str-any" title="Permalink to this heading">¶</a></h5>
+<p>Load data with automatic format detection.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># JSON</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;results.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># PyTorch</span>
+<span class="n">state_dict</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model.pt&quot;</span><span class="p">)</span>
+
+<span class="c1"># NumPy</span>
+<span class="n">array</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;embeddings.npy&quot;</span><span class="p">)</span>
+
+<span class="c1"># Pickle</span>
+<span class="n">obj</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;object.pkl&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="load-torch-filename-str-any">
+<h5><code class="docutils literal notranslate"><span class="pre">load_torch(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">Any</span></code><a class="headerlink" href="#load-torch-filename-str-any" title="Permalink to this heading">¶</a></h5>
+<p>Load PyTorch checkpoint (adds .pt extension if missing).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">checkpoint</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load_torch</span><span class="p">(</span><span class="s2">&quot;best_model&quot;</span><span class="p">)</span>
+<span class="c1"># Loads &quot;best_model.pt&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="id6">
+<h5>Namespacing: <code class="docutils literal notranslate"><span class="pre">__call__(namespace:</span> <span class="pre">str)</span></code><a class="headerlink" href="#id6" title="Permalink to this heading">¶</a></h5>
+<p>Create a namespaced file manager.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create namespaced file managers</span>
+<span class="n">checkpoints</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;checkpoints&quot;</span><span class="p">)</span>
+<span class="n">configs</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;configs&quot;</span><span class="p">)</span>
+
+<span class="c1"># Save to different directories</span>
+<span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s2">&quot;epoch_10.pt&quot;</span><span class="p">)</span>
+<span class="c1"># Saves to: files/checkpoints/epoch_10.pt</span>
+
+<span class="n">configs</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;training.json&quot;</span><span class="p">)</span>
+<span class="c1"># Saves to: files/configs/training.json</span>
+</pre></div>
+</div>
+</section>
+<section id="exists-filename-str-bool">
+<h5><code class="docutils literal notranslate"><span class="pre">exists(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">bool</span></code><a class="headerlink" href="#exists-filename-str-bool" title="Permalink to this heading">¶</a></h5>
+<p>Check if file exists.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;checkpoint.pt&quot;</span><span class="p">):</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;checkpoint.pt&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<section id="list-list">
+<h5><code class="docutils literal notranslate"><span class="pre">list()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code><a class="headerlink" href="#list-list" title="Permalink to this heading">¶</a></h5>
+<p>List files in current namespace.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">files</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Files: </span><span class="si">{</span><span class="n">files</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># With namespace</span>
+<span class="n">checkpoint_files</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;checkpoints&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="usage-patterns">
+<h2>Usage Patterns<a class="headerlink" href="#usage-patterns" title="Permalink to this heading">¶</a></h2>
+<section id="pattern-1-simple-training-loop">
+<h3>Pattern 1: Simple Training Loop<a class="headerlink" href="#pattern-1-simple-training-loop" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;mnist&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;simple-cnn&quot;</span>
+<span class="p">)</span>
+
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Log hyperparameters</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+
+    <span class="c1"># Training loop</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train_one_epoch</span><span class="p">()</span>
+        <span class="n">val_loss</span> <span class="o">=</span> <span class="n">validate</span><span class="p">()</span>
+
+        <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span>
+            <span class="n">train_loss</span><span class="o">=</span><span class="n">train_loss</span><span class="p">,</span>
+            <span class="n">val_loss</span><span class="o">=</span><span class="n">val_loss</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Save model</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s2">&quot;final_model.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-2-batch-level-metrics-with-aggregation">
+<h3>Pattern 2: Batch-Level Metrics with Aggregation<a class="headerlink" href="#pattern-2-batch-level-metrics-with-aggregation" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="c1"># Collect batch-level metrics</span>
+        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">:</span>
+            <span class="n">loss</span><span class="p">,</span> <span class="n">acc</span> <span class="o">=</span> <span class="n">train_step</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+            <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">acc</span><span class="p">)</span>
+
+        <span class="c1"># Aggregate and log epoch metrics</span>
+        <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-3-separate-train-val-metrics">
+<h3>Pattern 3: Separate Train/Val Metrics<a class="headerlink" href="#pattern-3-separate-train-val-metrics" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Create namespaced loggers</span>
+    <span class="n">train_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+    <span class="n">val_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="c1"># Training phase</span>
+        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">:</span>
+            <span class="n">loss</span><span class="p">,</span> <span class="n">acc</span> <span class="o">=</span> <span class="n">train_step</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+            <span class="n">train_metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">acc</span><span class="p">)</span>
+        <span class="n">train_metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+
+        <span class="c1"># Validation phase</span>
+        <span class="n">val_loss</span><span class="p">,</span> <span class="n">val_acc</span> <span class="o">=</span> <span class="n">validate</span><span class="p">()</span>
+        <span class="n">val_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">val_loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">val_acc</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-4-checkpoint-management">
+<h3>Pattern 4: Checkpoint Management<a class="headerlink" href="#pattern-4-checkpoint-management" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="n">checkpoints</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;checkpoints&quot;</span><span class="p">)</span>
+
+    <span class="n">best_val_loss</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train</span><span class="p">()</span>
+        <span class="n">val_loss</span> <span class="o">=</span> <span class="n">validate</span><span class="p">()</span>
+
+        <span class="c1"># Save regular checkpoint</span>
+        <span class="k">if</span> <span class="n">epoch</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="sa">f</span><span class="s2">&quot;epoch_</span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s2">.pt&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Save best model</span>
+        <span class="k">if</span> <span class="n">val_loss</span> <span class="o">&lt;</span> <span class="n">best_val_loss</span><span class="p">:</span>
+            <span class="n">best_val_loss</span> <span class="o">=</span> <span class="n">val_loss</span>
+            <span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+                <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
+                <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                <span class="s2">&quot;optimizer&quot;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                <span class="s2">&quot;val_loss&quot;</span><span class="p">:</span> <span class="n">val_loss</span>
+            <span class="p">},</span> <span class="s2">&quot;best_model.pt&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Save final model</span>
+    <span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s2">&quot;final_model.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-5-hierarchical-organization">
+<h3>Pattern 5: Hierarchical Organization<a class="headerlink" href="#pattern-5-hierarchical-organization" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Organize experiments in a directory hierarchy</span>
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;vision&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;run-001&quot;</span><span class="p">,</span>
+    <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;image-classification/resnet50/cifar10&quot;</span>
+<span class="p">)</span>
+<span class="c1"># Creates: .ml-dash/alice/vision/image-classification/resnet50/cifar10/run-001/</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">¶</a></h2>
+<section id="example-1-basic-mnist-training">
+<h3>Example 1: Basic MNIST Training<a class="headerlink" href="#example-1-basic-mnist-training" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="kn">import</span> <span class="n">datasets</span><span class="p">,</span> <span class="n">transforms</span>
+
+<span class="c1"># Create experiment</span>
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;mnist&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;basic-cnn-001&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Define model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">MaxPool2d</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">MaxPool2d</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Flatten</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">1600</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Training</span>
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Log configuration</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+        <span class="n">epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;adam&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Setup</span>
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">datasets</span><span class="o">.</span><span class="n">MNIST</span><span class="p">(</span><span class="s1">&#39;../data&#39;</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                       <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">()),</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+    <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+
+    <span class="c1"># Training loop</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+        <span class="n">total_loss</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">correct</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">data</span><span class="p">,</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">:</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+            <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+            <span class="n">total_loss</span> <span class="o">+=</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">pred</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">correct</span> <span class="o">+=</span> <span class="p">(</span><span class="n">pred</span> <span class="o">==</span> <span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">total</span> <span class="o">+=</span> <span class="n">target</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Log epoch metrics</span>
+        <span class="n">avg_loss</span> <span class="o">=</span> <span class="n">total_loss</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">train_loader</span><span class="p">)</span>
+        <span class="n">accuracy</span> <span class="o">=</span> <span class="n">correct</span> <span class="o">/</span> <span class="n">total</span>
+
+        <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span>
+            <span class="n">loss</span><span class="o">=</span><span class="n">avg_loss</span><span class="p">,</span>
+            <span class="n">accuracy</span><span class="o">=</span><span class="n">accuracy</span>
+        <span class="p">)</span>
+
+        <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Epoch </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">avg_loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">accuracy</span><span class="p">)</span>
+
+    <span class="c1"># Save final model</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s2">&quot;model.pt&quot;</span><span class="p">)</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Training completed!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-2-transfer-learning-with-checkpointing">
+<h3>Example 2: Transfer Learning with Checkpointing<a class="headerlink" href="#example-2-transfer-learning-with-checkpointing" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="kn">import</span> <span class="n">models</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;vision&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;resnet-transfer-001&quot;</span><span class="p">,</span>
+    <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;transfer-learning/cifar10&quot;</span><span class="p">,</span>
+    <span class="n">readme</span><span class="o">=</span><span class="s2">&quot;ResNet50 transfer learning on CIFAR-10&quot;</span>
+<span class="p">)</span>
+
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Configuration</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pretrained&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;num_classes&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="s2">&quot;learning_rate&quot;</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">,</span>
+        <span class="s2">&quot;epochs&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="mi">128</span><span class="p">,</span>
+        <span class="s2">&quot;early_stopping_patience&quot;</span><span class="p">:</span> <span class="mi">10</span>
+    <span class="p">}</span>
+
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="c1"># Load pretrained model</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">fc</span><span class="o">.</span><span class="n">in_features</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+    <span class="c1"># Create namespaced loggers</span>
+    <span class="n">train_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+    <span class="n">val_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+    <span class="n">checkpoints</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;checkpoints&quot;</span><span class="p">)</span>
+
+    <span class="n">best_val_acc</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">patience_counter</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;epochs&quot;</span><span class="p">]):</span>
+        <span class="c1"># Training phase</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">:</span>
+            <span class="n">loss</span><span class="p">,</span> <span class="n">acc</span> <span class="o">=</span> <span class="n">train_step</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+            <span class="n">train_metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">acc</span><span class="p">)</span>
+
+        <span class="n">train_metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+
+        <span class="c1"># Validation phase</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+        <span class="n">val_loss</span><span class="p">,</span> <span class="n">val_acc</span> <span class="o">=</span> <span class="n">validate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">val_loader</span><span class="p">)</span>
+        <span class="n">val_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">val_loss</span><span class="p">,</span> <span class="n">accuracy</span><span class="o">=</span><span class="n">val_acc</span><span class="p">)</span>
+
+        <span class="c1"># Checkpoint best model</span>
+        <span class="k">if</span> <span class="n">val_acc</span> <span class="o">&gt;</span> <span class="n">best_val_acc</span><span class="p">:</span>
+            <span class="n">best_val_acc</span> <span class="o">=</span> <span class="n">val_acc</span>
+            <span class="n">patience_counter</span> <span class="o">=</span> <span class="mi">0</span>
+
+            <span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+                <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
+                <span class="s2">&quot;model_state_dict&quot;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                <span class="s2">&quot;val_accuracy&quot;</span><span class="p">:</span> <span class="n">val_acc</span><span class="p">,</span>
+                <span class="s2">&quot;config&quot;</span><span class="p">:</span> <span class="n">config</span>
+            <span class="p">},</span> <span class="s2">&quot;best_model.pt&quot;</span><span class="p">)</span>
+
+            <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;New best model!&quot;</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">val_acc</span><span class="o">=</span><span class="n">val_acc</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">patience_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># Early stopping</span>
+        <span class="k">if</span> <span class="n">patience_counter</span> <span class="o">&gt;=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;early_stopping_patience&quot;</span><span class="p">]:</span>
+            <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Early stopping&quot;</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+            <span class="k">break</span>
+
+        <span class="c1"># Regular checkpoint</span>
+        <span class="k">if</span> <span class="n">epoch</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="sa">f</span><span class="s2">&quot;checkpoint_epoch_</span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s2">.pt&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Save final summary</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+        <span class="s2">&quot;best_val_accuracy&quot;</span><span class="p">:</span> <span class="n">best_val_acc</span><span class="p">,</span>
+        <span class="s2">&quot;total_epochs&quot;</span><span class="p">:</span> <span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;config&quot;</span><span class="p">:</span> <span class="n">config</span>
+    <span class="p">},</span> <span class="s2">&quot;summary.json&quot;</span><span class="p">)</span>
+
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Training completed!&quot;</span><span class="p">,</span> <span class="n">best_val_acc</span><span class="o">=</span><span class="n">best_val_acc</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-3-hyperparameter-sweep">
+<h3>Example 3: Hyperparameter Sweep<a class="headerlink" href="#example-3-hyperparameter-sweep" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+
+<span class="c1"># Define hyperparameter grid</span>
+<span class="n">learning_rates</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.001</span><span class="p">,</span> <span class="mf">0.0001</span><span class="p">,</span> <span class="mf">0.00001</span><span class="p">]</span>
+<span class="n">batch_sizes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">]</span>
+
+<span class="k">for</span> <span class="n">lr</span> <span class="ow">in</span> <span class="n">learning_rates</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">bs</span> <span class="ow">in</span> <span class="n">batch_sizes</span><span class="p">:</span>
+        <span class="c1"># Create unique experiment for each combination</span>
+        <span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+            <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;hp-sweep&quot;</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;lr</span><span class="si">{</span><span class="n">lr</span><span class="si">}</span><span class="s2">_bs</span><span class="si">{</span><span class="n">bs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;mnist/grid-search&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+            <span class="c1"># Log this combination</span>
+            <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+                <span class="n">learning_rate</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span>
+                <span class="n">batch_size</span><span class="o">=</span><span class="n">bs</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">=</span><span class="s2">&quot;simple-cnn&quot;</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Train with these hyperparameters</span>
+            <span class="n">final_acc</span> <span class="o">=</span> <span class="n">train_model</span><span class="p">(</span><span class="n">lr</span><span class="p">,</span> <span class="n">bs</span><span class="p">)</span>
+
+            <span class="c1"># Log final result</span>
+            <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">final_accuracy</span><span class="o">=</span><span class="n">final_acc</span><span class="p">)</span>
+            <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Sweep run completed&quot;</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">bs</span><span class="o">=</span><span class="n">bs</span><span class="p">,</span> <span class="n">acc</span><span class="o">=</span><span class="n">final_acc</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Hyperparameter sweep completed!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="example-4-multi-stage-training">
+<h3>Example 4: Multi-Stage Training<a class="headerlink" href="#example-4-multi-stage-training" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ml_dash</span> <span class="kn">import</span> <span class="n">Experiment</span>
+
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;nlp&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;bert-finetuning-001&quot;</span><span class="p">,</span>
+    <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;transformers/bert/squad&quot;</span>
+<span class="p">)</span>
+
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="c1"># Stage 1: Warmup</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">stage</span><span class="o">=</span><span class="s2">&quot;warmup&quot;</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.00001</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting warmup phase&quot;</span><span class="p">)</span>
+
+    <span class="n">warmup_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;warmup&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">train_epoch</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.00001</span><span class="p">)</span>
+        <span class="n">warmup_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">)</span>
+
+    <span class="c1"># Stage 2: Main training</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">stage</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting main training phase&quot;</span><span class="p">)</span>
+
+    <span class="n">train_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+    <span class="n">val_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">20</span><span class="p">):</span>
+        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train_epoch</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">)</span>
+        <span class="n">val_loss</span> <span class="o">=</span> <span class="n">validate</span><span class="p">()</span>
+
+        <span class="n">train_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">train_loss</span><span class="p">)</span>
+        <span class="n">val_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">val_loss</span><span class="p">)</span>
+
+    <span class="c1"># Stage 3: Fine-tuning</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">stage</span><span class="o">=</span><span class="s2">&quot;finetune&quot;</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.00001</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting fine-tuning phase&quot;</span><span class="p">)</span>
+
+    <span class="n">finetune_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;finetune&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">train_epoch</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.00001</span><span class="p">)</span>
+        <span class="n">finetune_metrics</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">)</span>
+
+    <span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Multi-stage training completed!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="remote-backend">
+<h2>Remote Backend<a class="headerlink" href="#remote-backend" title="Permalink to this heading">¶</a></h2>
+<p>ML-Dash supports syncing to a remote server for team collaboration.</p>
+<section id="setup-remote-backend">
+<h3>Setup Remote Backend<a class="headerlink" href="#setup-remote-backend" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;shared-project&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;experiment-001&quot;</span><span class="p">,</span>
+    <span class="n">remote</span><span class="o">=</span><span class="s2">&quot;http://localhost:4000&quot;</span><span class="p">,</span>  <span class="c1"># Remote server URL</span>
+    <span class="n">readme</span><span class="o">=</span><span class="s2">&quot;Shared experiment for team&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="how-it-works">
+<h3>How It Works<a class="headerlink" href="#how-it-works" title="Permalink to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Local-First</strong>: Data is always saved locally first</p></li>
+<li><p><strong>Automatic Sync</strong>: When <code class="docutils literal notranslate"><span class="pre">remote</span></code> is specified, data syncs to server</p></li>
+<li><p><strong>Experiment Creation</strong>: Server creates an experiment record</p></li>
+<li><p><strong>Run Tracking</strong>: Server tracks run status (RUNNING, COMPLETED, FAILED)</p></li>
+<li><p><strong>GraphQL API</strong>: Query experiments via GraphQL at <code class="docutils literal notranslate"><span class="pre">http://localhost:4000/graphql</span></code></p></li>
+</ol>
+</section>
+<section id="environment-variables">
+<h3>Environment Variables<a class="headerlink" href="#environment-variables" title="Permalink to this heading">¶</a></h3>
+<p>Configure remote backend via environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">ML_DASH_REMOTE</span><span class="o">=</span><span class="s2">&quot;http://localhost:4000&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ML_DASH_NAMESPACE</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ML_DASH_WORKSPACE</span><span class="o">=</span><span class="s2">&quot;production&quot;</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Uses environment variables if not specified</span>
+<span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;my-experiment&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="server-requirements">
+<h3>Server Requirements<a class="headerlink" href="#server-requirements" title="Permalink to this heading">¶</a></h3>
+<p>To use remote backend, you need the dash-server running:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>ml-dash/ml-dash-server
+pnpm<span class="w"> </span>install
+pnpm<span class="w"> </span>dev
+</pre></div>
+</div>
+<p>Server will be available at <code class="docutils literal notranslate"><span class="pre">http://localhost:4000</span></code></p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Permalink to this heading">¶</a></h2>
+<section id="use-context-manager">
+<h3>1. <strong>Use Context Manager</strong><a class="headerlink" href="#use-context-manager" title="Permalink to this heading">¶</a></h3>
+<p>Always use <code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">exp.run():</span></code> for automatic cleanup:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Good</span>
+<span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="n">train</span><span class="p">()</span>
+
+<span class="c1"># Avoid</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="n">train</span><span class="p">()</span>
+<span class="n">exp</span><span class="o">.</span><span class="n">complete</span><span class="p">()</span>  <span class="c1"># Easy to forget!</span>
+</pre></div>
+</div>
+</section>
+<section id="namespace-metrics-and-files">
+<h3>2. <strong>Namespace Metrics and Files</strong><a class="headerlink" href="#namespace-metrics-and-files" title="Permalink to this heading">¶</a></h3>
+<p>Organize metrics and files with namespaces:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">train_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">)</span>
+<span class="n">val_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;val&quot;</span><span class="p">)</span>
+<span class="n">test_metrics</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">)</span>
+
+<span class="n">checkpoints</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;checkpoints&quot;</span><span class="p">)</span>
+<span class="n">configs</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;configs&quot;</span><span class="p">)</span>
+<span class="n">visualizations</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;plots&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="use-collect-flush-for-batch-metrics">
+<h3>3. <strong>Use collect() + flush() for Batch Metrics</strong><a class="headerlink" href="#use-collect-flush-for-batch-metrics" title="Permalink to this heading">¶</a></h3>
+<p>For fine-grained batch logging with epoch aggregation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">batches</span><span class="p">:</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">train_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+        <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">)</span>
+
+    <span class="c1"># Log aggregated metrics once per epoch</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="log-configuration-early">
+<h3>4. <strong>Log Configuration Early</strong><a class="headerlink" href="#log-configuration-early" title="Permalink to this heading">¶</a></h3>
+<p>Log all hyperparameters at the start:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
+        <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+        <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="o">=</span><span class="s2">&quot;adam&quot;</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;cifar10&quot;</span>
+    <span class="p">)</span>
+    <span class="c1"># ... training ...</span>
+</pre></div>
+</div>
+</section>
+<section id="use-hierarchical-organization">
+<h3>5. <strong>Use Hierarchical Organization</strong><a class="headerlink" href="#use-hierarchical-organization" title="Permalink to this heading">¶</a></h3>
+<p>Organize experiments with directories:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+    <span class="n">workspace</span><span class="o">=</span><span class="s2">&quot;vision&quot;</span><span class="p">,</span>
+    <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;run-001&quot;</span><span class="p">,</span>
+    <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;models/resnet/cifar10&quot;</span>  <span class="c1"># Hierarchical organization</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="add-context-to-logs">
+<h3>6. <strong>Add Context to Logs</strong><a class="headerlink" href="#add-context-to-logs" title="Permalink to this heading">¶</a></h3>
+<p>Make logs searchable with context:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">exp</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Epoch completed&quot;</span><span class="p">,</span>
+         <span class="n">epoch</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+         <span class="n">train_loss</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+         <span class="n">val_loss</span><span class="o">=</span><span class="mf">0.35</span><span class="p">,</span>
+         <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+
+<span class="n">exp</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;High memory usage&quot;</span><span class="p">,</span>
+            <span class="n">memory_gb</span><span class="o">=</span><span class="mf">14.5</span><span class="p">,</span>
+            <span class="n">available_gb</span><span class="o">=</span><span class="mf">16.0</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="save-comprehensive-checkpoints">
+<h3>7. <strong>Save Comprehensive Checkpoints</strong><a class="headerlink" href="#save-comprehensive-checkpoints" title="Permalink to this heading">¶</a></h3>
+<p>Include all state needed for resumption:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">checkpoints</span><span class="o">.</span><span class="n">save</span><span class="p">({</span>
+    <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
+    <span class="s2">&quot;model_state_dict&quot;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+    <span class="s2">&quot;optimizer_state_dict&quot;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+    <span class="s2">&quot;scheduler_state_dict&quot;</span><span class="p">:</span> <span class="n">scheduler</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+    <span class="s2">&quot;best_val_loss&quot;</span><span class="p">:</span> <span class="n">best_val_loss</span><span class="p">,</span>
+    <span class="s2">&quot;config&quot;</span><span class="p">:</span> <span class="n">config</span>
+<span class="p">},</span> <span class="s2">&quot;checkpoint.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="version-control-integration">
+<h3>8. <strong>Version Control Integration</strong><a class="headerlink" href="#version-control-integration" title="Permalink to this heading">¶</a></h3>
+<p>Log git information:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="n">git_hash</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;git&quot;</span><span class="p">,</span> <span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">]</span>
+<span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+<span class="n">exp</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">git_commit</span><span class="o">=</span><span class="n">git_hash</span><span class="p">,</span>
+    <span class="n">git_branch</span><span class="o">=</span><span class="s2">&quot;main&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="error-handling">
+<h3>9. <strong>Error Handling</strong><a class="headerlink" href="#error-handling" title="Permalink to this heading">¶</a></h3>
+<p>The context manager handles errors automatically, but you can add custom handling:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">train</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">exp</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Training error&quot;</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="file-format-details">
+<h2>File Format Details<a class="headerlink" href="#file-format-details" title="Permalink to this heading">¶</a></h2>
+<section id="metrics-jsonl">
+<h3>metrics.jsonl<a class="headerlink" href="#metrics-jsonl" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567890.123</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;loss&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.8</span><span class="p">}}</span>
+<span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567891.456</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;loss&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.85</span><span class="p">}}</span>
+</pre></div>
+</div>
+</section>
+<section id="parameters-jsonl">
+<h3>parameters.jsonl<a class="headerlink" href="#parameters-jsonl" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567890.123</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;operation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;set&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;lr&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.001</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;batch_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">32</span><span class="p">}}</span>
+<span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567892.456</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;operation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;update&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lr&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0001</span><span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="logs-jsonl">
+<h3>logs.jsonl<a class="headerlink" href="#logs-jsonl" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567890.123</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Training started&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;epoch&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}}</span>
+<span class="p">{</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567891.456</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;WARNING&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;High memory&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;memory_gb&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">14.5</span><span class="p">}}</span>
+</pre></div>
+</div>
+</section>
+<section id="ml-dash-meta-json">
+<h3>.ml-dash.meta.json<a class="headerlink" href="#ml-dash-meta-json" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;alice&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;workspace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vision&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;experiment-1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;completed&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;started_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567890.123</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;completed_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1234567900.456</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;readme&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ResNet experiment&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;experiment_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exp_123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;hostname&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpu-server-01&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this heading">¶</a></h2>
+<section id="issue-remote-server-connection-failed">
+<h3>Issue: Remote server connection failed<a class="headerlink" href="#issue-remote-server-connection-failed" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Warning: Failed to initialize experiment on remote server</span>
+<span class="c1"># Solution: Check if ml-dash-server is running</span>
+<span class="n">cd</span> <span class="n">ml</span><span class="o">-</span><span class="n">dash</span><span class="o">/</span><span class="n">dash</span><span class="o">-</span><span class="n">server</span> <span class="o">&amp;&amp;</span> <span class="n">pnpm</span> <span class="n">dev</span>
+</pre></div>
+</div>
+</section>
+<section id="issue-file-not-found-when-loading">
+<h3>Issue: File not found when loading<a class="headerlink" href="#issue-file-not-found-when-loading" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if file exists first</span>
+<span class="k">if</span> <span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;model.pt&quot;</span><span class="p">):</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">exp</span><span class="o">.</span><span class="n">files</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model.pt&quot;</span><span class="p">))</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Checkpoint not found&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="issue-metrics-not-aggregating-correctly">
+<h3>Issue: Metrics not aggregating correctly<a class="headerlink" href="#issue-metrics-not-aggregating-correctly" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Make sure to call flush() after collect()</span>
+<span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">batches</span><span class="p">:</span>
+    <span class="n">metrics</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">)</span>
+
+<span class="n">metrics</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">_aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>  <span class="c1"># Don&#39;t forget this!</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="api-summary">
+<h2>API Summary<a class="headerlink" href="#api-summary" title="Permalink to this heading">¶</a></h2>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Key Methods</p></th>
+<th class="head"><p>Purpose</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Experiment</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">run()</span></code>, <code class="docutils literal notranslate"><span class="pre">complete()</span></code>, <code class="docutils literal notranslate"><span class="pre">fail()</span></code>, <code class="docutils literal notranslate"><span class="pre">info()</span></code></p></td>
+<td><p>Manage experiment lifecycle</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Parameters</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">set()</span></code>, <code class="docutils literal notranslate"><span class="pre">extend()</span></code>, <code class="docutils literal notranslate"><span class="pre">update()</span></code>, <code class="docutils literal notranslate"><span class="pre">read()</span></code></p></td>
+<td><p>Store configuration</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Metrics</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">log()</span></code>, <code class="docutils literal notranslate"><span class="pre">collect()</span></code>, <code class="docutils literal notranslate"><span class="pre">flush()</span></code>, <code class="docutils literal notranslate"><span class="pre">read()</span></code></p></td>
+<td><p>Track time-series metrics</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Logs</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">info()</span></code>, <code class="docutils literal notranslate"><span class="pre">warning()</span></code>, <code class="docutils literal notranslate"><span class="pre">error()</span></code>, <code class="docutils literal notranslate"><span class="pre">debug()</span></code></p></td>
+<td><p>Structured logging</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Files</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">save()</span></code>, <code class="docutils literal notranslate"><span class="pre">load()</span></code>, <code class="docutils literal notranslate"><span class="pre">exists()</span></code>, <code class="docutils literal notranslate"><span class="pre">list()</span></code></p></td>
+<td><p>File management</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<hr class="docutils" />
+<section id="additional-resources">
+<h2>Additional Resources<a class="headerlink" href="#additional-resources" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>GitHub</strong>: https://github.com/fortyfive-labs/ml-dash</p></li>
+<li><p><strong>Examples</strong>: See <code class="docutils literal notranslate"><span class="pre">ml-dash/examples/</span></code> directory</p></li>
+<li><p><strong>Tests</strong>: See <code class="docutils literal notranslate"><span class="pre">ml-dash/tests/</span></code> for usage examples</p></li>
+<li><p><strong>Dashboard</strong>: http://localhost:4000 (when dash-server is running)</p></li>
+</ul>
+<hr class="docutils" />
+<p><strong>Happy Experimenting!</strong> 🚀</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2024, Ge Yang
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/fortyfive-labs/ml-dash" aria-label="GitHub">
+                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+            </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">ML-Dash API Documentation</a><ul>
+<li><a class="reference internal" href="#table-of-contents">Table of Contents</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#quick-start">Quick Start</a><ul>
+<li><a class="reference internal" href="#basic-example">Basic Example</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#core-concepts">Core Concepts</a><ul>
+<li><a class="reference internal" href="#namespace">1. <strong>Namespace</strong></a></li>
+<li><a class="reference internal" href="#workspace">2. <strong>Workspace</strong></a></li>
+<li><a class="reference internal" href="#prefix">3. <strong>Prefix</strong></a></li>
+<li><a class="reference internal" href="#directory-optional">4. <strong>Directory</strong> (Optional)</a></li>
+<li><a class="reference internal" href="#local-first">5. <strong>Local-First</strong></a></li>
+<li><a class="reference internal" href="#append-only">6. <strong>Append-Only</strong></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-reference">API Reference</a><ul>
+<li><a class="reference internal" href="#experiment">Experiment</a><ul>
+<li><a class="reference internal" href="#constructor">Constructor</a></li>
+<li><a class="reference internal" href="#methods">Methods</a><ul>
+<li><a class="reference internal" href="#run-func-none"><code class="docutils literal notranslate"><span class="pre">run(func=None)</span></code></a></li>
+<li><a class="reference internal" href="#complete"><code class="docutils literal notranslate"><span class="pre">complete()</span></code></a></li>
+<li><a class="reference internal" href="#fail-error-str"><code class="docutils literal notranslate"><span class="pre">fail(error:</span> <span class="pre">str)</span></code></a></li>
+<li><a class="reference internal" href="#logging-convenience-methods">Logging Convenience Methods</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#properties">Properties</a></li>
+<li><a class="reference internal" href="#components">Components</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#parameters">Parameters</a><ul>
+<li><a class="reference internal" href="#id1">Methods</a><ul>
+<li><a class="reference internal" href="#set-kwargs"><code class="docutils literal notranslate"><span class="pre">set(**kwargs)</span></code></a></li>
+<li><a class="reference internal" href="#extend-kwargs"><code class="docutils literal notranslate"><span class="pre">extend(**kwargs)</span></code></a></li>
+<li><a class="reference internal" href="#update-key-str-value-any"><code class="docutils literal notranslate"><span class="pre">update(key:</span> <span class="pre">str,</span> <span class="pre">value:</span> <span class="pre">Any)</span></code></a></li>
+<li><a class="reference internal" href="#read-dict"><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">dict</span></code></a></li>
+<li><a class="reference internal" href="#log-kwargs"><code class="docutils literal notranslate"><span class="pre">log(**kwargs)</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#metrics">Metrics</a><ul>
+<li><a class="reference internal" href="#id2">Methods</a><ul>
+<li><a class="reference internal" href="#log-step-none-metrics"><code class="docutils literal notranslate"><span class="pre">log(step=None,</span> <span class="pre">**metrics)</span></code></a></li>
+<li><a class="reference internal" href="#collect-step-none-metrics"><code class="docutils literal notranslate"><span class="pre">collect(step=None,</span> <span class="pre">**metrics)</span></code></a></li>
+<li><a class="reference internal" href="#flush-aggregation-mean-step-none-additional-metrics"><code class="docutils literal notranslate"><span class="pre">flush(_aggregation=&quot;mean&quot;,</span> <span class="pre">step=None,</span> <span class="pre">**additional_metrics)</span></code></a></li>
+<li><a class="reference internal" href="#namespacing-call-namespace-str">Namespacing: <code class="docutils literal notranslate"><span class="pre">__call__(namespace:</span> <span class="pre">str)</span></code></a></li>
+<li><a class="reference internal" href="#read-list"><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#logs">Logs</a><ul>
+<li><a class="reference internal" href="#id3">Methods</a><ul>
+<li><a class="reference internal" href="#log-message-str-level-str-info-context"><code class="docutils literal notranslate"><span class="pre">log(message:</span> <span class="pre">str,</span> <span class="pre">level:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">&quot;INFO&quot;,</span> <span class="pre">**context)</span></code></a></li>
+<li><a class="reference internal" href="#level-specific-methods">Level-Specific Methods</a></li>
+<li><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">read()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#files">Files</a><ul>
+<li><a class="reference internal" href="#id5">Methods</a><ul>
+<li><a class="reference internal" href="#save-data-any-filename-str"><code class="docutils literal notranslate"><span class="pre">save(data:</span> <span class="pre">Any,</span> <span class="pre">filename:</span> <span class="pre">str)</span></code></a></li>
+<li><a class="reference internal" href="#save-pkl-data-any-filename-str"><code class="docutils literal notranslate"><span class="pre">save_pkl(data:</span> <span class="pre">Any,</span> <span class="pre">filename:</span> <span class="pre">str)</span></code></a></li>
+<li><a class="reference internal" href="#load-filename-str-any"><code class="docutils literal notranslate"><span class="pre">load(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">Any</span></code></a></li>
+<li><a class="reference internal" href="#load-torch-filename-str-any"><code class="docutils literal notranslate"><span class="pre">load_torch(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">Any</span></code></a></li>
+<li><a class="reference internal" href="#id6">Namespacing: <code class="docutils literal notranslate"><span class="pre">__call__(namespace:</span> <span class="pre">str)</span></code></a></li>
+<li><a class="reference internal" href="#exists-filename-str-bool"><code class="docutils literal notranslate"><span class="pre">exists(filename:</span> <span class="pre">str)</span> <span class="pre">-&gt;</span> <span class="pre">bool</span></code></a></li>
+<li><a class="reference internal" href="#list-list"><code class="docutils literal notranslate"><span class="pre">list()</span> <span class="pre">-&gt;</span> <span class="pre">list</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#usage-patterns">Usage Patterns</a><ul>
+<li><a class="reference internal" href="#pattern-1-simple-training-loop">Pattern 1: Simple Training Loop</a></li>
+<li><a class="reference internal" href="#pattern-2-batch-level-metrics-with-aggregation">Pattern 2: Batch-Level Metrics with Aggregation</a></li>
+<li><a class="reference internal" href="#pattern-3-separate-train-val-metrics">Pattern 3: Separate Train/Val Metrics</a></li>
+<li><a class="reference internal" href="#pattern-4-checkpoint-management">Pattern 4: Checkpoint Management</a></li>
+<li><a class="reference internal" href="#pattern-5-hierarchical-organization">Pattern 5: Hierarchical Organization</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#examples">Examples</a><ul>
+<li><a class="reference internal" href="#example-1-basic-mnist-training">Example 1: Basic MNIST Training</a></li>
+<li><a class="reference internal" href="#example-2-transfer-learning-with-checkpointing">Example 2: Transfer Learning with Checkpointing</a></li>
+<li><a class="reference internal" href="#example-3-hyperparameter-sweep">Example 3: Hyperparameter Sweep</a></li>
+<li><a class="reference internal" href="#example-4-multi-stage-training">Example 4: Multi-Stage Training</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#remote-backend">Remote Backend</a><ul>
+<li><a class="reference internal" href="#setup-remote-backend">Setup Remote Backend</a></li>
+<li><a class="reference internal" href="#how-it-works">How It Works</a></li>
+<li><a class="reference internal" href="#environment-variables">Environment Variables</a></li>
+<li><a class="reference internal" href="#server-requirements">Server Requirements</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#best-practices">Best Practices</a><ul>
+<li><a class="reference internal" href="#use-context-manager">1. <strong>Use Context Manager</strong></a></li>
+<li><a class="reference internal" href="#namespace-metrics-and-files">2. <strong>Namespace Metrics and Files</strong></a></li>
+<li><a class="reference internal" href="#use-collect-flush-for-batch-metrics">3. <strong>Use collect() + flush() for Batch Metrics</strong></a></li>
+<li><a class="reference internal" href="#log-configuration-early">4. <strong>Log Configuration Early</strong></a></li>
+<li><a class="reference internal" href="#use-hierarchical-organization">5. <strong>Use Hierarchical Organization</strong></a></li>
+<li><a class="reference internal" href="#add-context-to-logs">6. <strong>Add Context to Logs</strong></a></li>
+<li><a class="reference internal" href="#save-comprehensive-checkpoints">7. <strong>Save Comprehensive Checkpoints</strong></a></li>
+<li><a class="reference internal" href="#version-control-integration">8. <strong>Version Control Integration</strong></a></li>
+<li><a class="reference internal" href="#error-handling">9. <strong>Error Handling</strong></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#file-format-details">File Format Details</a><ul>
+<li><a class="reference internal" href="#metrics-jsonl">metrics.jsonl</a></li>
+<li><a class="reference internal" href="#parameters-jsonl">parameters.jsonl</a></li>
+<li><a class="reference internal" href="#logs-jsonl">logs.jsonl</a></li>
+<li><a class="reference internal" href="#ml-dash-meta-json">.ml-dash.meta.json</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li><a class="reference internal" href="#issue-remote-server-connection-failed">Issue: Remote server connection failed</a></li>
+<li><a class="reference internal" href="#issue-file-not-found-when-loading">Issue: File not found when loading</a></li>
+<li><a class="reference internal" href="#issue-metrics-not-aggregating-correctly">Issue: Metrics not aggregating correctly</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-summary">API Summary</a></li>
+<li><a class="reference internal" href="#additional-resources">Additional Resources</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/scripts/furo.js?v=5fa4622c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    </body>
+</html>
