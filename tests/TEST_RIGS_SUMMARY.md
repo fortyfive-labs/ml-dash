@@ -111,7 +111,7 @@ def test_make_video(self, logger):
 
 ```python
 def test_env_auth(self, monkeypatch):
-    monkeypatch.setenv("ML_LOGGER_TOKEN", "token")
+    monkeypatch.setenv("ML_DASH_TOKEN", "token")
     logger = ML_Logger(backend=backend)
     assert logger is not None
 ```

@@ -1,7 +1,7 @@
-# ml_logger.types - Type Interface
+# ml_dash.types - Type Interface
 
 ```{eval-rst}
-.. automodule:: ml_logger.types
+.. automodule:: ml_dash.types
    :members:
    :undoc-members:
    :show-inheritance:

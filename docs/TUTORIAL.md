@@ -20,7 +20,7 @@ A complete guide to experiment tracking with ML-Logger - from basics to advanced
 
 ```bash
 # Using uv (recommended)
-cd ml-logger
+cd ml-dash
 uv sync
 
 # Using pip
@@ -67,7 +67,7 @@ print(f"✓ Experiment saved to: {exp.local_path}")
 # Output: ✓ Experiment saved to: your-username/my-project/first-experiment
 ```
 
-**That's it!** Your experiment data is now saved locally in `.ml-logger/`
+**That's it!** Your experiment data is now saved locally in `.ml-dash/`
 
 ---
 
@@ -100,7 +100,7 @@ exp.logs  # Text logs and events
 ML-Logger stores everything locally by default:
 
 ```
-.ml-logger/
+.ml-dash/
 └── alice/                          # namespace
     └── vision-project/             # workspace
         └── resnet50-baseline/      # prefix (experiment name)
@@ -110,7 +110,7 @@ ML-Logger stores everything locally by default:
             ├── files/              # Saved files
             │   ├── model.pt
             │   └── config.json
-            └── .ml-logger.meta.json  # Metadata
+            └── .ml-dash.meta.json  # Metadata
 ```
 
 ### Three Ways to Run Experiments
@@ -818,10 +818,10 @@ Configure once, use everywhere:
 
 ```bash
 # Set environment variables
-export ML_LOGGER_NAMESPACE="alice"
-export ML_LOGGER_WORKSPACE="my-project"
-export ML_LOGGER_PREFIX="exp-001"
-export ML_LOGGER_REMOTE="http://localhost:4000"
+export ML_DASH_NAMESPACE="alice"
+export ML_DASH_WORKSPACE="my-project"
+export ML_DASH_PREFIX="exp-001"
+export ML_DASH_REMOTE="http://localhost:4000"
 ```
 
 ```python
@@ -1304,7 +1304,7 @@ from pathlib import Path
 def load_experiment_results(namespace, workspace, directory):
     """Load results from all experiments in a directory"""
 
-    base_path = Path(f".ml-logger/{namespace}/{workspace}/{directory}")
+    base_path = Path(f".ml-dash/{namespace}/{workspace}/{directory}")
 
     results = []
 
@@ -1624,7 +1624,7 @@ exp.complete()
 
 ## Getting Help
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/vuer-ai/vuer-dashboard/issues)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/fortyfive-labs/ml-dash/issues)
 - **Documentation**: See `docs/` directory for detailed guides
 - **Examples**: Browse [examples/](examples/) for real-world usage patterns
 

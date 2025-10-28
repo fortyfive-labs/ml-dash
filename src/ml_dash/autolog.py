@@ -13,10 +13,10 @@ Example:
 
 Configuration:
     The auto-experiment is configured from environment variables:
-    - ML_LOGGER_NAMESPACE: User/team namespace (default: "default")
-    - ML_LOGGER_WORKSPACE: Project workspace (default: "experiments")
-    - ML_LOGGER_PREFIX: Experiment prefix (default: auto-generated timestamp+uuid)
-    - ML_LOGGER_REMOTE: Remote server URL (optional)
+    - ML_DASH_NAMESPACE: User/team namespace (default: "default")
+    - ML_DASH_WORKSPACE: Project workspace (default: "experiments")
+    - ML_DASH_PREFIX: Experiment prefix (default: auto-generated timestamp+uuid)
+    - ML_DASH_REMOTE: Remote server URL (optional)
 
     Or from ~/.ml-logger/config.yaml:
         namespace: alice

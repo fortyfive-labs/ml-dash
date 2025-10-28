@@ -1,13 +1,13 @@
-# ml_logger - Core Logger
+# ml_dash - Core Logger
 
 ```{eval-rst}
-.. automodule:: ml_logger
+.. automodule:: ml_dash
    :members:
    :undoc-members:
    :show-inheritance:
 ```
 
-## ML_Logger
+## ML_Dash
 
 The main logger class for tracking experiments.
 

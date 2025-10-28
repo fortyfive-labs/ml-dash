@@ -7,13 +7,13 @@ ML-Logger is a lightweight and flexible experiment tracking library for machine 
 To get started, install ML-Logger:
 
 ```shell
-pip install ml-logger
+pip install ml-dash
 ```
 
 ML-Logger works the best with the [dash.ml](https://dash.ml) visualization dashboard. To authenticate with dash.ml, run the following command:
 
 ```shell
-ml-logger login
+ml-dash login
 ```
 
 Follow the prompts to authenticate with your dash.ml account. todo: figure out how to pass access_token to workers. 
@@ -23,10 +23,10 @@ Follow the prompts to authenticate with your dash.ml account. todo: figure out h
 Here is a simple example of logging metrics and parameters:
 
 ```python
-from ml_dash import ML_Logger
+from ml_dash import ML_Dash
 
 # Initialize logger
-logger = ML_Logger(
+logger = ML_Dash(
     namespace="your-name",
     workspace="project-name",
     prefix="my-experiment/" + __file__,
@@ -77,7 +77,7 @@ todo: add link to a screenshot of dash.ml
 ## Getting Started
 
 - Check out the [Quick Start](quick_start) guide to begin using ML-Logger
-- Review the [API Documentation](api/ml_logger.md) for detailed reference
+- Review the [API Documentation](api/ml_dash.md) for detailed reference
 - See the [CHANGE LOG](CHANGE_LOG.md) for version history
 
 <!-- prettier-ignore-start -->
@@ -89,7 +89,7 @@ todo: add link to a screenshot of dash.ml
    :titlesonly:
 
    Quick Start <quick_start>
-   Report Issues <https://github.com/vuer-ai/vuer-dashboard/issues>
+   Report Issues <https://github.com/fortyfive-labs/ml-dash/issues>
    CHANGE LOG <CHANGE_LOG.md>
 
 .. toctree::
@@ -97,9 +97,9 @@ todo: add link to a screenshot of dash.ml
    :caption: Python API
    :hidden:
 
-   ml_logger — Core Logger <api/ml_logger.md>
-   ml_logger.types — Type Interface <api/types.md>
-   ml_logger.client — HTTP Client <api/client.md>
-   ml_logger.cache — Local Caching <api/cache.md>
+   ml_dash — Core Logger <api/ml_dash.md>
+   ml_dash.types — Type Interface <api/types.md>
+   ml_dash.client — HTTP Client <api/client.md>
+   ml_dash.cache — Local Caching <api/cache.md>
 
 ```

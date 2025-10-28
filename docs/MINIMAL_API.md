@@ -35,7 +35,7 @@ experiment = Experiment(
 workspace: str,  # Required: Project workspace
 prefix: str,  # Required: Experiment path
 remote: str | None = None,  # Optional: Remote server URL
-local_root: str = ".ml-logger",  # Local storage directory
+local_root: str = ".ml-dash",  # Local storage directory
 readme: str | None = None,  # Searchable description
 experiment_id: str | None = None  # Server-side experiment ID
 )
@@ -69,10 +69,10 @@ experiment_id: str | None = None  # Server-side experiment ID
 from ml_dash.autolog import experiment
 
 # Auto-configured from environment variables:
-# - ML_LOGGER_NAMESPACE
-# - ML_LOGGER_WORKSPACE
-# - ML_LOGGER_PREFIX
-# - ML_LOGGER_REMOTE
+# - ML_DASH_NAMESPACE
+# - ML_DASH_WORKSPACE
+# - ML_DASH_PREFIX
+# - ML_DASH_REMOTE
 
 experiment.params.set(learning_rate=0.001)
 experiment.metrics.log(step=0, loss=0.5)
@@ -233,17 +233,17 @@ result = train(config)  # Auto-completes on success
 ## File Structure
 
 ```
-.ml-logger/{namespace}/{workspace}/{prefix}/
+.ml-dash/{namespace}/{workspace}/{prefix}/
 ├── parameters.jsonl         # Parameter operations
 ├── metrics.jsonl            # All metrics
 ├── logs.jsonl               # Text logs
 ├── files/                   # Saved files and artifacts
 │   ├── checkpoints/         # (if using namespaced files)
 │   └── ...
-└── .ml-logger.meta.json     # Experiment metadata
+└── .ml-dash.meta.json     # Experiment metadata
 ```
 
-**Metadata file (`.ml-logger.meta.json`):**
+**Metadata file (`.ml-dash.meta.json`):**
 ```json
 {
   "namespace": "alice",
@@ -268,7 +268,7 @@ result = train(config)  # Auto-completes on success
 ### Features to Remove:
 1. ❌ **Image logging** - `save_image()`, image helpers
 2. ❌ **Video logging** - `save_video()`, `make_video()`, video conversion
-3. ❌ **Authentication** - `ml-logger login`, token management
+3. ❌ **Authentication** - `ml-dash login`, token management
 4. ❌ **`.logrc` configuration** - YAML config file support
 5. ❌ **Tags** - `experiment.tags` (use readme for search instead)
 6. ❌ **Advanced file operations** - Complex file queries/filters
@@ -350,10 +350,10 @@ print(f"✓ Experiment completed: {experiment.local_path}")
 
 ### Environment Variables (for autolog)
 ```bash
-export ML_LOGGER_NAMESPACE="your-username"
-export ML_LOGGER_WORKSPACE="your-project"
-export ML_LOGGER_PREFIX="exp1/trial-001"      # Optional
-export ML_LOGGER_REMOTE="http://localhost:3001"  # Optional
+export ML_DASH_NAMESPACE="your-username"
+export ML_DASH_WORKSPACE="your-project"
+export ML_DASH_PREFIX="exp1/trial-001"      # Optional
+export ML_DASH_REMOTE="http://localhost:3001"  # Optional
 ```
 
 ### Programmatic Configuration
@@ -363,7 +363,7 @@ experiment = Experiment(
     workspace="project",
     prefix="exp1/trial-001",
     remote="http://localhost:3001",  # Optional remote server
-    local_root=".ml-logger"           # Local storage
+    local_root=".ml-dash"           # Local storage
 )
 ```
 
@@ -375,7 +375,7 @@ experiment = Experiment(
 - One `Experiment` = one training execution
 - Four components: `params`, `metrics`, `files`, `logs`
 - Three lifecycle patterns: direct call, context manager, decorator
-- Local-first: All writes go to `.ml-logger/` directory
+- Local-first: All writes go to `.ml-dash/` directory
 - Searchable metadata: `readme`, `charts`
 
 **What's included:**

@@ -1,7 +1,7 @@
-# ml_logger.cache - Local Caching
+# ml_dash.cache - Local Caching
 
 ```{eval-rst}
-.. automodule:: ml_logger.cache
+.. automodule:: ml_dash.cache
    :members:
    :undoc-members:
    :show-inheritance:
@@ -59,7 +59,7 @@ Remove successfully uploaded items from cache.
 ```python
 from ml_dash.cache import LocalCache
 
-cache = LocalCache(cache_dir="~/.ml-logger/cache")
+cache = LocalCache(cache_dir="~/.ml-dash/cache")
 
 # Cache is used automatically by MLLogger
 # when server is unavailable or for batching

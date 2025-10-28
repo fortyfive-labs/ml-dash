@@ -153,7 +153,7 @@ logger.error("GPU OOM", gpu_id=0, allocated="8GB")
 ## 🗂️ Complete File Structure
 
 ```
-.ml-logger/alice/project-name/experiments/resnet-baseline/
+.ml-dash/alice/project-name/experiments/resnet-baseline/
 ├── parameters.jsonl            # ⚡ Special: Auto-synced to GraphQL
 ├── metrics.jsonl               # ⚡ Special: Auto-synced to REST batch endpoint
 ├── logs.jsonl                  # ⚡ Special: Auto-synced (low priority)
@@ -164,7 +164,7 @@ logger.error("GPU OOM", gpu_id=0, allocated="8GB")
 │   │   └── confusion_matrix.png
 │   └── videos/
 │       └── training.mp4
-└── .ml-logger.meta.json        # Sync state (line numbers, upload status)
+└── .ml-dash.meta.json        # Sync state (line numbers, upload status)
 ```
 
 ---
@@ -172,7 +172,7 @@ logger.error("GPU OOM", gpu_id=0, allocated="8GB")
 ## 🔄 Daemon Processing Logic
 
 ### Startup
-1. Load `.ml-logger.meta.json` to get sync state
+1. Load `.ml-dash.meta.json` to get sync state
 2. Watch for changes to special files
 3. Start periodic sync timer
 
@@ -262,7 +262,7 @@ def periodic_sync():
 
 **Python code**:
 ```python
-logger = ML_Logger(
+logger = ML_Dash(
     namespace="alice",
     workspace="project-name",
     prefix="experiments/resnet-baseline"
@@ -283,7 +283,7 @@ for epoch in range(100):
 
 **Files created**:
 ```
-.ml-logger/alice/project-name/experiments/resnet-baseline/
+.ml-dash/alice/project-name/experiments/resnet-baseline/
 ├── parameters.jsonl        # 1 line
 ├── metrics.jsonl           # 100,000 lines (100 epochs × 1000 batches)
 ├── logs.jsonl              # 100 lines (one per epoch)
@@ -291,7 +291,7 @@ for epoch in range(100):
 │   ├── checkpoint_epoch_0.pt
 │   ├── checkpoint_epoch_1.pt
 │   └── ...
-└── .ml-logger.meta.json    # Sync state
+└── .ml-dash.meta.json    # Sync state
 ```
 
 ### Daemon Activity
@@ -321,7 +321,7 @@ T+300s: First checkpoint uploaded (when idle)
 ### Phase 1: Core Special Files (MVP)
 1. ✅ `parameters.jsonl` - Set/extend/update tracking
 2. ✅ `metrics.jsonl` - All metrics in one file
-3. ✅ `.ml-logger.meta.json` - Sync state
+3. ✅ `.ml-dash.meta.json` - Sync state
 4. ✅ Daemon - Basic sync logic
 
 ### Phase 2: Enhanced Features

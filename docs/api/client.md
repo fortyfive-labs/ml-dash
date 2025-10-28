@@ -1,7 +1,7 @@
-# ml_logger.client - HTTP Client
+# ml_dash.client - HTTP Client
 
 ```{eval-rst}
-.. automodule:: ml_logger.client
+.. automodule:: ml_dash.client
    :members:
    :undoc-members:
    :show-inheritance:

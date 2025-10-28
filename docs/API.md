@@ -26,7 +26,7 @@ ML-Logger is a minimal, local-first experiment tracking library for machine lear
 
 ```bash
 # Using pip
-pip install -i https://test.pypi.org/simple/ ml-logger-beta
+pip install -i https://test.pypi.org/simple/ ml-dash-beta
 ```
 
 ---
@@ -71,11 +71,11 @@ with exp.run():
 
 This creates a local directory structure:
 ```
-.ml-logger/
+.ml-dash/
 └── alice/
     └── my-project/
         └── experiment-1/
-            ├── .ml-logger.meta.json
+            ├── .ml-dash.meta.json
             ├── parameters.jsonl
             ├── metrics.jsonl
             ├── logs.jsonl
@@ -121,7 +121,7 @@ Experiment(
     workspace: str,              # Required: Project workspace
     prefix: str,                 # Required: Experiment name
     remote: str = None,          # Optional: Remote server URL
-    local_root: str = ".ml-logger",  # Local storage directory
+    local_root: str = ".ml-dash",  # Local storage directory
     directory: str = None,       # Optional: Subdirectory path
     readme: str = None,          # Optional: Description
     experiment_id: str = None,   # Optional: Server experiment ID
@@ -661,7 +661,7 @@ exp = Experiment(
     prefix="run-001",
     directory="image-classification/resnet50/cifar10"
 )
-# Creates: .ml-logger/alice/vision/image-classification/resnet50/cifar10/run-001/
+# Creates: .ml-dash/alice/vision/image-classification/resnet50/cifar10/run-001/
 ```
 
 ---
@@ -959,9 +959,9 @@ exp = Experiment(
 Configure remote backend via environment:
 
 ```bash
-export ML_LOGGER_REMOTE="http://localhost:4000"
-export ML_LOGGER_NAMESPACE="alice"
-export ML_LOGGER_WORKSPACE="production"
+export ML_DASH_REMOTE="http://localhost:4000"
+export ML_DASH_NAMESPACE="alice"
+export ML_DASH_WORKSPACE="production"
 ```
 
 ```python
@@ -1142,7 +1142,7 @@ with exp.run():
 {"timestamp": 1234567891.456, "level": "WARNING", "message": "High memory", "context": {"memory_gb": 14.5}}
 ```
 
-### .ml-logger.meta.json
+### .ml-dash.meta.json
 ```json
 {
   "namespace": "alice",
@@ -1205,9 +1205,9 @@ metrics.flush(_aggregation="mean", step=epoch)  # Don't forget this!
 
 ## Additional Resources
 
-- **GitHub**: https://github.com/vuer-ai/vuer-dashboard
-- **Examples**: See `ml-logger/examples/` directory
-- **Tests**: See `ml-logger/tests/` for usage examples
+- **GitHub**: https://github.com/fortyfive-labs/ml-dash
+- **Examples**: See `ml-dash/examples/` directory
+- **Tests**: See `ml-dash/tests/` for usage examples
 - **Dashboard**: http://localhost:4000 (when dash-server is running)
 
 ---

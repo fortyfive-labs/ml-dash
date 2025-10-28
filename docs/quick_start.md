@@ -5,7 +5,7 @@
 To install ML-Logger, use pip:
 
 ```bash
-pip install ml-logger
+pip install ml-dash
 ```
 
 ### Configuration
@@ -16,12 +16,12 @@ You can configure ML-Logger using environment variables or explicit configuratio
 
 ```bash
 # Configure using environment variables
-export ML_LOGGER_NAMESPACE="your-username"
-export ML_LOGGER_WORKSPACE="your-project"
-export ML_LOGGER_REMOTE="http://localhost:3001"  # Optional: ML-Dash server URL
+export ML_DASH_NAMESPACE="your-username"
+export ML_DASH_WORKSPACE="your-project"
+export ML_DASH_REMOTE="http://localhost:3001"  # Optional: ML-Dash server URL
 ```
 
-When using `ml_logger.autolog`, these environment variables are automatically used:
+When using `ml_dash.autolog`, these environment variables are automatically used:
 
 ```python
 from ml_dash.autolog import experiment
@@ -190,7 +190,7 @@ experiment.files.save({"results": metrics}, "results.json")
 # Use namespaced file storage
 checkpoints = experiment.files("checkpoints")
 checkpoints.save(model.state_dict(), "model_epoch_10.pt")
-# Saves to: .ml-logger/.../files/checkpoints/model_epoch_10.pt
+# Saves to: .ml-dash/.../files/checkpoints/model_epoch_10.pt
 ```
 
 ## Advanced Features
@@ -270,14 +270,14 @@ experiment = Experiment(
     workspace="project",
     prefix="experiment-1",
     remote="http://localhost:3001",  # ML-Dash server
-    local_root=".ml-logger"  # Local storage
+    local_root=".ml-dash"  # Local storage
 )
 
 # All operations write locally first, then sync in background
 experiment.params.set(learning_rate=0.001)
 experiment.metrics.log(step=0, loss=0.5)
 
-# Files are written to .ml-logger/alice/project/experiment-1/
+# Files are written to .ml-dash/alice/project/experiment-1/
 # Daemon automatically syncs *.jsonl files to remote server
 ```
 
@@ -297,7 +297,7 @@ Then navigate to `http://localhost:3000` to visualize your experiments.
 If you want to develop ML-Logger, you can install it in editable mode:
 
 ```bash
-cd ml-logger
+cd ml-dash
 pip install -e '.[dev]'
 ```
 
@@ -309,6 +309,6 @@ make docs
 
 ## Next Steps
 
-- Check out the [API Documentation](api/ml_logger.md) for detailed reference
+- Check out the [API Documentation](api/ml_dash.md) for detailed reference
 - See the [CHANGE LOG](CHANGE_LOG.md) for version history
-- Report issues on [GitHub](https://github.com/vuer-ai/vuer-dashboard/issues)
+- Report issues on [GitHub](https://github.com/fortyfive-labs/ml-dash/issues)

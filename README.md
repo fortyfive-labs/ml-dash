@@ -975,9 +975,9 @@ exp = Experiment(
 Configure remote backend via environment:
 
 ```bash
-export ML_LOGGER_REMOTE="http://qwqdug4btp.us-east-1.awsapprunner.com"
-export ML_LOGGER_NAMESPACE="alice"
-export ML_LOGGER_WORKSPACE="production"
+export ML_DASH_REMOTE="http://qwqdug4btp.us-east-1.awsapprunner.com"
+export ML_DASH_NAMESPACE="alice"
+export ML_DASH_WORKSPACE="production"
 ```
 
 ```python
