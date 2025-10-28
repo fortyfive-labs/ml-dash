@@ -2,7 +2,7 @@
 
 ## Installation
 
-To install ML-Logger, use pip:
+To install ML-Dash, use pip:
 
 ```bash
 pip install ml-dash
@@ -10,7 +10,7 @@ pip install ml-dash
 
 ### Configuration
 
-You can configure ML-Logger using environment variables or explicit configuration:
+You can configure ML-Dash using environment variables or explicit configuration:
 
 **Option 1: Environment Variables**
 
@@ -259,7 +259,7 @@ result = train(config)  # Auto-completes on success
 
 ### Local-First Logging Mode with Background Sync
 
-ML-Logger writes everything to local files first for zero-latency logging. When a remote server is configured, a background daemon syncs the data:
+ML-Dash writes everything to local files first for zero-latency logging. When a remote server is configured, a background daemon syncs the data:
 
 ```python
 from ml_dash import Experiment
@@ -292,9 +292,9 @@ ml-dash --data-dir ./experiments
 
 Then navigate to `http://localhost:3000` to visualize your experiments.
 
-## Developing ML-Logger
+## Developing ML-Dash
 
-If you want to develop ML-Logger, you can install it in editable mode:
+If you want to develop ML-Dash, you can install it in editable mode:
 
 ```bash
 cd ml-dash

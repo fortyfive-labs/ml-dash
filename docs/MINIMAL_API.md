@@ -1,6 +1,6 @@
-# ML-Logger Minimal API
+# ML-Dash Minimal API
 
-**This is the canonical minimal API specification for ML-Logger.**
+**This is the canonical minimal API specification for ML-Dash.**
 
 All features, examples, and tests should align with this specification. Features not listed here should be removed.
 

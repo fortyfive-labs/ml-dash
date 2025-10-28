@@ -1,16 +1,16 @@
-# Welcome to ML-Logger
+# Welcome to ML-Dash
 
-ML-Logger is a lightweight and flexible experiment tracking library for machine learning research and development, integrated with the visualization at dash.ml.
+ML-Dash is a lightweight and flexible experiment tracking library for machine learning research and development, integrated with the visualization at dash.ml.
 
 ## Installation
 
-To get started, install ML-Logger:
+To get started, install ML-Dash:
 
 ```shell
 pip install ml-dash
 ```
 
-ML-Logger works the best with the [dash.ml](https://dash.ml) visualization dashboard. To authenticate with dash.ml, run the following command:
+ML-Dash works the best with the [dash.ml](https://dash.ml) visualization dashboard. To authenticate with dash.ml, run the following command:
 
 ```shell
 ml-dash login
@@ -76,7 +76,7 @@ todo: add link to a screenshot of dash.ml
 
 ## Getting Started
 
-- Check out the [Quick Start](quick_start) guide to begin using ML-Logger
+- Check out the [Quick Start](quick_start) guide to begin using ML-Dash
 - Review the [API Documentation](api/ml_dash.md) for detailed reference
 - See the [CHANGE LOG](CHANGE_LOG.md) for version history
 

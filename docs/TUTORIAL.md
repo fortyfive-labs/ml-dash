@@ -1,6 +1,6 @@
-# ML-Logger Tutorial
+# ML-Dash Tutorial
 
-A complete guide to experiment tracking with ML-Logger - from basics to advanced features.
+A complete guide to experiment tracking with ML-Dash - from basics to advanced features.
 
 ## Table of Contents
 
@@ -97,7 +97,7 @@ exp.logs  # Text logs and events
 
 ### Storage Structure
 
-ML-Logger stores everything locally by default:
+ML-Dash stores everything locally by default:
 
 ```
 .ml-dash/
@@ -534,7 +534,7 @@ Save and load models, checkpoints, and any other files.
 
 #### Automatic Format Detection
 
-ML-Logger auto-detects format based on file extension:
+ML-Dash auto-detects format based on file extension:
 
 ```python
 exp = Experiment(namespace="alice", workspace="project", prefix="exp")
@@ -1095,7 +1095,7 @@ print(f"  View at: http://localhost:4000/graphql")
 
 ### Example 2: Hyperparameter Search
 
-Systematic hyperparameter tuning with ML-Logger:
+Systematic hyperparameter tuning with ML-Dash:
 
 ```python
 from ml_dash import Experiment
@@ -1194,7 +1194,7 @@ summary_exp.files.save(best, "best_config.json")
 
 ### Example 3: Multi-GPU Distributed Training
 
-Using ML-Logger with PyTorch distributed training:
+Using ML-Dash with PyTorch distributed training:
 
 ```python
 import torch

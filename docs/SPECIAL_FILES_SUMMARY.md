@@ -1,8 +1,8 @@
-# ML-Logger Special Files Summary
+# ML-Dash Special Files Summary
 
 ## Overview
 
-ML-Logger uses **special `.jsonl` files** that get automatic handling by the sync daemon. This document summarizes which files are special and how they're processed.
+ML-Dash uses **special `.jsonl` files** that get automatic handling by the sync daemon. This document summarizes which files are special and how they're processed.
 
 ---
 

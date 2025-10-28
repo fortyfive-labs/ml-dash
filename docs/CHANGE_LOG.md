@@ -2,7 +2,7 @@
 
 ## v0.1.0 (Planned)
 
-Initial release of ML-Logger with basic functionality:
+Initial release of ML-Dash with basic functionality:
 
 ### Features
 - Core logging API for metrics and parameters

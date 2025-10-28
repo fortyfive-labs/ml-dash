@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "ML-Logger"
+project = "ML-Dash"
 copyright = "2024, Ge Yang"
 author = "Ge Yang"
 
@@ -105,15 +105,15 @@ myst_enable_checkboxes = True
 # we use the default.
 # html_title = f"{project} v{version} documentation"
 # we use lower case here, different from project title
-html_title = "ML-Logger"
+html_title = "ML-Dash"
 html_theme = "furo"
 html_theme_options: Dict[str, Any] = {
   # "light_css_variables": {
   #     "color-brand-content": "blue",
   #     "color-admonition-background": "blue",
   # },
-  "light_logo": "logos/logo_light.png",
-  "dark_logo": "logos/logo_dark.png",
+  "light_logo": "logo/logo_light.png",
+  "dark_logo": "logo/logo_light.png",
   "footer_icons": [
     {
       "name": "GitHub",

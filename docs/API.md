@@ -1,8 +1,8 @@
-# ML-Logger API Documentation
+# ML-Dash API Documentation
 
 **Version:** 0.1.0
 
-ML-Logger is a minimal, local-first experiment tracking library for machine learning. It provides a simple API to log parameters, metrics, files, and logs during your ML experiments.
+ML-Dash is a minimal, local-first experiment tracking library for machine learning. It provides a simple API to log parameters, metrics, files, and logs during your ML experiments.
 
 ## Table of Contents
 
@@ -932,7 +932,7 @@ with exp.run():
 
 ## Remote Backend
 
-ML-Logger supports syncing to a remote server for team collaboration.
+ML-Dash supports syncing to a remote server for team collaboration.
 
 ### Setup Remote Backend
 
