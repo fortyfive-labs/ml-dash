@@ -1255,13 +1255,42 @@ metrics.flush(_aggregation="mean", step=epoch)  # Don't forget this!
 
 ## API Summary
 
-| Component      | Key Methods                                 | Purpose                     |
-|----------------|---------------------------------------------|-----------------------------|
-| **Experiment** | `run()`, `complete()`, `fail()`, `info()`   | Manage experiment lifecycle |
-| **Parameters** | `set()`, `extend()`, `update()`, `read()`   | Store configuration         |
-| **Metrics**    | `log()`, `collect()`, `flush()`, `read()`   | Track time-series metrics   |
-| **Logs**       | `info()`, `warning()`, `error()`, `debug()` | Structured logging          |
-| **Files**      | `save()`, `load()`, `exists()`, `list()`    | File management             |
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Key Methods</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Experiment</strong></td>
+<td><code>run()</code>, <code>complete()</code>, <code>fail()</code>, <code>info()</code></td>
+<td>Manage experiment lifecycle</td>
+</tr>
+<tr>
+<td><strong>Parameters</strong></td>
+<td><code>set()</code>, <code>extend()</code>, <code>update()</code>, <code>read()</code></td>
+<td>Store configuration</td>
+</tr>
+<tr>
+<td><strong>Metrics</strong></td>
+<td><code>log()</code>, <code>collect()</code>, <code>flush()</code>, <code>read()</code></td>
+<td>Track time-series metrics</td>
+</tr>
+<tr>
+<td><strong>Logs</strong></td>
+<td><code>info()</code>, <code>warning()</code>, <code>error()</code>, <code>debug()</code></td>
+<td>Structured logging</td>
+</tr>
+<tr>
+<td><strong>Files</strong></td>
+<td><code>save()</code>, <code>load()</code>, <code>exists()</code>, <code>list()</code></td>
+<td>File management</td>
+</tr>
+</tbody>
+</table>
 
 ---
 
@@ -1307,16 +1336,18 @@ uv run pytest tests/test_backends.py
 
 ```bash
 # Build HTML documentation
+uv run docs
+
+# Build and preview with live reload (auto-opens browser, auto-refreshes on file changes)
+uv run preview
+
+# Alternative: Using Makefile
 cd docs && make html
-
-# Serve docs with live reload (auto-refreshes on file changes)
-cd docs && make serve
-
-# Clean build artifacts
-cd docs && make clean
+cd docs && make serve  # Serve with live reload
+cd docs && make clean  # Clean build artifacts
 ```
 
-The built documentation will be in `docs/_build/html/`. The `make serve` command starts a local server at `http://localhost:8000` with automatic rebuilding on file changes.
+The built documentation will be in `docs/_build/html/`. The `uv run preview` command automatically opens your browser and rebuilds the docs whenever you make changes to the source files.
 
 ### Linting and Code Checks
 
@@ -1362,9 +1393,10 @@ The project uses a simplified dependency structure:
 - **`dependencies`**: Core runtime dependencies (always installed)
     - `msgpack`, `numpy`, `requests`
 - **`dev`**: All development dependencies
-    - Linting and formatting: `ruff`
+    - Linting and formatting: `ruff`, `mypy`
     - Testing: `pytest`, `pytest-cov`, `pytest-asyncio`
-    - Documentation: `sphinx`, `furo`, `myst-parser`, `sphinx-copybutton`, `sphinx-autobuild`
+    - Documentation: `sphinx`, `furo`, `myst-parser`, `sphinx-copybutton`, `sphinx-autobuild`, `sphinxcontrib-video`
+    - Development tools: `ipython`, `ipdb`, `pre-commit`
     - Optional features: `torch` (for saving/loading .pt/.pth files)
 
 ### Making Changes
