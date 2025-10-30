@@ -1,7 +1,7 @@
 API Reference
 =============
 
-This section contains the API documentation for the DreamLake Python SDK.
+This section contains the API documentation for the ML-Dash Python SDK.
 
 Core Modules
 ------------

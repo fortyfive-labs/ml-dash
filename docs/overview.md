@@ -1,6 +1,6 @@
 # Overview
 
-DreamLake is a lightweight Python SDK for metricing machine learning experiments and storing experiment data. It provides a simple, intuitive API for logging, parameter metricing, metrics monitoring, and file management.
+ML-Dash is a lightweight Python SDK for metricing machine learning experiments and storing experiment data. It provides a simple, intuitive API for logging, parameter metricing, metrics monitoring, and file management.
 
 **Start in 60 seconds.** Install, import, and start metricing - no configuration needed.
 

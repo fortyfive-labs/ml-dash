@@ -1,6 +1,6 @@
 # FAQ & Troubleshooting
 
-Common questions and solutions for using DreamLake.
+Common questions and solutions for using ML-Dash.
 
 ## General Questions
 
@@ -72,9 +72,9 @@ This will automatically sync local data to remote server.
 
 ---
 
-### How does DreamLake compare to MLflow, Weights & Biases, and Neptune?
+### How does ML-Dash compare to MLflow, Weights & Biases, and Neptune?
 
-| Feature | DreamLake | MLflow | W&B | Neptune |
+| Feature | ML-Dash | MLflow | W&B | Neptune |
 |---------|-----------|--------|-----|---------|
 | **Local Mode** | ✅ Zero setup | ✅ Yes | ❌ Cloud only | ❌ Cloud only |
 | **Self-hosted** | ✅ Easy Docker | ✅ Complex | ⚠️ Enterprise | ❌ No |
@@ -85,7 +85,7 @@ This will automatically sync local data to remote server.
 | **File Storage** | ✅ Built-in | ✅ Artifacts | ✅ Yes | ✅ Yes |
 | **Web UI** | 🔜 v0.3 | ✅ Yes | ✅ Advanced | ✅ Advanced |
 
-**DreamLake's strengths**:
+**ML-Dash's strengths**:
 - Simplest setup (literally zero for local mode)
 - True offline capability
 - Full data ownership
@@ -100,7 +100,7 @@ This will automatically sync local data to remote server.
 
 ### What happens if my experiment crashes mid-training?
 
-DreamLake experiments are designed for **resilience**:
+ML-Dash experiments are designed for **resilience**:
 
 1. **Data is written immediately**: Logs, parameters, and metrics are saved as soon as you call them (not buffered)
 2. **Re-open experiments**: Use the same experiment name to continue
@@ -128,7 +128,7 @@ with Experiment(name="training", project="test", local_prefix=".ml-dash",
 
 ---
 
-### Does DreamLake support distributed training?
+### Does ML-Dash support distributed training?
 
 **Current**: Basic support - each worker can log to the same experiment
 
@@ -671,6 +671,6 @@ ModuleNotFoundError: No module named 'ml-dash'
 ## See Also
 
 - [Getting Started](getting-started.md) - Quick start guide
-- [Architecture](architecture.md) - How DreamLake works internally
+- [Architecture](architecture.md) - How ML-Dash works internally
 - [Deployment Guide](deployment.md) - Setting up your server
 - [API Reference](api/modules.rst) - Detailed API documentation

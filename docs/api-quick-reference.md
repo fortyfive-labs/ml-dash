@@ -1,6 +1,6 @@
-# DreamLake - API Quick Reference
+# ML-Dash - API Quick Reference
 
-Quick reference for common DreamLake operations.
+Quick reference for common ML-Dash operations.
 
 ## Experiment Creation
 

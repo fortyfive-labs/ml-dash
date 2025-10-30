@@ -1,10 +1,10 @@
 # Architecture & Design
 
-This document provides an in-depth look at DreamLake's architecture, design decisions, and internal workings.
+This document provides an in-depth look at ML-Dash's architecture, design decisions, and internal workings.
 
 ## Overview
 
-DreamLake is built with a clean, modular architecture that supports both local filesystem and remote API server backends. The design emphasizes simplicity, flexibility, and ease of use while maintaining powerful functionality for ML experiment metricing.
+ML-Dash is built with a clean, modular architecture that supports both local filesystem and remote API server backends. The design emphasizes simplicity, flexibility, and ease of use while maintaining powerful functionality for ML experiment metricing.
 
 ### High-Level Architecture
 
@@ -41,7 +41,7 @@ flowchart TB
 
 ### 1. Experiment Manager
 
-The `Experiment` class is the entry point for all DreamLake operations. It:
+The `Experiment` class is the entry point for all ML-Dash operations. It:
 
 - **Manages lifecycle**: Creation, opening, closing of experiment experiments
 - **Handles backends**: Automatically selects LocalStorage or RemoteClient based on configuration
@@ -60,7 +60,7 @@ Experiment
 
 ### 2. Builder APIs
 
-DreamLake uses the **Builder Pattern** to provide a fluent, chainable API for data operations:
+ML-Dash uses the **Builder Pattern** to provide a fluent, chainable API for data operations:
 
 #### LogBuilder
 ```python
@@ -101,7 +101,7 @@ experiment.file(file_prefix="model.pth", prefix="/models").save()
 
 ### 3. Backend Layer
 
-The backend layer abstracts storage implementation, allowing DreamLake to work with different backends without changing user code.
+The backend layer abstracts storage implementation, allowing ML-Dash to work with different backends without changing user code.
 
 #### LocalStorage
 
@@ -316,7 +316,7 @@ Benefits:
 
 ### Custom Storage Backends
 
-DreamLake's architecture allows for custom storage backends by implementing the storage interface:
+ML-Dash's architecture allows for custom storage backends by implementing the storage interface:
 
 ```python
 class CustomStorage:
@@ -417,7 +417,7 @@ Experiment(remote="...", api_key="actual-jwt-token")
 
 ## Comparison with Other Tools
 
-| Feature | DreamLake | MLflow | Weights & Biases | Neptune.ai |
+| Feature | ML-Dash | MLflow | Weights & Biases | Neptune.ai |
 |---------|-----------|---------|------------------|------------|
 | **Local Mode** | ✅ First-class | ✅ Yes | ❌ Cloud-only | ❌ Cloud-only |
 | **Self-hosted** | ✅ Easy | ✅ Yes | ❌ Enterprise only | ❌ No |
@@ -426,7 +426,7 @@ Experiment(remote="...", api_key="actual-jwt-token")
 | **Learning Curve** | ✅ Low | ⚠️ Medium | ⚠️ Medium | ⚠️ Medium |
 | **Setup Time** | ✅ < 1 min | ⚠️ 5-10 min | ✅ 2 min | ✅ 2 min |
 
-**DreamLake's sweet spot**:
+**ML-Dash's sweet spot**:
 - Quick local experiments with zero setup
 - Easy transition to collaborative remote mode
 - Simple, intuitive API

@@ -1,6 +1,6 @@
 # Experiments
 
-Experiments are the foundation of DreamLake. Each experiment represents a single experiment run, containing all your logs, parameters, metrics, and files.
+Experiments are the foundation of ML-Dash. Each experiment represents a single experiment run, containing all your logs, parameters, metrics, and files.
 
 ## Three Usage Styles
 
@@ -128,7 +128,7 @@ with Experiment(name="long-training", project="ml",
 
 ## Available Operations
 
-Once a experiment is open, you can use all DreamLake features:
+Once a experiment is open, you can use all ML-Dash features:
 
 ```{code-block} python
 :linenos:

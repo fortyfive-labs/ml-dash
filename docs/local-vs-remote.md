@@ -1,6 +1,6 @@
 # Local vs Remote Mode
 
-DreamLake operates in two modes: **Local** (filesystem) and **Remote** (API + Cloud storage). Understanding the differences helps you choose the right mode for your use case.
+ML-Dash operates in two modes: **Local** (filesystem) and **Remote** (API + Cloud storage). Understanding the differences helps you choose the right mode for your use case.
 
 ## Local Mode
 
@@ -260,7 +260,7 @@ Choose **Remote Mode** if:
 ## See Also
 
 **Deployment & Operations:**
-- **[Deployment Guide](deployment.md)** - Deploy your own DreamLake server (Docker, Kubernetes, Cloud)
+- **[Deployment Guide](deployment.md)** - Deploy your own ML-Dash server (Docker, Kubernetes, Cloud)
 - **[Architecture](architecture.md)** - Understand the technical differences between modes
 - **[FAQ](faq.md)** - When should I use local vs remote mode?
 

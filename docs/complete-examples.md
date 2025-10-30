@@ -1,6 +1,6 @@
 # Complete Examples
 
-This document contains complete, runnable examples showcasing common use cases for DreamLake.
+This document contains complete, runnable examples showcasing common use cases for ML-Dash.
 
 ## Example 1: Simple Training Loop
 
@@ -12,7 +12,7 @@ import random
 from ml_dash import Experiment
 
 def train_simple_model():
-    """Train a simple model and metric with DreamLake."""
+    """Train a simple model and metric with ML-Dash."""
 
     with Experiment(
         name="simple-training",
@@ -67,7 +67,7 @@ if __name__ == "__main__":
 Complete PyTorch MNIST training with full experiment metricing.
 
 ```python
-"""PyTorch MNIST training with DreamLake metricing."""
+"""PyTorch MNIST training with ML-Dash metricing."""
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -89,7 +89,7 @@ class SimpleNet(nn.Module):
         return self.fc3(x)
 
 def train_mnist():
-    """Train MNIST model with DreamLake metricing."""
+    """Train MNIST model with ML-Dash metricing."""
 
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -114,7 +114,7 @@ def train_mnist():
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
 
-    # DreamLake experiment
+    # ML-Dash experiment
     with Experiment(
         name="mnist-pytorch",
         project="computer-vision",
@@ -468,8 +468,8 @@ python architecture_comparison.py
 - [Files](files.md) - File upload and management
 
 **Deployment & Operations:**
-- **[Deployment Guide](deployment.md)** - Deploy your own DreamLake server
-- **[Architecture](architecture.md)** - How DreamLake works internally
+- **[Deployment Guide](deployment.md)** - Deploy your own ML-Dash server
+- **[Architecture](architecture.md)** - How ML-Dash works internally
 - **[FAQ & Troubleshooting](faq.md)** - Common problems and solutions
 
 **Getting Started:**

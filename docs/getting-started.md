@@ -1,6 +1,6 @@
-# Getting Started with DreamLake
+# Getting Started with ML-Dash
 
-This guide will help you get started with DreamLake.
+This guide will help you get started with ML-Dash.
 
 ## Installation
 
@@ -26,14 +26,14 @@ A **Project** is a container for organizing related experiments. Think of it as 
 
 ### Local vs Remote Mode
 
-DreamLake operates in two modes:
+ML-Dash operates in two modes:
 
 - **Local Mode**: Data stored in filesystem (`.ml-dash/` directory)
 - **Remote Mode**: Data stored in MongoDB + S3 via API
 
 ## Your First Experiment
 
-DreamLake supports **three usage styles**. Choose the one that fits your workflow best:
+ML-Dash supports **three usage styles**. Choose the one that fits your workflow best:
 
 ### Style 1: Decorator (Recommended for ML Training)
 
@@ -50,7 +50,7 @@ from ml_dash import ml_dash_experiment
 def my_first_experiment(experiment):
     """Experiment is automatically injected as a parameter"""
     # Log a message
-    experiment.log("Hello from DreamLake!", level="info")
+    experiment.log("Hello from ML-Dash!", level="info")
 
     # Metric a parameter
     experiment.parameters().set(message="Hello World")
@@ -77,7 +77,7 @@ with Experiment(
         local_path=".ml-dash"
 ) as experiment:
     # Log a message
-    experiment.log("Hello from DreamLake!", level="info")
+    experiment.log("Hello from ML-Dash!", level="info")
 
     # Metric a parameter
     experiment.parameters().set(message="Hello World")
@@ -106,7 +106,7 @@ experiment.open()
 
 try:
     # Log a message
-    experiment.log("Hello from DreamLake!", level="info")
+    experiment.log("Hello from ML-Dash!", level="info")
 
     # Metric a parameter
     experiment.parameters().set(message="Hello World")
@@ -153,7 +153,7 @@ cat ./my_experiments/.ml-dash/tutorials/hello-ml-dash/parameters.json
 
 ## Experiment Context Manager
 
-DreamLake uses Python's context manager pattern (`with` statement) to ensure proper cleanup:
+ML-Dash uses Python's context manager pattern (`with` statement) to ensure proper cleanup:
 
 ```python
 # ✓ Good - Automatic cleanup
@@ -310,8 +310,8 @@ def train(experiment):
 
 Now that you know the basics, explore these guides:
 
-- **[Architecture](architecture.md)** - Understand how DreamLake works internally
-- **[Deployment Guide](deployment.md)** - Deploy your own DreamLake server
+- **[Architecture](architecture.md)** - Understand how ML-Dash works internally
+- **[Deployment Guide](deployment.md)** - Deploy your own ML-Dash server
 - **[API Quick Reference](api-quick-reference.md)** - Cheat sheet for common patterns
 - **[Complete Examples](complete-examples.md)** - End-to-end ML workflows
 - **[FAQ & Troubleshooting](faq.md)** - Common questions and solutions

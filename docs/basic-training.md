@@ -1,6 +1,6 @@
 # Basic Training Loop
 
-A complete example showing how to metric a simple training loop with DreamLake.
+A complete example showing how to metric a simple training loop with ML-Dash.
 
 ## The Scenario
 
@@ -19,7 +19,7 @@ import random
 from ml_dash import Experiment
 
 def train_simple_model():
-    """Train a simple model and metric everything with DreamLake."""
+    """Train a simple model and metric everything with ML-Dash."""
 
     with Experiment(
         name="simple-training",

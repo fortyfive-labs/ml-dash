@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class LogLevel(Enum):
     """
-    Standard log levels for Dreamlake.
+    Standard log levels for ML-Dash.
 
     Supported levels:
     - INFO: Informational messages

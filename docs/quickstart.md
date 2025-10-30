@@ -1,6 +1,6 @@
 # Quickstart
 
-Get started with DreamLake in under 5 minutes.
+Get started with ML-Dash in under 5 minutes.
 
 ## Installation
 
@@ -119,7 +119,7 @@ with Experiment(name="my-experiment", project="project",
 
 ## Remote Mode
 
-To collaborate with your team, switch to remote mode by pointing to a DreamLake server:
+To collaborate with your team, switch to remote mode by pointing to a ML-Dash server:
 
 ```{code-block} python
 :linenos:

@@ -208,4 +208,4 @@ with Experiment(name="my-experiment", project="project",
 
 ---
 
-**That's it!** You've completed all the core DreamLake tutorials. Check out the API Reference for detailed method documentation.
+**That's it!** You've completed all the core ML-Dash tutorials. Check out the API Reference for detailed method documentation.

@@ -1,5 +1,5 @@
 """
-Parameters module for Dreamlake SDK.
+Parameters module for ML-Dash SDK.
 
 Provides fluent API for parameter management with automatic dict flattening.
 Nested dicts are flattened to dot-notation: {"model": {"lr": 0.001}} → {"model.lr": 0.001}

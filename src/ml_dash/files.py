@@ -1,5 +1,5 @@
 """
-Files module for Dreamlake SDK.
+Files module for ML-Dash SDK.
 
 Provides fluent API for file upload, download, list, and delete operations.
 """

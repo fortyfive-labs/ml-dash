@@ -1,6 +1,6 @@
-# DreamLake Examples
+# ML-Dash Examples
 
-This directory contains runnable examples demonstrating DreamLake features.
+This directory contains runnable examples demonstrating ML-Dash features.
 
 ## Running Examples
 
@@ -22,7 +22,7 @@ PYTHONPATH=./src python docs/examples/06_complete_training.py
 | Example | Description | Features |
 |---------|-------------|----------|
 | `three_usage_styles.py` | **NEW!** Three ways to use experiments | Decorator, context manager, direct instantiation |
-| `01_basic_experiment.py` | Your first DreamLake experiment | Experiment creation, logging, parameters |
+| `01_basic_experiment.py` | Your first ML-Dash experiment | Experiment creation, logging, parameters |
 | `02_logging_example.py` | Structured logging | Log levels, metadata, progress logging |
 | `03_parameters_example.py` | Hyperparameters metricing | Simple params, nested params, updates |
 | `04_metrics_example.py` | Time-series metrics | Metrics, batch append, reading data, stats |
@@ -83,14 +83,14 @@ rm -rf tutorial_data/
 
 ### Three Usage Styles (`three_usage_styles.py`)
 
-Demonstrates all three ways to use DreamLake experiments:
+Demonstrates all three ways to use ML-Dash experiments:
 - **Decorator style**: Best for ML training functions
 - **Context manager style**: Best for scripts
 - **Direct instantiation**: Advanced usage with manual lifecycle management
 
 ### Basic Experiment (`01_basic_experiment.py`)
 
-Your first DreamLake experiment showing:
+Your first ML-Dash experiment showing:
 - Creating a local experiment
 - Basic logging
 - Setting parameters
