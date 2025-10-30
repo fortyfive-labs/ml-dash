@@ -1,13 +1,14 @@
-aiohttp
-aiohttp-cors
-killport
-msgpack
-numpy
-params-proto
+# Sphinx and documentation dependencies
+# Required for building documentation on Read the Docs
 
-sphinx==7.1.2
-furo
-myst_parser
-sphinx_copybutton
-# this is the relative width implementation.
-git+https://github.com/QuLogic/sphinxcontrib-video.git@634ce982244ae9fee29958524536f5288b49c5d5
+sphinx>=7.2.0
+furo>=2024.0.0
+sphinx-autodoc-typehints>=2.0.0
+sphinx-autobuild>=2024.0.0
+sphinx-copybutton>=0.5.0
+sphinx-design>=0.5.0
+sphinx-tabs>=3.4.0
+sphinxcontrib-mermaid>=0.9.0
+sphinxext-opengraph>=0.9.0
+myst-parser>=2.0.0
+linkify-it-py>=2.0.0

@@ -1,0 +1,32 @@
+/* Custom ML-Dash styling */
+
+/* Headers will use default theme colors */
+
+/* Enhanced code blocks */
+.highlight {
+    border-radius: 8px;
+    margin: 1.5em 0;
+}
+
+div.highlight pre {
+    padding: 1em;
+    line-height: 1.6;
+    border-radius: 8px;
+}
+
+/* Code block captions */
+.code-block-caption {
+    font-weight: 600;
+    margin-bottom: 0.3em;
+    color: #59007e;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Line numbers in code blocks */
+.highlight .linenos {
+    opacity: 0.5;
+    user-select: none;
+    padding-right: 1em;
+}
