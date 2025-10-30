@@ -4,7 +4,7 @@ version = "0.2.1"
 description = "ML experiment metricing and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 authors = [
     {name = "Ge Yang"},
     {name = "Tom Tao"}
