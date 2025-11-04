@@ -273,6 +273,5 @@ ls .ml-dash/project/experiment/files/
 
 ## See Also
 
-- [Getting Started](getting-started.md)
 - [Complete Examples](complete-examples.md)
 - [Runnable Examples](examples.md)

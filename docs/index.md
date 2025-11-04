@@ -1,53 +1,126 @@
 # Welcome to ML-Dash
 
-## Installation
+You can install the package with uv or pip:
 
 ```shell
 uv add ml-dash
 ```
 
-or using pip
+or
 
 ```shell
 pip install ml-dash
 ```
 
-## Quick Example
+The core of ML-Dash is the `Experiment` class. It supports logging, upload, and download of
+metrics, training hyper parameters, and binary files. The following example shows how to use
+it in a simple training script.
 
 ```python
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="my-project", local_path=".ml_dash") as experiment:
-    # Log messages
-    experiment.log("Training started")
+dxp = Experiment()
 
-    # Metric parameters
-    experiment.parameters().set(learning_rate=0.001, batch_size=32)
+dxp.run.start("You can log any message here, to mark the start of the run")
 
-    # Metric metrics
-    experiment.metric("loss").append(value=0.5, epoch=1)
+# you can log the training hyper-parameters. These will be indexed and searchable
+dxp.parameters.set(learning_rate=0.001, batch_size=32)
+
+# log metrics
+dxp.metric.append(loss=0.001, accuracy=0.5)
+
+# and you can namespace the metrics by calling the metrics writer.
+dxp.metric("eval").append(loss=0.001, accuracy=0.5)
+
+# You can upload files with a prefix
+dxp.file("checkpoints").save(fname="model.pth")
+
+# and you can mark the run as complete.
+dxp.run.complete("This is over!")
+
 ```
+
+Each experiment has a current "Run", that doubles as a context manager that
+automatically manages the start and end of the current execution:
+
+```python
+with dxp.run("Training"):
+    # training logic
+    pass
+```
+
+```{admonition} Dash Experiment Run Lifecycle 🔄
+:class: note    
+
+Each experimental run has the following lifecycle stages: 
+- created: when the experimental run has been registered in the zaku job queue.
+- running: when the run has been pulled, hydrated, and initialized.
+- on-hold: when the context recieves a pause trigger event to put it on hold.
+- complete: when the run finished without error. Sometimes the job can hang here due to on-goinng file-upload in the background.
+- failed: when the run failed due to an error.
+- aborted: when the run was aborted by the user.
+- deleted: when the run was deleted by the user (soft delete)
+
+```
+
+## A More Complete Example
+
+```python
+import torch.nn as nn
+
+# We typically access the dash experiment through the singleton import
+from ml_dash.auto import dxp
+
+
+# This `auto` module creates a new experiment instance upon import.
+# the default experiment path is https://dash.ml/@user/scratch/date-and-time
+# and this template can be changed by setting the ml_dash.run.Run template.
+def train(lr=0.001, batch_size=32, n_steps=10):
+    net = nn.Sequential(nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10))
+
+    for step in range(n_steps):
+        # Training logic
+        loss = (lambda: 0.001)()
+        accuracy = (lambda: 0.5)()
+
+        # Logging metrics
+        dxp.metrics.append(loss=loss, accuracy=accuracy, step=step)
+
+    # then you can log the evaluation metrics.
+    eval_loss, eval_accuracy = 0.001, 0.02
+    dxp.metrics("eval").append(loss=eval_loss, accuracy=eval_accuracy, step=step)
+
+    # this allows you to upload the file.
+    dxp.files.save_torch(net, "model_last.pt")
+
+```
+
+Refer to the [Quick Start Guide](quickstart.md) and the Examples section for more detailed usage examples:
+
+- [Basic Training](basic-training.md) - Simple training loop with ML-Dash
+- [Hyperparameter Search](hyperparameter-search.md) - Running parameter sweeps
+- [Model Comparison](model-comparison.md) - Comparing multiple model runs
+- [Complete Examples](complete-examples.md) - Full end-to-end examples
 
 ```{toctree}
 :maxdepth: 2
-:caption: Getting Started
+:caption: Introduction
 :hidden:
 
-overview
 quickstart
-getting-started
 ```
 
 ```{toctree}
 :maxdepth: 2
-:caption: Tutorials
+:caption: Core Concepts
 :hidden:
 
-experiments
-logging
-parameters
-metrics
-files
+Experiment Configuration <experiments>
+The Run Life-cycle <experiments>
+Parameters & Hyperparameters <parameters>
+Metrics & Time Series <metrics>
+Message Logging <logging>
+Files & Artifacts <files>
 ```
 
 ```{toctree}
