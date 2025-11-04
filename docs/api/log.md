@@ -1,7 +1,8 @@
-Client
-======
+# Log
 
-.. automodule:: ml_dash.client
+```{eval-rst}
+.. automodule:: ml_dash.log
    :members:
    :undoc-members:
    :show-inheritance:
+```
