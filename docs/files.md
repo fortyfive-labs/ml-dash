@@ -184,7 +184,7 @@ with Experiment(name="my-experiment", project="project",
 
 ## Storage Format
 
-**Local mode** - Files stored in experiment directory:
+**Local mode** - Files stored with prefix-based organization:
 
 ```
 ./experiments/
@@ -192,16 +192,30 @@ with Experiment(name="my-experiment", project="project",
     └── my-experiment/
         └── files/
             ├── models/
-            │   ├── model.pth
-            │   └── best_model.pth
+            │   ├── 7218065541365719/
+            │   │   └── model.pth
+            │   └── 7218065541366823/
+            │       └── best_model.pth
             ├── visualizations/
-            │   └── loss_curve.png
+            │   └── 7218065541367921/
+            │       └── loss_curve.png
             └── config/
-                └── config.json
+                └── 7218065541368015/
+                    └── config.json
 ```
 
+Each file is stored as: `files/{prefix}/{snowflake_id}/{filename}`
+- **prefix**: Logical organization path (e.g., "models", "configs", "visualizations")
+- **snowflake_id**: Unique identifier generated for each file
+- **filename**: Original filename
+
+The prefix is automatically created from the `prefix` parameter when calling `experiment.file()`. This structure ensures:
+- Files with same name in different prefixes don't collide
+- Easy organization by file type or purpose
+- Unique identification via snowflake IDs
+
 **Remote mode** - Files uploaded to S3, metadata in MongoDB:
-- Files stored: `s3://bucket/files/{namespace}/{project}/{experiment}/{file_id}/filename`
+- Files stored: `s3://bucket/files/{namespace}/{project}/{experiment}/{prefix}/{file_id}/filename`
 - Metadata: path, size, SHA256 checksum, tags, description
 
 **File size limit:** 5GB per file

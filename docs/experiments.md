@@ -89,7 +89,7 @@ with Experiment(
 
 ## Experiment Metadata
 
-Add description, tags, and folders for organization:
+Add description, tags, bindrs, and folders for organization:
 
 ```{code-block} python
 :linenos:
@@ -100,11 +100,70 @@ with Experiment(
     local_prefix="./experiments",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
+    bindrs=["gpu-cluster", "team-a"],
     folder="/experiments/2025/resnet",
         local_path=".ml-dash"
 ) as experiment:
     experiment.log("Training started")
 ```
+
+**Metadata fields:**
+- `description`: Human-readable experiment description
+- `tags`: List of tags for categorization (e.g., ["baseline", "production"])
+- `bindrs`: List of bindrs for resource/team association (e.g., ["gpu-1", "team-ml"])
+- `folder`: Hierarchical folder path for organization
+
+## Experiment Status Lifecycle
+
+Experiments automatically track their status through the lifecycle:
+
+- **RUNNING**: Automatically set when experiment opens
+- **COMPLETED**: Set when experiment closes normally
+- **FAILED**: Set when exception occurs during experiment
+- **CANCELLED**: Can be set manually
+
+**Automatic status management** (recommended):
+
+```{code-block} python
+:linenos:
+
+# Normal completion - status becomes COMPLETED
+with Experiment(name="training", project="ml",
+        remote="https://server.com") as experiment:
+    experiment.log("Training...")
+    # Status automatically set to COMPLETED on exit
+
+# Exception handling - status becomes FAILED
+with Experiment(name="training", project="ml",
+        remote="https://server.com") as experiment:
+    experiment.log("Training...")
+    raise ValueError("Training failed!")
+    # Status automatically set to FAILED on exception
+```
+
+**Manual status control**:
+
+```{code-block} python
+:linenos:
+
+from ml_dash import Experiment
+
+experiment = Experiment(name="training", project="ml",
+        remote="https://server.com")
+experiment.open()
+
+try:
+    experiment.log("Training...")
+    # ... training code ...
+    experiment.close(status="COMPLETED")
+except KeyboardInterrupt:
+    experiment.close(status="CANCELLED")
+except Exception as e:
+    experiment.log(f"Error: {e}")
+    experiment.close(status="FAILED")
+```
+
+**Note:** Status updates only work in remote mode. Local mode doesn't track status.
 
 ## Resuming Experiments
 
@@ -164,8 +223,14 @@ with Experiment(name="demo", project="test",
         │       └── data.jsonl
         └── files/
             └── models/
-                └── model.pth
+                └── 7218065541365719/
+                    └── model.pth
 ```
+
+Files are stored under `files/{prefix}/{snowflake_id}/{filename}` where:
+- `prefix`: Logical path (e.g., "models", "configs")
+- `snowflake_id`: Unique identifier for the file
+- `filename`: Original filename
 
 **Remote mode** stores data in MongoDB + S3 on your server.
 

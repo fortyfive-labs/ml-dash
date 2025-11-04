@@ -8,6 +8,9 @@ A simple and flexible SDK for ML experiment metricing and data storage.
 - **Dual Operation Modes**: Remote (API server) or local (filesystem)
 - **Auto-creation**: Automatically creates namespace, project, and folder hierarchy
 - **Upsert Behavior**: Updates existing experiments or creates new ones
+- **Experiment Lifecycle**: Automatic status tracking (RUNNING, COMPLETED, FAILED, CANCELLED)
+- **Organized File Storage**: Prefix-based file organization with unique snowflake IDs
+- **Rich Metadata**: Tags, bindrs, descriptions, and custom metadata support
 - **Simple API**: Minimal configuration, maximum flexibility
 
 ## Installation
