@@ -35,6 +35,7 @@ class RemoteClient:
         name: str,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        bindrs: Optional[List[str]] = None,
         folder: Optional[str] = None,
         write_protected: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
@@ -47,6 +48,7 @@ class RemoteClient:
             name: Experiment name
             description: Optional description
             tags: Optional list of tags
+            bindrs: Optional list of bindrs
             folder: Optional folder path
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
@@ -65,6 +67,8 @@ class RemoteClient:
             payload["description"] = description
         if tags is not None:
             payload["tags"] = tags
+        if bindrs is not None:
+            payload["bindrs"] = bindrs
         if folder is not None:
             payload["folder"] = folder
         if write_protected:
@@ -74,6 +78,35 @@ class RemoteClient:
 
         response = self._client.post(
             f"/projects/{project}/experiments",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def update_experiment_status(
+        self,
+        experiment_id: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        """
+        Update experiment status.
+
+        Args:
+            experiment_id: Experiment ID
+            status: Status value - "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED"
+
+        Returns:
+            Response dict with updated experiment data
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        payload = {
+            "status": status,
+        }
+
+        response = self._client.patch(
+            f"/experiments/{experiment_id}/status",
             json=payload,
         )
         response.raise_for_status()

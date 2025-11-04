@@ -43,6 +43,7 @@ class LocalStorage:
         name: str,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        bindrs: Optional[List[str]] = None,
         folder: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Path:
@@ -54,6 +55,7 @@ class LocalStorage:
             name: Experiment name
             description: Optional description
             tags: Optional tags
+            bindrs: Optional bindrs
             folder: Optional folder path (used for organization)
             metadata: Optional metadata
 
@@ -79,6 +81,7 @@ class LocalStorage:
             "project": project,
             "description": description,
             "tags": tags or [],
+            "bindrs": bindrs or [],
             "folder": folder,
             "metadata": metadata,
             "created_at": datetime.utcnow().isoformat() + "Z",
@@ -99,6 +102,8 @@ class LocalStorage:
                 existing["description"] = description
             if tags is not None:
                 existing["tags"] = tags
+            if bindrs is not None:
+                existing["bindrs"] = bindrs
             if folder is not None:
                 existing["folder"] = folder
             if metadata is not None:
@@ -288,7 +293,7 @@ class LocalStorage:
         """
         Write file to local storage.
 
-        Copies file to: files/<file_id>/<filename>
+        Copies file to: files/<prefix>/<file_id>/<filename>
         Updates .files_metadata.json with file metadata
 
         Args:
@@ -317,8 +322,14 @@ class LocalStorage:
         # Generate Snowflake ID for file
         file_id = generate_snowflake_id()
 
-        # Create file directory
-        file_dir = files_dir / file_id
+        # Normalize prefix (remove leading slashes to avoid absolute paths)
+        normalized_prefix = prefix.lstrip("/") if prefix else ""
+
+        # Create prefix directory, then file directory
+        prefix_dir = files_dir / normalized_prefix if normalized_prefix else files_dir
+        prefix_dir.mkdir(parents=True, exist_ok=True)
+
+        file_dir = prefix_dir / file_id
         file_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy file
@@ -363,7 +374,11 @@ class LocalStorage:
         if existing_index is not None:
             # Overwrite: remove old file and update metadata
             old_file = files_metadata["files"][existing_index]
-            old_file_dir = files_dir / old_file["id"]
+            old_prefix = old_file["path"].lstrip("/") if old_file["path"] else ""
+            if old_prefix:
+                old_file_dir = files_dir / old_prefix / old_file["id"]
+            else:
+                old_file_dir = files_dir / old_file["id"]
             if old_file_dir.exists():
                 shutil.rmtree(old_file_dir)
             files_metadata["files"][existing_index] = file_metadata
@@ -470,7 +485,11 @@ class LocalStorage:
             raise FileNotFoundError(f"File {file_id} not found")
 
         # Get source file
-        source_file = files_dir / file_id / file_metadata["filename"]
+        file_prefix = file_metadata["path"].lstrip("/") if file_metadata["path"] else ""
+        if file_prefix:
+            source_file = files_dir / file_prefix / file_id / file_metadata["filename"]
+        else:
+            source_file = files_dir / file_id / file_metadata["filename"]
         if not source_file.exists():
             raise FileNotFoundError(f"File {file_id} not found on disk")
 

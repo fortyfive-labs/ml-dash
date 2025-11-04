@@ -65,6 +65,7 @@ class Experiment:
         *,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        bindrs: Optional[List[str]] = None,
         folder: Optional[str] = None,
         write_protected: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
@@ -82,6 +83,7 @@ class Experiment:
             project: Project name
             description: Optional experiment description
             tags: Optional list of tags
+            bindrs: Optional list of bindrs
             folder: Optional folder path (e.g., "/experiments/baseline")
             write_protected: If True, experiment becomes immutable after creation
             metadata: Optional metadata dict
@@ -94,6 +96,7 @@ class Experiment:
         self.project = project
         self.description = description
         self.tags = tags
+        self.bindrs = bindrs
         self.folder = folder
         self.write_protected = write_protected
         self.metadata = metadata
@@ -185,6 +188,7 @@ class Experiment:
                 name=self.name,
                 description=self.description,
                 tags=self.tags,
+                bindrs=self.bindrs,
                 folder=self.folder,
                 write_protected=self.write_protected,
                 metadata=self.metadata,
@@ -199,6 +203,7 @@ class Experiment:
                 name=self.name,
                 description=self.description,
                 tags=self.tags,
+                bindrs=self.bindrs,
                 folder=self.folder,
                 metadata=self.metadata,
             )
@@ -206,14 +211,30 @@ class Experiment:
         self._is_open = True
         return self
 
-    def close(self):
-        """Close the experiment."""
+    def close(self, status: str = "COMPLETED"):
+        """
+        Close the experiment and update status.
+
+        Args:
+            status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
+        """
         if not self._is_open:
             return
 
         # Flush any pending writes
         if self._storage:
             self._storage.flush()
+
+        # Update experiment status in remote mode
+        if self._client and self._experiment_id:
+            try:
+                self._client.update_experiment_status(
+                    experiment_id=self._experiment_id,
+                    status=status
+                )
+            except Exception as e:
+                # Log error but don't fail the close operation
+                print(f"Warning: Failed to update experiment status: {e}")
 
         self._is_open = False
 
@@ -222,8 +243,10 @@ class Experiment:
         return self.open()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        self.close()
+        """Context manager exit. Sets status to FAILED if exception occurred."""
+        # Determine status based on whether an exception occurred
+        status = "FAILED" if exc_type is not None else "COMPLETED"
+        self.close(status=status)
         return False
 
     def log(

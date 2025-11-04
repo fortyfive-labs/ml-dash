@@ -24,7 +24,7 @@ class TestBasicFileOperations:
 
         files_dir = temp_project / "test" / "file-test" / "files"
         assert files_dir.exists()
-        saved_files = list(files_dir.glob("*/model.txt"))
+        saved_files = list(files_dir.glob("*/*/model.txt"))
         assert len(saved_files) == 1
 
     @pytest.mark.remote
@@ -223,7 +223,7 @@ class TestFileTypes:
             experiment.file(file_path=sample_files["model"], prefix="/text").save()
 
         files_dir = temp_project / "test" / "text-file" / "files"
-        saved_files = list(files_dir.glob("*/model.txt"))
+        saved_files = list(files_dir.glob("*/*/model.txt"))
         assert len(saved_files) == 1
 
     def test_json_file_upload_local(self, local_experiment, sample_files):
