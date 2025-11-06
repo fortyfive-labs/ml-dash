@@ -11,6 +11,99 @@ if TYPE_CHECKING:
     from .experiment import Experiment
 
 
+class MetricsManager:
+    """
+    Manager for metric operations that supports both named and unnamed usage.
+
+    Supports two usage patterns:
+    1. Named: experiment.metrics("loss").append(value=0.5, step=1)
+    2. Unnamed: experiment.metrics.append(name="loss", value=0.5, step=1)
+
+    Usage:
+        # With explicit metric name
+        experiment.metrics("train_loss").append(value=0.5, step=100)
+
+        # Without specifying name upfront (name in append call)
+        experiment.metrics.append(name="train_loss", value=0.5, step=100)
+    """
+
+    def __init__(self, experiment: 'Experiment'):
+        """
+        Initialize MetricsManager.
+
+        Args:
+            experiment: Parent Experiment instance
+        """
+        self._experiment = experiment
+
+    def __call__(self, name: str, description: Optional[str] = None,
+                 tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None) -> 'MetricBuilder':
+        """
+        Get a MetricBuilder for a specific metric name.
+
+        Args:
+            name: Metric name (unique within experiment)
+            description: Optional metric description
+            tags: Optional tags for categorization
+            metadata: Optional structured metadata
+
+        Returns:
+            MetricBuilder instance for the named metric
+
+        Examples:
+            experiment.metrics("loss").append(value=0.5, step=1)
+        """
+        return MetricBuilder(self._experiment, name, description, tags, metadata)
+
+    def append(self, name: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """
+        Append a data point to a metric (name specified in call).
+
+        Args:
+            name: Metric name
+            data: Data dict (alternative to kwargs)
+            **kwargs: Data as keyword arguments
+
+        Returns:
+            Response dict with metric metadata
+
+        Examples:
+            experiment.metrics.append(name="loss", value=0.5, step=1)
+            experiment.metrics.append(name="loss", data={"value": 0.5, "step": 1})
+        """
+        if data is None:
+            data = kwargs
+        return self._experiment._append_to_metric(name, data, None, None, None)
+
+    def append_batch(self, name: str, data_points: List[Dict[str, Any]],
+                     description: Optional[str] = None,
+                     tags: Optional[List[str]] = None,
+                     metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Append multiple data points to a metric.
+
+        Args:
+            name: Metric name
+            data_points: List of data point dicts
+            description: Optional metric description
+            tags: Optional tags for categorization
+            metadata: Optional structured metadata
+
+        Returns:
+            Response dict with metric metadata
+
+        Examples:
+            experiment.metrics.append_batch(
+                name="loss",
+                data_points=[
+                    {"value": 0.5, "step": 1},
+                    {"value": 0.4, "step": 2}
+                ]
+            )
+        """
+        return self._experiment._append_batch_to_metric(name, data_points, description, tags, metadata)
+
+
 class MetricBuilder:
     """
     Builder for metric operations.

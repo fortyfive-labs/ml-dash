@@ -10,7 +10,7 @@ class TestBasicFileOperations:
 
     def test_upload_single_file_local(self, local_experiment, sample_files, temp_project):
         """Test uploading a single file in local mode."""
-        with local_experiment(name="file-test", project="test") as experiment:
+        with local_experiment(name="file-test", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["model"],
                 prefix="/models",
@@ -30,7 +30,7 @@ class TestBasicFileOperations:
     @pytest.mark.remote
     def test_upload_single_file_remote(self, remote_experiment, sample_files):
         """Test uploading a file in remote mode."""
-        with remote_experiment(name="file-test-remote", project="test") as experiment:
+        with remote_experiment(name="file-test-remote", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["model"],
                 prefix="/models",
@@ -41,7 +41,7 @@ class TestBasicFileOperations:
 
     def test_upload_multiple_files_local(self, local_experiment, sample_files, temp_project):
         """Test uploading multiple files."""
-        with local_experiment(name="multi-file", project="test") as experiment:
+        with local_experiment(name="multi-file", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
             experiment.file(file_path=sample_files["config"], prefix="/config").save()
             experiment.file(file_path=sample_files["results"], prefix="/results").save()
@@ -53,7 +53,7 @@ class TestBasicFileOperations:
     @pytest.mark.remote
     def test_upload_multiple_files_remote(self, remote_experiment, sample_files):
         """Test uploading multiple files in remote mode."""
-        with remote_experiment(name="multi-file-remote", project="test") as experiment:
+        with remote_experiment(name="multi-file-remote", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
             experiment.file(file_path=sample_files["config"], prefix="/config").save()
 
@@ -63,7 +63,7 @@ class TestFileMetadata:
 
     def test_file_with_metadata_local(self, local_experiment, sample_files, temp_project):
         """Test uploading file with custom metadata."""
-        with local_experiment(name="file-meta", project="test") as experiment:
+        with local_experiment(name="file-meta", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["results"],
                 prefix="/results",
@@ -90,7 +90,7 @@ class TestFileMetadata:
     @pytest.mark.remote
     def test_file_with_metadata_remote(self, remote_experiment, sample_files):
         """Test file metadata in remote mode."""
-        with remote_experiment(name="file-meta-remote", project="test") as experiment:
+        with remote_experiment(name="file-meta-remote", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["config"],
                 prefix="/config",
@@ -106,7 +106,7 @@ class TestFileMetadata:
         with open(sample_files["model"], "rb") as f:
             expected_checksum = hashlib.sha256(f.read()).hexdigest()
 
-        with local_experiment(name="file-checksum", project="test") as experiment:
+        with local_experiment(name="file-checksum", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["model"], prefix="/models").save()
             assert result["checksum"] == expected_checksum
 
@@ -114,13 +114,13 @@ class TestFileMetadata:
         """Test that file sizes are correctly metriced."""
         model_size = Path(sample_files["model"]).stat().st_size
 
-        with local_experiment(name="file-size", project="test") as experiment:
+        with local_experiment(name="file-size", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["model"], prefix="/models").save()
             assert result["sizeBytes"] == model_size
 
     def test_file_tags_local(self, local_experiment, sample_files, temp_project):
         """Test file tagging."""
-        with local_experiment(name="file-tags", project="test") as experiment:
+        with local_experiment(name="file-tags", project="test").run as experiment:
             experiment.file(
                 file_path=sample_files["model"],
                 prefix="/models",
@@ -140,7 +140,7 @@ class TestListFiles:
 
     def test_list_files_local(self, local_experiment, sample_files):
         """Test listing all files in a experiment."""
-        with local_experiment(name="file-list", project="test") as experiment:
+        with local_experiment(name="file-list", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
             experiment.file(file_path=sample_files["config"], prefix="/config").save()
 
@@ -154,7 +154,7 @@ class TestListFiles:
     @pytest.mark.remote
     def test_list_files_remote(self, remote_experiment, sample_files):
         """Test listing files in remote mode."""
-        with remote_experiment(name="file-list-remote", project="test") as experiment:
+        with remote_experiment(name="file-list-remote", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
             experiment.file(file_path=sample_files["config"], prefix="/config").save()
 
@@ -163,7 +163,7 @@ class TestListFiles:
 
     def test_list_empty_files_local(self, local_experiment):
         """Test listing when no files uploaded."""
-        with local_experiment(name="no-files", project="test") as experiment:
+        with local_experiment(name="no-files", project="test").run as experiment:
             experiment.log("No files")
             # Depending on implementation, this may return empty list or handle gracefully
 
@@ -173,7 +173,7 @@ class TestFilePrefixes:
 
     def test_file_prefixes_local(self, local_experiment, sample_files):
         """Test that file prefixes are correctly stored."""
-        with local_experiment(name="file-prefix", project="test") as experiment:
+        with local_experiment(name="file-prefix", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models/v1").save()
             experiment.file(file_path=sample_files["config"], prefix="/configs/prod").save()
 
@@ -186,7 +186,7 @@ class TestFilePrefixes:
 
     def test_nested_prefixes_local(self, local_experiment, sample_files):
         """Test deeply nested prefix paths."""
-        with local_experiment(name="nested-prefix", project="test") as experiment:
+        with local_experiment(name="nested-prefix", project="test").run as experiment:
             experiment.file(
                 file_path=sample_files["model"],
                 prefix="/a/b/c/d/e/models"
@@ -199,7 +199,7 @@ class TestFilePrefixes:
 
     def test_same_file_different_prefixes_local(self, local_experiment, sample_files):
         """Test uploading same file to different locations."""
-        with local_experiment(name="same-file-diff-prefix", project="test") as experiment:
+        with local_experiment(name="same-file-diff-prefix", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models/v1").save()
             experiment.file(file_path=sample_files["model"], prefix="/models/v2").save()
             experiment.file(file_path=sample_files["model"], prefix="/backup").save()
@@ -219,7 +219,7 @@ class TestFileTypes:
 
     def test_text_file_upload_local(self, local_experiment, sample_files, temp_project):
         """Test uploading text files."""
-        with local_experiment(name="text-file", project="test") as experiment:
+        with local_experiment(name="text-file", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/text").save()
 
         files_dir = temp_project / "test" / "text-file" / "files"
@@ -228,26 +228,26 @@ class TestFileTypes:
 
     def test_json_file_upload_local(self, local_experiment, sample_files):
         """Test uploading JSON files."""
-        with local_experiment(name="json-file", project="test") as experiment:
+        with local_experiment(name="json-file", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["config"], prefix="/json").save()
             assert result["filename"] == "config.json"
 
     def test_csv_file_upload_local(self, local_experiment, sample_files):
         """Test uploading CSV files."""
-        with local_experiment(name="csv-file", project="test") as experiment:
+        with local_experiment(name="csv-file", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["results"], prefix="/csv").save()
             assert result["filename"] == "results.csv"
 
     def test_binary_file_upload_local(self, local_experiment, sample_files):
         """Test uploading binary files."""
-        with local_experiment(name="binary-file", project="test") as experiment:
+        with local_experiment(name="binary-file", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["image"], prefix="/images").save()
             assert result["filename"] == "test_image.png"
             assert result["sizeBytes"] > 0
 
     def test_large_file_upload_local(self, local_experiment, sample_files):
         """Test uploading larger files."""
-        with local_experiment(name="large-file", project="test") as experiment:
+        with local_experiment(name="large-file", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["large"], prefix="/large").save()
             assert result["filename"] == "large_file.bin"
             assert result["sizeBytes"] == 1024 * 100  # 100 KB
@@ -255,7 +255,7 @@ class TestFileTypes:
     @pytest.mark.remote
     def test_various_file_types_remote(self, remote_experiment, sample_files):
         """Test uploading various file types in remote mode."""
-        with remote_experiment(name="file-types-remote", project="test") as experiment:
+        with remote_experiment(name="file-types-remote", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/text").save()
             experiment.file(file_path=sample_files["config"], prefix="/json").save()
             experiment.file(file_path=sample_files["image"], prefix="/images").save()
@@ -269,7 +269,7 @@ class TestFileEdgeCases:
         file_with_spaces = tmp_path / "my file with spaces.txt"
         file_with_spaces.write_text("Content with spaces in filename")
 
-        with local_experiment(name="spaces-file", project="test") as experiment:
+        with local_experiment(name="spaces-file", project="test").run as experiment:
             result = experiment.file(file_path=str(file_with_spaces), prefix="/files").save()
             assert "my file with spaces.txt" in result["filename"]
 
@@ -278,7 +278,7 @@ class TestFileEdgeCases:
         unicode_file = tmp_path / "文件_файл_αρχείο.txt"
         unicode_file.write_text("Unicode filename test")
 
-        with local_experiment(name="unicode-file", project="test") as experiment:
+        with local_experiment(name="unicode-file", project="test").run as experiment:
             result = experiment.file(file_path=str(unicode_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
@@ -288,13 +288,13 @@ class TestFileEdgeCases:
         long_file = tmp_path / long_name
         long_file.write_text("Long filename test")
 
-        with local_experiment(name="long-filename", project="test") as experiment:
+        with local_experiment(name="long-filename", project="test").run as experiment:
             result = experiment.file(file_path=str(long_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
     def test_multiple_uploads_same_file_local(self, local_experiment, sample_files):
         """Test uploading the same file multiple times to same location."""
-        with local_experiment(name="duplicate-upload", project="test") as experiment:
+        with local_experiment(name="duplicate-upload", project="test").run as experiment:
             result1 = experiment.file(file_path=sample_files["model"], prefix="/models").save()
             result2 = experiment.file(file_path=sample_files["model"], prefix="/models").save()
 
@@ -306,7 +306,7 @@ class TestFileEdgeCases:
         special_file = tmp_path / "file-with_special.chars@123.txt"
         special_file.write_text("Special characters test")
 
-        with local_experiment(name="special-chars-file", project="test") as experiment:
+        with local_experiment(name="special-chars-file", project="test").run as experiment:
             result = experiment.file(file_path=str(special_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
@@ -315,7 +315,7 @@ class TestFileEdgeCases:
         empty_file = tmp_path / "empty.txt"
         empty_file.write_text("")
 
-        with local_experiment(name="empty-file", project="test") as experiment:
+        with local_experiment(name="empty-file", project="test").run as experiment:
             result = experiment.file(file_path=str(empty_file), prefix="/files").save()
             assert result["sizeBytes"] == 0
 
@@ -323,7 +323,7 @@ class TestFileEdgeCases:
         """Test file with extensive metadata."""
         large_metadata = {f"key_{i}": f"value_{i}" for i in range(100)}
 
-        with local_experiment(name="large-file-meta", project="test") as experiment:
+        with local_experiment(name="large-file-meta", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["model"],
                 prefix="/models",
@@ -336,7 +336,7 @@ class TestFileEdgeCases:
         """Test file with many tags."""
         many_tags = [f"tag-{i}" for i in range(50)]
 
-        with local_experiment(name="many-tags-file", project="test") as experiment:
+        with local_experiment(name="many-tags-file", project="test").run as experiment:
             result = experiment.file(
                 file_path=sample_files["model"],
                 prefix="/models",
@@ -348,7 +348,7 @@ class TestFileEdgeCases:
     @pytest.mark.remote
     def test_large_file_remote(self, remote_experiment, sample_files):
         """Test uploading large file in remote mode."""
-        with remote_experiment(name="large-file-remote", project="test") as experiment:
+        with remote_experiment(name="large-file-remote", project="test").run as experiment:
             result = experiment.file(file_path=sample_files["large"], prefix="/large").save()
             assert result["sizeBytes"] == 1024 * 100
 
@@ -358,7 +358,7 @@ class TestFileOrganization:
 
     def test_organize_by_type_local(self, local_experiment, sample_files):
         """Test organizing files by type."""
-        with local_experiment(name="organized", project="test") as experiment:
+        with local_experiment(name="organized", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models", tags=["model"]).save()
             experiment.file(file_path=sample_files["config"], prefix="/configs", tags=["config"]).save()
             experiment.file(file_path=sample_files["results"], prefix="/results", tags=["results"]).save()
@@ -376,7 +376,7 @@ class TestFileOrganization:
 
     def test_organize_by_version_local(self, local_experiment, sample_files):
         """Test organizing files by version."""
-        with local_experiment(name="versioned", project="test") as experiment:
+        with local_experiment(name="versioned", project="test").run as experiment:
             experiment.file(file_path=sample_files["model"], prefix="/models/v1", tags=["v1"]).save()
             experiment.file(file_path=sample_files["model"], prefix="/models/v2", tags=["v2"]).save()
             experiment.file(file_path=sample_files["model"], prefix="/models/v3", tags=["v3", "latest"]).save()

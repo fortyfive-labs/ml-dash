@@ -9,7 +9,7 @@ class TestBasicLogging:
 
     def test_simple_log_local(self, local_experiment, temp_project):
         """Test basic log message in local mode."""
-        with local_experiment(name="log-test", project="test") as experiment:
+        with local_experiment(name="log-test", project="test").run as experiment:
             experiment.log("Test message")
 
         logs_file = temp_project / "test" / "log-test" / "logs" / "logs.jsonl"
@@ -24,13 +24,13 @@ class TestBasicLogging:
     @pytest.mark.remote
     def test_simple_log_remote(self, remote_experiment):
         """Test basic log message in remote mode."""
-        with remote_experiment(name="log-test-remote", project="test") as experiment:
+        with remote_experiment(name="log-test-remote", project="test").run as experiment:
             experiment.log("Test message from remote")
             # Remote mode sends to server
 
     def test_multiple_logs_local(self, local_experiment, temp_project):
         """Test logging multiple messages."""
-        with local_experiment(name="multi-log", project="test") as experiment:
+        with local_experiment(name="multi-log", project="test").run as experiment:
             experiment.log("Message 1")
             experiment.log("Message 2")
             experiment.log("Message 3")
@@ -48,7 +48,7 @@ class TestBasicLogging:
     @pytest.mark.remote
     def test_multiple_logs_remote(self, remote_experiment):
         """Test logging multiple messages in remote mode."""
-        with remote_experiment(name="multi-log-remote", project="test") as experiment:
+        with remote_experiment(name="multi-log-remote", project="test").run as experiment:
             for i in range(10):
                 experiment.log(f"Remote message {i}")
 
@@ -58,7 +58,7 @@ class TestLogLevels:
 
     def test_all_log_levels_local(self, local_experiment, temp_project):
         """Test all available log levels."""
-        with local_experiment(name="log-levels", project="test") as experiment:
+        with local_experiment(name="log-levels", project="test").run as experiment:
             experiment.log("Debug message", level="debug")
             experiment.log("Info message", level="info")
             experiment.log("Warning message", level="warn")
@@ -79,7 +79,7 @@ class TestLogLevels:
     @pytest.mark.remote
     def test_all_log_levels_remote(self, remote_experiment):
         """Test all log levels in remote mode."""
-        with remote_experiment(name="log-levels-remote", project="test") as experiment:
+        with remote_experiment(name="log-levels-remote", project="test").run as experiment:
             experiment.log("Debug message", level="debug")
             experiment.log("Info message", level="info")
             experiment.log("Warning message", level="warn")
@@ -88,7 +88,7 @@ class TestLogLevels:
 
     def test_default_log_level_local(self, local_experiment, temp_project):
         """Test that default log level is 'info'."""
-        with local_experiment(name="default-level", project="test") as experiment:
+        with local_experiment(name="default-level", project="test").run as experiment:
             experiment.log("Default level message")
 
         logs_file = temp_project / "test" / "default-level" / "logs" / "logs.jsonl"
@@ -98,7 +98,7 @@ class TestLogLevels:
 
     def test_debug_level_local(self, local_experiment, temp_project):
         """Test debug level logging."""
-        with local_experiment(name="debug-test", project="test") as experiment:
+        with local_experiment(name="debug-test", project="test").run as experiment:
             experiment.log("Debug info: Variable x = 42", level="debug")
 
         logs_file = temp_project / "test" / "debug-test" / "logs" / "logs.jsonl"
@@ -109,7 +109,7 @@ class TestLogLevels:
 
     def test_error_level_local(self, local_experiment, temp_project):
         """Test error level logging."""
-        with local_experiment(name="error-test", project="test") as experiment:
+        with local_experiment(name="error-test", project="test").run as experiment:
             experiment.log("An error occurred during processing", level="error")
 
         logs_file = temp_project / "test" / "error-test" / "logs" / "logs.jsonl"
@@ -123,7 +123,7 @@ class TestLogMetadata:
 
     def test_log_with_simple_metadata_local(self, local_experiment, temp_project):
         """Test logging with simple metadata."""
-        with local_experiment(name="meta-log", project="test") as experiment:
+        with local_experiment(name="meta-log", project="test").run as experiment:
             experiment.log(
                 "Training epoch complete",
                 level="info",
@@ -142,7 +142,7 @@ class TestLogMetadata:
     @pytest.mark.remote
     def test_log_with_metadata_remote(self, remote_experiment):
         """Test logging with metadata in remote mode."""
-        with remote_experiment(name="meta-log-remote", project="test") as experiment:
+        with remote_experiment(name="meta-log-remote", project="test").run as experiment:
             experiment.log(
                 "Remote training epoch complete",
                 level="info",
@@ -151,7 +151,7 @@ class TestLogMetadata:
 
     def test_log_with_nested_metadata_local(self, local_experiment, temp_project):
         """Test logging with nested metadata structures."""
-        with local_experiment(name="nested-meta", project="test") as experiment:
+        with local_experiment(name="nested-meta", project="test").run as experiment:
             experiment.log(
                 "Complex operation complete",
                 level="info",
@@ -176,7 +176,7 @@ class TestLogMetadata:
 
     def test_log_with_various_types_local(self, local_experiment, temp_project):
         """Test logging metadata with various data types."""
-        with local_experiment(name="types-meta", project="test") as experiment:
+        with local_experiment(name="types-meta", project="test").run as experiment:
             experiment.log(
                 "Various types test",
                 level="info",
@@ -210,7 +210,7 @@ class TestLogSequencing:
 
     def test_log_sequence_numbers_local(self, local_experiment, temp_project):
         """Test that logs have sequential sequence numbers."""
-        with local_experiment(name="sequence", project="test") as experiment:
+        with local_experiment(name="sequence", project="test").run as experiment:
             for i in range(10):
                 experiment.log(f"Message {i}")
 
@@ -225,13 +225,13 @@ class TestLogSequencing:
     @pytest.mark.remote
     def test_log_sequence_numbers_remote(self, remote_experiment):
         """Test log sequencing in remote mode."""
-        with remote_experiment(name="sequence-remote", project="test") as experiment:
+        with remote_experiment(name="sequence-remote", project="test").run as experiment:
             for i in range(20):
                 experiment.log(f"Remote message {i}")
 
     def test_log_timestamps_local(self, local_experiment, temp_project):
         """Test that all logs have timestamps."""
-        with local_experiment(name="timestamps", project="test") as experiment:
+        with local_experiment(name="timestamps", project="test").run as experiment:
             for i in range(5):
                 experiment.log(f"Message {i}")
 
@@ -249,7 +249,7 @@ class TestProgressLogging:
 
     def test_training_progress_local(self, local_experiment, temp_project):
         """Test logging training progress."""
-        with local_experiment(name="progress", project="test") as experiment:
+        with local_experiment(name="progress", project="test").run as experiment:
             total_epochs = 10
             for epoch in range(total_epochs):
                 experiment.log(
@@ -272,7 +272,7 @@ class TestProgressLogging:
     @pytest.mark.remote
     def test_training_progress_remote(self, remote_experiment):
         """Test logging training progress in remote mode."""
-        with remote_experiment(name="progress-remote", project="test") as experiment:
+        with remote_experiment(name="progress-remote", project="test").run as experiment:
             for epoch in range(5):
                 experiment.log(
                     f"Remote epoch {epoch + 1}/5",
@@ -281,7 +281,7 @@ class TestProgressLogging:
 
     def test_batch_progress_local(self, local_experiment, temp_project):
         """Test logging batch-level progress."""
-        with local_experiment(name="batch-progress", project="test") as experiment:
+        with local_experiment(name="batch-progress", project="test").run as experiment:
             total_batches = 100
             for batch in range(0, total_batches + 1, 20):
                 experiment.log(
@@ -301,7 +301,7 @@ class TestErrorLogging:
 
     def test_exception_logging_local(self, local_experiment, temp_project):
         """Test logging exceptions with details."""
-        with local_experiment(name="exception-log", project="test") as experiment:
+        with local_experiment(name="exception-log", project="test").run as experiment:
             try:
                 raise ValueError("Simulated error for testing")
             except Exception as e:
@@ -325,7 +325,7 @@ class TestErrorLogging:
     @pytest.mark.remote
     def test_exception_logging_remote(self, remote_experiment):
         """Test logging exceptions in remote mode."""
-        with remote_experiment(name="exception-log-remote", project="test") as experiment:
+        with remote_experiment(name="exception-log-remote", project="test").run as experiment:
             try:
                 raise RuntimeError("Remote error for testing")
             except Exception as e:
@@ -337,7 +337,7 @@ class TestErrorLogging:
 
     def test_multiple_errors_local(self, local_experiment, temp_project):
         """Test logging multiple errors."""
-        with local_experiment(name="multi-error", project="test") as experiment:
+        with local_experiment(name="multi-error", project="test").run as experiment:
             errors = [
                 ValueError("Error 1"),
                 RuntimeError("Error 2"),
@@ -360,7 +360,7 @@ class TestErrorLogging:
 
     def test_warning_logging_local(self, local_experiment, temp_project):
         """Test warning level logging."""
-        with local_experiment(name="warning-log", project="test") as experiment:
+        with local_experiment(name="warning-log", project="test").run as experiment:
             experiment.log("Learning rate might be too high", level="warn")
             experiment.log("Gradient clipping applied", level="warn")
             experiment.log("Memory usage above threshold", level="warn")
@@ -378,7 +378,7 @@ class TestLogEdgeCases:
 
     def test_empty_log_message_local(self, local_experiment, temp_project):
         """Test logging empty message."""
-        with local_experiment(name="empty-log", project="test") as experiment:
+        with local_experiment(name="empty-log", project="test").run as experiment:
             experiment.log("")
 
         logs_file = temp_project / "test" / "empty-log" / "logs" / "logs.jsonl"
@@ -389,7 +389,7 @@ class TestLogEdgeCases:
     def test_very_long_log_message_local(self, local_experiment, temp_project):
         """Test logging very long message."""
         long_message = "A" * 10000
-        with local_experiment(name="long-log", project="test") as experiment:
+        with local_experiment(name="long-log", project="test").run as experiment:
             experiment.log(long_message)
 
         logs_file = temp_project / "test" / "long-log" / "logs" / "logs.jsonl"
@@ -400,7 +400,7 @@ class TestLogEdgeCases:
     def test_log_with_special_characters_local(self, local_experiment, temp_project):
         """Test logging messages with special characters."""
         special_message = "Special chars: \n\t\r\\ \"quotes\" 'apostrophes' 日本語 emoji 🚀"
-        with local_experiment(name="special-log", project="test") as experiment:
+        with local_experiment(name="special-log", project="test").run as experiment:
             experiment.log(special_message)
 
         logs_file = temp_project / "test" / "special-log" / "logs" / "logs.jsonl"
@@ -410,7 +410,7 @@ class TestLogEdgeCases:
 
     def test_log_with_empty_metadata_local(self, local_experiment, temp_project):
         """Test logging with empty metadata dict."""
-        with local_experiment(name="empty-meta", project="test") as experiment:
+        with local_experiment(name="empty-meta", project="test").run as experiment:
             experiment.log("Message with empty metadata", metadata={})
 
         logs_file = temp_project / "test" / "empty-meta" / "logs" / "logs.jsonl"
@@ -425,7 +425,7 @@ class TestLogEdgeCases:
         """Test logging with large metadata object."""
         large_metadata = {f"key_{i}": f"value_{i}" for i in range(100)}
 
-        with local_experiment(name="large-meta", project="test") as experiment:
+        with local_experiment(name="large-meta", project="test").run as experiment:
             experiment.log("Message with large metadata", metadata=large_metadata)
 
         logs_file = temp_project / "test" / "large-meta" / "logs" / "logs.jsonl"
@@ -435,7 +435,7 @@ class TestLogEdgeCases:
 
     def test_rapid_logging_local(self, local_experiment, temp_project):
         """Test rapid sequential logging."""
-        with local_experiment(name="rapid-log", project="test") as experiment:
+        with local_experiment(name="rapid-log", project="test").run as experiment:
             for i in range(1000):
                 experiment.log(f"Rapid message {i}")
 
@@ -448,6 +448,6 @@ class TestLogEdgeCases:
     @pytest.mark.remote
     def test_rapid_logging_remote(self, remote_experiment):
         """Test rapid logging in remote mode."""
-        with remote_experiment(name="rapid-log-remote", project="test") as experiment:
+        with remote_experiment(name="rapid-log-remote", project="test").run as experiment:
             for i in range(100):
                 experiment.log(f"Rapid remote message {i}")

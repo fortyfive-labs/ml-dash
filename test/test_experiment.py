@@ -9,7 +9,7 @@ class TestExperimentCreation:
 
     def test_context_manager_local(self, local_experiment, temp_project):
         """Test experiment creation using context manager in local mode."""
-        with local_experiment(name="test-ctx", project="test-ws") as experiment:
+        with local_experiment(name="test-ctx", project="test-ws").run as experiment:
             assert experiment._is_open
             assert experiment.name == "test-ctx"
             assert experiment.project == "test-ws"
@@ -23,7 +23,7 @@ class TestExperimentCreation:
     @pytest.mark.remote
     def test_context_manager_remote(self, remote_experiment):
         """Test experiment creation using context manager in remote mode."""
-        with remote_experiment(name="test-ctx-remote", project="test-ws-remote") as experiment:
+        with remote_experiment(name="test-ctx-remote", project="test-ws-remote").run as experiment:
             assert experiment._is_open
             assert experiment.name == "test-ctx-remote"
             assert experiment.project == "test-ws-remote"
@@ -36,13 +36,13 @@ class TestExperimentCreation:
         experiment = local_experiment(name="manual-test", project="test-ws")
         assert not experiment._is_open
 
-        experiment.open()
+        experiment.run.start()
         assert experiment._is_open
 
         experiment.log("Working...")
-        experiment.parameters().set(test_param="test_value")
+        experiment.params.set(test_param="test_value")
 
-        experiment.close()
+        experiment.run.complete()
         assert not experiment._is_open
 
         # Verify data was saved
@@ -56,13 +56,13 @@ class TestExperimentCreation:
         experiment = remote_experiment(name="manual-test-remote", project="test-ws")
         assert not experiment._is_open
 
-        experiment.open()
+        experiment.run.start()
         assert experiment._is_open
 
         experiment.log("Working remotely...")
-        experiment.parameters().set(test_param="remote_value")
+        experiment.params.set(test_param="remote_value")
 
-        experiment.close()
+        experiment.run.complete()
         assert not experiment._is_open
 
     def test_experiment_with_metadata_local(self, local_experiment, temp_project):
@@ -73,7 +73,7 @@ class TestExperimentCreation:
             description="Test experiment with metadata",
             tags=["test", "metadata", "local"],
             folder="/experiments/meta",
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Experiment with metadata")
 
         # Verify metadata
@@ -98,7 +98,7 @@ class TestExperimentCreation:
             description="Remote test experiment with metadata",
             tags=["test", "metadata", "remote"],
             folder="/experiments/remote",
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Remote experiment with metadata")
             # In remote mode, metadata is sent to server
 
@@ -108,7 +108,7 @@ class TestExperimentProperties:
 
     def test_experiment_properties_local(self, local_experiment):
         """Test accessing experiment properties in local mode."""
-        with local_experiment(name="props-test", project="props-ws") as experiment:
+        with local_experiment(name="props-test", project="props-ws").run as experiment:
             assert experiment.name == "props-test"
             assert experiment.project == "props-ws"
             assert experiment._is_open
@@ -116,7 +116,7 @@ class TestExperimentProperties:
     @pytest.mark.remote
     def test_experiment_properties_remote(self, remote_experiment):
         """Test accessing experiment properties in remote mode."""
-        with remote_experiment(name="props-test-remote", project="props-ws-remote") as experiment:
+        with remote_experiment(name="props-test-remote", project="props-ws-remote").run as experiment:
             assert experiment.name == "props-test-remote"
             assert experiment.project == "props-ws-remote"
             assert experiment._is_open
@@ -127,17 +127,17 @@ class TestMultipleExperiments:
 
     def test_experiments_same_project_local(self, local_experiment, temp_project):
         """Test experiments in the same project."""
-        with local_experiment(name="experiment-1", project="shared-ws") as experiment:
+        with local_experiment(name="experiment-1", project="shared-ws").run as experiment:
             experiment.log("Experiment 1")
-            experiment.parameters().set(experiment_id=1)
+            experiment.params.set(experiment_id=1)
 
-        with local_experiment(name="experiment-2", project="shared-ws") as experiment:
+        with local_experiment(name="experiment-2", project="shared-ws").run as experiment:
             experiment.log("Experiment 2")
-            experiment.parameters().set(experiment_id=2)
+            experiment.params.set(experiment_id=2)
 
-        with local_experiment(name="experiment-3", project="shared-ws") as experiment:
+        with local_experiment(name="experiment-3", project="shared-ws").run as experiment:
             experiment.log("Experiment 3")
-            experiment.parameters().set(experiment_id=3)
+            experiment.params.set(experiment_id=3)
 
         # Verify all experiments exist
         project_dir = temp_project / "shared-ws"
@@ -148,23 +148,23 @@ class TestMultipleExperiments:
     @pytest.mark.remote
     def test_experiments_same_project_remote(self, remote_experiment):
         """Test experiments in the same project in remote mode."""
-        with remote_experiment(name="remote-experiment-1", project="shared-ws-remote") as experiment:
+        with remote_experiment(name="remote-experiment-1", project="shared-ws-remote").run as experiment:
             experiment.log("Remote Experiment 1")
-            experiment.parameters().set(experiment_id=1)
+            experiment.params.set(experiment_id=1)
 
-        with remote_experiment(name="remote-experiment-2", project="shared-ws-remote") as experiment:
+        with remote_experiment(name="remote-experiment-2", project="shared-ws-remote").run as experiment:
             experiment.log("Remote Experiment 2")
-            experiment.parameters().set(experiment_id=2)
+            experiment.params.set(experiment_id=2)
 
     def test_experiments_different_projects_local(self, local_experiment, temp_project):
         """Test experiments in different projects."""
-        with local_experiment(name="experiment-a", project="project-1") as experiment:
+        with local_experiment(name="experiment-a", project="project-1").run as experiment:
             experiment.log("Experiment A in project 1")
 
-        with local_experiment(name="experiment-b", project="project-2") as experiment:
+        with local_experiment(name="experiment-b", project="project-2").run as experiment:
             experiment.log("Experiment B in project 2")
 
-        with local_experiment(name="experiment-c", project="project-3") as experiment:
+        with local_experiment(name="experiment-c", project="project-3").run as experiment:
             experiment.log("Experiment C in project 3")
 
         # Verify all projects and experiments exist
@@ -176,9 +176,9 @@ class TestMultipleExperiments:
         """Test experiments sequentially."""
         experiments = []
         for i in range(5):
-            with local_experiment(name=f"seq-experiment-{i}", project="sequential") as experiment:
+            with local_experiment(name=f"seq-experiment-{i}", project="sequential").run as experiment:
                 experiment.log(f"Sequential experiment {i}")
-                experiment.parameters().set(index=i)
+                experiment.params.set(index=i)
                 experiments.append(experiment)
 
         # All experiments should be closed
@@ -192,10 +192,10 @@ class TestExperimentErrorHandling:
     def test_experiment_error_still_saves_data_local(self, local_experiment, temp_project):
         """Test that experiment saves data even when errors occur."""
         try:
-            with local_experiment(name="error-test", project="error-ws") as experiment:
+            with local_experiment(name="error-test", project="error-ws").run as experiment:
                 experiment.log("Starting work")
-                experiment.parameters().set(param="value")
-                experiment.metric("metric").append(value=0.5, step=0)
+                experiment.params.set(param="value")
+                experiment.metrics("metric").append(value=0.5, step=0)
                 raise ValueError("Simulated error")
         except ValueError:
             pass
@@ -210,9 +210,9 @@ class TestExperimentErrorHandling:
     def test_experiment_error_still_saves_data_remote(self, remote_experiment):
         """Test that remote experiment handles errors gracefully."""
         try:
-            with remote_experiment(name="error-test-remote", project="error-ws-remote") as experiment:
+            with remote_experiment(name="error-test-remote", project="error-ws-remote").run as experiment:
                 experiment.log("Starting remote work")
-                experiment.parameters().set(param="remote_value")
+                experiment.params.set(param="remote_value")
                 raise ValueError("Simulated remote error")
         except ValueError:
             pass
@@ -220,7 +220,7 @@ class TestExperimentErrorHandling:
 
     def test_experiment_local(self, local_experiment, temp_project):
         """Test experiment handling multiple errors."""
-        with local_experiment(name="multi-error", project="error-ws") as experiment:
+        with local_experiment(name="multi-error", project="error-ws").run as experiment:
             try:
                 experiment.log("Attempt 1")
                 raise ValueError("Error 1")
@@ -251,14 +251,14 @@ class TestExperimentReuse:
     def test_experiment_local(self, local_experiment, temp_project):
         """Test reopening an existing experiment (upsert behavior)."""
         # Create initial experiment
-        with local_experiment(name="reuse-experiment", project="reuse-ws") as experiment:
+        with local_experiment(name="reuse-experiment", project="reuse-ws").run as experiment:
             experiment.log("Initial experiment")
-            experiment.parameters().set(version=1)
+            experiment.params.set(version=1)
 
         # Reopen same experiment
-        with local_experiment(name="reuse-experiment", project="reuse-ws") as experiment:
+        with local_experiment(name="reuse-experiment", project="reuse-ws").run as experiment:
             experiment.log("Reopened experiment")
-            experiment.parameters().set(version=2, new_param="added")
+            experiment.params.set(version=2, new_param="added")
 
         # Verify both operations are recorded
         experiment_dir = temp_project / "reuse-ws" / "reuse-experiment"
@@ -273,14 +273,14 @@ class TestExperimentReuse:
     def test_experiment_remote(self, remote_experiment):
         """Test reopening an existing experiment in remote mode."""
         # Create initial experiment
-        with remote_experiment(name="reuse-experiment-remote", project="reuse-ws-remote") as experiment:
+        with remote_experiment(name="reuse-experiment-remote", project="reuse-ws-remote").run as experiment:
             experiment.log("Initial remote experiment")
-            experiment.parameters().set(version=1)
+            experiment.params.set(version=1)
 
         # Reopen same experiment
-        with remote_experiment(name="reuse-experiment-remote", project="reuse-ws-remote") as experiment:
+        with remote_experiment(name="reuse-experiment-remote", project="reuse-ws-remote").run as experiment:
             experiment.log("Reopened remote experiment")
-            experiment.parameters().set(version=2)
+            experiment.params.set(version=2)
 
 
 class TestExperimentEdgeCases:
@@ -288,7 +288,7 @@ class TestExperimentEdgeCases:
 
     def test_experiment_local(self, local_experiment, temp_project):
         """Test experiment with no operations."""
-        with local_experiment(name="empty-experiment", project="empty-ws") as experiment:
+        with local_experiment(name="empty-experiment", project="empty-ws").run as experiment:
             pass  # Do nothing
 
         # Experiment directory should still be created
@@ -297,7 +297,7 @@ class TestExperimentEdgeCases:
 
     def test_experiment_with_special_characters_local(self, local_experiment, temp_project):
         """Test experiment names with special characters."""
-        with local_experiment(name="test-experiment_v1.0", project="special-ws") as experiment:
+        with local_experiment(name="test-experiment_v1.0", project="special-ws").run as experiment:
             experiment.log("Experiment with special chars in name")
 
         experiment_dir = temp_project / "special-ws" / "test-experiment_v1.0"
@@ -306,7 +306,7 @@ class TestExperimentEdgeCases:
     def test_experiment_with_long_name_local(self, local_experiment):
         """Test experiment with very long name."""
         long_name = "a" * 200
-        with local_experiment(name=long_name, project="long-ws") as experiment:
+        with local_experiment(name=long_name, project="long-ws").run as experiment:
             experiment.log("Experiment with long name")
 
     def test_deeply_nested_folder_local(self, local_experiment, temp_project):
@@ -315,7 +315,7 @@ class TestExperimentEdgeCases:
             name="nested-experiment",
             project="nested-ws",
             folder="/a/b/c/d/e/f/g/h",
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Deeply nested experiment")
 
         experiment_file = temp_project / "nested-ws" / "nested-experiment" / "experiment.json"
@@ -330,7 +330,7 @@ class TestExperimentEdgeCases:
             name="many-tags",
             project="tags-ws",
             tags=tags,
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Experiment with many tags")
 
         experiment_file = temp_project / "tags-ws" / "many-tags" / "experiment.json"
@@ -341,9 +341,9 @@ class TestExperimentEdgeCases:
     def test_experiment_double_close_local(self, local_experiment):
         """Test that closing a experiment twice doesn't cause issues."""
         experiment = local_experiment(name="double-close", project="test-ws")
-        experiment.open()
-        experiment.close()
-        experiment.close()  # Should not raise error
+        experiment.run.start()
+        experiment.run.complete()
+        experiment.run.complete()  # Should not raise error
         assert not experiment._is_open
 
     def test_operations_before_open_local(self, local_experiment):

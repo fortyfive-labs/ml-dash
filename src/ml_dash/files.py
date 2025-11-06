@@ -44,6 +44,7 @@ class FileBuilder:
                 - prefix: Logical path prefix (default: "/")
                 - description: Optional description
                 - tags: Optional list of tags
+                - bindrs: Optional list of bindrs
                 - metadata: Optional metadata dict
                 - file_id: File ID for download/delete/update operations
                 - dest_path: Destination path for download
@@ -53,6 +54,7 @@ class FileBuilder:
         self._prefix = kwargs.get('prefix', '/')
         self._description = kwargs.get('description')
         self._tags = kwargs.get('tags', [])
+        self._bindrs = kwargs.get('bindrs', [])
         self._metadata = kwargs.get('metadata')
         self._file_id = kwargs.get('file_id')
         self._dest_path = kwargs.get('dest_path')
@@ -76,7 +78,7 @@ class FileBuilder:
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
-        if self._experiment.write_protected:
+        if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
         if not self._file_path:
@@ -189,7 +191,7 @@ class FileBuilder:
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
-        if self._experiment.write_protected:
+        if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
         if not self._file_id:
@@ -219,7 +221,7 @@ class FileBuilder:
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
-        if self._experiment.write_protected:
+        if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
         if not self._file_id:
@@ -231,6 +233,124 @@ class FileBuilder:
             tags=self._tags,
             metadata=self._metadata
         )
+
+    def save_json(self, content: Any, file_name: str) -> Dict[str, Any]:
+        """
+        Save JSON content to a file.
+
+        Args:
+            content: Content to save as JSON (dict, list, or any JSON-serializable object)
+            file_name: Name of the file to create
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment is not open or write-protected
+            ValueError: If content is not JSON-serializable
+
+        Examples:
+            config = {"model": "resnet50", "lr": 0.001}
+            result = experiment.file(prefix="/configs").save_json(config, "config.json")
+        """
+        import json
+        import tempfile
+        import os
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Create temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.json', text=True)
+        try:
+            # Write JSON content to temp file
+            with os.fdopen(temp_fd, 'w') as f:
+                json.dump(content, f, indent=2)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    def save_torch(self, model: Any, file_name: str) -> Dict[str, Any]:
+        """
+        Save PyTorch model to a file.
+
+        Args:
+            model: PyTorch model or state dict to save
+            file_name: Name of the file to create (should end with .pt or .pth)
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment is not open or write-protected
+            ImportError: If torch is not installed
+            ValueError: If model cannot be saved
+
+        Examples:
+            import torch
+            model = torch.nn.Linear(10, 5)
+            result = experiment.file(prefix="/models").save_torch(model, "model.pt")
+
+            # Or save state dict
+            result = experiment.file(prefix="/models").save_torch(model.state_dict(), "model.pth")
+        """
+        import tempfile
+        import os
+
+        try:
+            import torch
+        except ImportError:
+            raise ImportError("PyTorch is not installed. Install it with: pip install torch")
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Create temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.pt')
+        os.close(temp_fd)  # Close the file descriptor
+
+        try:
+            # Save model to temp file
+            torch.save(model, temp_path)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
 
 
 def compute_sha256(file_path: str) -> str:

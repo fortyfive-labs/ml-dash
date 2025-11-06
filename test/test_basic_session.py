@@ -5,9 +5,9 @@ from pathlib import Path
 
 def test_experiment_creation_with_context_manager(local_experiment, temp_project):
     """Test basic experiment creation using context manager."""
-    with local_experiment(name="hello-ml-dash", project="tutorials") as experiment:
+    with local_experiment(name="hello-ml-dash", project="tutorials").run as experiment:
         experiment.log("Hello from ML-Dash!", level="info")
-        experiment.parameters().set(message="Hello World")
+        experiment.params.set(message="Hello World")
 
     # Verify experiment directory was created
     experiment_dir = temp_project / "tutorials" / "hello-ml-dash"
@@ -23,7 +23,7 @@ def test_experiment_with_metadata(local_experiment, temp_project):
         description="Baseline CNN for MNIST classification",
         tags=["mnist", "cnn", "baseline"],
         folder="/experiments/mnist",
-    ) as experiment:
+    ).run as experiment:
         experiment.log("Experiment created with metadata")
 
     # Verify metadata was saved
@@ -49,14 +49,14 @@ def test_experiment_manual_open_close(local_experiment, temp_project):
     assert not experiment._is_open
 
     # Open experiment
-    experiment.open()
+    experiment.run.start()
     assert experiment._is_open
 
     # Do work
     experiment.log("Working...")
 
     # Close experiment
-    experiment.close()
+    experiment.run.complete()
     assert not experiment._is_open
 
     # Verify data was saved
@@ -66,7 +66,7 @@ def test_experiment_manual_open_close(local_experiment, temp_project):
 
 def test_experiment_auto_close_on_context_exit(local_experiment):
     """Test that experiment is automatically closed when exiting context manager."""
-    with local_experiment(name="auto-close", project="test") as experiment:
+    with local_experiment(name="auto-close", project="test").run as experiment:
         assert experiment._is_open
         experiment.log("Working...")
 
@@ -77,11 +77,11 @@ def test_experiment_auto_close_on_context_exit(local_experiment):
 def test_experiments_same_project(local_experiment, temp_project):
     """Test experiments in the same project."""
     # Create first experiment
-    with local_experiment(name="experiment-1", project="shared") as experiment:
+    with local_experiment(name="experiment-1", project="shared").run as experiment:
         experiment.log("Experiment 1")
 
     # Create second experiment
-    with local_experiment(name="experiment-2", project="shared") as experiment:
+    with local_experiment(name="experiment-2", project="shared").run as experiment:
         experiment.log("Experiment 2")
 
     # Verify both experiments exist
@@ -92,7 +92,7 @@ def test_experiments_same_project(local_experiment, temp_project):
 
 def test_experiment_name_and_project_properties(local_experiment):
     """Test that experiment properties are accessible."""
-    with local_experiment(name="my-experiment", project="my-project") as experiment:
+    with local_experiment(name="my-experiment", project="my-project").run as experiment:
         assert experiment.name == "my-experiment"
         assert experiment.project == "my-project"
 
@@ -100,9 +100,9 @@ def test_experiment_name_and_project_properties(local_experiment):
 def test_experiment_error_handling(local_experiment, temp_project):
     """Test that experiment handles errors gracefully and still saves data."""
     try:
-        with local_experiment(name="error-test", project="test") as experiment:
+        with local_experiment(name="error-test", project="test").run as experiment:
             experiment.log("Starting work")
-            experiment.parameters().set(param="value")
+            experiment.params.set(param="value")
             raise ValueError("Simulated error")
     except ValueError:
         pass

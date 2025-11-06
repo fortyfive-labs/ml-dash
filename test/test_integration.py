@@ -16,9 +16,9 @@ class TestCompleteWorkflows:
             description="Complete ML training experiment",
             tags=["ml", "training", "test"],
             folder="/experiments/2024"
-        ) as experiment:
+        ).run as experiment:
             # 1. Set hyperparameters
-            experiment.parameters().set(
+            experiment.params.set(
                 learning_rate=0.001,
                 batch_size=32,
                 epochs=10,
@@ -34,9 +34,9 @@ class TestCompleteWorkflows:
                 val_loss = 1.2 / (epoch + 1) + random.uniform(-0.05, 0.05)
                 accuracy = min(0.95, 0.5 + epoch * 0.05)
 
-                experiment.metric("train_loss").append(value=train_loss, epoch=epoch, step=epoch * 100)
-                experiment.metric("val_loss").append(value=val_loss, epoch=epoch, step=epoch * 100)
-                experiment.metric("accuracy").append(value=accuracy, epoch=epoch, step=epoch * 100)
+                experiment.metrics("train_loss").append(value=train_loss, epoch=epoch, step=epoch * 100)
+                experiment.metrics("val_loss").append(value=val_loss, epoch=epoch, step=epoch * 100)
+                experiment.metrics("accuracy").append(value=accuracy, epoch=epoch, step=epoch * 100)
 
                 experiment.log(
                     f"Epoch {epoch + 1}/10 complete",
@@ -82,8 +82,8 @@ class TestCompleteWorkflows:
             project="experiments",
             description="Remote ML training experiment",
             tags=["ml", "remote"]
-        ) as experiment:
-            experiment.parameters().set(
+        ).run as experiment:
+            experiment.params.set(
                 learning_rate=0.001,
                 batch_size=64,
                 epochs=5,
@@ -94,7 +94,7 @@ class TestCompleteWorkflows:
 
             for epoch in range(5):
                 loss = 1.0 / (epoch + 1)
-                experiment.metric("loss").append(value=loss, epoch=epoch)
+                experiment.metrics("loss").append(value=loss, epoch=epoch)
                 experiment.log(f"Epoch {epoch + 1}/5", metadata={"loss": loss})
 
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
@@ -118,9 +118,9 @@ class TestHyperparameterSearch:
                     project="hyperparam-search",
                     description=f"Grid search: lr={lr}, bs={bs}",
                     tags=["grid-search", f"lr-{lr}", f"bs-{bs}"]
-                ) as experiment:
+                ).run as experiment:
                     # Metric hyperparameters
-                    experiment.parameters().set(
+                    experiment.params.set(
                         learning_rate=lr,
                         batch_size=bs,
                         epochs=10
@@ -130,8 +130,8 @@ class TestHyperparameterSearch:
                     final_acc = 0.5 + random.random() * 0.4
                     final_loss = 0.5 - random.random() * 0.3
 
-                    experiment.metric("accuracy").append(value=final_acc, epoch=9)
-                    experiment.metric("loss").append(value=final_loss, epoch=9)
+                    experiment.metrics("accuracy").append(value=final_acc, epoch=9)
+                    experiment.metrics("loss").append(value=final_loss, epoch=9)
 
                     experiment.log(f"Grid search run complete: acc={final_acc:.4f}")
 
@@ -151,10 +151,10 @@ class TestHyperparameterSearch:
                 name=f"random-search-run-{run}",
                 project="random-search",
                 tags=["random-search"]
-            ) as experiment:
-                experiment.parameters().set(learning_rate=lr, batch_size=bs)
+            ).run as experiment:
+                experiment.params.set(learning_rate=lr, batch_size=bs)
                 acc = 0.6 + random.random() * 0.3
-                experiment.metric("accuracy").append(value=acc, run=run)
+                experiment.metrics("accuracy").append(value=acc, run=run)
                 experiment.log(f"Run {run} complete")
 
 
@@ -196,9 +196,9 @@ class TestIterativeExperimentation:
                 project="iterative",
                 description=exp["description"],
                 tags=["iterative", exp["name"]]
-            ) as experiment:
-                experiment.parameters().set(**exp["params"])
-                experiment.metric("val_accuracy").append(value=exp["expected_acc"], step=0)
+            ).run as experiment:
+                experiment.params.set(**exp["params"])
+                experiment.metrics("val_accuracy").append(value=exp["expected_acc"], step=0)
                 experiment.log(f"{exp['name']} experiment complete", level="info")
 
         # Verify progression
@@ -220,13 +220,13 @@ class TestMultiExperimentPipeline:
             project="pipeline",
             tags=["pipeline", "preprocessing"],
             folder="/pipeline/stage-1"
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Starting data preprocessing", level="info")
-            experiment.parameters().set(
+            experiment.params.set(
                 data_source="raw_data.csv",
                 preprocessing_steps=["normalize", "augment", "split"]
             )
-            experiment.metric("samples_processed").append(value=10000, step=0)
+            experiment.metrics("samples_processed").append(value=10000, step=0)
             experiment.file(file_path=sample_files["results"], prefix="/data").save()
             experiment.log("Preprocessing complete", level="info")
 
@@ -236,15 +236,15 @@ class TestMultiExperimentPipeline:
             project="pipeline",
             tags=["pipeline", "training"],
             folder="/pipeline/stage-2"
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Starting model training", level="info")
-            experiment.parameters().set(
+            experiment.params.set(
                 model="resnet50",
                 epochs=10,
                 batch_size=32
             )
             for i in range(10):
-                experiment.metric("loss").append(value=1.0 / (i + 1), epoch=i)
+                experiment.metrics("loss").append(value=1.0 / (i + 1), epoch=i)
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
             experiment.log("Training complete", level="info")
 
@@ -254,11 +254,11 @@ class TestMultiExperimentPipeline:
             project="pipeline",
             tags=["pipeline", "evaluation"],
             folder="/pipeline/stage-3"
-        ) as experiment:
+        ).run as experiment:
             experiment.log("Starting model evaluation", level="info")
-            experiment.parameters().set(test_set="test.csv")
-            experiment.metric("test_accuracy").append(value=0.95, step=0)
-            experiment.metric("test_loss").append(value=0.15, step=0)
+            experiment.params.set(test_set="test.csv")
+            experiment.metrics("test_accuracy").append(value=0.95, step=0)
+            experiment.metrics("test_loss").append(value=0.15, step=0)
             experiment.log("Evaluation complete", level="info")
 
         # Verify all stages
@@ -277,10 +277,10 @@ class TestMultiExperimentPipeline:
                 name=f"stage-{i+1}-{stage}",
                 project="pipeline-remote",
                 tags=["pipeline", stage]
-            ) as experiment:
+            ).run as experiment:
                 experiment.log(f"Starting {stage}")
-                experiment.parameters().set(stage=stage, order=i+1)
-                experiment.metric("progress").append(value=(i+1)/len(stages)*100, step=i)
+                experiment.params.set(stage=stage, order=i+1)
+                experiment.metrics("progress").append(value=(i+1)/len(stages)*100, step=i)
                 experiment.log(f"{stage} complete")
 
 
@@ -294,8 +294,8 @@ class TestDebuggingWorkflow:
             project="debugging",
             description="Training with debug logging",
             tags=["debug", "verbose"]
-        ) as experiment:
-            experiment.parameters().set(
+        ).run as experiment:
+            experiment.params.set(
                 learning_rate=0.001,
                 batch_size=32,
                 debug_mode=True
@@ -323,7 +323,7 @@ class TestDebuggingWorkflow:
                         metadata={"gradient_norm": 15.5, "max_norm": 10.0}
                     )
 
-                experiment.metric("loss").append(value=loss, epoch=epoch)
+                experiment.metrics("loss").append(value=loss, epoch=epoch)
                 experiment.log(
                     f"Epoch {epoch + 1} complete",
                     level="info",
@@ -351,9 +351,9 @@ class TestAllFeaturesCombined:
             description="Test of all features combined",
             tags=["test", "comprehensive", "all-features"],
             folder="/tests/comprehensive"
-        ) as experiment:
+        ).run as experiment:
             # Parameters (simple and nested)
-            experiment.parameters().set(
+            experiment.params.set(
                 learning_rate=0.001,
                 batch_size=32,
                 epochs=5,
@@ -377,10 +377,10 @@ class TestAllFeaturesCombined:
 
             # Metric multiple metrics
             for i in range(5):
-                experiment.metric("train_loss").append(value=0.5 - i * 0.1, epoch=i)
-                experiment.metric("val_loss").append(value=0.6 - i * 0.1, epoch=i)
-                experiment.metric("accuracy").append(value=0.7 + i * 0.05, epoch=i)
-                experiment.metric("learning_rate").append(value=0.001 * (0.9 ** i), epoch=i)
+                experiment.metrics("train_loss").append(value=0.5 - i * 0.1, epoch=i)
+                experiment.metrics("val_loss").append(value=0.6 - i * 0.1, epoch=i)
+                experiment.metrics("accuracy").append(value=0.7 + i * 0.05, epoch=i)
+                experiment.metrics("learning_rate").append(value=0.001 * (0.9 ** i), epoch=i)
 
                 experiment.log(f"Epoch {i+1} metrics metriced", level="info")
 
@@ -420,9 +420,9 @@ class TestAllFeaturesCombined:
             project="full-test-remote",
             description="Remote test of all features",
             tags=["test", "remote", "comprehensive"]
-        ) as experiment:
+        ).run as experiment:
             # Parameters
-            experiment.parameters().set(
+            experiment.params.set(
                 learning_rate=0.001,
                 batch_size=64,
                 **{"model": {"type": "transformer", "layers": 12}}
@@ -433,8 +433,8 @@ class TestAllFeaturesCombined:
 
             # Metrics
             for i in range(3):
-                experiment.metric("loss").append(value=0.5 - i * 0.1, epoch=i)
-                experiment.metric("accuracy").append(value=0.8 + i * 0.05, epoch=i)
+                experiment.metrics("loss").append(value=0.5 - i * 0.1, epoch=i)
+                experiment.metrics("accuracy").append(value=0.8 + i * 0.05, epoch=i)
 
             # Files
             experiment.file(file_path=sample_files["model"], prefix="/models").save()
@@ -450,20 +450,20 @@ class TestRealWorldScenarios:
         """Test recovering from failed experiment."""
         # First attempt (fails)
         try:
-            with local_experiment(name="recovery-test", project="recovery") as experiment:
-                experiment.parameters().set(attempt=1)
+            with local_experiment(name="recovery-test", project="recovery").run as experiment:
+                experiment.params.set(attempt=1)
                 experiment.log("Starting experiment attempt 1")
-                experiment.metric("loss").append(value=0.5, epoch=0)
+                experiment.metrics("loss").append(value=0.5, epoch=0)
                 raise RuntimeError("Simulated failure")
         except RuntimeError:
             pass
 
         # Recovery attempt
-        with local_experiment(name="recovery-test", project="recovery") as experiment:
-            experiment.parameters().set(attempt=2, recovered=True)
+        with local_experiment(name="recovery-test", project="recovery").run as experiment:
+            experiment.params.set(attempt=2, recovered=True)
             experiment.log("Recovered and restarting")
-            experiment.metric("loss").append(value=0.4, epoch=1)
-            experiment.metric("loss").append(value=0.3, epoch=2)
+            experiment.metrics("loss").append(value=0.4, epoch=1)
+            experiment.metrics("loss").append(value=0.3, epoch=2)
             experiment.log("Recovery successful")
 
         # Verify both attempts are recorded
@@ -479,14 +479,14 @@ class TestRealWorldScenarios:
                 name=f"comparison-{model_name}",
                 project="comparisons",
                 tags=["comparison", model_name]
-            ) as experiment:
-                experiment.parameters().set(model=model_name, epochs=10)
+            ).run as experiment:
+                experiment.params.set(model=model_name, epochs=10)
 
                 # Simulate different performance
                 base_acc = {"resnet18": 0.75, "resnet50": 0.85, "vit-base": 0.90}
                 final_acc = base_acc[model_name] + random.uniform(-0.02, 0.02)
 
-                experiment.metric("accuracy").append(value=final_acc, epoch=9)
+                experiment.metrics("accuracy").append(value=final_acc, epoch=9)
                 experiment.log(f"{model_name} training complete", metadata={"final_acc": final_acc})
 
         # Verify all comparison runs
@@ -496,12 +496,12 @@ class TestRealWorldScenarios:
     @pytest.mark.slow
     def test_long_running_experiment_local(self, local_experiment):
         """Test long-running experiment with many data points."""
-        with local_experiment(name="long-run", project="longtest") as experiment:
-            experiment.parameters().set(total_steps=1000)
+        with local_experiment(name="long-run", project="longtest").run as experiment:
+            experiment.params.set(total_steps=1000)
 
             # Metric many data points
             for step in range(100):
-                experiment.metric("loss").append(value=1.0 / (step + 1), step=step)
+                experiment.metrics("loss").append(value=1.0 / (step + 1), step=step)
 
                 if step % 10 == 0:
                     experiment.log(f"Progress: {step}/100 steps", metadata={"step": step})

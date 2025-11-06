@@ -1,0 +1,993 @@
+# ML-Dash API Reference
+
+Complete API reference for ML-Dash Python SDK.
+
+## Table of Contents
+
+- [Experiment](#experiment)
+  - [Constructor](#experiment-constructor)
+  - [Lifecycle Management (run)](#lifecycle-management)
+  - [Properties](#experiment-properties)
+- [Parameters (params)](#parameters)
+- [Logging](#logging)
+- [Metrics](#metrics)
+- [Files](#files)
+- [Auto-Start (dxp)](#auto-start-dxp)
+- [Complete Examples](#complete-examples)
+
+---
+
+## Experiment
+
+The `Experiment` class is the main entry point for ML-Dash. It represents a single machine learning experiment run.
+
+### Experiment Constructor
+
+```python
+Experiment(
+    name: str,
+    project: str,
+    *,
+    description: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    bindrs: Optional[List[str]] = None,
+    folder: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    # Mode configuration
+    remote: Optional[str] = None,
+    api_key: Optional[str] = None,
+    user_name: Optional[str] = None,
+    local_path: Optional[str] = None,
+)
+```
+
+#### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | `str` | Unique experiment name within the project |
+| `project` | `str` | Project name to organize experiments |
+
+#### Optional Metadata Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `description` | `str` | `None` | Human-readable description of the experiment |
+| `tags` | `List[str]` | `None` | Tags for categorization and search |
+| `bindrs` | `List[str]` | `None` | Binders for advanced organization |
+| `folder` | `str` | `None` | Logical folder path (e.g., "/experiments/baseline") |
+| `metadata` | `Dict[str, Any]` | `None` | Additional structured metadata |
+
+#### Mode Configuration
+
+**Local Mode** (filesystem storage):
+```python
+Experiment(
+    name="my-experiment",
+    project="my-project",
+    local_path=".ml-dash"  # Required for local mode
+)
+```
+
+**Remote Mode** (API + S3 storage):
+```python
+# Option 1: With username (auto-generates API key)
+Experiment(
+    name="my-experiment",
+    project="my-project",
+    remote="http://localhost:3000",
+    user_name="your-username"
+)
+
+# Option 2: With API key
+Experiment(
+    name="my-experiment",
+    project="my-project",
+    remote="http://localhost:3000",
+    api_key="your-jwt-token"
+)
+```
+
+---
+
+### Lifecycle Management
+
+Experiments are managed through the `run` property, which returns a `RunManager` instance. The RunManager supports three usage patterns:
+
+#### 1. Context Manager (Recommended)
+
+Automatically starts and completes/fails the experiment:
+
+```python
+with Experiment(name="exp", project="proj", local_path=".ml-dash").run as exp:
+    exp.log("Training started")
+    exp.params.set(lr=0.001)
+    # Experiment automatically completes on successful exit
+    # or fails if an exception occurs
+```
+
+#### 2. Decorator Pattern
+
+Perfect for wrapping training functions:
+
+```python
+exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+
+@exp.run
+def train_model(experiment):
+    experiment.log("Training...")
+    experiment.params.set(lr=0.001)
+    return "done"
+
+result = train_model()
+```
+
+#### 3. Manual Control
+
+Explicit start/complete for fine-grained control:
+
+```python
+exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+
+exp.run.start()
+try:
+    exp.log("Training...")
+    exp.params.set(lr=0.001)
+    exp.run.complete()
+except Exception:
+    exp.run.fail()
+```
+
+#### RunManager Methods
+
+| Method | Description | Status Set |
+|--------|-------------|------------|
+| `run.start()` | Start the experiment | `RUNNING` |
+| `run.complete()` | Mark experiment as successfully completed | `COMPLETED` |
+| `run.fail()` | Mark experiment as failed | `FAILED` |
+| `run.cancel()` | Mark experiment as cancelled | `CANCELLED` |
+
+---
+
+### Experiment Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `experiment.name` | `str` | Experiment name |
+| `experiment.project` | `str` | Project name |
+| `experiment.description` | `str` | Experiment description |
+| `experiment.tags` | `List[str]` | Experiment tags |
+| `experiment.bindrs` | `List[str]` | Experiment bindrs |
+| `experiment.folder` | `str` | Folder path |
+| `experiment.id` | `str` | Experiment ID (remote mode only, after start) |
+| `experiment.data` | `dict` | Full experiment data (remote mode only, after start) |
+
+---
+
+## Parameters
+
+Access experiment parameters through the `params` property (not a method).
+
+### Setting Parameters
+
+```python
+# Set simple parameters
+exp.params.set(
+    learning_rate=0.001,
+    batch_size=32,
+    epochs=100
+)
+
+# Set nested parameters (auto-flattened)
+exp.params.set(
+    model={
+        "architecture": "resnet50",
+        "layers": 50,
+        "pretrained": True
+    },
+    optimizer={
+        "type": "adam",
+        "lr": 0.001
+    }
+)
+
+# Update specific nested parameters
+exp.params.set(model={"lr": 0.0001})  # Only updates model.lr
+```
+
+### Getting Parameters
+
+```python
+# Get flattened parameters (dot notation)
+params = exp.params.get()
+# Returns: {"learning_rate": 0.001, "model.architecture": "resnet50", ...}
+
+# Get nested parameters (hierarchical structure)
+params = exp.params.get(flatten=False)
+# Returns: {"learning_rate": 0.001, "model": {"architecture": "resnet50", ...}}
+```
+
+### Parameters API
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `params.set(**kwargs)` | `ParametersBuilder` | Set/merge parameters (supports nested dicts) |
+| `params.get(flatten=True)` | `dict` | Get parameters (flattened or nested) |
+
+**Note:** Parameters are automatically flattened for storage using dot notation:
+- Input: `{"model": {"lr": 0.001}}`
+- Stored as: `{"model.lr": 0.001}`
+
+---
+
+## Logging
+
+Log messages with different severity levels and optional metadata.
+
+### Basic Logging
+
+```python
+# Simple log
+exp.log("Training started")
+
+# Log with level
+exp.log("Training started", level="info")
+exp.log("Warning: Low GPU memory", level="warning")
+exp.log("Error occurred", level="error")
+```
+
+### Logging with Metadata
+
+```python
+# Traditional style
+exp.log(
+    "Epoch completed",
+    level="info",
+    metadata={"epoch": 1, "loss": 0.5, "accuracy": 0.85}
+)
+
+# Or pass metadata as kwargs
+exp.log("Epoch completed", level="info", epoch=1, loss=0.5, accuracy=0.85)
+```
+
+### Fluent Logging API
+
+```python
+# Fluent style (returns LogBuilder)
+exp.log(metadata={"epoch": 1}).info("Training started")
+exp.log().error("Failed to load data", error_code=500)
+exp.log().warning("GPU memory low", memory_available="1GB")
+```
+
+### Log Levels
+
+| Level | Description |
+|-------|-------------|
+| `debug` | Detailed diagnostic information |
+| `info` | General informational messages (default) |
+| `warning` | Warning messages for potential issues |
+| `error` | Error messages for failures |
+
+---
+
+## Metrics
+
+Track time-series metrics like loss, accuracy, etc.
+
+The `metrics` property supports two usage patterns:
+1. **Named**: Specify metric name upfront: `exp.metrics("loss").append(...)`
+2. **Unnamed**: Specify name in the call: `exp.metrics.append(name="loss", ...)`
+
+### Usage Pattern 1: Named Metrics
+
+Specify the metric name when accessing metrics:
+
+```python
+# Simple metric
+metric = exp.metrics("train_loss")
+
+# Metric with metadata
+metric = exp.metrics(
+    "train_loss",
+    description="Training loss over time",
+    tags=["training", "loss"],
+    metadata={"optimizer": "adam"}
+)
+
+# Append single data point
+exp.metrics("train_loss").append(value=0.5, epoch=1, step=100)
+
+# Append with multiple fields
+exp.metrics("metrics").append(
+    loss=0.5,
+    accuracy=0.85,
+    epoch=1,
+    step=100
+)
+```
+
+### Usage Pattern 2: Unnamed Metrics
+
+Specify the metric name in the method call:
+
+```python
+# Append with name in call
+exp.metrics.append(name="train_loss", value=0.5, step=100)
+
+# Append with multiple fields
+exp.metrics.append(
+    name="metrics",
+    loss=0.5,
+    accuracy=0.85,
+    step=100
+)
+
+# Batch append
+exp.metrics.append_batch(
+    name="train_loss",
+    data_points=[
+        {"value": 0.5, "step": 100},
+        {"value": 0.4, "step": 200}
+    ]
+)
+```
+
+### Batch Operations
+
+```python
+# Append batch of data points
+exp.metrics("train_loss").append_batch([
+    {"value": 0.5, "epoch": 1, "step": 100},
+    {"value": 0.4, "epoch": 2, "step": 200},
+    {"value": 0.3, "epoch": 3, "step": 300}
+])
+```
+
+### Reading Metrics
+
+```python
+# Read metric data
+data = exp.metrics("train_loss").read(start_index=0, limit=100)
+# Returns: {
+#     "data": [...],
+#     "startIndex": 0,
+#     "endIndex": 99,
+#     "total": 1000,
+#     "hasMore": True
+# }
+
+# Get statistics
+stats = exp.metrics("train_loss").stats()
+# Returns: {
+#     "count": 1000,
+#     "firstValue": {...},
+#     "lastValue": {...},
+#     ...
+# }
+```
+
+### Metrics API
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `metric(name, ...)` | See above | `MetricBuilder` | Create/get metric builder |
+| `append(**data)` | Flexible data fields | `dict` | Append single data point |
+| `append_batch(data_points)` | List of dicts | `dict` | Append multiple data points |
+| `read(start_index, limit)` | int, int | `dict` | Read data points |
+| `stats()` | - | `dict` | Get metric statistics |
+
+---
+
+## Files
+
+Upload, download, and manage files associated with experiments.
+
+### Basic File Upload
+
+```python
+# Upload a file
+result = exp.file(
+    file_path="./model.pt",
+    prefix="/models"
+).save()
+
+# Upload with metadata
+result = exp.file(
+    file_path="./model.pt",
+    prefix="/models",
+    description="Best model checkpoint",
+    tags=["best", "checkpoint"],
+    metadata={"epoch": 50, "accuracy": 0.95}
+).save()
+```
+
+### Enhanced File Operations
+
+#### Save JSON Objects
+
+```python
+# Save dict/object as JSON
+config = {
+    "model": "resnet50",
+    "lr": 0.001,
+    "batch_size": 32
+}
+
+result = exp.file(prefix="/configs").save_json(config, "config.json")
+```
+
+#### Save PyTorch Models
+
+```python
+import torch
+
+# Save PyTorch model
+model = torch.nn.Linear(10, 5)
+result = exp.file(prefix="/models").save_torch(model, "model.pt")
+
+# Save state dict
+result = exp.file(prefix="/models").save_torch(
+    model.state_dict(),
+    "model.pth"
+)
+```
+
+### File Organization with Bindrs
+
+```python
+# Upload file with bindrs for advanced organization
+result = exp.file(
+    file_path="./model.pt",
+    prefix="/models",
+    bindrs=["v1", "best", "production"],
+    description="Production model v1"
+).save()
+```
+
+### Listing Files
+
+```python
+# List all files
+files = exp.file().list()
+
+# List files by prefix
+files = exp.file(prefix="/models").list()
+
+# List files by tags
+files = exp.file(tags=["checkpoint"]).list()
+```
+
+### Downloading Files
+
+```python
+# Download to current directory with original filename
+path = exp.file(file_id="123").download()
+
+# Download to custom path
+path = exp.file(file_id="123").download(dest_path="./my_model.pt")
+```
+
+### File Management
+
+```python
+# Update file metadata
+result = exp.file(
+    file_id="123",
+    description="Updated description",
+    tags=["new", "tags"],
+    metadata={"version": "2.0"}
+).update()
+
+# Delete file (soft delete)
+result = exp.file(file_id="123").delete()
+```
+
+### Files API
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `file(**kwargs)` | See below | `FileBuilder` | Create file builder |
+| `save()` | - | `dict` | Upload file |
+| `save_json(content, filename)` | `Any`, `str` | `dict` | Save JSON object as file |
+| `save_torch(model, filename)` | `Any`, `str` | `dict` | Save PyTorch model as file |
+| `list()` | - | `List[dict]` | List files |
+| `download(dest_path)` | `Optional[str]` | `str` | Download file |
+| `update()` | - | `dict` | Update file metadata |
+| `delete()` | - | `dict` | Delete file |
+
+**FileBuilder kwargs:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `file_path` | `str` | Path to file to upload |
+| `prefix` | `str` | Logical path prefix (default: "/") |
+| `description` | `str` | File description |
+| `tags` | `List[str]` | File tags |
+| `bindrs` | `List[str]` | File bindrs |
+| `metadata` | `dict` | File metadata |
+| `file_id` | `str` | File ID (for download/update/delete) |
+| `dest_path` | `str` | Destination path (for download) |
+
+---
+
+## Auto-Start (dxp)
+
+The `ml_dash.auto_start` module provides a pre-configured, auto-started experiment singleton named `dxp` for quick prototyping and scratch work.
+
+### Overview
+
+The `dxp` singleton is:
+- **Pre-configured**: Name is "dxp", project is "scratch", storage is local (`.ml-dash`)
+- **Auto-started**: Ready to use immediately on import - no need to call `.run.start()`
+- **Auto-cleanup**: Automatically completed on Python exit via `atexit` handler
+- **Fully-featured**: Works exactly like a normal `Experiment` instance
+
+### Import
+
+```python
+from ml_dash.auto_start import dxp
+```
+
+### Usage
+
+#### Basic Usage
+
+```python
+from ml_dash.auto_start import dxp
+
+# Ready to use immediately - already started!
+dxp.log("Starting quick experiment")
+dxp.params.set(lr=0.001, batch_size=32)
+
+# Log metrics
+dxp.metrics(name="loss").append(step=0, value=0.5)
+dxp.metrics(name="loss").append(step=1, value=0.4)
+
+# Upload files
+dxp.file(file_path="model.pt", prefix="/models").save()
+
+# Automatically completed on Python exit
+```
+
+#### Interactive/Notebook Usage
+
+Perfect for Jupyter notebooks and interactive Python sessions:
+
+```python
+from ml_dash.auto_start import dxp
+
+# Quick parameter tracking
+dxp.params.set(
+    model="resnet50",
+    lr=0.001,
+    batch_size=32,
+    optimizer="adam"
+)
+
+# Log training progress
+for epoch in range(10):
+    loss = train_epoch()
+    dxp.metrics(name="loss").append(step=epoch, value=loss)
+    dxp.log(f"Epoch {epoch} completed", loss=loss)
+
+# Save results
+dxp.file(prefix="/results").save_json(results, "results.json")
+```
+
+#### Prototyping Scripts
+
+Great for quick experiments and throwaway scripts:
+
+```python
+from ml_dash.auto_start import dxp
+import torch
+
+# Track experiment
+dxp.params.set(model_name="simple_cnn", dataset="mnist")
+dxp.log("Training started")
+
+# Train model
+model = train_model()
+
+# Save model
+dxp.file(prefix="/models").save_torch(model, "model.pt")
+
+# Log final metrics
+dxp.metrics(name="accuracy").append(value=0.95, step=10)
+dxp.log("Training completed")
+
+# No cleanup needed - automatically handled!
+```
+
+### Configuration
+
+The `dxp` singleton has a fixed configuration:
+
+| Property | Value | Changeable |
+|----------|-------|------------|
+| Name | `"dxp"` | No (read-only) |
+| Project | `"scratch"` | No (read-only) |
+| Storage Mode | Local (`.ml-dash`) | No (fixed at initialization) |
+| Local Path | `".ml-dash"` | No (fixed at initialization) |
+| Parameters | Empty (initially) | Yes (during lifecycle) |
+| Tags | Empty (initially) | No |
+| Description | None | No |
+
+### Lifecycle
+
+Unlike normal experiments, `dxp` handles lifecycle automatically:
+
+```python
+from ml_dash.auto_start import dxp
+
+# Already started - no need to call .run.start()
+assert dxp._is_open  # True
+
+# Use normally
+dxp.log("Working...")
+dxp.params.set(foo="bar")
+
+# Automatically completed on Python exit
+# No need to call .run.complete()
+```
+
+### Manual Lifecycle Control
+
+You can still manually control the lifecycle if needed:
+
+```python
+from ml_dash.auto_start import dxp
+
+# Close manually if needed
+dxp.run.complete()
+
+# Can reopen
+dxp.run.start()
+
+# Or mark as failed
+dxp.run.fail()
+```
+
+### Comparison with Regular Experiment
+
+| Feature | Regular Experiment | dxp Singleton |
+|---------|-------------------|---------------|
+| Import | `from ml_dash import Experiment` | `from ml_dash.auto_start import dxp` |
+| Configuration | User-defined | Fixed (dxp/scratch/local) |
+| Lifecycle | Manual or context manager | Auto-started, auto-completed |
+| Use Case | Production experiments | Quick prototyping, notebooks |
+| Storage | Local or remote | Local only (`.ml-dash`) |
+| Reusable | Create multiple instances | Single global instance |
+
+### Best Practices
+
+1. **Use for Prototyping**: `dxp` is perfect for quick experiments and scratch work
+2. **Not for Production**: Use regular `Experiment` for production code
+3. **Notebook Sessions**: Ideal for Jupyter notebooks and interactive sessions
+4. **Single Session**: Best for single-run scripts; for multiple runs, use regular `Experiment`
+5. **Local Development**: Great for local development and debugging
+
+### Example: Complete Prototype
+
+```python
+from ml_dash.auto_start import dxp
+import torch
+import torch.nn as nn
+
+# Setup
+dxp.params.set(
+    model="simple_cnn",
+    lr=0.001,
+    epochs=10,
+    batch_size=64
+)
+
+dxp.log("Starting prototype experiment")
+
+# Define and train model
+model = nn.Sequential(
+    nn.Conv2d(1, 32, 3),
+    nn.ReLU(),
+    nn.MaxPool2d(2),
+    nn.Flatten(),
+    nn.Linear(32 * 13 * 13, 10)
+)
+
+for epoch in range(10):
+    loss = train_epoch(model)
+    acc = evaluate(model)
+
+    dxp.metrics(name="loss").append(step=epoch, value=loss)
+    dxp.metrics(name="accuracy").append(step=epoch, value=acc)
+    dxp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
+
+# Save results
+dxp.file(prefix="/models").save_torch(model.state_dict(), "final.pt")
+dxp.log("Experiment completed!")
+
+# Automatically saved on exit!
+```
+
+---
+
+## Complete Examples
+
+### Complete Training Workflow
+
+```python
+from ml_dash import Experiment
+
+# Create experiment
+with Experiment(
+    name="resnet50-training",
+    project="image-classification",
+    description="ResNet50 on CIFAR-10",
+    tags=["resnet", "cifar10", "baseline"],
+    local_path=".ml-dash"
+).run as exp:
+
+    # 1. Set hyperparameters
+    exp.params.set(
+        model={
+            "architecture": "resnet50",
+            "pretrained": True,
+            "num_classes": 10
+        },
+        training={
+            "optimizer": "adam",
+            "lr": 0.001,
+            "batch_size": 64,
+            "epochs": 100
+        }
+    )
+
+    # 2. Save configuration
+    config = {
+        "model": "resnet50",
+        "dataset": "cifar10",
+        "lr": 0.001
+    }
+    exp.file(prefix="/configs").save_json(config, "config.json")
+
+    # 3. Training loop
+    exp.log("Training started", level="info")
+
+    for epoch in range(100):
+        # Train one epoch
+        train_loss, train_acc = train_epoch()  # Your training code
+        val_loss, val_acc = validate()  # Your validation code
+
+        # Log metrics
+        exp.metrics("train_loss").append(value=train_loss, epoch=epoch)
+        exp.metrics("train_acc").append(value=train_acc, epoch=epoch)
+        exp.metrics("val_loss").append(value=val_loss, epoch=epoch)
+        exp.metrics("val_acc").append(value=val_acc, epoch=epoch)
+
+        # Log progress
+        if epoch % 10 == 0:
+            exp.log(
+                f"Epoch {epoch} completed",
+                level="info",
+                train_loss=train_loss,
+                val_acc=val_acc
+            )
+
+        # Save checkpoints
+        if val_acc > best_acc:
+            exp.file(prefix="/models").save_torch(
+                model.state_dict(),
+                f"checkpoint_epoch_{epoch}.pt"
+            )
+            exp.log(f"New best model saved at epoch {epoch}", level="info")
+
+    # 4. Save final model
+    exp.file(prefix="/models").save_torch(model, "final_model.pt")
+
+    exp.log("Training completed", level="info")
+```
+
+### Hyperparameter Search
+
+```python
+from ml_dash import Experiment
+import itertools
+
+# Define search space
+learning_rates = [0.001, 0.0001, 0.00001]
+batch_sizes = [32, 64, 128]
+
+for lr, bs in itertools.product(learning_rates, batch_sizes):
+    # Create experiment for each combination
+    with Experiment(
+        name=f"search-lr{lr}-bs{bs}",
+        project="hyperparam-search",
+        tags=["search", "grid"],
+        local_path=".ml-dash"
+    ).run as exp:
+
+        exp.params.set(
+            learning_rate=lr,
+            batch_size=bs,
+            model="resnet18"
+        )
+
+        # Train with these hyperparameters
+        final_acc = train(lr=lr, batch_size=bs)
+
+        exp.metrics("final_accuracy").append(value=final_acc, step=1)
+        exp.log(f"Search completed: lr={lr}, bs={bs}, acc={final_acc}")
+```
+
+### Decorator Pattern for Training Functions
+
+```python
+from ml_dash import Experiment
+
+# Create experiment instance
+exp = Experiment(
+    name="training-run",
+    project="my-project",
+    local_path=".ml-dash"
+)
+
+@exp.run
+def train_model(experiment):
+    """Training function with automatic experiment management."""
+
+    # Set parameters
+    experiment.params.set(
+        lr=0.001,
+        epochs=50,
+        model="resnet50"
+    )
+
+    # Training loop
+    for epoch in range(50):
+        loss = 1.0 / (epoch + 1)  # Simulated loss
+        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
+
+    # Save model
+    experiment.file(prefix="/models").save_json(
+        {"final_loss": loss},
+        "results.json"
+    )
+
+    return {"final_loss": loss}
+
+# Run training (experiment automatically managed)
+result = train_model()
+print(f"Training completed: {result}")
+```
+
+### Remote Mode with Team Collaboration
+
+```python
+from ml_dash import Experiment
+
+# Connect to shared ML-Dash server
+with Experiment(
+    name="team-experiment",
+    project="shared-project",
+    remote="http://ml-dash-server:3000",
+    user_name="alice",
+    description="Collaborative experiment",
+    tags=["team", "production"]
+).run as exp:
+
+    # All data automatically synced to remote server
+    exp.params.set(
+        researcher="Alice",
+        experiment_type="baseline",
+        model="bert-base"
+    )
+
+    exp.log("Running on remote server", level="info")
+
+    # Metrics stored in MongoDB
+    exp.metrics("training_loss").append(value=0.5, step=100)
+
+    # Files stored in S3
+    exp.file(prefix="/models").save_json(
+        {"config": "bert-base"},
+        "model_config.json"
+    )
+
+    exp.log("Data synced to team server", level="info")
+```
+
+---
+
+## Error Handling
+
+Experiments handle errors gracefully:
+
+```python
+try:
+    with Experiment(
+        name="my-experiment",
+        project="test",
+        local_path=".ml-dash"
+    ).run as exp:
+        exp.log("Starting work")
+        exp.params.set(test_param="value")
+
+        # Simulate error
+        raise ValueError("Something went wrong")
+
+except ValueError as e:
+    print(f"Error: {e}")
+    # Experiment is automatically marked as FAILED
+    # All data is still saved
+```
+
+The experiment status will be set to `FAILED` automatically, and all logs, parameters, and metrics are preserved for debugging.
+
+---
+
+## Best Practices
+
+1. **Use Context Managers**: Prefer `with exp.run as exp:` for automatic lifecycle management
+2. **Descriptive Names**: Use clear, descriptive experiment names and project names
+3. **Add Tags**: Use tags for easy filtering and organization
+4. **Log Liberally**: Log important events, errors, and milestones
+5. **Structured Metadata**: Use metadata for searchable, structured information
+6. **Organize Files**: Use logical prefix paths for file organization
+7. **Version Control**: Use bindrs and tags to track model/data versions
+8. **Remote for Teams**: Use remote mode for team collaboration and data persistence
+
+---
+
+## API Summary
+
+### Quick Reference
+
+```python
+from ml_dash import Experiment
+
+# Create experiment
+exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+
+# Lifecycle
+with exp.run as exp:                    # Context manager
+    exp.run.start()                     # Manual start
+    exp.run.complete()                  # Manual complete
+    exp.run.fail()                      # Mark as failed
+    exp.run.cancel()                    # Mark as cancelled
+
+# Parameters
+exp.params.set(lr=0.001, bs=32)         # Set parameters
+params = exp.params.get()                # Get flattened
+params = exp.params.get(flatten=False)   # Get nested
+
+# Logging
+exp.log("message")                       # Simple log
+exp.log("message", level="info")         # With level
+exp.log("msg", epoch=1, loss=0.5)        # With metadata
+exp.log().info("message")                # Fluent style
+
+# Metrics (two patterns)
+exp.metrics("loss").append(value=0.5, step=1)      # Named
+exp.metrics.append(name="loss", value=0.5, step=1)  # Unnamed
+exp.metrics("loss").append_batch([...])
+exp.metrics.append_batch(name="loss", data_points=[...])
+data = exp.metrics("loss").read(0, 100)
+stats = exp.metrics("loss").stats()
+
+# Files
+exp.file(file_path="model.pt", prefix="/models").save()
+exp.file(prefix="/configs").save_json(config, "config.json")
+exp.file(prefix="/models").save_torch(model, "model.pt")
+files = exp.file(prefix="/models").list()
+path = exp.file(file_id="123").download()
+exp.file(file_id="123").delete()
+
+# Auto-Start (dxp) - Quick prototyping
+from ml_dash.auto_start import dxp
+
+dxp.log("Already started!")              # Ready to use immediately
+dxp.params.set(lr=0.001)                 # Set parameters
+dxp.metrics("loss").append(value=0.5)     # Log metrics
+dxp.file(file_path="model.pt").save()    # Upload files
+# Auto-completed on Python exit
+```

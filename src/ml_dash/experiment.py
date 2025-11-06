@@ -27,6 +27,74 @@ class OperationMode(Enum):
     HYBRID = "hybrid"  # Future: sync local to remote
 
 
+class RunManager:
+    """
+    Lifecycle manager for experiments.
+
+    Supports three usage patterns:
+    1. Method calls: experiment.run.start(), experiment.run.complete()
+    2. Context manager: with Experiment(...).run as exp:
+    3. Decorator: @exp.run or @Experiment(...).run
+    """
+
+    def __init__(self, experiment: "Experiment"):
+        """
+        Initialize RunManager.
+
+        Args:
+            experiment: Parent Experiment instance
+        """
+        self._experiment = experiment
+
+    def start(self) -> "Experiment":
+        """
+        Start the experiment (sets status to RUNNING).
+
+        Returns:
+            The experiment instance for chaining
+        """
+        return self._experiment._open()
+
+    def complete(self) -> None:
+        """Mark experiment as completed (status: COMPLETED)."""
+        self._experiment._close(status="COMPLETED")
+
+    def fail(self) -> None:
+        """Mark experiment as failed (status: FAILED)."""
+        self._experiment._close(status="FAILED")
+
+    def cancel(self) -> None:
+        """Mark experiment as cancelled (status: CANCELLED)."""
+        self._experiment._close(status="CANCELLED")
+
+    def __enter__(self) -> "Experiment":
+        """Context manager entry - starts the experiment."""
+        return self.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - completes or fails the experiment."""
+        if exc_type is not None:
+            self.fail()
+        else:
+            self.complete()
+        return False
+
+    def __call__(self, func: Callable) -> Callable:
+        """
+        Decorator support for wrapping functions with experiment lifecycle.
+
+        Usage:
+            @exp.run
+            def train(exp):
+                exp.log("Training...")
+        """
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with self as exp:
+                return func(exp, *args, **kwargs)
+        return wrapper
+
+
 class Experiment:
     """
     ML-Dash experiment for metricing experiments.
@@ -67,13 +135,14 @@ class Experiment:
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
         folder: Optional[str] = None,
-        write_protected: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
         # Mode configuration
         remote: Optional[str] = None,
         api_key: Optional[str] = None,
         user_name: Optional[str] = None,
         local_path: Optional[str] = None,
+        # Internal parameters
+        _write_protected: bool = False,
     ):
         """
         Initialize an ML-Dash experiment.
@@ -85,12 +154,12 @@ class Experiment:
             tags: Optional list of tags
             bindrs: Optional list of bindrs
             folder: Optional folder path (e.g., "/experiments/baseline")
-            write_protected: If True, experiment becomes immutable after creation
             metadata: Optional metadata dict
             remote: Remote API URL (e.g., "http://localhost:3000")
             api_key: JWT token for authentication (if not provided, will be generated from user_name)
             user_name: Username for authentication (generates API key if api_key not provided)
             local_path: Local storage root path (for local mode)
+            _write_protected: Internal parameter - if True, experiment becomes immutable after creation
         """
         self.name = name
         self.project = project
@@ -98,7 +167,7 @@ class Experiment:
         self.tags = tags
         self.bindrs = bindrs
         self.folder = folder
-        self.write_protected = write_protected
+        self._write_protected = _write_protected
         self.metadata = metadata
 
         # Generate API key from username if not provided
@@ -171,9 +240,9 @@ class Experiment:
 
         return token
 
-    def open(self) -> "Experiment":
+    def _open(self) -> "Experiment":
         """
-        Open the experiment (create or update on server/filesystem).
+        Internal method to open the experiment (create or update on server/filesystem).
 
         Returns:
             self for chaining
@@ -190,7 +259,7 @@ class Experiment:
                 tags=self.tags,
                 bindrs=self.bindrs,
                 folder=self.folder,
-                write_protected=self.write_protected,
+                write_protected=self._write_protected,
                 metadata=self.metadata,
             )
             self._experiment_data = response
@@ -211,9 +280,9 @@ class Experiment:
         self._is_open = True
         return self
 
-    def close(self, status: str = "COMPLETED"):
+    def _close(self, status: str = "COMPLETED"):
         """
-        Close the experiment and update status.
+        Internal method to close the experiment and update status.
 
         Args:
             status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
@@ -238,16 +307,52 @@ class Experiment:
 
         self._is_open = False
 
-    def __enter__(self) -> "Experiment":
-        """Context manager entry."""
-        return self.open()
+    @property
+    def run(self) -> RunManager:
+        """
+        Get the RunManager for lifecycle operations.
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit. Sets status to FAILED if exception occurred."""
-        # Determine status based on whether an exception occurred
-        status = "FAILED" if exc_type is not None else "COMPLETED"
-        self.close(status=status)
-        return False
+        Usage:
+            # Method calls
+            experiment.run.start()
+            experiment.run.complete()
+
+            # Context manager
+            with Experiment(...).run as exp:
+                exp.log("Training...")
+
+            # Decorator
+            @experiment.run
+            def train(exp):
+                exp.log("Training...")
+
+        Returns:
+            RunManager instance
+        """
+        return RunManager(self)
+
+    @property
+    def params(self) -> ParametersBuilder:
+        """
+        Get a ParametersBuilder for parameter operations.
+
+        Usage:
+            # Set parameters
+            experiment.params.set(lr=0.001, batch_size=32)
+
+            # Get parameters
+            params = experiment.params.get()
+
+        Returns:
+            ParametersBuilder instance
+
+        Raises:
+            RuntimeError: If experiment is not open
+        """
+        if not self._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        return ParametersBuilder(self)
 
     def log(
         self,
@@ -591,31 +696,6 @@ class Experiment:
 
         return result
 
-    def parameters(self) -> ParametersBuilder:
-        """
-        Get a ParametersBuilder for fluent parameter operations.
-
-        Returns:
-            ParametersBuilder instance for chaining
-
-        Raises:
-            RuntimeError: If experiment is not open
-
-        Examples:
-            # Set parameters
-            experiment.parameters().set(
-                model={"lr": 0.001, "batch_size": 32},
-                optimizer="adam"
-            )
-
-            # Get parameters
-            params = experiment.parameters().get()  # Flattened
-            params = experiment.parameters().get(flatten=False)  # Nested
-        """
-        if not self._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
-
-        return ParametersBuilder(self)
 
     def _write_params(self, flattened_params: Dict[str, Any]) -> None:
         """
@@ -665,48 +745,49 @@ class Experiment:
 
         return params
 
-    def metric(self, name: str, description: Optional[str] = None,
-              tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None) -> 'MetricBuilder':
+    @property
+    def metrics(self) -> 'MetricsManager':
         """
-        Get a MetricBuilder for fluent metric operations.
+        Get a MetricsManager for metric operations.
 
-        Args:
-            name: Metric name (unique within experiment)
-            description: Optional metric description
-            tags: Optional tags for categorization
-            metadata: Optional structured metadata
+        Supports two usage patterns:
+        1. Named: experiment.metrics("loss").append(value=0.5, step=1)
+        2. Unnamed: experiment.metrics.append(name="loss", value=0.5, step=1)
 
         Returns:
-            MetricBuilder instance for chaining
+            MetricsManager instance
 
         Raises:
             RuntimeError: If experiment is not open
 
         Examples:
-            # Append single data point
-            experiment.metric(name="train_loss").append(value=0.5, step=100)
+            # Named metric
+            experiment.metrics("train_loss").append(value=0.5, step=100)
+
+            # Unnamed (name in append call)
+            experiment.metrics.append(name="train_loss", value=0.5, step=100)
 
             # Append batch
-            experiment.metric(name="metrics").append_batch([
+            experiment.metrics("metrics").append_batch([
                 {"loss": 0.5, "acc": 0.8, "step": 1},
                 {"loss": 0.4, "acc": 0.85, "step": 2}
             ])
 
             # Read data
-            data = experiment.metric(name="train_loss").read(start_index=0, limit=100)
+            data = experiment.metrics("train_loss").read(start_index=0, limit=100)
 
             # Get statistics
-            stats = experiment.metric(name="train_loss").stats()
+            stats = experiment.metrics("train_loss").stats()
         """
-        from .metric import MetricBuilder
+        from .metric import MetricsManager
 
         if not self._is_open:
             raise RuntimeError(
-                "Cannot use metric on closed experiment. "
-                "Use 'with Experiment(...) as experiment:' or call experiment.open() first."
+                "Cannot use metrics on closed experiment. "
+                "Use 'with Experiment(...).run as experiment:' or call experiment.run.start() first."
             )
 
-        return MetricBuilder(self, name, description, tags, metadata)
+        return MetricsManager(self)
 
     def _append_to_metric(
         self,

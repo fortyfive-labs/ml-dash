@@ -38,7 +38,7 @@ Usage:
         experiment.log("Training started")
 """
 
-from .experiment import Experiment, ml_dash_experiment, OperationMode
+from .experiment import Experiment, ml_dash_experiment, OperationMode, RunManager
 from .client import RemoteClient
 from .storage import LocalStorage
 from .log import LogLevel, LogBuilder
@@ -50,6 +50,7 @@ __all__ = [
     "Experiment",
     "ml_dash_experiment",
     "OperationMode",
+    "RunManager",
     "RemoteClient",
     "LocalStorage",
     "LogLevel",

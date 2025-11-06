@@ -62,9 +62,9 @@ class ParametersBuilder:
             experiment.parameters().set(**{"model.lr": 0.001, "model.batch_size": 32})
         """
         if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
 
-        if self._experiment.write_protected:
+        if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
         # Flatten the kwargs
