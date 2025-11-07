@@ -83,7 +83,7 @@ from ml_dash import Experiment
 with Experiment(
     name="my-experiment",
     project="my-project",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",     # API endpoint
+    remote="https://api.dash.ml",     # API endpoint
     user_name="your-username"            # Authentication
 ) as experiment:
     experiment.log("Running in remote mode")
@@ -95,7 +95,7 @@ with Experiment(
 with Experiment(
     name="my-experiment",
     project="my-project",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",     # API endpoint
+    remote="https://api.dash.ml",     # API endpoint
     api_key="your-api-key-here"          # Authentication
 ) as experiment:
     experiment.log("Running in remote mode")

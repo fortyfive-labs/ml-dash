@@ -257,7 +257,7 @@ with Experiment(
 with Experiment(
     name="experiment-name",
     project="project-name",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     user_name="your-username"
 ) as experiment:
     pass
@@ -266,7 +266,7 @@ with Experiment(
 with Experiment(
     name="experiment-name",
     project="project-name",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     api_key="your-api-key"
 ) as experiment:
     pass
@@ -295,7 +295,7 @@ finally:
 @ml_dash_experiment(
     name="experiment-name",
     project="project-name",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     user_name="your-username"
 )
 def train(experiment):

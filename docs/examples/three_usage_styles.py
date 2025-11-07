@@ -163,7 +163,7 @@ def train_with_direct_instantiation():
 @ml_dash_experiment(
     name="remote-decorator-example",
     project="usage-styles",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     user_name="demo-user",
     description="Decorator with remote mode",
     tags=["remote", "decorator"]
@@ -193,7 +193,7 @@ def train_remote_context_manager():
     with Experiment(
         name="remote-context-example",
         project="usage-styles",
-        remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+        remote="https://api.dash.ml",
         user_name="demo-user",
         description="Context manager with remote mode",
         tags=["remote", "context-manager"]

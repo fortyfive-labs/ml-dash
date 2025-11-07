@@ -21,7 +21,7 @@ with Experiment(
 with Experiment(
     name="experiment-name",
     project="project-name",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     user_name="your-username"
 ) as experiment:
     # Your code here

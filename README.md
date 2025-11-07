@@ -48,7 +48,7 @@ from ml_dash import Experiment
 with Experiment(
     name="my-experiment",
     project="my-project",
-    remote="https://cu3thurmv3.us-east-1.awsapprunner.com",
+    remote="https://api.dash.ml",
     api_key="your-jwt-token"
 ) as experiment:
     print(f"Experiment ID: {experiment.id}")
