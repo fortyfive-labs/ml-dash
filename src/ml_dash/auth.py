@@ -70,6 +70,10 @@ class OAuth2AuthFlow:
             callback_url = server.get_callback_url()
             auth_url = f"{self.auth_server}/cli-auth?redirect_uri={callback_url}"
 
+            # Display authorization URL
+            print("Authorization URL:")
+            print(f"  {auth_url}\n")
+
             # Open browser
             print("Opening authorization page in your browser...")
 
@@ -80,10 +84,10 @@ class OAuth2AuthFlow:
                 pass
 
             if not opened:
-                print(f"\nCouldn't open browser automatically.")
-                print(f"Please open this URL manually:\n{auth_url}\n")
+                print("⚠ Couldn't open browser automatically.")
+                print("Please open the URL above manually.\n")
             else:
-                print()
+                print("✓ Browser opened\n")
 
             # Wait for callback with visual feedback
             token = self.wait_with_feedback(server, self.timeout)
