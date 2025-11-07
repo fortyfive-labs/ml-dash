@@ -170,9 +170,18 @@ class Experiment:
         self._write_protected = _write_protected
         self.metadata = metadata
 
-        # Generate API key from username if not provided
-        if remote and not api_key and user_name:
-            api_key = self._generate_api_key_from_username(user_name)
+        # Get API key from: explicit parameter > saved token > generated from username
+        if remote and not api_key:
+            if not user_name:
+                # Try to load saved token from config
+                from .config import ConfigManager
+                config_manager = ConfigManager()
+                saved_token = config_manager.get_token()
+                if saved_token:
+                    api_key = saved_token
+            else:
+                # Generate API key from username
+                api_key = self._generate_api_key_from_username(user_name)
 
         # Determine operation mode
         if remote and local_path:
@@ -195,7 +204,13 @@ class Experiment:
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
             if not api_key:
-                raise ValueError("Either api_key or user_name is required for remote mode")
+                raise ValueError(
+                    "Authentication required for remote mode. "
+                    "Please provide either:\n"
+                    "  1. api_key parameter\n"
+                    "  2. user_name parameter (will generate temp token)\n"
+                    "  3. Run 'ml-dash setup' to authenticate (recommended)"
+                )
             self._client = RemoteClient(base_url=remote, api_key=api_key)
 
         if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
