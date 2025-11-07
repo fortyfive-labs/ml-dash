@@ -23,7 +23,7 @@ class ConfigManager:
     """
 
     DEFAULT_CONFIG_DIR = Path.home() / ".ml-dash"
-    DEFAULT_AUTH_SERVER = "https://staging-auth.ml-dash.com"
+    DEFAULT_AUTH_SERVER = "https://staging-auth.vuer.ai/authorize"
     CONFIG_FILE = "config.json"
 
     def __init__(self, config_dir: Optional[Path] = None):

@@ -8,6 +8,7 @@ import webbrowser
 import time
 import sys
 from typing import Optional
+from urllib.parse import quote
 from .auth_server import AuthCallbackServer
 from .config import ConfigManager
 
@@ -23,7 +24,7 @@ class OAuth2AuthFlow:
     - Token storage in user home directory
     """
 
-    DEFAULT_AUTH_SERVER = "https://staging-auth.ml-dash.com"
+    DEFAULT_AUTH_SERVER = "https://staging-auth.vuer.ai/authorize"
     DEFAULT_PORT = 52845
     DEFAULT_TIMEOUT = 180.0  # 3 minutes
 
@@ -38,7 +39,7 @@ class OAuth2AuthFlow:
         Initialize OAuth2 authentication flow.
 
         Args:
-            auth_server: Auth server URL (defaults to staging-auth.ml-dash.com)
+            auth_server: Auth server URL (defaults to staging-auth.vuer.ai/authorize)
             callback_port: Port for local callback server (default: 52845)
             timeout: Maximum time to wait for authentication (default: 180s)
             config_manager: Optional config manager (for testing)
@@ -68,7 +69,12 @@ class OAuth2AuthFlow:
 
             # Build authorization URL
             callback_url = server.get_callback_url()
-            auth_url = f"{self.auth_server}/cli-auth?redirect_uri={callback_url}"
+            # Add trailing slash to callback_url if not present
+            if not callback_url.endswith('/'):
+                callback_url += '/'
+            # URL encode the callback_url for the query parameter
+            encoded_callback = quote(callback_url, safe='')
+            auth_url = f"{self.auth_server}?clientApi={encoded_callback}"
 
             # Display authorization URL
             print("Authorization URL:")
@@ -218,7 +224,7 @@ def authenticate(
     Convenience function to run authentication flow.
 
     Args:
-        auth_server: Auth server URL (defaults to staging-auth.ml-dash.com)
+        auth_server: Auth server URL (defaults to staging-auth.vuer.ai/authorize)
         callback_port: Port for local callback server (default: 52845)
         timeout: Maximum time to wait for authentication (default: 180s)
 
