@@ -19,24 +19,24 @@ it in a simple training script.
 ```python
 from ml_dash import Experiment
 
-dxp = Experiment()
+exp = Experiment()
 
-dxp.run.start("You can log any message here, to mark the start of the run")
+exp.run.start("You can log any message here, to mark the start of the run")
 
 # you can log the training hyper-parameters. These will be indexed and searchable
-dxp.parameters.set(learning_rate=0.001, batch_size=32)
+exp.params.set(learning_rate=0.001, batch_size=32)
 
 # log metrics
-dxp.metric.append(loss=0.001, accuracy=0.5)
+exp.metrics.append(loss=0.001, accuracy=0.5)
 
 # and you can namespace the metrics by calling the metrics writer.
-dxp.metric("eval").append(loss=0.001, accuracy=0.5)
+exp.metrics("eval").append(loss=0.001, accuracy=0.5)
 
 # You can upload files with a prefix
-dxp.file("checkpoints").save(fname="model.pth")
+exp.files("checkpoints").save(fname="model.pth")
 
 # and you can mark the run as complete.
-dxp.run.complete("This is over!")
+exp.run.complete("This is over!")
 
 ```
 
@@ -44,7 +44,7 @@ Each experiment has a current "Run", that doubles as a context manager that
 automatically manages the start and end of the current execution:
 
 ```python
-with dxp.run("Training"):
+with exp.run("Training"):
     # training logic
     pass
 ```
@@ -69,7 +69,7 @@ Each experimental run has the following lifecycle stages:
 import torch.nn as nn
 
 # We typically access the dash experiment through the singleton import
-from ml_dash.auto import dxp
+from ml_dash.auto_start import dxp
 
 
 # This `auto` module creates a new experiment instance upon import.
@@ -95,19 +95,19 @@ def train(lr=0.001, batch_size=32, n_steps=10):
 
 ```
 
-Refer to the [Quick Start Guide](quickstart.md) and the Examples section for more detailed usage examples:
+Refer to the [Getting Started Guide](getting-started.md) and the Examples section for more detailed usage examples:
 
-- [Basic Training](basic-training.md) - Simple training loop with ML-Dash
+- [Basic Training Loop](basic-training.md) - Simple training loop with ML-Dash
 - [Hyperparameter Search](hyperparameter-search.md) - Running parameter sweeps
 - [Model Comparison](model-comparison.md) - Comparing multiple model runs
 - [Complete Examples](complete-examples.md) - Full end-to-end examples
 
 ```{toctree}
 :maxdepth: 2
-:caption: Introduction
+:caption: Getting Started
 :hidden:
 
-quickstart
+getting-started
 ```
 
 ```{toctree}
@@ -128,7 +128,6 @@ Files & Artifacts <files>
 :caption: Examples
 :hidden:
 
-examples
 basic-training
 hyperparameter-search
 model-comparison
@@ -137,27 +136,8 @@ complete-examples
 
 ```{toctree}
 :maxdepth: 2
-:caption: Advanced Topics
-:hidden:
-
-local-vs-remote
-deployment
-architecture
-```
-
-```{toctree}
-:maxdepth: 2
 :caption: API Reference
 :hidden:
 
-api-quick-reference
-api/modules
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Help
-:hidden:
-
-faq
+api-reference
 ```

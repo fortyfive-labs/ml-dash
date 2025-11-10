@@ -75,7 +75,7 @@ Experiment(
 Experiment(
     name="my-experiment",
     project="my-project",
-    remote="http://localhost:3000",
+    remote="https://api.dash.ml",
     user_name="your-username"
 )
 
@@ -83,7 +83,7 @@ Experiment(
 Experiment(
     name="my-experiment",
     project="my-project",
-    remote="http://localhost:3000",
+    remote="https://api.dash.ml",
     api_key="your-jwt-token"
 )
 ```
@@ -844,7 +844,7 @@ def train_model(experiment):
     # Training loop
     for epoch in range(50):
         loss = 1.0 / (epoch + 1)  # Simulated loss
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
         experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     # Save model

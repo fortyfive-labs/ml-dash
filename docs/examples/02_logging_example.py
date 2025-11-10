@@ -14,7 +14,7 @@ def main():
         name="logging-demo",
         project="tutorials",
         local_path="./tutorial_data"
-    ) as experiment:
+    ).run as experiment:
         # Different log levels //
         experiment.log("Debug information", level="debug")
         experiment.log("Training started", level="info")

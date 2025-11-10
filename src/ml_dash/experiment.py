@@ -1012,7 +1012,7 @@ def ml_dash_experiment(
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **func_kwargs):
-            with Experiment(name=name, project=project, **kwargs) as experiment:
+            with Experiment(name=name, project=project, **kwargs).run as experiment:
                 # Inject experiment into function kwargs
                 func_kwargs['experiment'] = experiment
                 return func(*args, **func_kwargs)

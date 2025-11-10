@@ -12,9 +12,9 @@ Experiments are the foundation of ML-Dash. Each experiment represents a single e
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Training started")
-    experiment.parameters().set(learning_rate=0.001)
+    experiment.params.set(learning_rate=0.001)
     # Experiment automatically closed on exit
 ```
 
@@ -28,11 +28,11 @@ from ml_dash import ml_dash_experiment
 @ml_dash_experiment(name="my-experiment", project="project")
 def train_model(experiment):
     experiment.log("Training started")
-    experiment.parameters().set(learning_rate=0.001)
+    experiment.params.set(learning_rate=0.001)
 
     for epoch in range(10):
         loss = train_epoch()
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
 
     return "Training complete!"
 
@@ -48,13 +48,13 @@ from ml_dash import Experiment
 
 experiment = Experiment(name="my-experiment", project="project",
         local_path=".ml-dash")
-experiment.open()
+experiment.run.start()
 
 try:
     experiment.log("Training started")
-    experiment.parameters().set(learning_rate=0.001)
+    experiment.params.set(learning_rate=0.001)
 finally:
-    experiment.close()
+    experiment.run.complete()
 ```
 
 ## Local vs Remote Mode
@@ -67,9 +67,8 @@ finally:
 with Experiment(
     name="my-experiment",
     project="project",
-    local_prefix="./experiments",
-        local_path=".ml-dash"
-) as experiment:
+    local_path=".ml-dash"
+).run as experiment:
     experiment.log("Using local storage")
 ```
 
@@ -81,9 +80,9 @@ with Experiment(
 with Experiment(
     name="my-experiment",
     project="project",
-    remote="https://your-server.com",
+    remote="https://api.dash.ml",
     user_name="alice"
-) as experiment:
+).run as experiment:
     experiment.log("Using remote server")
 ```
 
@@ -97,13 +96,12 @@ Add description, tags, bindrs, and folders for organization:
 with Experiment(
     name="resnet50-imagenet",
     project="computer-vision",
-    local_prefix="./experiments",
+    local_path=".ml-dash",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
     bindrs=["gpu-cluster", "team-a"],
-    folder="/experiments/2025/resnet",
-        local_path=".ml-dash"
-) as experiment:
+    folder="/experiments/2025/resnet"
+).run as experiment:
     experiment.log("Training started")
 ```
 
@@ -129,13 +127,13 @@ Experiments automatically track their status through the lifecycle:
 
 # Normal completion - status becomes COMPLETED
 with Experiment(name="training", project="ml",
-        remote="https://server.com") as experiment:
+        remote="https://api.dash.ml").run as experiment:
     experiment.log("Training...")
     # Status automatically set to COMPLETED on exit
 
 # Exception handling - status becomes FAILED
 with Experiment(name="training", project="ml",
-        remote="https://server.com") as experiment:
+        remote="https://api.dash.ml").run as experiment:
     experiment.log("Training...")
     raise ValueError("Training failed!")
     # Status automatically set to FAILED on exception
@@ -149,18 +147,18 @@ with Experiment(name="training", project="ml",
 from ml_dash import Experiment
 
 experiment = Experiment(name="training", project="ml",
-        remote="https://server.com")
-experiment.open()
+        remote="https://api.dash.ml")
+experiment.run.start()
 
 try:
     experiment.log("Training...")
     # ... training code ...
-    experiment.close(status="COMPLETED")
+    experiment.run.complete()
 except KeyboardInterrupt:
-    experiment.close(status="CANCELLED")
+    experiment.run.cancel()
 except Exception as e:
     experiment.log(f"Error: {e}")
-    experiment.close(status="FAILED")
+    experiment.run.fail()
 ```
 
 **Note:** Status updates only work in remote mode. Local mode doesn't track status.
@@ -174,15 +172,15 @@ Experiments use **upsert behavior** - reopen by using the same name:
 
 # First run
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Starting epoch 1")
-    experiment.metric("loss").append(value=0.5, epoch=1)
+    experiment.metrics("loss").append(value=0.5, epoch=1)
 
 # Later - continues same experiment
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Resuming from checkpoint")
-    experiment.metric("loss").append(value=0.3, epoch=2)
+    experiment.metrics("loss").append(value=0.3, epoch=2)
 ```
 
 ## Available Operations
@@ -193,18 +191,18 @@ Once a experiment is open, you can use all ML-Dash features:
 :linenos:
 
 with Experiment(name="demo", project="test",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Logging
     experiment.log("Training started", level="info")
 
     # Parameters
-    experiment.parameters().set(lr=0.001, batch_size=32)
+    experiment.params.set(lr=0.001, batch_size=32)
 
-    # Metrics metricing
-    experiment.metric("loss").append(value=0.5, epoch=1)
+    # Metrics tracking
+    experiment.metrics("loss").append(value=0.5, epoch=1)
 
     # File uploads
-    experiment.file("model.pth", prefix="/models")
+    experiment.file(file_path="model.pth", prefix="/models").save()
 ```
 
 ## Storage Structure

@@ -37,8 +37,8 @@ def train_model(architecture, experiment):
 
         loss = (1 - progress) * 2.0 + random.uniform(-0.1, 0.1)
 
-        experiment.metric("accuracy").append(value=accuracy, epoch=epoch)
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
 
     return accuracy
 
@@ -56,9 +56,9 @@ def compare_architectures():
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
         local_path=".ml-dash"
-        ) as experiment:
+        .run as experiment:
             # Same configuration for fair comparison
-            experiment.parameters().set(
+            experiment.params.set(
                 architecture=arch,
                 dataset="cifar10",
                 batch_size=128,
@@ -124,7 +124,7 @@ name=f"comparison-{arch}"
 
 **Fair comparison** - Same hyperparameters for all:
 ```python
-experiment.parameters().set(
+experiment.params.set(
     batch_size=128,      # Same for all
     learning_rate=0.001, # Same for all
     epochs=20,           # Same for all
@@ -186,16 +186,16 @@ def train_and_evaluate(model, train_loader, val_loader, experiment):
         accuracy = correct / total
 
         # Metric metrics
-        experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metric("val_accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+        experiment.metrics("val_accuracy").append(value=accuracy, epoch=epoch)
 
     return accuracy
 
 # Compare architectures
 for arch in ["cnn", "resnet", "vit"]:
     with Experiment(name=f"comparison-{arch}", project="arch-comp",
-        local_path=".ml-dash") as experiment:
-        experiment.parameters().set(architecture=arch, dataset="cifar10")
+        local_path=".ml-dash".run as experiment:
+        experiment.params.set(architecture=arch, dataset="cifar10")
 
         model = create_model(arch)
         final_acc = train_and_evaluate(model, train_loader, val_loader, experiment)

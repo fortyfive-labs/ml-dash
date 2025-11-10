@@ -54,10 +54,10 @@ def main():
         local_path="./tutorial_data",
         description="Complete end-to-end training example",
         tags=["tutorial", "complete", "cifar10", "resnet"]
-    ) as experiment:
+    ).run as experiment:
         # 1. Metric configuration
         print("\n[1/6] Metricing configuration...")
-        experiment.parameters().set(**config)
+        experiment.params.set(**config)
         experiment.log("Configuration saved", level="info")
 
         # 2. Log training start
@@ -87,14 +87,14 @@ def main():
             val_acc = min(0.92, val_acc + epoch * 0.01)
 
             # Metric metrics
-            experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-            experiment.metric("train_accuracy").append(value=train_acc, epoch=epoch)
-            experiment.metric("val_loss").append(value=val_loss, epoch=epoch)
-            experiment.metric("val_accuracy").append(value=val_acc, epoch=epoch)
+            experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+            experiment.metrics("train_accuracy").append(value=train_acc, epoch=epoch)
+            experiment.metrics("val_loss").append(value=val_loss, epoch=epoch)
+            experiment.metrics("val_accuracy").append(value=val_acc, epoch=epoch)
 
             # Metric learning rate (simulated schedule)
             lr = config["training"]["learning_rate"] * (0.95 ** epoch)
-            experiment.metric("learning_rate").append(value=lr, epoch=epoch)
+            experiment.metrics("learning_rate").append(value=lr, epoch=epoch)
 
             # Log epoch summary
             experiment.log(

@@ -10,8 +10,8 @@ Metric hyperparameters, configuration values, and experiment settings. Parameter
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(
         learning_rate=0.001,
         batch_size=32,
         optimizer="adam",
@@ -27,8 +27,8 @@ Use nested dictionaries - they're automatically flattened with dot notation:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(**{
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(**{
         "model": {
             "architecture": "resnet50",
             "pretrained": True,
@@ -56,15 +56,15 @@ Call `parameters().set()` multiple times - values merge and overwrite:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Initial parameters
-    experiment.parameters().set(learning_rate=0.001, batch_size=32)
+    experiment.params.set(learning_rate=0.001, batch_size=32)
 
     # Add more
-    experiment.parameters().set(optimizer="adam", momentum=0.9)
+    experiment.params.set(optimizer="adam", momentum=0.9)
 
     # Update existing
-    experiment.parameters().set(learning_rate=0.0001)
+    experiment.params.set(learning_rate=0.0001)
 
     # Final result:
     # learning_rate = 0.0001  (updated)
@@ -87,8 +87,8 @@ with open("config.json", "r") as f:
     config = json.load(f)
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(**config)
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(**config)
     experiment.log("Configuration loaded")
 ```
 
@@ -106,8 +106,8 @@ parser.add_argument("--batch-size", type=int, default=32)
 args = parser.parse_args()
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(**vars(args))
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(**vars(args))
 ```
 
 **From dataclass:**
@@ -127,8 +127,8 @@ class TrainingConfig:
 config = TrainingConfig()
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(**asdict(config))
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(**asdict(config))
 ```
 
 ## Complete Training Configuration
@@ -137,8 +137,8 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="resnet-imagenet", project="cv",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(**{
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(**{
         "model": {
             "architecture": "resnet50",
             "pretrained": True,
@@ -181,4 +181,4 @@ cat ./experiments/project/my-experiment/parameters.json
 
 ---
 
-**Next:** Learn about [Metrics](metrics.md) for time-series metrics metricing.
+**Next:** Learn about [Metrics](metrics.md) for time-series metrics tracking.

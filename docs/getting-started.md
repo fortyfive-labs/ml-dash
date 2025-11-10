@@ -1,4 +1,4 @@
-# Quickstart
+# Getting Started
 
 Get started with ML-Dash in under 5 minutes.
 
@@ -10,7 +10,6 @@ pip install ml-dash
 
 ## Your First Experiment
 
-### Local Mode (Recommended for First Try)
 
 Local mode stores everything on your filesystem - perfect for getting started:
 
@@ -21,12 +20,12 @@ from ml_dash import Experiment
 
 # Create a experiment (stores data in .ml-dash/ directory)
 with Experiment(name="my-first-experiment", project="tutorial",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Log messages
     experiment.log("Training started")
 
     # Metric parameters
-    experiment.parameters().set(
+    experiment.params.set(
         learning_rate=0.001,
         batch_size=32,
         epochs=10
@@ -35,7 +34,7 @@ with Experiment(name="my-first-experiment", project="tutorial",
     # Metric metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
 
     experiment.log("Training completed")
 ```
@@ -60,7 +59,7 @@ After running the code above, your data is organized like this:
 
 ## Common Patterns
 
-### Metricing a Training Loop
+### Tracking a Training Loop
 
 ```{code-block} python
 :linenos:
@@ -68,9 +67,9 @@ After running the code above, your data is organized like this:
 from ml_dash import Experiment
 
 with Experiment(name="train-model", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Set hyperparameters
-    experiment.parameters().set(
+    experiment.params.set(
         model="resnet50",
         optimizer="adam",
         learning_rate=0.001
@@ -83,8 +82,8 @@ with Experiment(name="train-model", project="project",
         val_acc = 0.9     # your actual accuracy
 
         # Metric metrics
-        experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metric("val_accuracy").append(value=val_acc, epoch=epoch)
+        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+        experiment.metrics("val_accuracy").append(value=val_acc, epoch=epoch)
 
         # Log important events
         if epoch % 10 == 0:
@@ -99,7 +98,7 @@ with Experiment(name="train-model", project="project",
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Train your model...
     # model.save("model.pth")
 
@@ -129,12 +128,12 @@ from ml_dash import Experiment
 with Experiment(
     name="my-experiment",
     project="team-project",
-    remote="http://your-server:3000",
+    remote="https://api.dash.ml",
     user_name="your-name"
-) as experiment:
+).run as experiment:
     # Use exactly the same API as local mode!
     experiment.log("Running on remote server")
-    experiment.parameters().set(learning_rate=0.001)
+    experiment.params.set(learning_rate=0.001)
 ```
 
 The API is identical - just add `remote` and `user_name` parameters.

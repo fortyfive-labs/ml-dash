@@ -10,7 +10,7 @@ Metric events, progress, and debugging information throughout your experiments. 
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Training started")
     experiment.log("Model architecture: ResNet-50", level="info")
     experiment.log("GPU memory low", level="warn")
@@ -25,7 +25,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Detailed debugging info", level="debug")
     experiment.log("Training epoch 1", level="info")
     experiment.log("Learning rate decreased", level="warn")
@@ -41,7 +41,7 @@ Add context and metrics to your logs:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Log with metrics
     experiment.log(
         "Epoch completed",
@@ -73,7 +73,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="mnist-training", project="ml",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.log("Starting training", level="info")
 
     for epoch in range(10):
@@ -93,13 +93,13 @@ with Experiment(name="mnist-training", project="ml",
     experiment.log("Training complete", level="info")
 ```
 
-**Error metricing:**
+**Error tracking:**
 
 ```{code-block} python
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     try:
         result = risky_operation()
         experiment.log("Operation succeeded", level="info")
@@ -115,13 +115,13 @@ with Experiment(name="my-experiment", project="project",
         raise
 ```
 
-**Progress metricing:**
+**Progress tracking:**
 
 ```{code-block} python
 :linenos:
 
 with Experiment(name="data-processing", project="etl",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     total = 10000
     experiment.log(f"Processing {total} items", level="info")
 

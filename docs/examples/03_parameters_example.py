@@ -13,9 +13,9 @@ def main():
         name="parameters-demo",
         project="tutorials",
         local_path="./tutorial_data"
-    ) as experiment:
+    ).run as experiment:
         # Simple parameters
-        experiment.parameters().set(
+        experiment.params.set(
             learning_rate=0.001,
             batch_size=32,
             epochs=100
@@ -24,7 +24,7 @@ def main():
         print("\n1. Metriced simple parameters")
 
         # Nested parameters (automatically flattened)
-        experiment.parameters().set(**{
+        experiment.params.set(**{
             "model": {
                 "architecture": "resnet50",
                 "pretrained": True,
@@ -46,12 +46,12 @@ def main():
         print("2. Metriced nested parameters (auto-flattened)")
 
         # Update existing parameter
-        experiment.parameters().set(learning_rate=0.0001)
+        experiment.params.set(learning_rate=0.0001)
 
         print("3. Updated learning_rate")
 
         # Add more parameters
-        experiment.parameters().set(
+        experiment.params.set(
             use_mixed_precision=True,
             gradient_clipping=1.0
         )

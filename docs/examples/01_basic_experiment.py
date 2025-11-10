@@ -16,12 +16,12 @@ def main():
         local_path="./tutorial_data",
         description="My first ML-Dash experiment",
         tags=["tutorial", "basic"]
-    ) as experiment:
+    ).run as experiment:
         # Log a message
         experiment.log("Hello from ML-Dash!", level="info")
 
         # Metric parameters
-        experiment.parameters().set(message="Hello World", version="1.0")
+        experiment.params.set(message="Hello World", version="1.0")
 
         print("\n✓ Experiment created successfully!")
         print(f"Data stored in: {experiment._storage.root_path}")

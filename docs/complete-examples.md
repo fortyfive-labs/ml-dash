@@ -4,7 +4,7 @@ This document contains complete, runnable examples showcasing common use cases f
 
 ## Example 1: Simple Training Loop
 
-A basic training loop with logging, parameters, and metrics metricing.
+A basic training loop with logging, parameters, and metrics tracking.
 
 ```python
 """Simple training loop example."""
@@ -21,9 +21,9 @@ def train_simple_model():
         description="Simple training example",
         tags=["tutorial", "simple"],
         local_path=".ml-dash"
-    ) as experiment:
+    .run as experiment:
         # Metric hyperparameters
-        experiment.parameters().set(
+        experiment.params.set(
             learning_rate=0.001,
             batch_size=32,
             epochs=10,
@@ -40,9 +40,9 @@ def train_simple_model():
             accuracy = min(0.95, 0.5 + epoch * 0.05)
 
             # Metric metrics
-            experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-            experiment.metric("val_loss").append(value=val_loss, epoch=epoch)
-            experiment.metric("accuracy").append(value=accuracy, epoch=epoch)
+            experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+            experiment.metrics("val_loss").append(value=val_loss, epoch=epoch)
+            experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
 
             # Log progress
             experiment.log(
@@ -64,10 +64,10 @@ if __name__ == "__main__":
 
 ## Example 2: PyTorch MNIST Training
 
-Complete PyTorch MNIST training with full experiment metricing.
+Complete PyTorch MNIST training with full experiment tracking.
 
 ```python
-"""PyTorch MNIST training with ML-Dash metricing."""
+"""PyTorch MNIST training with ML-Dash tracking."""
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -89,7 +89,7 @@ class SimpleNet(nn.Module):
         return self.fc3(x)
 
 def train_mnist():
-    """Train MNIST model with ML-Dash metricing."""
+    """Train MNIST model with ML-Dash tracking."""
 
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -122,9 +122,9 @@ def train_mnist():
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
         local_path=".ml-dash"
-    ) as experiment:
+    .run as experiment:
         # Metric configuration
-        experiment.parameters().set({
+        experiment.params.set({
             "model": {
                 "architecture": "SimpleMLP",
                 "layers": [784, 128, 64, 10]
@@ -189,10 +189,10 @@ def train_mnist():
             val_accuracy = correct / total
 
             # Metric metrics
-            experiment.metric("train_loss").append(value=avg_train_loss, epoch=epoch)
-            experiment.metric("train_accuracy").append(value=train_accuracy, epoch=epoch)
-            experiment.metric("val_loss").append(value=avg_val_loss, epoch=epoch)
-            experiment.metric("val_accuracy").append(value=val_accuracy, epoch=epoch)
+            experiment.metrics("train_loss").append(value=avg_train_loss, epoch=epoch)
+            experiment.metrics("train_accuracy").append(value=train_accuracy, epoch=epoch)
+            experiment.metrics("val_loss").append(value=avg_val_loss, epoch=epoch)
+            experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
 
             # Log progress
             experiment.log(
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
 ## Example 3: Hyperparameter Search
 
-Grid search over hyperparameters with full metricing.
+Grid search over hyperparameters with full tracking.
 
 ```python
 """Hyperparameter search example."""
@@ -255,8 +255,8 @@ def train_with_config(lr, batch_size, experiment):
         # Larger batch size = slightly worse performance
         accuracy = min(0.95, 0.5 + epoch * 0.05 * (32 / batch_size))
 
-        experiment.metric("loss").append(value=loss, epoch=epoch)
-        experiment.metric("accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
 
     return accuracy
 
@@ -278,9 +278,9 @@ def hyperparameter_search():
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
         local_path=".ml-dash"
-        ) as experiment:
+        .run as experiment:
             # Metric hyperparameters
-            experiment.parameters().set(
+            experiment.params.set(
                 learning_rate=lr,
                 batch_size=bs,
                 optimizer="sgd",
@@ -332,7 +332,7 @@ def train_model(architecture, experiment):
 
     for epoch in range(epochs):
         acc = min(base_lr, 0.5 + epoch * (base_lr - 0.5) / epochs + random.uniform(-0.02, 0.02))
-        experiment.metric("accuracy").append(value=acc, epoch=epoch)
+        experiment.metrics("accuracy").append(value=acc, epoch=epoch)
 
     return acc
 
@@ -350,9 +350,9 @@ def compare_architectures():
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
         local_path=".ml-dash"
-        ) as experiment:
+        .run as experiment:
             # Configuration
-            experiment.parameters().set(
+            experiment.params.set(
                 architecture=arch,
                 dataset="cifar10",
                 batch_size=128,
@@ -398,8 +398,8 @@ def train_with_debug():
         description="Training with debug logging",
         tags=["debug"],
         local_path=".ml-dash"
-    ) as experiment:
-        experiment.parameters().set(
+    .run as experiment:
+        experiment.params.set(
             learning_rate=0.001,
             batch_size=32,
             model="debug_net"
@@ -431,7 +431,7 @@ def train_with_debug():
                     metadata={"gradient_norm": 15.5, "max_norm": 10.0}
                 )
 
-            experiment.metric("loss").append(value=loss, epoch=epoch)
+            experiment.metrics("loss").append(value=loss, epoch=epoch)
 
             experiment.log(
                 f"Epoch {epoch + 1} complete",
@@ -463,8 +463,8 @@ python architecture_comparison.py
 
 **Feature-specific guides:**
 - [Logging](logging.md) - Structured logging with levels and metadata
-- [Parameters](parameters.md) - Hyperparameter metricing and flattening
-- [Metrics](metrics.md) - Time-series metrics metricing
+- [Parameters](parameters.md) - Hyperparameter tracking and flattening
+- [Metrics](metrics.md) - Time-series metrics tracking
 - [Files](files.md) - File upload and management
 
 **Deployment & Operations:**

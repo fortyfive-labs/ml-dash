@@ -37,7 +37,7 @@ def main():
         name="files-demo",
         project="tutorials",
         local_path="./tutorial_data"
-    ) as experiment:
+    ).run as experiment:
         print("\n1. Uploading model file...")
 
         # Upload model

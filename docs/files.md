@@ -10,7 +10,7 @@ Upload and manage experiment artifacts - models, plots, configs, and results. Fi
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     result = experiment.file("model.pth", prefix="/models")
 
     print(f"Uploaded: {result['filename']}")
@@ -26,7 +26,7 @@ Use paths to organize files logically:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Models
     experiment.file("model.pth", prefix="/models")
     experiment.file("best_model.pth", prefix="/models/checkpoints")
@@ -50,7 +50,7 @@ Add description, tags, and custom metadata:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     experiment.file(
         "best_model.pth",
         prefix="/models",
@@ -75,8 +75,8 @@ import torch
 from ml_dash import Experiment
 
 with Experiment(name="resnet-training", project="cv",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(model="resnet50", epochs=100)
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(model="resnet50", epochs=100)
     experiment.log("Starting training")
 
     best_accuracy = 0.0
@@ -86,8 +86,8 @@ with Experiment(name="resnet-training", project="cv",
         val_loss, val_accuracy = validate(model, val_loader)
 
         # Metric metrics
-        experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metric("val_accuracy").append(value=val_accuracy, epoch=epoch)
+        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+        experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
@@ -130,7 +130,7 @@ import matplotlib.pyplot as plt
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Generate plot
     losses = [0.5, 0.4, 0.3, 0.25, 0.2]
     plt.plot(losses)
@@ -166,9 +166,9 @@ config = {
 }
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Metric as parameters
-    experiment.parameters().set(**config)
+    experiment.params.set(**config)
 
     # Also save as file
     with open("config.json", "w") as f:
