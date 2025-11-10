@@ -1,7 +1,7 @@
 [project]
 name = "ml-dash"
-version = "0.5.1"
-description = "ML experiment metricing and data storage"
+version = "0.5.2"
+description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
@@ -9,7 +9,7 @@ authors = [
     {name = "Ge Yang"},
     {name = "Tom Tao"}
 ]
-keywords = ["machine-learning", "experiment-metricing", "mlops", "data-storage"]
+keywords = ["machine-learning", "experiment-tracking", "mlops", "data-storage"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
