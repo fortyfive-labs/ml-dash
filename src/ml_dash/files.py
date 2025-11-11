@@ -263,11 +263,12 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        # Create temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.json', text=True)
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
         try:
             # Write JSON content to temp file
-            with os.fdopen(temp_fd, 'w') as f:
+            with open(temp_path, 'w') as f:
                 json.dump(content, f, indent=2)
 
             # Save using existing save() method
@@ -282,9 +283,10 @@ class FileBuilder:
 
             return result
         finally:
-            # Clean up temp file
+            # Clean up temp file and directory
             try:
                 os.unlink(temp_path)
+                os.rmdir(temp_dir)
             except Exception:
                 pass
 
@@ -326,9 +328,9 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        # Create temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.pt')
-        os.close(temp_fd)  # Close the file descriptor
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
 
         try:
             # Save model to temp file
@@ -346,9 +348,69 @@ class FileBuilder:
 
             return result
         finally:
-            # Clean up temp file
+            # Clean up temp file and directory
             try:
                 os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_pkl(self, content: Any, file_name: str) -> Dict[str, Any]:
+        """
+        Save Python object to a pickle file.
+
+        Args:
+            content: Python object to pickle (must be pickle-serializable)
+            file_name: Name of the file to create (should end with .pkl or .pickle)
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment is not open or write-protected
+            ValueError: If content cannot be pickled
+
+        Examples:
+            data = {"model": "resnet50", "weights": np.array([1, 2, 3])}
+            result = experiment.file(prefix="/data").save_pkl(data, "data.pkl")
+
+            # Or save any Python object
+            result = experiment.file(prefix="/models").save_pkl(trained_model, "model.pickle")
+        """
+        import pickle
+        import tempfile
+        import os
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+        try:
+            # Write pickled content to temp file
+            with open(temp_path, 'wb') as f:
+                pickle.dump(content, f)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
             except Exception:
                 pass
 
