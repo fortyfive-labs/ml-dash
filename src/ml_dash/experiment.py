@@ -791,7 +791,7 @@ class Experiment:
 
     def _append_to_metric(
         self,
-        name: str,
+        name: Optional[str],
         data: Dict[str, Any],
         description: Optional[str],
         tags: Optional[List[str]],
@@ -801,7 +801,7 @@ class Experiment:
         Internal method to append a single data point to a metric.
 
         Args:
-            name: Metric name
+            name: Metric name (can be None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
             tags: Optional tags
@@ -839,7 +839,7 @@ class Experiment:
 
     def _append_batch_to_metric(
         self,
-        name: str,
+        name: Optional[str],
         data_points: List[Dict[str, Any]],
         description: Optional[str],
         tags: Optional[List[str]],
@@ -849,7 +849,7 @@ class Experiment:
         Internal method to append multiple data points to a metric.
 
         Args:
-            name: Metric name
+            name: Metric name (can be None for unnamed metrics)
             data_points: List of data points
             description: Optional metric description
             tags: Optional tags

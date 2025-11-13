@@ -636,7 +636,7 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        metric_name: str,
+        metric_name: Optional[str],
         data: Dict[str, Any],
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
@@ -653,7 +653,7 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
-            metric_name: Metric name
+            metric_name: Metric name (None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
             tags: Optional tags
@@ -666,7 +666,9 @@ class LocalStorage:
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 
-        metric_dir = metrics_dir / metric_name
+        # Convert None to string for directory name
+        dir_name = str(metric_name) if metric_name is not None else "None"
+        metric_dir = metrics_dir / dir_name
         metric_dir.mkdir(exist_ok=True)
 
         data_file = metric_dir / "data.jsonl"
@@ -720,7 +722,7 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        metric_name: str,
+        metric_name: Optional[str],
         data_points: List[Dict[str, Any]],
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
@@ -732,7 +734,7 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
-            metric_name: Metric name
+            metric_name: Metric name (None for unnamed metrics)
             data_points: List of data points
             description: Optional metric description
             tags: Optional tags
@@ -745,7 +747,9 @@ class LocalStorage:
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 
-        metric_dir = metrics_dir / metric_name
+        # Convert None to string for directory name
+        dir_name = str(metric_name) if metric_name is not None else "None"
+        metric_dir = metrics_dir / dir_name
         metric_dir.mkdir(exist_ok=True)
 
         data_file = metric_dir / "data.jsonl"
