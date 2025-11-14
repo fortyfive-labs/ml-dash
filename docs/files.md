@@ -42,6 +42,112 @@ with Experiment(name="my-experiment", project="project",
     experiment.file("results.csv", prefix="/results")
 ```
 
+## Downloading Files
+
+Download files from experiments:
+
+```{code-block} python
+:linenos:
+
+from ml_dash import Experiment
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # Upload a file first
+    upload_result = experiment.file(
+        file_path="model.pth",
+        prefix="/models"
+    ).save()
+
+    file_id = upload_result["id"]
+
+    # Download to specific path
+    downloaded_path = experiment.file(
+        file_id=file_id,
+        dest_path="./downloaded_model.pth"
+    ).download()
+
+    print(f"Downloaded to: {downloaded_path}")
+```
+
+### Download to Current Directory
+
+If `dest_path` is not specified, the file will be downloaded to the current directory with its original filename:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # List all files
+    files = experiment.file().list()
+
+    # Download first file using original filename
+    if files:
+        file_id = files[0]["id"]
+        downloaded_path = experiment.file(file_id=file_id).download()
+        print(f"Downloaded: {downloaded_path}")
+```
+
+### List and Download
+
+List files and download specific ones:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # List all files
+    files = experiment.file().list()
+
+    for file_info in files:
+        print(f"File: {file_info['filename']}")
+        print(f"  Path: {file_info['path']}")
+        print(f"  Size: {file_info['sizeBytes']} bytes")
+        print(f"  ID: {file_info['id']}")
+
+    # Download a specific file by ID
+    best_model = next(
+        (f for f in files if "best" in f.get("tags", [])),
+        None
+    )
+
+    if best_model:
+        downloaded = experiment.file(
+            file_id=best_model["id"],
+            dest_path="./best_model.pth"
+        ).download()
+        print(f"Downloaded best model to: {downloaded}")
+```
+
+### Checksum Verification
+
+Downloads automatically verify checksums to ensure file integrity:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # Upload
+    upload_result = experiment.file(
+        file_path="model.pth",
+        prefix="/models"
+    ).save()
+
+    original_checksum = upload_result["checksum"]
+    print(f"Original checksum: {original_checksum}")
+
+    # Download (checksum verified automatically)
+    downloaded = experiment.file(
+        file_id=upload_result["id"],
+        dest_path="./verified_model.pth"
+    ).download()
+
+    print(f"Download verified and saved to: {downloaded}")
+```
+
 ## File Metadata
 
 Add description, tags, and custom metadata:
