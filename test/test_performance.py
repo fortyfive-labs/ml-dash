@@ -61,7 +61,7 @@ class TestMetricPerformance:
     @pytest.mark.remote
     def test_million_metrics_remote(self, remote_experiment):
         """Test creating one million metrics on remote server."""
-        total_metrics = 50_000
+        total_metrics = 1_080_000
         batch_size = 10_000
 
         print(f"\nStarting remote test to create {total_metrics:,} metrics...")
