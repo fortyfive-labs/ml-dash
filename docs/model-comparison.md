@@ -202,7 +202,7 @@ for arch in ["cnn", "resnet", "vit"]:
 
         # Save best model
         torch.save(model.state_dict(), f"{arch}_model.pth")
-        experiment.file(f"{arch}_model.pth", prefix="/models")
+        experiment.files(f"{arch}_model.pth", prefix="/models")
 ```
 
 ---

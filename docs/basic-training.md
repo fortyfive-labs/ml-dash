@@ -67,7 +67,7 @@ def train_simple_model():
         with open("model.pth", "w") as f:
             f.write("model weights")
 
-        experiment.file(
+        experiment.files(
             file_path="model.pth",
             prefix="/models",
             description="Final trained model",

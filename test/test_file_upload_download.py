@@ -12,7 +12,7 @@ class TestFileUploadDownload:
         """Test uploading and downloading a text file in local mode."""
         with local_experiment(name="upload-download", project="test").run as experiment:
             # Upload file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 description="Model file"
@@ -23,7 +23,7 @@ class TestFileUploadDownload:
 
             # Download file
             download_path = tmp_path / "downloaded_model.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=file_id,
                 dest_path=str(download_path)
             ).download()
@@ -42,7 +42,7 @@ class TestFileUploadDownload:
         """Test uploading and downloading a text file in remote mode."""
         with remote_experiment(name="upload-download-remote", project="test").run as experiment:
             # Upload file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
@@ -52,7 +52,7 @@ class TestFileUploadDownload:
 
             # Download file
             download_path = tmp_path / "downloaded_model_remote.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=file_id,
                 dest_path=str(download_path)
             ).download()
@@ -65,7 +65,7 @@ class TestFileUploadDownload:
         """Test uploading and downloading a JSON file."""
         with local_experiment(name="json-upload-download", project="test").run as experiment:
             # Upload JSON file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["config"],
                 prefix="/configs",
                 tags=["config", "json"]
@@ -73,7 +73,7 @@ class TestFileUploadDownload:
 
             # Download it back
             download_path = tmp_path / "downloaded_config.json"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -87,7 +87,7 @@ class TestFileUploadDownload:
         """Test uploading and downloading a binary file."""
         with local_experiment(name="binary-upload-download", project="test").run as experiment:
             # Upload binary image file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["image"],
                 prefix="/images",
                 tags=["image", "png"]
@@ -97,7 +97,7 @@ class TestFileUploadDownload:
 
             # Download it back
             download_path = tmp_path / "downloaded_image.png"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -112,7 +112,7 @@ class TestFileUploadDownload:
         """Test uploading and downloading a large file."""
         with local_experiment(name="large-upload-download", project="test").run as experiment:
             # Upload large file (100 KB)
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["large"],
                 prefix="/large",
                 description="Large binary file"
@@ -122,7 +122,7 @@ class TestFileUploadDownload:
 
             # Download it back
             download_path = tmp_path / "downloaded_large.bin"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -141,13 +141,13 @@ class TestFileUploadDownload:
 
         with local_experiment(name="download-current-dir", project="test").run as experiment:
             # Upload file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
 
             # Download without dest_path (should use original filename in current directory)
-            downloaded = experiment.file(file_id=upload_result["id"]).download()
+            downloaded = experiment.files(file_id=upload_result["id"]).download()
 
         # Verify file is in current directory with original name
         assert Path(downloaded).exists()
@@ -159,33 +159,33 @@ class TestFileUploadDownload:
         """Test uploading and downloading multiple files."""
         with local_experiment(name="multi-upload-download", project="test").run as experiment:
             # Upload multiple files
-            model_result = experiment.file(
+            model_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
 
-            config_result = experiment.file(
+            config_result = experiment.files(
                 file_path=sample_files["config"],
                 prefix="/configs"
             ).save()
 
-            results_result = experiment.file(
+            results_result = experiment.files(
                 file_path=sample_files["results"],
                 prefix="/results"
             ).save()
 
             # Download all files
-            model_download = experiment.file(
+            model_download = experiment.files(
                 file_id=model_result["id"],
                 dest_path=str(tmp_path / "model.txt")
             ).download()
 
-            config_download = experiment.file(
+            config_download = experiment.files(
                 file_id=config_result["id"],
                 dest_path=str(tmp_path / "config.json")
             ).download()
 
-            results_download = experiment.file(
+            results_download = experiment.files(
                 file_id=results_result["id"],
                 dest_path=str(tmp_path / "results.csv")
             ).download()
@@ -204,7 +204,7 @@ class TestFileUploadDownload:
         """Test that metadata is preserved after download."""
         with local_experiment(name="metadata-upload-download", project="test").run as experiment:
             # Upload with metadata
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 description="Test model with metadata",
@@ -213,7 +213,7 @@ class TestFileUploadDownload:
             ).save()
 
             # List files to verify metadata
-            files = experiment.file().list()
+            files = experiment.files().list()
             our_file = next(f for f in files if f["id"] == upload_result["id"])
 
             assert our_file["description"] == "Test model with metadata"
@@ -223,7 +223,7 @@ class TestFileUploadDownload:
 
             # Download file
             download_path = tmp_path / "model_with_metadata.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -235,7 +235,7 @@ class TestFileUploadDownload:
         """Test that checksum is verified during download."""
         with local_experiment(name="checksum-verify", project="test").run as experiment:
             # Upload file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
@@ -244,7 +244,7 @@ class TestFileUploadDownload:
 
             # Download file
             download_path = tmp_path / "verified_model.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -261,23 +261,23 @@ class TestFileUploadDownload:
         """Test uploading and downloading multiple files in remote mode."""
         with remote_experiment(name="multi-remote-download", project="test").run as experiment:
             # Upload files
-            model_result = experiment.file(
+            model_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
 
-            config_result = experiment.file(
+            config_result = experiment.files(
                 file_path=sample_files["config"],
                 prefix="/configs"
             ).save()
 
             # Download files
-            model_download = experiment.file(
+            model_download = experiment.files(
                 file_id=model_result["id"],
                 dest_path=str(tmp_path / "remote_model.txt")
             ).download()
 
-            config_download = experiment.file(
+            config_download = experiment.files(
                 file_id=config_result["id"],
                 dest_path=str(tmp_path / "remote_config.json")
             ).download()
@@ -290,33 +290,33 @@ class TestFileUploadDownload:
         """Test uploading same file to different locations and downloading each."""
         with local_experiment(name="same-file-diff-locations", project="test").run as experiment:
             # Upload same file to different prefixes
-            v1_result = experiment.file(
+            v1_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models/v1"
             ).save()
 
-            v2_result = experiment.file(
+            v2_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models/v2"
             ).save()
 
-            backup_result = experiment.file(
+            backup_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/backup"
             ).save()
 
             # Download all versions
-            v1_download = experiment.file(
+            v1_download = experiment.files(
                 file_id=v1_result["id"],
                 dest_path=str(tmp_path / "model_v1.txt")
             ).download()
 
-            v2_download = experiment.file(
+            v2_download = experiment.files(
                 file_id=v2_result["id"],
                 dest_path=str(tmp_path / "model_v2.txt")
             ).download()
 
-            backup_download = experiment.file(
+            backup_download = experiment.files(
                 file_id=backup_result["id"],
                 dest_path=str(tmp_path / "model_backup.txt")
             ).download()
@@ -332,13 +332,13 @@ class TestFileUploadDownload:
         with local_experiment(name="download-nonexistent", project="test").run as experiment:
             # Try to download file with fake ID
             with pytest.raises((ValueError, FileNotFoundError, RuntimeError)):
-                experiment.file(file_id="nonexistent-id-12345").download()
+                experiment.files(file_id="nonexistent-id-12345").download()
 
     def test_upload_and_re_download_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading, downloading, and re-downloading the same file."""
         with local_experiment(name="re-download", project="test").run as experiment:
             # Upload
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
@@ -346,13 +346,13 @@ class TestFileUploadDownload:
             file_id = upload_result["id"]
 
             # First download
-            first_download = experiment.file(
+            first_download = experiment.files(
                 file_id=file_id,
                 dest_path=str(tmp_path / "first_download.txt")
             ).download()
 
             # Second download (same file)
-            second_download = experiment.file(
+            second_download = experiment.files(
                 file_id=file_id,
                 dest_path=str(tmp_path / "second_download.txt")
             ).download()
@@ -372,13 +372,13 @@ class TestFileUploadDownloadEdgeCases:
 
         with local_experiment(name="overwrite-download", project="test").run as experiment:
             # Upload file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models"
             ).save()
 
             # Download to existing file location
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -394,7 +394,7 @@ class TestFileUploadDownloadEdgeCases:
 
         with local_experiment(name="empty-file-download", project="test").run as experiment:
             # Upload empty file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=str(empty_file),
                 prefix="/files"
             ).save()
@@ -403,7 +403,7 @@ class TestFileUploadDownloadEdgeCases:
 
             # Download it back
             download_path = tmp_path / "downloaded_empty.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -419,14 +419,14 @@ class TestFileUploadDownloadEdgeCases:
 
         with local_experiment(name="special-chars-download", project="test").run as experiment:
             # Upload
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=str(special_file),
                 prefix="/files"
             ).save()
 
             # Download
             download_path = tmp_path / "downloaded_special.txt"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()
@@ -439,14 +439,14 @@ class TestFileUploadDownloadEdgeCases:
         """Test uploading and downloading large file in remote mode."""
         with remote_experiment(name="large-remote-download", project="test").run as experiment:
             # Upload large file
-            upload_result = experiment.file(
+            upload_result = experiment.files(
                 file_path=sample_files["large"],
                 prefix="/large"
             ).save()
 
             # Download it back
             download_path = tmp_path / "downloaded_large_remote.bin"
-            downloaded = experiment.file(
+            downloaded = experiment.files(
                 file_id=upload_result["id"],
                 dest_path=str(download_path)
             ).download()

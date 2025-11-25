@@ -126,7 +126,7 @@ def main():
                     f.write(f"Best model at epoch {best_epoch}\n")
                     f.write(f"Validation accuracy: {best_val_acc:.4f}\n")
 
-                experiment.file(
+                experiment.files(
                     file_path=model_path,
                     prefix="/models",
                     description=f"Best model (val_acc={best_val_acc:.4f})",
@@ -149,7 +149,7 @@ def main():
             f.write(f"Final model after {config['training']['epochs']} epochs\n")
             f.write(f"Best validation accuracy: {best_val_acc:.4f} at epoch {best_epoch}\n")
 
-        experiment.file(
+        experiment.files(
             file_path=final_model_path,
             prefix="/models",
             description="Final model after all epochs",
@@ -168,7 +168,7 @@ def main():
             f.write(f"Best validation accuracy: {best_val_acc:.4f}\n")
             f.write(f"Best epoch: {best_epoch}\n")
 
-        experiment.file(
+        experiment.files(
             file_path=results_path,
             prefix="/results",
             description="Training results summary",

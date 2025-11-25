@@ -49,14 +49,14 @@ class TestCompleteWorkflows:
                 )
 
             # 3. Upload artifacts
-            experiment.file(
+            experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models/final",
                 tags=["final", "best"],
                 description="Final trained model"
             ).save()
 
-            experiment.file(
+            experiment.files(
                 file_path=sample_files["config"],
                 prefix="/configs",
                 tags=["config"],
@@ -97,7 +97,7 @@ class TestCompleteWorkflows:
                 experiment.metrics("loss").append(value=loss, epoch=epoch)
                 experiment.log(f"Epoch {epoch + 1}/5", metadata={"loss": loss})
 
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
             experiment.log("Remote experiment completed", level="info")
 
 
@@ -227,7 +227,7 @@ class TestMultiExperimentPipeline:
                 preprocessing_steps=["normalize", "augment", "split"]
             )
             experiment.metrics("samples_processed").append(value=10000, step=0)
-            experiment.file(file_path=sample_files["results"], prefix="/data").save()
+            experiment.files(file_path=sample_files["results"], prefix="/data").save()
             experiment.log("Preprocessing complete", level="info")
 
         # Stage 2: Training
@@ -245,7 +245,7 @@ class TestMultiExperimentPipeline:
             )
             for i in range(10):
                 experiment.metrics("loss").append(value=1.0 / (i + 1), epoch=i)
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
             experiment.log("Training complete", level="info")
 
         # Stage 3: Evaluation
@@ -385,9 +385,9 @@ class TestAllFeaturesCombined:
                 experiment.log(f"Epoch {i+1} metrics metriced", level="info")
 
             # Upload multiple files
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/configs").save()
-            experiment.file(file_path=sample_files["results"], prefix="/results").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/configs").save()
+            experiment.files(file_path=sample_files["results"], prefix="/results").save()
 
             # Warnings and errors
             experiment.log("Simulated warning", level="warn")
@@ -437,8 +437,8 @@ class TestAllFeaturesCombined:
                 experiment.metrics("accuracy").append(value=0.8 + i * 0.05, epoch=i)
 
             # Files
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/configs").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/configs").save()
 
             experiment.log("Remote comprehensive test complete", level="info")
 

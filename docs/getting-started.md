@@ -103,13 +103,13 @@ with Experiment(name="my-experiment", project="project",
     # model.save("model.pth")
 
     # Upload the model file
-    experiment.file(
+    experiment.files(
         file_prefix="model.pth",
         prefix="/models"
     ).save()
 
     # Upload a config file with metadata
-    experiment.file(
+    experiment.files(
         file_prefix="config.yaml",
         prefix="/configs",
         metadata={"version": "1.0"}

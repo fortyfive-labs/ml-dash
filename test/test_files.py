@@ -11,7 +11,7 @@ class TestBasicFileOperations:
     def test_upload_single_file_local(self, local_experiment, sample_files, temp_project):
         """Test uploading a single file in local mode."""
         with local_experiment(name="file-test", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 description="Model weights",
@@ -31,7 +31,7 @@ class TestBasicFileOperations:
     def test_upload_single_file_remote(self, remote_experiment, sample_files):
         """Test uploading a file in remote mode."""
         with remote_experiment(name="file-test-remote", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 tags=["model", "remote"]
@@ -42,9 +42,9 @@ class TestBasicFileOperations:
     def test_upload_multiple_files_local(self, local_experiment, sample_files, temp_project):
         """Test uploading multiple files."""
         with local_experiment(name="multi-file", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/config").save()
-            experiment.file(file_path=sample_files["results"], prefix="/results").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/config").save()
+            experiment.files(file_path=sample_files["results"], prefix="/results").save()
 
         files_dir = temp_project / "test" / "multi-file" / "files"
         file_dirs = [d for d in files_dir.iterdir() if d.is_dir()]
@@ -54,8 +54,8 @@ class TestBasicFileOperations:
     def test_upload_multiple_files_remote(self, remote_experiment, sample_files):
         """Test uploading multiple files in remote mode."""
         with remote_experiment(name="multi-file-remote", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/config").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/config").save()
 
 
 class TestFileMetadata:
@@ -64,7 +64,7 @@ class TestFileMetadata:
     def test_file_with_metadata_local(self, local_experiment, sample_files, temp_project):
         """Test uploading file with custom metadata."""
         with local_experiment(name="file-meta", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["results"],
                 prefix="/results",
                 description="Training results per epoch",
@@ -91,7 +91,7 @@ class TestFileMetadata:
     def test_file_with_metadata_remote(self, remote_experiment, sample_files):
         """Test file metadata in remote mode."""
         with remote_experiment(name="file-meta-remote", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["config"],
                 prefix="/config",
                 description="Training configuration",
@@ -107,7 +107,7 @@ class TestFileMetadata:
             expected_checksum = hashlib.sha256(f.read()).hexdigest()
 
         with local_experiment(name="file-checksum", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["model"], prefix="/models").save()
+            result = experiment.files(file_path=sample_files["model"], prefix="/models").save()
             assert result["checksum"] == expected_checksum
 
     def test_file_size_metricing_local(self, local_experiment, sample_files):
@@ -115,19 +115,19 @@ class TestFileMetadata:
         model_size = Path(sample_files["model"]).stat().st_size
 
         with local_experiment(name="file-size", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["model"], prefix="/models").save()
+            result = experiment.files(file_path=sample_files["model"], prefix="/models").save()
             assert result["sizeBytes"] == model_size
 
     def test_file_tags_local(self, local_experiment, sample_files, temp_project):
         """Test file tagging."""
         with local_experiment(name="file-tags", project="test").run as experiment:
-            experiment.file(
+            experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 tags=["best", "final", "v1.0", "production"]
             ).save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 1
         assert "best" in files[0]["tags"]
@@ -141,10 +141,10 @@ class TestListFiles:
     def test_list_files_local(self, local_experiment, sample_files):
         """Test listing all files in a experiment."""
         with local_experiment(name="file-list", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/config").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/config").save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 2
         filenames = [f["filename"] for f in files]
@@ -155,10 +155,10 @@ class TestListFiles:
     def test_list_files_remote(self, remote_experiment, sample_files):
         """Test listing files in remote mode."""
         with remote_experiment(name="file-list-remote", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            experiment.file(file_path=sample_files["config"], prefix="/config").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            experiment.files(file_path=sample_files["config"], prefix="/config").save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
             assert len(files) >= 2
 
     def test_list_empty_files_local(self, local_experiment):
@@ -174,10 +174,10 @@ class TestFilePrefixes:
     def test_file_prefixes_local(self, local_experiment, sample_files):
         """Test that file prefixes are correctly stored."""
         with local_experiment(name="file-prefix", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models/v1").save()
-            experiment.file(file_path=sample_files["config"], prefix="/configs/prod").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v1").save()
+            experiment.files(file_path=sample_files["config"], prefix="/configs/prod").save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 2
         paths = [f["path"] for f in files]
@@ -187,12 +187,12 @@ class TestFilePrefixes:
     def test_nested_prefixes_local(self, local_experiment, sample_files):
         """Test deeply nested prefix paths."""
         with local_experiment(name="nested-prefix", project="test").run as experiment:
-            experiment.file(
+            experiment.files(
                 file_path=sample_files["model"],
                 prefix="/a/b/c/d/e/models"
             ).save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 1
         assert files[0]["path"] == "/a/b/c/d/e/models"
@@ -200,11 +200,11 @@ class TestFilePrefixes:
     def test_same_file_different_prefixes_local(self, local_experiment, sample_files):
         """Test uploading same file to different locations."""
         with local_experiment(name="same-file-diff-prefix", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models/v1").save()
-            experiment.file(file_path=sample_files["model"], prefix="/models/v2").save()
-            experiment.file(file_path=sample_files["model"], prefix="/backup").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v1").save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v2").save()
+            experiment.files(file_path=sample_files["model"], prefix="/backup").save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 3
         assert all(f["filename"] == "model.txt" for f in files)
@@ -220,7 +220,7 @@ class TestFileTypes:
     def test_text_file_upload_local(self, local_experiment, sample_files, temp_project):
         """Test uploading text files."""
         with local_experiment(name="text-file", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/text").save()
+            experiment.files(file_path=sample_files["model"], prefix="/text").save()
 
         files_dir = temp_project / "test" / "text-file" / "files"
         saved_files = list(files_dir.glob("*/*/model.txt"))
@@ -229,26 +229,26 @@ class TestFileTypes:
     def test_json_file_upload_local(self, local_experiment, sample_files):
         """Test uploading JSON files."""
         with local_experiment(name="json-file", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["config"], prefix="/json").save()
+            result = experiment.files(file_path=sample_files["config"], prefix="/json").save()
             assert result["filename"] == "config.json"
 
     def test_csv_file_upload_local(self, local_experiment, sample_files):
         """Test uploading CSV files."""
         with local_experiment(name="csv-file", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["results"], prefix="/csv").save()
+            result = experiment.files(file_path=sample_files["results"], prefix="/csv").save()
             assert result["filename"] == "results.csv"
 
     def test_binary_file_upload_local(self, local_experiment, sample_files):
         """Test uploading binary files."""
         with local_experiment(name="binary-file", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["image"], prefix="/images").save()
+            result = experiment.files(file_path=sample_files["image"], prefix="/images").save()
             assert result["filename"] == "test_image.png"
             assert result["sizeBytes"] > 0
 
     def test_large_file_upload_local(self, local_experiment, sample_files):
         """Test uploading larger files."""
         with local_experiment(name="large-file", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["large"], prefix="/large").save()
+            result = experiment.files(file_path=sample_files["large"], prefix="/large").save()
             assert result["filename"] == "large_file.bin"
             assert result["sizeBytes"] == 1024 * 100  # 100 KB
 
@@ -256,9 +256,9 @@ class TestFileTypes:
     def test_various_file_types_remote(self, remote_experiment, sample_files):
         """Test uploading various file types in remote mode."""
         with remote_experiment(name="file-types-remote", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/text").save()
-            experiment.file(file_path=sample_files["config"], prefix="/json").save()
-            experiment.file(file_path=sample_files["image"], prefix="/images").save()
+            experiment.files(file_path=sample_files["model"], prefix="/text").save()
+            experiment.files(file_path=sample_files["config"], prefix="/json").save()
+            experiment.files(file_path=sample_files["image"], prefix="/images").save()
 
 
 class TestFileEdgeCases:
@@ -270,7 +270,7 @@ class TestFileEdgeCases:
         file_with_spaces.write_text("Content with spaces in filename")
 
         with local_experiment(name="spaces-file", project="test").run as experiment:
-            result = experiment.file(file_path=str(file_with_spaces), prefix="/files").save()
+            result = experiment.files(file_path=str(file_with_spaces), prefix="/files").save()
             assert "my file with spaces.txt" in result["filename"]
 
     def test_file_with_unicode_name_local(self, local_experiment, tmp_path):
@@ -279,7 +279,7 @@ class TestFileEdgeCases:
         unicode_file.write_text("Unicode filename test")
 
         with local_experiment(name="unicode-file", project="test").run as experiment:
-            result = experiment.file(file_path=str(unicode_file), prefix="/files").save()
+            result = experiment.files(file_path=str(unicode_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
     def test_file_with_long_filename_local(self, local_experiment, tmp_path):
@@ -289,14 +289,14 @@ class TestFileEdgeCases:
         long_file.write_text("Long filename test")
 
         with local_experiment(name="long-filename", project="test").run as experiment:
-            result = experiment.file(file_path=str(long_file), prefix="/files").save()
+            result = experiment.files(file_path=str(long_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
     def test_multiple_uploads_same_file_local(self, local_experiment, sample_files):
         """Test uploading the same file multiple times to same location."""
         with local_experiment(name="duplicate-upload", project="test").run as experiment:
-            result1 = experiment.file(file_path=sample_files["model"], prefix="/models").save()
-            result2 = experiment.file(file_path=sample_files["model"], prefix="/models").save()
+            result1 = experiment.files(file_path=sample_files["model"], prefix="/models").save()
+            result2 = experiment.files(file_path=sample_files["model"], prefix="/models").save()
 
             # Both uploads should succeed
             assert result1["filename"] == result2["filename"]
@@ -307,7 +307,7 @@ class TestFileEdgeCases:
         special_file.write_text("Special characters test")
 
         with local_experiment(name="special-chars-file", project="test").run as experiment:
-            result = experiment.file(file_path=str(special_file), prefix="/files").save()
+            result = experiment.files(file_path=str(special_file), prefix="/files").save()
             assert result["sizeBytes"] > 0
 
     def test_empty_file_upload_local(self, local_experiment, tmp_path):
@@ -316,7 +316,7 @@ class TestFileEdgeCases:
         empty_file.write_text("")
 
         with local_experiment(name="empty-file", project="test").run as experiment:
-            result = experiment.file(file_path=str(empty_file), prefix="/files").save()
+            result = experiment.files(file_path=str(empty_file), prefix="/files").save()
             assert result["sizeBytes"] == 0
 
     def test_file_with_long_metadata_local(self, local_experiment, sample_files):
@@ -324,7 +324,7 @@ class TestFileEdgeCases:
         large_metadata = {f"key_{i}": f"value_{i}" for i in range(100)}
 
         with local_experiment(name="large-file-meta", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 metadata=large_metadata
@@ -337,7 +337,7 @@ class TestFileEdgeCases:
         many_tags = [f"tag-{i}" for i in range(50)]
 
         with local_experiment(name="many-tags-file", project="test").run as experiment:
-            result = experiment.file(
+            result = experiment.files(
                 file_path=sample_files["model"],
                 prefix="/models",
                 tags=many_tags
@@ -349,7 +349,7 @@ class TestFileEdgeCases:
     def test_large_file_remote(self, remote_experiment, sample_files):
         """Test uploading large file in remote mode."""
         with remote_experiment(name="large-file-remote", project="test").run as experiment:
-            result = experiment.file(file_path=sample_files["large"], prefix="/large").save()
+            result = experiment.files(file_path=sample_files["large"], prefix="/large").save()
             assert result["sizeBytes"] == 1024 * 100
 
 
@@ -359,11 +359,11 @@ class TestFileOrganization:
     def test_organize_by_type_local(self, local_experiment, sample_files):
         """Test organizing files by type."""
         with local_experiment(name="organized", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models", tags=["model"]).save()
-            experiment.file(file_path=sample_files["config"], prefix="/configs", tags=["config"]).save()
-            experiment.file(file_path=sample_files["results"], prefix="/results", tags=["results"]).save()
+            experiment.files(file_path=sample_files["model"], prefix="/models", tags=["model"]).save()
+            experiment.files(file_path=sample_files["config"], prefix="/configs", tags=["config"]).save()
+            experiment.files(file_path=sample_files["results"], prefix="/results", tags=["results"]).save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         # Group by prefix
         models = [f for f in files if f["path"] == "/models"]
@@ -377,11 +377,11 @@ class TestFileOrganization:
     def test_organize_by_version_local(self, local_experiment, sample_files):
         """Test organizing files by version."""
         with local_experiment(name="versioned", project="test").run as experiment:
-            experiment.file(file_path=sample_files["model"], prefix="/models/v1", tags=["v1"]).save()
-            experiment.file(file_path=sample_files["model"], prefix="/models/v2", tags=["v2"]).save()
-            experiment.file(file_path=sample_files["model"], prefix="/models/v3", tags=["v3", "latest"]).save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v1", tags=["v1"]).save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v2", tags=["v2"]).save()
+            experiment.files(file_path=sample_files["model"], prefix="/models/v3", tags=["v3", "latest"]).save()
 
-            files = experiment.file().list()
+            files = experiment.files().list()
 
         assert len(files) == 3
         versions = [f["path"] for f in files]

@@ -386,13 +386,13 @@ Upload, download, and manage files associated with experiments.
 
 ```python
 # Upload a file
-result = exp.file(
+result = exp.files(
     file_path="./model.pt",
     prefix="/models"
 ).save()
 
 # Upload with metadata
-result = exp.file(
+result = exp.files(
     file_path="./model.pt",
     prefix="/models",
     description="Best model checkpoint",
@@ -413,7 +413,7 @@ config = {
     "batch_size": 32
 }
 
-result = exp.file(prefix="/configs").save_json(config, "config.json")
+result = exp.files(prefix="/configs").save_json(config, "config.json")
 ```
 
 #### Save PyTorch Models
@@ -423,10 +423,10 @@ import torch
 
 # Save PyTorch model
 model = torch.nn.Linear(10, 5)
-result = exp.file(prefix="/models").save_torch(model, "model.pt")
+result = exp.files(prefix="/models").save_torch(model, "model.pt")
 
 # Save state dict
-result = exp.file(prefix="/models").save_torch(
+result = exp.files(prefix="/models").save_torch(
     model.state_dict(),
     "model.pth"
 )
@@ -436,7 +436,7 @@ result = exp.file(prefix="/models").save_torch(
 
 ```python
 # Upload file with bindrs for advanced organization
-result = exp.file(
+result = exp.files(
     file_path="./model.pt",
     prefix="/models",
     bindrs=["v1", "best", "production"],
@@ -448,30 +448,30 @@ result = exp.file(
 
 ```python
 # List all files
-files = exp.file().list()
+files = exp.files().list()
 
 # List files by prefix
-files = exp.file(prefix="/models").list()
+files = exp.files(prefix="/models").list()
 
 # List files by tags
-files = exp.file(tags=["checkpoint"]).list()
+files = exp.files(tags=["checkpoint"]).list()
 ```
 
 ### Downloading Files
 
 ```python
 # Download to current directory with original filename
-path = exp.file(file_id="123").download()
+path = exp.files(file_id="123").download()
 
 # Download to custom path
-path = exp.file(file_id="123").download(dest_path="./my_model.pt")
+path = exp.files(file_id="123").download(dest_path="./my_model.pt")
 ```
 
 ### File Management
 
 ```python
 # Update file metadata
-result = exp.file(
+result = exp.files(
     file_id="123",
     description="Updated description",
     tags=["new", "tags"],
@@ -479,7 +479,7 @@ result = exp.file(
 ).update()
 
 # Delete file (soft delete)
-result = exp.file(file_id="123").delete()
+result = exp.files(file_id="123").delete()
 ```
 
 ### Files API
@@ -544,7 +544,7 @@ dxp.metrics(name="loss").append(step=0, value=0.5)
 dxp.metrics(name="loss").append(step=1, value=0.4)
 
 # Upload files
-dxp.file(file_path="model.pt", prefix="/models").save()
+dxp.files(file_path="model.pt", prefix="/models").save()
 
 # Automatically completed on Python exit
 ```
@@ -571,7 +571,7 @@ for epoch in range(10):
     dxp.log(f"Epoch {epoch} completed", loss=loss)
 
 # Save results
-dxp.file(prefix="/results").save_json(results, "results.json")
+dxp.files(prefix="/results").save_json(results, "results.json")
 ```
 
 #### Prototyping Scripts
@@ -590,7 +590,7 @@ dxp.log("Training started")
 model = train_model()
 
 # Save model
-dxp.file(prefix="/models").save_torch(model, "model.pt")
+dxp.files(prefix="/models").save_torch(model, "model.pt")
 
 # Log final metrics
 dxp.metrics(name="accuracy").append(value=0.95, step=10)
@@ -702,7 +702,7 @@ for epoch in range(10):
     dxp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
 
 # Save results
-dxp.file(prefix="/models").save_torch(model.state_dict(), "final.pt")
+dxp.files(prefix="/models").save_torch(model.state_dict(), "final.pt")
 dxp.log("Experiment completed!")
 
 # Automatically saved on exit!
@@ -747,7 +747,7 @@ with Experiment(
         "dataset": "cifar10",
         "lr": 0.001
     }
-    exp.file(prefix="/configs").save_json(config, "config.json")
+    exp.files(prefix="/configs").save_json(config, "config.json")
 
     # 3. Training loop
     exp.log("Training started", level="info")
@@ -774,14 +774,14 @@ with Experiment(
 
         # Save checkpoints
         if val_acc > best_acc:
-            exp.file(prefix="/models").save_torch(
+            exp.files(prefix="/models").save_torch(
                 model.state_dict(),
                 f"checkpoint_epoch_{epoch}.pt"
             )
             exp.log(f"New best model saved at epoch {epoch}", level="info")
 
     # 4. Save final model
-    exp.file(prefix="/models").save_torch(model, "final_model.pt")
+    exp.files(prefix="/models").save_torch(model, "final_model.pt")
 
     exp.log("Training completed", level="info")
 ```
@@ -848,7 +848,7 @@ def train_model(experiment):
         experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     # Save model
-    experiment.file(prefix="/models").save_json(
+    experiment.files(prefix="/models").save_json(
         {"final_loss": loss},
         "results.json"
     )
@@ -888,7 +888,7 @@ with Experiment(
     exp.metrics("training_loss").append(value=0.5, step=100)
 
     # Files stored in S3
-    exp.file(prefix="/models").save_json(
+    exp.files(prefix="/models").save_json(
         {"config": "bert-base"},
         "model_config.json"
     )
@@ -975,12 +975,12 @@ data = exp.metrics("loss").read(0, 100)
 stats = exp.metrics("loss").stats()
 
 # Files
-exp.file(file_path="model.pt", prefix="/models").save()
-exp.file(prefix="/configs").save_json(config, "config.json")
-exp.file(prefix="/models").save_torch(model, "model.pt")
-files = exp.file(prefix="/models").list()
-path = exp.file(file_id="123").download()
-exp.file(file_id="123").delete()
+exp.files(file_path="model.pt", prefix="/models").save()
+exp.files(prefix="/configs").save_json(config, "config.json")
+exp.files(prefix="/models").save_torch(model, "model.pt")
+files = exp.files(prefix="/models").list()
+path = exp.files(file_id="123").download()
+exp.files(file_id="123").delete()
 
 # Auto-Start (dxp) - Quick prototyping
 from ml_dash.auto_start import dxp
@@ -988,6 +988,6 @@ from ml_dash.auto_start import dxp
 dxp.log("Already started!")              # Ready to use immediately
 dxp.params.set(lr=0.001)                 # Set parameters
 dxp.metrics("loss").append(value=0.5)     # Log metrics
-dxp.file(file_path="model.pt").save()    # Upload files
+dxp.files(file_path="model.pt").save()    # Upload files
 # Auto-completed on Python exit
 ```

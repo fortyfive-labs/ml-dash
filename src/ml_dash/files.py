@@ -19,18 +19,18 @@ class FileBuilder:
 
     Usage:
         # Upload file
-        experiment.file(file_path="./model.pt", prefix="/models").save()
+        experiment.files(file_path="./model.pt", prefix="/models").save()
 
         # List files
-        files = experiment.file().list()
-        files = experiment.file(prefix="/models").list()
+        files = experiment.files().list()
+        files = experiment.files(prefix="/models").list()
 
         # Download file
-        experiment.file(file_id="123").download()
-        experiment.file(file_id="123", dest_path="./model.pt").download()
+        experiment.files(file_id="123").download()
+        experiment.files(file_id="123", dest_path="./model.pt").download()
 
         # Delete file
-        experiment.file(file_id="123").delete()
+        experiment.files(file_id="123").delete()
     """
 
     def __init__(self, experiment: 'Experiment', **kwargs):
@@ -72,7 +72,7 @@ class FileBuilder:
             ValueError: If file size exceeds 5GB limit
 
         Examples:
-            result = experiment.file(file_path="./model.pt", prefix="/models").save()
+            result = experiment.files(file_path="./model.pt", prefix="/models").save()
             # Returns: {"id": "123", "path": "/models", "filename": "model.pt", ...}
         """
         if not self._experiment._is_open:
@@ -130,9 +130,9 @@ class FileBuilder:
             RuntimeError: If experiment is not open
 
         Examples:
-            files = experiment.file().list()  # All files
-            files = experiment.file(prefix="/models").list()  # Filter by prefix
-            files = experiment.file(tags=["checkpoint"]).list()  # Filter by tags
+            files = experiment.files().list()  # All files
+            files = experiment.files(prefix="/models").list()  # Filter by prefix
+            files = experiment.files(tags=["checkpoint"]).list()  # Filter by tags
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -158,10 +158,10 @@ class FileBuilder:
 
         Examples:
             # Download to current directory with original filename
-            path = experiment.file(file_id="123").download()
+            path = experiment.files(file_id="123").download()
 
             # Download to custom path
-            path = experiment.file(file_id="123", dest_path="./model.pt").download()
+            path = experiment.files(file_id="123", dest_path="./model.pt").download()
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -186,7 +186,7 @@ class FileBuilder:
             ValueError: If file_id not provided
 
         Examples:
-            result = experiment.file(file_id="123").delete()
+            result = experiment.files(file_id="123").delete()
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -211,7 +211,7 @@ class FileBuilder:
             ValueError: If file_id not provided
 
         Examples:
-            result = experiment.file(
+            result = experiment.files(
                 file_id="123",
                 description="Updated description",
                 tags=["new", "tags"],
@@ -251,7 +251,7 @@ class FileBuilder:
 
         Examples:
             config = {"model": "resnet50", "lr": 0.001}
-            result = experiment.file(prefix="/configs").save_json(config, "config.json")
+            result = experiment.files(prefix="/configs").save_json(config, "config.json")
         """
         import json
         import tempfile
@@ -309,10 +309,10 @@ class FileBuilder:
         Examples:
             import torch
             model = torch.nn.Linear(10, 5)
-            result = experiment.file(prefix="/models").save_torch(model, "model.pt")
+            result = experiment.files(prefix="/models").save_torch(model, "model.pt")
 
             # Or save state dict
-            result = experiment.file(prefix="/models").save_torch(model.state_dict(), "model.pth")
+            result = experiment.files(prefix="/models").save_torch(model.state_dict(), "model.pth")
         """
         import tempfile
         import os
@@ -372,10 +372,10 @@ class FileBuilder:
 
         Examples:
             data = {"model": "resnet50", "weights": np.array([1, 2, 3])}
-            result = experiment.file(prefix="/data").save_pkl(data, "data.pkl")
+            result = experiment.files(prefix="/data").save_pkl(data, "data.pkl")
 
             # Or save any Python object
-            result = experiment.file(prefix="/models").save_pkl(trained_model, "model.pickle")
+            result = experiment.files(prefix="/models").save_pkl(trained_model, "model.pickle")
         """
         import pickle
         import tempfile

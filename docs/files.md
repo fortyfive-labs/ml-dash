@@ -11,7 +11,7 @@ from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
-    result = experiment.file("model.pth", prefix="/models")
+    result = experiment.files("model.pth", prefix="/models")
 
     print(f"Uploaded: {result['filename']}")
     print(f"Size: {result['sizeBytes']} bytes")
@@ -28,18 +28,18 @@ Use paths to organize files logically:
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
     # Models
-    experiment.file("model.pth", prefix="/models")
-    experiment.file("best_model.pth", prefix="/models/checkpoints")
+    experiment.files("model.pth", prefix="/models")
+    experiment.files("best_model.pth", prefix="/models/checkpoints")
 
     # Visualizations
-    experiment.file("loss_curve.png", prefix="/visualizations")
-    experiment.file("confusion_matrix.png", prefix="/visualizations")
+    experiment.files("loss_curve.png", prefix="/visualizations")
+    experiment.files("confusion_matrix.png", prefix="/visualizations")
 
     # Configuration
-    experiment.file("config.json", prefix="/config")
+    experiment.files("config.json", prefix="/config")
 
     # Results
-    experiment.file("results.csv", prefix="/results")
+    experiment.files("results.csv", prefix="/results")
 ```
 
 ## Downloading Files
@@ -54,7 +54,7 @@ from ml_dash import Experiment
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
     # Upload a file first
-    upload_result = experiment.file(
+    upload_result = experiment.files(
         file_path="model.pth",
         prefix="/models"
     ).save()
@@ -62,7 +62,7 @@ with Experiment(name="my-experiment", project="project",
     file_id = upload_result["id"]
 
     # Download to specific path
-    downloaded_path = experiment.file(
+    downloaded_path = experiment.files(
         file_id=file_id,
         dest_path="./downloaded_model.pth"
     ).download()
@@ -80,12 +80,12 @@ If `dest_path` is not specified, the file will be downloaded to the current dire
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
     # List all files
-    files = experiment.file().list()
+    files = experiment.files().list()
 
     # Download first file using original filename
     if files:
         file_id = files[0]["id"]
-        downloaded_path = experiment.file(file_id=file_id).download()
+        downloaded_path = experiment.files(file_id=file_id).download()
         print(f"Downloaded: {downloaded_path}")
 ```
 
@@ -99,7 +99,7 @@ List files and download specific ones:
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
     # List all files
-    files = experiment.file().list()
+    files = experiment.files().list()
 
     for file_info in files:
         print(f"File: {file_info['filename']}")
@@ -114,7 +114,7 @@ with Experiment(name="my-experiment", project="project",
     )
 
     if best_model:
-        downloaded = experiment.file(
+        downloaded = experiment.files(
             file_id=best_model["id"],
             dest_path="./best_model.pth"
         ).download()
@@ -131,7 +131,7 @@ Downloads automatically verify checksums to ensure file integrity:
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
     # Upload
-    upload_result = experiment.file(
+    upload_result = experiment.files(
         file_path="model.pth",
         prefix="/models"
     ).save()
@@ -140,7 +140,7 @@ with Experiment(name="my-experiment", project="project",
     print(f"Original checksum: {original_checksum}")
 
     # Download (checksum verified automatically)
-    downloaded = experiment.file(
+    downloaded = experiment.files(
         file_id=upload_result["id"],
         dest_path="./verified_model.pth"
     ).download()
@@ -157,7 +157,7 @@ Add description, tags, and custom metadata:
 
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as experiment:
-    experiment.file(
+    experiment.files(
         "best_model.pth",
         prefix="/models",
         description="Best model from epoch 50",
@@ -200,7 +200,7 @@ with Experiment(name="resnet-training", project="cv",
             checkpoint_path = f"checkpoint_epoch_{epoch + 1}.pth"
             torch.save(model.state_dict(), checkpoint_path)
 
-            experiment.file(
+            experiment.files(
                 checkpoint_path,
                 prefix="/checkpoints",
                 tags=["checkpoint"],
@@ -212,7 +212,7 @@ with Experiment(name="resnet-training", project="cv",
             best_accuracy = val_accuracy
 
             torch.save(model.state_dict(), "best_model.pth")
-            experiment.file(
+            experiment.files(
                 "best_model.pth",
                 prefix="/models",
                 description=f"Best model (accuracy: {best_accuracy:.4f})",
@@ -246,7 +246,7 @@ with Experiment(name="my-experiment", project="project",
 
     # Save and upload
     plt.savefig("loss_curve.png")
-    experiment.file(
+    experiment.files(
         "loss_curve.png",
         prefix="/visualizations",
         description="Training loss over epochs",
@@ -280,7 +280,7 @@ with Experiment(name="my-experiment", project="project",
     with open("config.json", "w") as f:
         json.dump(config, f, indent=2)
 
-    experiment.file(
+    experiment.files(
         "config.json",
         prefix="/config",
         description="Experiment configuration",
@@ -315,7 +315,7 @@ Each file is stored as: `files/{prefix}/{snowflake_id}/{filename}`
 - **snowflake_id**: Unique identifier generated for each file
 - **filename**: Original filename
 
-The prefix is automatically created from the `prefix` parameter when calling `experiment.file()`. This structure ensures:
+The prefix is automatically created from the `prefix` parameter when calling `experiment.files()`. This structure ensures:
 - Files with same name in different prefixes don't collide
 - Easy organization by file type or purpose
 - Unique identification via snowflake IDs

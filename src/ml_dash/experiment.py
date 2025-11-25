@@ -460,7 +460,7 @@ class Experiment:
                 timestamp=log_entry["timestamp"]
             )
 
-    def file(self, **kwargs) -> FileBuilder:
+    def files(self, **kwargs) -> FileBuilder:
         """
         Get a FileBuilder for fluent file operations.
 
@@ -472,17 +472,17 @@ class Experiment:
 
         Examples:
             # Upload file
-            experiment.file(file_path="./model.pt", prefix="/models").save()
+            experiment.files(file_path="./model.pt", prefix="/models").save()
 
             # List files
-            files = experiment.file().list()
-            files = experiment.file(prefix="/models").list()
+            files = experiment.files().list()
+            files = experiment.files(prefix="/models").list()
 
             # Download file
-            experiment.file(file_id="123").download()
+            experiment.files(file_id="123").download()
 
             # Delete file
-            experiment.file(file_id="123").delete()
+            experiment.files(file_id="123").delete()
         """
         if not self._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")

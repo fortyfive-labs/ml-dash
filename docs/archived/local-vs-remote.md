@@ -28,7 +28,7 @@ with Experiment(
     experiment.log("Running in local mode")
     experiment.parameters().set(batch_size=32)
     experiment.metric("loss").append(value=0.5)
-    experiment.file("model.pth", prefix="/models")
+    experiment.files("model.pth", prefix="/models")
 ```
 
 ### Local Storage Structure
@@ -89,7 +89,7 @@ with Experiment(
     experiment.log("Running in remote mode")
     experiment.parameters().set(batch_size=32)
     experiment.metric("loss").append(value=0.5)
-    experiment.file("model.pth", prefix="/models")
+    experiment.files("model.pth", prefix="/models")
 
 # Or with API key (advanced)
 with Experiment(
@@ -101,7 +101,7 @@ with Experiment(
     experiment.log("Running in remote mode")
     experiment.parameters().set(batch_size=32)
     experiment.metric("loss").append(value=0.5)
-    experiment.file("model.pth", prefix="/models")
+    experiment.files("model.pth", prefix="/models")
 ```
 
 ### Remote Storage Architecture
