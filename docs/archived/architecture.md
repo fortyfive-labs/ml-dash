@@ -92,7 +92,7 @@ experiment.metric("loss").append_batch([...])
 
 #### FileBuilder
 ```python
-experiment.file(file_prefix="model.pth", prefix="/models").save()
+experiment.files(file_prefix="model.pth", prefix="/models").save()
 ```
 - File upload and organization
 - Checksum validation (SHA256)

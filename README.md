@@ -38,7 +38,7 @@ pip install ml-dash
 </tr>
 </table>
 
-## Quick Start
+## Getting Started
 
 ### Remote Mode (with API Server)
 

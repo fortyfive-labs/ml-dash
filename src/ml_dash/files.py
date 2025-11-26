@@ -6,7 +6,7 @@ Provides fluent API for file upload, download, list, and delete operations.
 
 import hashlib
 import mimetypes
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
 if TYPE_CHECKING:
@@ -19,18 +19,18 @@ class FileBuilder:
 
     Usage:
         # Upload file
-        experiment.file(file_path="./model.pt", prefix="/models").save()
+        experiment.files(file_path="./model.pt", prefix="/models").save()
 
         # List files
-        files = experiment.file().list()
-        files = experiment.file(prefix="/models").list()
+        files = experiment.files().list()
+        files = experiment.files(prefix="/models").list()
 
         # Download file
-        experiment.file(file_id="123").download()
-        experiment.file(file_id="123", dest_path="./model.pt").download()
+        experiment.files(file_id="123").download()
+        experiment.files(file_id="123", dest_path="./model.pt").download()
 
         # Delete file
-        experiment.file(file_id="123").delete()
+        experiment.files(file_id="123").delete()
     """
 
     def __init__(self, experiment: 'Experiment', **kwargs):
@@ -72,7 +72,7 @@ class FileBuilder:
             ValueError: If file size exceeds 5GB limit
 
         Examples:
-            result = experiment.file(file_path="./model.pt", prefix="/models").save()
+            result = experiment.files(file_path="./model.pt", prefix="/models").save()
             # Returns: {"id": "123", "path": "/models", "filename": "model.pt", ...}
         """
         if not self._experiment._is_open:
@@ -130,9 +130,9 @@ class FileBuilder:
             RuntimeError: If experiment is not open
 
         Examples:
-            files = experiment.file().list()  # All files
-            files = experiment.file(prefix="/models").list()  # Filter by prefix
-            files = experiment.file(tags=["checkpoint"]).list()  # Filter by tags
+            files = experiment.files().list()  # All files
+            files = experiment.files(prefix="/models").list()  # Filter by prefix
+            files = experiment.files(tags=["checkpoint"]).list()  # Filter by tags
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -158,10 +158,10 @@ class FileBuilder:
 
         Examples:
             # Download to current directory with original filename
-            path = experiment.file(file_id="123").download()
+            path = experiment.files(file_id="123").download()
 
             # Download to custom path
-            path = experiment.file(file_id="123", dest_path="./model.pt").download()
+            path = experiment.files(file_id="123", dest_path="./model.pt").download()
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -186,7 +186,7 @@ class FileBuilder:
             ValueError: If file_id not provided
 
         Examples:
-            result = experiment.file(file_id="123").delete()
+            result = experiment.files(file_id="123").delete()
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -211,7 +211,7 @@ class FileBuilder:
             ValueError: If file_id not provided
 
         Examples:
-            result = experiment.file(
+            result = experiment.files(
                 file_id="123",
                 description="Updated description",
                 tags=["new", "tags"],
@@ -251,7 +251,7 @@ class FileBuilder:
 
         Examples:
             config = {"model": "resnet50", "lr": 0.001}
-            result = experiment.file(prefix="/configs").save_json(config, "config.json")
+            result = experiment.files(prefix="/configs").save_json(config, "config.json")
         """
         import json
         import tempfile
@@ -263,11 +263,12 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        # Create temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.json', text=True)
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
         try:
             # Write JSON content to temp file
-            with os.fdopen(temp_fd, 'w') as f:
+            with open(temp_path, 'w') as f:
                 json.dump(content, f, indent=2)
 
             # Save using existing save() method
@@ -282,9 +283,10 @@ class FileBuilder:
 
             return result
         finally:
-            # Clean up temp file
+            # Clean up temp file and directory
             try:
                 os.unlink(temp_path)
+                os.rmdir(temp_dir)
             except Exception:
                 pass
 
@@ -307,10 +309,10 @@ class FileBuilder:
         Examples:
             import torch
             model = torch.nn.Linear(10, 5)
-            result = experiment.file(prefix="/models").save_torch(model, "model.pt")
+            result = experiment.files(prefix="/models").save_torch(model, "model.pt")
 
             # Or save state dict
-            result = experiment.file(prefix="/models").save_torch(model.state_dict(), "model.pth")
+            result = experiment.files(prefix="/models").save_torch(model.state_dict(), "model.pth")
         """
         import tempfile
         import os
@@ -326,9 +328,9 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        # Create temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.pt')
-        os.close(temp_fd)  # Close the file descriptor
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
 
         try:
             # Save model to temp file
@@ -346,9 +348,262 @@ class FileBuilder:
 
             return result
         finally:
-            # Clean up temp file
+            # Clean up temp file and directory
             try:
                 os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_pkl(self, content: Any, file_name: str) -> Dict[str, Any]:
+        """
+        Save Python object to a pickle file.
+
+        Args:
+            content: Python object to pickle (must be pickle-serializable)
+            file_name: Name of the file to create (should end with .pkl or .pickle)
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment is not open or write-protected
+            ValueError: If content cannot be pickled
+
+        Examples:
+            data = {"model": "resnet50", "weights": np.array([1, 2, 3])}
+            result = experiment.files(prefix="/data").save_pkl(data, "data.pkl")
+
+            # Or save any Python object
+            result = experiment.files(prefix="/models").save_pkl(trained_model, "model.pickle")
+        """
+        import pickle
+        import tempfile
+        import os
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+        try:
+            # Write pickled content to temp file
+            with open(temp_path, 'wb') as f:
+                pickle.dump(content, f)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_fig(self, fig: Optional[Any] = None, file_name: str = "figure.png", **kwargs) -> Dict[str, Any]:
+        """
+        Save matplotlib figure to a file.
+
+        Args:
+            fig: Matplotlib figure object. If None, uses plt.gcf() (current figure)
+            file_name: Name of file to create (extension determines format: .png, .pdf, .svg, .jpg)
+            **kwargs: Additional arguments passed to fig.savefig():
+                - dpi: Resolution (int or 'figure')
+                - transparent: Make background transparent (bool)
+                - bbox_inches: 'tight' to auto-crop (str or Bbox)
+                - quality: JPEG quality 0-100 (int)
+                - format: Override format detection (str)
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment not open or write-protected
+            ImportError: If matplotlib not installed
+
+        Examples:
+            import matplotlib.pyplot as plt
+
+            # Use current figure
+            plt.plot([1, 2, 3], [1, 4, 9])
+            result = experiment.files(prefix="/plots").save_fig(file_name="plot.png")
+
+            # Specify figure explicitly
+            fig, ax = plt.subplots()
+            ax.plot([1, 2, 3])
+            result = experiment.files(prefix="/plots").save_fig(fig=fig, file_name="plot.pdf", dpi=150)
+        """
+        import tempfile
+        import os
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError("Matplotlib is not installed. Install it with: pip install matplotlib")
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Get figure
+        if fig is None:
+            fig = plt.gcf()
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+
+        try:
+            # Save figure to temp file
+            fig.savefig(temp_path, **kwargs)
+
+            # Close figure to prevent memory leaks
+            plt.close(fig)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_video(
+        self,
+        frame_stack: Union[List, Any],
+        file_name: str,
+        fps: int = 20,
+        **imageio_kwargs
+    ) -> Dict[str, Any]:
+        """
+        Save video frame stack to a file.
+
+        Args:
+            frame_stack: List of numpy arrays or stacked array (shape: [N, H, W] or [N, H, W, C])
+            file_name: Name of file to create (extension determines format: .mp4, .gif, .avi, .webm)
+            fps: Frames per second (default: 20)
+            **imageio_kwargs: Additional arguments passed to imageio.v3.imwrite():
+                - codec: Video codec (e.g., 'libx264', 'h264')
+                - quality: Quality level (int, higher is better)
+                - pixelformat: Pixel format (e.g., 'yuv420p')
+                - macro_block_size: Macro block size for encoding
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment not open or write-protected
+            ImportError: If imageio or scikit-image not installed
+            ValueError: If frame_stack is empty or invalid format
+
+        Examples:
+            import numpy as np
+
+            # Grayscale frames (float values 0-1)
+            frames = [np.random.rand(480, 640) for _ in range(30)]
+            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4")
+
+            # RGB frames with custom FPS
+            frames = [np.random.rand(480, 640, 3) for _ in range(60)]
+            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4", fps=30)
+
+            # Save as GIF
+            frames = [np.random.rand(200, 200) for _ in range(20)]
+            result = experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+
+            # With custom codec and quality
+            result = experiment.files(prefix="/videos").save_video(
+                frames, "output.mp4", fps=30, codec='libx264', quality=8
+            )
+        """
+        import tempfile
+        import os
+
+        try:
+            import imageio.v3 as iio
+        except ImportError:
+            raise ImportError("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
+
+        try:
+            from skimage import img_as_ubyte
+        except ImportError:
+            raise ImportError("scikit-image is not installed. Install it with: pip install scikit-image")
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Validate frame_stack
+        try:
+            # Handle both list and numpy array
+            if len(frame_stack) == 0:
+                raise ValueError("frame_stack is empty")
+        except TypeError:
+            raise ValueError("frame_stack must be a list or numpy array")
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+
+        try:
+            # Convert frames to uint8 format (handles float32/64, grayscale, RGB, etc.)
+            # img_as_ubyte automatically scales [0.0, 1.0] floats to [0, 255] uint8
+            frames_ubyte = img_as_ubyte(frame_stack)
+
+            # Encode video to temp file
+            try:
+                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
+            except iio.core.NeedDownloadError:
+                # Auto-download FFmpeg if not available
+                import imageio.plugins.ffmpeg
+                imageio.plugins.ffmpeg.download()
+                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
             except Exception:
                 pass
 

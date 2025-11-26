@@ -27,9 +27,9 @@ def train_simple_model():
         description="Basic training loop example",
         tags=["tutorial", "simple"],
         local_path=".ml-dash"
-    ) as experiment:
+    .run as experiment:
         # Metric hyperparameters
-        experiment.parameters().set(
+        experiment.params.set(
             learning_rate=0.001,
             batch_size=32,
             epochs=10,
@@ -47,9 +47,9 @@ def train_simple_model():
             accuracy = min(0.95, 0.5 + epoch * 0.05)
 
             # Metric metrics
-            experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-            experiment.metric("val_loss").append(value=val_loss, epoch=epoch)
-            experiment.metric("accuracy").append(value=accuracy, epoch=epoch)
+            experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
+            experiment.metrics("val_loss").append(value=val_loss, epoch=epoch)
+            experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
 
             # Log progress
             experiment.log(
@@ -67,7 +67,7 @@ def train_simple_model():
         with open("model.pth", "w") as f:
             f.write("model weights")
 
-        experiment.file(
+        experiment.files(
             file_path="model.pth",
             prefix="/models",
             description="Final trained model",
@@ -117,18 +117,18 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(name="...", project="...") as experiment:
+with Experiment(name="...", project="...".run as experiment:
     # Your code here
 ```
 
 **Metric parameters once** - At the start:
 ```python
-experiment.parameters().set(learning_rate=0.001, batch_size=32)
+experiment.params.set(learning_rate=0.001, batch_size=32)
 ```
 
 **Metric metrics in the loop** - Every epoch:
 ```python
-experiment.metric("loss").append(value=loss, epoch=epoch)
+experiment.metrics("loss").append(value=loss, epoch=epoch)
 ```
 
 **Log important events** - Progress and completion:
@@ -138,4 +138,4 @@ experiment.log("Epoch 1/10 complete", metadata={"loss": 0.5})
 
 ---
 
-**Next:** See [Hyperparameter Search](hyperparameter-search.md) for metricing multiple experiments.
+**Next:** See [Hyperparameter Search](hyperparameter-search.md) for tracking multiple experiments.

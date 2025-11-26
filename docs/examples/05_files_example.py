@@ -37,11 +37,11 @@ def main():
         name="files-demo",
         project="tutorials",
         local_path="./tutorial_data"
-    ) as experiment:
+    ).run as experiment:
         print("\n1. Uploading model file...")
 
         # Upload model
-        result = experiment.file(
+        result = experiment.files(
             file_path="temp_files/model.txt",
             prefix="/models",
             description="Trained model weights",
@@ -53,7 +53,7 @@ def main():
         print("\n2. Uploading configuration...")
 
         # Upload config
-        result = experiment.file(
+        result = experiment.files(
             file_path="temp_files/config.json",
             prefix="/config",
             description="Training configuration",
@@ -64,7 +64,7 @@ def main():
         print("\n3. Uploading results...")
 
         # Upload results
-        result = experiment.file(
+        result = experiment.files(
             file_path="temp_files/results.txt",
             prefix="/results",
             description="Training results per epoch",
@@ -76,7 +76,7 @@ def main():
         print("\n4. Listing all files...")
 
         # List all files
-        files = experiment.file().list()
+        files = experiment.files().list()
         print(f"   Found {len(files)} files:")
         for file in files:
             print(f"     - {file['path']}/{file['filename']} ({file['sizeBytes']} bytes)")

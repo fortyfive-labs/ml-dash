@@ -39,7 +39,7 @@ def train_with_decorator(experiment):
     experiment.log("Training started with decorator", level="info")
 
     # Set hyperparameters
-    experiment.parameters().set(
+    experiment.params.set(
         learning_rate=0.001,
         batch_size=32,
         optimizer="adam"
@@ -48,7 +48,7 @@ def train_with_decorator(experiment):
     # Simulate training
     for epoch in range(3):
         loss = 1.0 / (epoch + 1)  # Fake decreasing loss
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("loss").append(value=loss, epoch=epoch)
         experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     experiment.log("Training completed", level="info")
@@ -79,12 +79,12 @@ def train_with_context_manager():
         local_path="./context_manager_demo",
         description="Demonstrating context manager style",
         tags=["context-manager", "demo"]
-    ) as experiment:
+    ).run as experiment:
         # Experiment is automatically opened by the 'with' statement
         experiment.log("Training started with context manager", level="info")
 
         # Set hyperparameters
-        experiment.parameters().set(
+        experiment.params.set(
             learning_rate=0.002,
             batch_size=64,
             optimizer="sgd"
@@ -93,7 +93,7 @@ def train_with_context_manager():
         # Simulate training
         for epoch in range(3):
             loss = 0.8 / (epoch + 1)  # Fake decreasing loss
-            experiment.metric("loss").append(value=loss, epoch=epoch)
+            experiment.metrics("loss").append(value=loss, epoch=epoch)
             experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
         experiment.log("Training completed", level="info")
@@ -128,15 +128,15 @@ def train_with_direct_instantiation():
         tags=["direct", "demo"]
     )
 
-    # Explicitly open the experiment
-    experiment.open()
+    # Explicitly start the experiment
+    experiment.run.start()
 
     try:
         # Now we can use the experiment
         experiment.log("Training started with direct instantiation", level="info")
 
         # Set hyperparameters
-        experiment.parameters().set(
+        experiment.params.set(
             learning_rate=0.003,
             batch_size=128,
             optimizer="adamw"
@@ -145,14 +145,14 @@ def train_with_direct_instantiation():
         # Simulate training
         for epoch in range(3):
             loss = 0.6 / (epoch + 1)  # Fake decreasing loss
-            experiment.metric("loss").append(value=loss, epoch=epoch)
+            experiment.metrics("loss").append(value=loss, epoch=epoch)
             experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
         experiment.log("Training completed", level="info")
 
     finally:
-        # Always close in finally block to ensure cleanup
-        experiment.close()
+        # Always complete in finally block to ensure cleanup
+        experiment.run.complete()
         print("✓ Experiment manually closed")
 
 
@@ -177,10 +177,10 @@ def train_remote_decorator(experiment):
     print("=" * 50)
 
     experiment.log("Training on remote server", level="info")
-    experiment.parameters().set(mode="remote", style="decorator")
+    experiment.params.set(mode="remote", style="decorator")
 
     for i in range(3):
-        experiment.metric("metrics").append(value=i * 0.1, step=i)
+        experiment.metrics("metrics").append(value=i * 0.1, step=i)
 
     print("✓ Data stored remotely (MongoDB + S3)")
 
@@ -197,12 +197,12 @@ def train_remote_context_manager():
         user_name="demo-user",
         description="Context manager with remote mode",
         tags=["remote", "context-manager"]
-    ) as experiment:
+    ).run as experiment:
         experiment.log("Training on remote server", level="info")
-        experiment.parameters().set(mode="remote", style="context_manager")
+        experiment.params.set(mode="remote", style="context_manager")
 
         for i in range(3):
-            experiment.metric("metrics").append(value=i * 0.2, step=i)
+            experiment.metrics("metrics").append(value=i * 0.2, step=i)
 
         print("✓ Data stored remotely (MongoDB + S3)")
 

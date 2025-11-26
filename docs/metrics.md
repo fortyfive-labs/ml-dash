@@ -10,12 +10,12 @@ Metric time-series metrics that change over time - loss, accuracy, learning rate
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Append a single data point
-    experiment.metric("train_loss").append(value=0.5, epoch=1)
+    experiment.metrics("train_loss").append(value=0.5, epoch=1)
 
     # With step and epoch
-    experiment.metric("accuracy").append(value=0.85, step=100, epoch=1)
+    experiment.metrics("accuracy").append(value=0.85, step=100, epoch=1)
 ```
 
 ## Flexible Schema
@@ -26,12 +26,12 @@ Define your own data structure for each metric:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Simple value
-    experiment.metric("loss").append(value=0.5)
+    experiment.metrics("loss").append(value=0.5)
 
     # Multiple fields per point
-    experiment.metric("metrics").append(
+    experiment.metrics("metrics").append(
         loss=0.5,
         accuracy=0.85,
         learning_rate=0.001,
@@ -40,7 +40,7 @@ with Experiment(name="my-experiment", project="project",
 
     # With timestamp
     import time
-    experiment.metric("system").append(
+    experiment.metrics("system").append(
         cpu_percent=45.2,
         memory_mb=1024,
         timestamp=time.time()
@@ -55,8 +55,8 @@ Append multiple data points at once for better performance:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
-    result = experiment.metric("train_loss").append_batch([
+        local_path=".ml-dash").run as experiment:
+    result = experiment.metrics("train_loss").append_batch([
         {"value": 0.5, "step": 1, "epoch": 1},
         {"value": 0.45, "step": 2, "epoch": 1},
         {"value": 0.40, "step": 3, "epoch": 1},
@@ -74,13 +74,13 @@ Read metric data by index range:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     # Append data
     for i in range(100):
-        experiment.metric("loss").append(value=1.0 / (i + 1), step=i)
+        experiment.metrics("loss").append(value=1.0 / (i + 1), step=i)
 
     # Read first 10 points
-    result = experiment.metric("loss").read(start_index=0, limit=10)
+    result = experiment.metrics("loss").read(start_index=0, limit=10)
 
     for point in result['data']:
         print(f"Index {point['index']}: {point['data']}")
@@ -92,8 +92,8 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="mnist-training", project="cv",
-        local_path=".ml-dash") as experiment:
-    experiment.parameters().set(learning_rate=0.001, batch_size=32)
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(learning_rate=0.001, batch_size=32)
     experiment.log("Starting training")
 
     for epoch in range(10):
@@ -101,9 +101,9 @@ with Experiment(name="mnist-training", project="cv",
         val_loss, val_accuracy = validate(model, val_loader)
 
         # Metric metrics
-        experiment.metric("train_loss").append(value=train_loss, epoch=epoch + 1)
-        experiment.metric("val_loss").append(value=val_loss, epoch=epoch + 1)
-        experiment.metric("val_accuracy").append(value=val_accuracy, epoch=epoch + 1)
+        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch + 1)
+        experiment.metrics("val_loss").append(value=val_loss, epoch=epoch + 1)
+        experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch + 1)
 
         experiment.log(
             f"Epoch {epoch + 1}/10 complete",
@@ -121,7 +121,7 @@ Collect points in memory, then append in batches:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     batch = []
 
     for step in range(1000):
@@ -131,12 +131,12 @@ with Experiment(name="my-experiment", project="project",
 
         # Append every 100 steps
         if len(batch) >= 100:
-            experiment.metric("train_loss").append_batch(batch)
+            experiment.metrics("train_loss").append_batch(batch)
             batch = []
 
     # Append remaining
     if batch:
-        experiment.metric("train_loss").append_batch(batch)
+        experiment.metrics("train_loss").append_batch(batch)
 ```
 
 ## Multiple Metrics in One Metric
@@ -147,9 +147,9 @@ Combine related metrics:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash") as experiment:
+        local_path=".ml-dash").run as experiment:
     for epoch in range(10):
-        experiment.metric("all_metrics").append(
+        experiment.metrics("all_metrics").append(
             epoch=epoch,
             train_loss=0.5 / (epoch + 1),
             val_loss=0.6 / (epoch + 1),

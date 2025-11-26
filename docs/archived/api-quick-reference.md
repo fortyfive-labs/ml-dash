@@ -110,7 +110,7 @@ for metric in metrics:
 
 ```python
 # Upload file
-experiment.file(
+experiment.files(
     file_prefix="model.pth",
     prefix="models/",
     description="Trained model",
@@ -118,14 +118,14 @@ experiment.file(
 ).save()
 
 # Upload with metadata
-experiment.file(
+experiment.files(
     file_prefix="model.pth",
     prefix="models/checkpoints/",
     metadata={"epoch": 50, "accuracy": 0.95}
 ).save()
 
 # List files
-files = experiment.file().list()
+files = experiment.files().list()
 for file in files:
     print(f"{file['prefix']}{file['filename']}")
 ```
@@ -172,7 +172,7 @@ with Experiment(
 
     # Save model
     save_model("model.pth")
-    experiment.file(file_prefix="model.pth", prefix="models/").save()
+    experiment.files(file_prefix="model.pth", prefix="models/").save()
 
     experiment.log("Training complete!", level="info")
 ```
@@ -193,7 +193,7 @@ with Experiment(...) as experiment:
         if acc > best_acc:
             best_acc = acc
             save_checkpoint(f"checkpoint_{epoch}.pth")
-            experiment.file(
+            experiment.files(
                 file_path=f"checkpoint_{epoch}.pth",
                 prefix="checkpoints/",
                 tags=["best"]
@@ -273,6 +273,5 @@ ls .ml-dash/project/experiment/files/
 
 ## See Also
 
-- [Getting Started](getting-started.md)
 - [Complete Examples](complete-examples.md)
 - [Runnable Examples](examples.md)

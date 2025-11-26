@@ -1,7 +1,7 @@
 [project]
 name = "ml-dash"
-version = "0.5.1"
-description = "ML experiment metricing and data storage"
+version = "0.5.6"
+description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
@@ -9,7 +9,7 @@ authors = [
     {name = "Ge Yang"},
     {name = "Tom Tao"}
 ]
-keywords = ["machine-learning", "experiment-metricing", "mlops", "data-storage"]
+keywords = ["machine-learning", "experiment-tracking", "mlops", "data-storage"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -26,6 +26,9 @@ classifiers = [
 dependencies = [
     "httpx>=0.27.0",
     "pyjwt>=2.8.0",
+    "imageio>=2.31.0",
+    "imageio-ffmpeg>=0.4.9",
+    "scikit-image>=0.21.0",
 ]
 
 [project.scripts]

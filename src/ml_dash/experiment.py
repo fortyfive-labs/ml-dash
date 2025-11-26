@@ -475,7 +475,7 @@ class Experiment:
                 timestamp=log_entry["timestamp"]
             )
 
-    def file(self, **kwargs) -> FileBuilder:
+    def files(self, **kwargs) -> FileBuilder:
         """
         Get a FileBuilder for fluent file operations.
 
@@ -487,17 +487,17 @@ class Experiment:
 
         Examples:
             # Upload file
-            experiment.file(file_path="./model.pt", prefix="/models").save()
+            experiment.files(file_path="./model.pt", prefix="/models").save()
 
             # List files
-            files = experiment.file().list()
-            files = experiment.file(prefix="/models").list()
+            files = experiment.files().list()
+            files = experiment.files(prefix="/models").list()
 
             # Download file
-            experiment.file(file_id="123").download()
+            experiment.files(file_id="123").download()
 
             # Delete file
-            experiment.file(file_id="123").delete()
+            experiment.files(file_id="123").delete()
         """
         if not self._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -806,7 +806,7 @@ class Experiment:
 
     def _append_to_metric(
         self,
-        name: str,
+        name: Optional[str],
         data: Dict[str, Any],
         description: Optional[str],
         tags: Optional[List[str]],
@@ -816,7 +816,7 @@ class Experiment:
         Internal method to append a single data point to a metric.
 
         Args:
-            name: Metric name
+            name: Metric name (can be None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
             tags: Optional tags
@@ -854,7 +854,7 @@ class Experiment:
 
     def _append_batch_to_metric(
         self,
-        name: str,
+        name: Optional[str],
         data_points: List[Dict[str, Any]],
         description: Optional[str],
         tags: Optional[List[str]],
@@ -864,7 +864,7 @@ class Experiment:
         Internal method to append multiple data points to a metric.
 
         Args:
-            name: Metric name
+            name: Metric name (can be None for unnamed metrics)
             data_points: List of data points
             description: Optional metric description
             tags: Optional tags
@@ -1027,7 +1027,7 @@ def ml_dash_experiment(
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **func_kwargs):
-            with Experiment(name=name, project=project, **kwargs) as experiment:
+            with Experiment(name=name, project=project, **kwargs).run as experiment:
                 # Inject experiment into function kwargs
                 func_kwargs['experiment'] = experiment
                 return func(*args, **func_kwargs)
