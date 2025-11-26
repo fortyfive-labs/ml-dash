@@ -227,12 +227,13 @@ with Experiment(name="resnet-training", project="cv",
 
 ## Saving Visualizations
 
-Upload matplotlib plots:
+Upload matplotlib plots using the convenient `save_fig()` method:
 
 ```{code-block} python
 :linenos:
 
 import matplotlib.pyplot as plt
+import numpy as np
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
@@ -244,17 +245,112 @@ with Experiment(name="my-experiment", project="project",
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
 
-    # Save and upload
-    plt.savefig("loss_curve.png")
+    # Save directly (auto-closes figure)
     experiment.files(
-        "loss_curve.png",
         prefix="/visualizations",
         description="Training loss over epochs",
         tags=["plot"]
-    )
+    ).save_fig("loss_curve.png")
 
-    plt.close()
+    # Save as PDF with custom DPI
+    xs = np.linspace(-5, 5, 100)
+    plt.plot(xs, np.cos(xs), label='Cosine')
+    plt.legend()
+    experiment.files(prefix="/visualizations").save_fig(
+        "cosine_function.pdf",
+        dpi=150,
+        transparent=True,
+        bbox_inches='tight'
+    )
 ```
+
+**Note:** `save_fig()` automatically closes the figure after saving to prevent memory leaks.
+
+## Saving Videos
+
+Upload video frame stacks using the `save_video()` method:
+
+```{code-block} python
+:linenos:
+
+import numpy as np
+from ml_dash import Experiment
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # Generate frame stack
+    def im(x, y):
+        canvas = np.zeros((200, 200))
+        for i in range(200):
+            for j in range(200):
+                if x - 5 < i < x + 5 and y - 5 < j < y + 5:
+                    canvas[i, j] = 1
+        return canvas
+
+    frames = [im(100 + i, 80) for i in range(20)]
+
+    # Save as MP4 (default 20 FPS)
+    experiment.files(prefix="/videos").save_video(frames, "animation.mp4")
+
+    # Save with custom FPS
+    experiment.files(prefix="/videos").save_video(frames, "animation.mp4", fps=30)
+
+    # Save as GIF
+    experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+```
+
+### Frame Format Support
+
+`save_video()` automatically handles various frame formats:
+
+```{code-block} python
+:linenos:
+
+# Grayscale frames (H×W)
+frames = [np.random.rand(480, 640) for _ in range(30)]
+experiment.files(prefix="/videos").save_video(frames, "grayscale.mp4")
+
+# RGB frames (H×W×3)
+frames = [np.random.rand(480, 640, 3) for _ in range(30)]
+experiment.files(prefix="/videos").save_video(frames, "rgb.mp4")
+
+# Stacked array (N×H×W or N×H×W×C)
+frames = np.random.rand(30, 480, 640, 3)
+experiment.files(prefix="/videos").save_video(frames, "stacked.mp4")
+```
+
+**Frame value ranges:**
+- Float values (0.0 to 1.0) - automatically scaled to 0-255
+- Uint8 values (0 to 255) - used directly
+- Other formats - automatically converted
+
+### Custom Video Options
+
+Pass additional encoding parameters:
+
+```{code-block} python
+:linenos:
+
+# Custom codec and quality
+experiment.files(prefix="/videos").save_video(
+    frames,
+    "high_quality.mp4",
+    fps=30,
+    codec='libx264',
+    quality=8,
+    pixelformat='yuv420p'
+)
+
+# Animated GIF with custom duration
+experiment.files(prefix="/videos").save_video(
+    frames,
+    "animation.gif",
+    fps=10,
+    duration=0.1  # 100ms per frame
+)
+```
+
+**Note:** Video encoding dependencies (`imageio`, `imageio-ffmpeg`, `scikit-image`) are included in the base installation.
 
 ## Uploading Configuration
 

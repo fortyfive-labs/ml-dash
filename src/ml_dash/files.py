@@ -6,7 +6,7 @@ Provides fluent API for file upload, download, list, and delete operations.
 
 import hashlib
 import mimetypes
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
 if TYPE_CHECKING:
@@ -394,6 +394,199 @@ class FileBuilder:
             # Write pickled content to temp file
             with open(temp_path, 'wb') as f:
                 pickle.dump(content, f)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_fig(self, fig: Optional[Any] = None, file_name: str = "figure.png", **kwargs) -> Dict[str, Any]:
+        """
+        Save matplotlib figure to a file.
+
+        Args:
+            fig: Matplotlib figure object. If None, uses plt.gcf() (current figure)
+            file_name: Name of file to create (extension determines format: .png, .pdf, .svg, .jpg)
+            **kwargs: Additional arguments passed to fig.savefig():
+                - dpi: Resolution (int or 'figure')
+                - transparent: Make background transparent (bool)
+                - bbox_inches: 'tight' to auto-crop (str or Bbox)
+                - quality: JPEG quality 0-100 (int)
+                - format: Override format detection (str)
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment not open or write-protected
+            ImportError: If matplotlib not installed
+
+        Examples:
+            import matplotlib.pyplot as plt
+
+            # Use current figure
+            plt.plot([1, 2, 3], [1, 4, 9])
+            result = experiment.files(prefix="/plots").save_fig(file_name="plot.png")
+
+            # Specify figure explicitly
+            fig, ax = plt.subplots()
+            ax.plot([1, 2, 3])
+            result = experiment.files(prefix="/plots").save_fig(fig=fig, file_name="plot.pdf", dpi=150)
+        """
+        import tempfile
+        import os
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError("Matplotlib is not installed. Install it with: pip install matplotlib")
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Get figure
+        if fig is None:
+            fig = plt.gcf()
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+
+        try:
+            # Save figure to temp file
+            fig.savefig(temp_path, **kwargs)
+
+            # Close figure to prevent memory leaks
+            plt.close(fig)
+
+            # Save using existing save() method
+            original_file_path = self._file_path
+            self._file_path = temp_path
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original file_path
+            self._file_path = original_file_path
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def save_video(
+        self,
+        frame_stack: Union[List, Any],
+        file_name: str,
+        fps: int = 20,
+        **imageio_kwargs
+    ) -> Dict[str, Any]:
+        """
+        Save video frame stack to a file.
+
+        Args:
+            frame_stack: List of numpy arrays or stacked array (shape: [N, H, W] or [N, H, W, C])
+            file_name: Name of file to create (extension determines format: .mp4, .gif, .avi, .webm)
+            fps: Frames per second (default: 20)
+            **imageio_kwargs: Additional arguments passed to imageio.v3.imwrite():
+                - codec: Video codec (e.g., 'libx264', 'h264')
+                - quality: Quality level (int, higher is better)
+                - pixelformat: Pixel format (e.g., 'yuv420p')
+                - macro_block_size: Macro block size for encoding
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment not open or write-protected
+            ImportError: If imageio or scikit-image not installed
+            ValueError: If frame_stack is empty or invalid format
+
+        Examples:
+            import numpy as np
+
+            # Grayscale frames (float values 0-1)
+            frames = [np.random.rand(480, 640) for _ in range(30)]
+            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4")
+
+            # RGB frames with custom FPS
+            frames = [np.random.rand(480, 640, 3) for _ in range(60)]
+            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4", fps=30)
+
+            # Save as GIF
+            frames = [np.random.rand(200, 200) for _ in range(20)]
+            result = experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+
+            # With custom codec and quality
+            result = experiment.files(prefix="/videos").save_video(
+                frames, "output.mp4", fps=30, codec='libx264', quality=8
+            )
+        """
+        import tempfile
+        import os
+
+        try:
+            import imageio.v3 as iio
+        except ImportError:
+            raise ImportError("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
+
+        try:
+            from skimage import img_as_ubyte
+        except ImportError:
+            raise ImportError("scikit-image is not installed. Install it with: pip install scikit-image")
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Validate frame_stack
+        try:
+            # Handle both list and numpy array
+            if len(frame_stack) == 0:
+                raise ValueError("frame_stack is empty")
+        except TypeError:
+            raise ValueError("frame_stack must be a list or numpy array")
+
+        # Create temporary file with desired filename
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, file_name)
+
+        try:
+            # Convert frames to uint8 format (handles float32/64, grayscale, RGB, etc.)
+            # img_as_ubyte automatically scales [0.0, 1.0] floats to [0, 255] uint8
+            frames_ubyte = img_as_ubyte(frame_stack)
+
+            # Encode video to temp file
+            try:
+                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
+            except iio.core.NeedDownloadError:
+                # Auto-download FFmpeg if not available
+                import imageio.plugins.ffmpeg
+                imageio.plugins.ffmpeg.download()
+                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
 
             # Save using existing save() method
             original_file_path = self._file_path

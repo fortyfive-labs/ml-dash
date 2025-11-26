@@ -432,6 +432,64 @@ result = exp.files(prefix="/models").save_torch(
 )
 ```
 
+#### Save Pickle Objects
+
+```python
+# Save any Python object as pickle
+data = {"results": [1, 2, 3], "metadata": {"version": "1.0"}}
+result = exp.files(prefix="/data").save_pkl(data, "data.pkl")
+```
+
+#### Save Matplotlib Figures
+
+```python
+import matplotlib.pyplot as plt
+
+# Create plot
+plt.plot([1, 2, 3], [1, 4, 9])
+plt.title("Sample Plot")
+
+# Save current figure
+result = exp.files(prefix="/plots").save_fig(file_name="plot.png")
+
+# Save specific figure with custom DPI
+fig, ax = plt.subplots()
+ax.plot([1, 2, 3])
+result = exp.files(prefix="/plots").save_fig(
+    fig=fig,
+    file_name="plot.pdf",
+    dpi=150,
+    bbox_inches='tight'
+)
+```
+
+#### Save Videos
+
+```python
+import numpy as np
+
+# Create video frames (grayscale or RGB)
+frames = [np.random.rand(480, 640) for _ in range(30)]
+
+# Save as MP4 (default 20 FPS)
+result = exp.files(prefix="/videos").save_video(frames, "output.mp4")
+
+# Save with custom FPS
+result = exp.files(prefix="/videos").save_video(frames, "output.mp4", fps=30)
+
+# Save as GIF
+result = exp.files(prefix="/videos").save_video(frames, "animation.gif")
+
+# Save with custom codec and quality
+result = exp.files(prefix="/videos").save_video(
+    frames,
+    "high_quality.mp4",
+    fps=30,
+    codec='libx264',
+    quality=8
+)
+```
+
 ### File Organization with Bindrs
 
 ```python
@@ -490,6 +548,9 @@ result = exp.files(file_id="123").delete()
 | `save()` | - | `dict` | Upload file |
 | `save_json(content, filename)` | `Any`, `str` | `dict` | Save JSON object as file |
 | `save_torch(model, filename)` | `Any`, `str` | `dict` | Save PyTorch model as file |
+| `save_pkl(content, filename)` | `Any`, `str` | `dict` | Save Python object as pickle file |
+| `save_fig(fig, filename, **kwargs)` | `Optional[Any]`, `str`, `**kwargs` | `dict` | Save matplotlib figure as file |
+| `save_video(frames, filename, fps, **kwargs)` | `Union[List, Any]`, `str`, `int`, `**kwargs` | `dict` | Save video frame stack as file |
 | `list()` | - | `List[dict]` | List files |
 | `download(dest_path)` | `Optional[str]` | `str` | Download file |
 | `update()` | - | `dict` | Update file metadata |
