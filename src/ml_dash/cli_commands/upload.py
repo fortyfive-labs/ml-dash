@@ -104,6 +104,43 @@ class UploadState:
             return None
 
 
+def generate_api_key_from_username(user_name: str) -> str:
+    """
+    Generate a deterministic API key (JWT) from username.
+
+    This is a temporary solution until proper user authentication is implemented.
+    Generates a unique user ID from the username and creates a JWT token.
+
+    Args:
+        user_name: Username to generate API key from
+
+    Returns:
+        JWT token string
+    """
+    import hashlib
+    import time
+    import jwt
+
+    # Generate deterministic user ID from username (first 10 digits of SHA256 hash)
+    user_id = str(int(hashlib.sha256(user_name.encode()).hexdigest()[:16], 16))[:10]
+
+    # JWT payload
+    payload = {
+        "userId": user_id,
+        "userName": user_name,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + (30 * 24 * 60 * 60)  # 30 days expiration
+    }
+
+    # Secret key for signing (should match server's JWT_SECRET)
+    secret = "your-secret-key-change-this-in-production"
+
+    # Generate JWT
+    token = jwt.encode(payload, secret, algorithm="HS256")
+
+    return token
+
+
 def add_parser(subparsers) -> argparse.ArgumentParser:
     """Add upload command parser."""
     parser = subparsers.add_parser(
@@ -129,7 +166,12 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     parser.add_argument(
         "--api-key",
         type=str,
-        help="JWT token for authentication (required unless set in config)",
+        help="JWT token for authentication (required unless --user-name or config is set)",
+    )
+    parser.add_argument(
+        "--user-name",
+        type=str,
+        help="Username for authentication (generates API key automatically)",
     )
 
     # Scope control
@@ -822,14 +864,20 @@ def cmd_upload(args: argparse.Namespace) -> int:
     # Get remote URL (command line > config)
     remote_url = args.remote or config.remote_url
     if not remote_url:
-        console.print("[red]Error:[/red] --remote URL is required (or set in config with 'ml-dash setup')")
+        console.print("[red]Error:[/red] --remote URL is required (or set in config)")
         return 1
 
-    # Get API key (command line > config)
+    # Get API key (command line > config > generate from username)
     api_key = args.api_key or config.api_key
+
+    # If no API key, try to generate from username
     if not api_key:
-        console.print("[red]Error:[/red] --api-key is required (or set in config with 'ml-dash setup')")
-        return 1
+        if args.user_name:
+            console.print(f"[dim]Generating API key from username: {args.user_name}[/dim]")
+            api_key = generate_api_key_from_username(args.user_name)
+        else:
+            console.print("[red]Error:[/red] --api-key or --user-name is required (or set in config)")
+            return 1
 
     # Validate experiment filter requires project
     if args.experiment and not args.project:
