@@ -51,6 +51,59 @@ class UploadResult:
     errors: List[str] = field(default_factory=list)
 
 
+@dataclass
+class UploadState:
+    """Tracks upload state for resume functionality."""
+    local_path: str
+    remote_url: str
+    completed_experiments: List[str] = field(default_factory=list)  # ["project/experiment"]
+    failed_experiments: List[str] = field(default_factory=list)
+    in_progress_experiment: Optional[str] = None
+    timestamp: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "local_path": self.local_path,
+            "remote_url": self.remote_url,
+            "completed_experiments": self.completed_experiments,
+            "failed_experiments": self.failed_experiments,
+            "in_progress_experiment": self.in_progress_experiment,
+            "timestamp": self.timestamp,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UploadState":
+        """Create from dictionary."""
+        return cls(
+            local_path=data["local_path"],
+            remote_url=data["remote_url"],
+            completed_experiments=data.get("completed_experiments", []),
+            failed_experiments=data.get("failed_experiments", []),
+            in_progress_experiment=data.get("in_progress_experiment"),
+            timestamp=data.get("timestamp"),
+        )
+
+    def save(self, path: Path):
+        """Save state to file."""
+        import datetime
+        self.timestamp = datetime.datetime.now().isoformat()
+        with open(path, "w") as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    @classmethod
+    def load(cls, path: Path) -> Optional["UploadState"]:
+        """Load state from file."""
+        if not path.exists():
+            return None
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            return cls.from_dict(data)
+        except (json.JSONDecodeError, IOError, KeyError):
+            return None
+
+
 def add_parser(subparsers) -> argparse.ArgumentParser:
     """Add upload command parser."""
     parser = subparsers.add_parser(
@@ -134,6 +187,17 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
         type=int,
         default=100,
         help="Batch size for logs/metrics (default: 100)",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume previous interrupted upload",
+    )
+    parser.add_argument(
+        "--state-file",
+        type=str,
+        default=".ml-dash-upload-state.json",
+        help="Path to state file for resume (default: .ml-dash-upload-state.json)",
     )
 
     return parser
@@ -778,6 +842,34 @@ def cmd_upload(args: argparse.Namespace) -> int:
         console.print(f"[red]Error:[/red] Local storage path does not exist: {local_path}")
         return 1
 
+    # Handle state file for resume functionality
+    state_file = Path(args.state_file)
+    upload_state = None
+
+    if args.resume:
+        upload_state = UploadState.load(state_file)
+        if upload_state:
+            # Validate state matches current upload
+            if upload_state.local_path != str(local_path.absolute()):
+                console.print("[yellow]Warning:[/yellow] State file local path doesn't match. Starting fresh upload.")
+                upload_state = None
+            elif upload_state.remote_url != remote_url:
+                console.print("[yellow]Warning:[/yellow] State file remote URL doesn't match. Starting fresh upload.")
+                upload_state = None
+            else:
+                console.print(f"[green]Resuming previous upload from {upload_state.timestamp}[/green]")
+                console.print(f"  Already completed: {len(upload_state.completed_experiments)} experiments")
+                console.print(f"  Failed: {len(upload_state.failed_experiments)} experiments")
+        else:
+            console.print("[yellow]No previous upload state found. Starting fresh upload.[/yellow]")
+
+    # Create new state if not resuming
+    if not upload_state:
+        upload_state = UploadState(
+            local_path=str(local_path.absolute()),
+            remote_url=remote_url,
+        )
+
     console.print(f"[bold]Scanning local storage:[/bold] {local_path.absolute()}")
     experiments = discover_experiments(
         local_path,
@@ -794,7 +886,18 @@ def cmd_upload(args: argparse.Namespace) -> int:
             console.print("[yellow]No experiments found in local storage[/yellow]")
         return 1
 
-    console.print(f"[green]Found {len(experiments)} experiment(s)[/green]")
+    # Filter out already completed experiments when resuming
+    if args.resume and upload_state.completed_experiments:
+        original_count = len(experiments)
+        experiments = [
+            exp for exp in experiments
+            if f"{exp.project}/{exp.experiment}" not in upload_state.completed_experiments
+        ]
+        skipped_count = original_count - len(experiments)
+        if skipped_count > 0:
+            console.print(f"[dim]Skipping {skipped_count} already completed experiment(s)[/dim]")
+
+    console.print(f"[green]Found {len(experiments)} experiment(s) to upload[/green]")
 
     # Display discovered experiments
     if args.verbose or args.dry_run:
@@ -899,9 +1002,24 @@ def cmd_upload(args: argparse.Namespace) -> int:
                 total=100,  # Will be updated with actual steps
             )
 
+            # Update state - mark as in progress
+            upload_state.in_progress_experiment = exp_key
+            if not args.dry_run:
+                upload_state.save(state_file)
+
             validation = validation_results[exp_key]
             result = uploader.upload_experiment(exp, validation, task_id=task_id)
             results.append(result)
+
+            # Update state - mark as completed or failed
+            upload_state.in_progress_experiment = None
+            if result.success:
+                upload_state.completed_experiments.append(exp_key)
+            else:
+                upload_state.failed_experiments.append(exp_key)
+
+            if not args.dry_run:
+                upload_state.save(state_file)
 
             # Update task to completed
             progress.update(task_id, completed=100, total=100)
@@ -970,6 +1088,13 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
         console.print()
         console.print(data_table)
+
+    # Clean up state file if all uploads succeeded
+    if not args.dry_run and len(failed) == 0 and state_file.exists():
+        state_file.unlink()
+        console.print("\n[dim]Upload complete. State file removed.[/dim]")
+    elif not args.dry_run and failed:
+        console.print(f"\n[yellow]State saved to {state_file}. Use --resume to retry failed uploads.[/yellow]")
 
     # Return exit code
     return 0 if len(failed) == 0 else 1
