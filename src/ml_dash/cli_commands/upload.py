@@ -6,9 +6,17 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.table import Table
+from rich.panel import Panel
+
 from ..storage import LocalStorage
 from ..client import RemoteClient
 from ..config import Config
+
+# Initialize rich console
+console = Console()
 
 
 @dataclass
@@ -436,6 +444,7 @@ class ExperimentUploader:
         skip_files: bool = False,
         skip_params: bool = False,
         verbose: bool = False,
+        progress: Optional[Progress] = None,
     ):
         """
         Initialize uploader.
@@ -449,6 +458,7 @@ class ExperimentUploader:
             skip_files: Skip uploading files
             skip_params: Skip uploading parameters
             verbose: Show verbose output
+            progress: Optional rich Progress instance for tracking
         """
         self.local = local_storage
         self.remote = remote_client
@@ -458,9 +468,10 @@ class ExperimentUploader:
         self.skip_files = skip_files
         self.skip_params = skip_params
         self.verbose = verbose
+        self.progress = progress
 
     def upload_experiment(
-        self, exp_info: ExperimentInfo, validation_result: ValidationResult
+        self, exp_info: ExperimentInfo, validation_result: ValidationResult, task_id=None
     ) -> UploadResult:
         """
         Upload a single experiment with all its data.
@@ -468,16 +479,37 @@ class ExperimentUploader:
         Args:
             exp_info: Experiment information
             validation_result: Validation results
+            task_id: Optional progress task ID
 
         Returns:
             UploadResult with upload status
         """
         result = UploadResult(experiment=f"{exp_info.project}/{exp_info.experiment}")
 
+        # Calculate total steps for progress tracking
+        total_steps = 1  # metadata
+        if not self.skip_params and "parameters" in validation_result.valid_data:
+            total_steps += 1
+        if not self.skip_logs and exp_info.has_logs:
+            total_steps += 1
+        if not self.skip_metrics and exp_info.metric_names:
+            total_steps += len(exp_info.metric_names)
+        if not self.skip_files and exp_info.file_count > 0:
+            total_steps += exp_info.file_count
+
+        current_step = 0
+
+        def update_progress(description: str):
+            nonlocal current_step
+            current_step += 1
+            if self.progress and task_id is not None:
+                self.progress.update(task_id, completed=current_step, total=total_steps, description=description)
+
         try:
             # 1. Create/update experiment metadata
+            update_progress("Creating experiment...")
             if self.verbose:
-                print(f"  Creating experiment...")
+                console.print(f"  [dim]Creating experiment...[/dim]")
 
             metadata = validation_result.valid_data.get("metadata", {})
             response = self.remote.create_or_update_experiment(
@@ -493,33 +525,34 @@ class ExperimentUploader:
 
             experiment_id = response["id"]
             if self.verbose:
-                print(f"  ✓ Created experiment (id: {experiment_id})")
+                console.print(f"  [green]✓[/green] Created experiment (id: {experiment_id})")
 
             # 2. Upload parameters
             if not self.skip_params and "parameters" in validation_result.valid_data:
+                update_progress("Uploading parameters...")
                 if self.verbose:
-                    print(f"  Uploading parameters...")
+                    console.print(f"  [dim]Uploading parameters...[/dim]")
 
                 params = validation_result.valid_data["parameters"]
                 self.remote.set_parameters(experiment_id, params)
                 result.uploaded["params"] = len(params)
 
                 if self.verbose:
-                    print(f"  ✓ Uploaded {len(params)} parameters")
+                    console.print(f"  [green]✓[/green] Uploaded {len(params)} parameters")
 
             # 3. Upload logs
             if not self.skip_logs and exp_info.has_logs:
-                count = self._upload_logs(experiment_id, exp_info, result)
+                count = self._upload_logs(experiment_id, exp_info, result, task_id, update_progress)
                 result.uploaded["logs"] = count
 
             # 4. Upload metrics
             if not self.skip_metrics and exp_info.metric_names:
-                count = self._upload_metrics(experiment_id, exp_info, result)
+                count = self._upload_metrics(experiment_id, exp_info, result, task_id, update_progress)
                 result.uploaded["metrics"] = count
 
             # 5. Upload files
             if not self.skip_files and exp_info.file_count > 0:
-                count = self._upload_files(experiment_id, exp_info, result)
+                count = self._upload_files(experiment_id, exp_info, result, task_id, update_progress)
                 result.uploaded["files"] = count
 
             result.success = True
@@ -528,14 +561,17 @@ class ExperimentUploader:
             result.success = False
             result.errors.append(str(e))
             if self.verbose:
-                print(f"  ✗ Error: {e}")
+                console.print(f"  [red]✗ Error: {e}[/red]")
 
         return result
 
-    def _upload_logs(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult) -> int:
+    def _upload_logs(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult,
+                     task_id=None, update_progress=None) -> int:
         """Upload logs in batches."""
+        if update_progress:
+            update_progress("Uploading logs...")
         if self.verbose:
-            print(f"  Uploading logs...")
+            console.print(f"  [dim]Uploading logs...[/dim]")
 
         logs_file = exp_info.path / "logs" / "logs.jsonl"
         logs_batch = []
@@ -580,23 +616,26 @@ class ExperimentUploader:
                 total_uploaded += len(logs_batch)
 
             if self.verbose:
-                msg = f"  ✓ Uploaded {total_uploaded} log entries"
+                msg = f"  [green]✓[/green] Uploaded {total_uploaded} log entries"
                 if skipped > 0:
                     msg += f" (skipped {skipped} invalid)"
-                print(msg)
+                console.print(msg)
 
         except IOError as e:
             result.failed.setdefault("logs", []).append(str(e))
 
         return total_uploaded
 
-    def _upload_metrics(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult) -> int:
+    def _upload_metrics(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult,
+                        task_id=None, update_progress=None) -> int:
         """Upload metrics in batches."""
         total_metrics = 0
 
         for metric_name in exp_info.metric_names:
+            if update_progress:
+                update_progress(f"Uploading metric '{metric_name}'...")
             if self.verbose:
-                print(f"  Uploading metric '{metric_name}'...")
+                console.print(f"  [dim]Uploading metric '{metric_name}'...[/dim]")
 
             metric_dir = exp_info.path / "metrics" / metric_name
             data_file = metric_dir / "data.jsonl"
@@ -636,10 +675,10 @@ class ExperimentUploader:
                     total_uploaded += len(data_batch)
 
                 if self.verbose:
-                    msg = f"  ✓ Uploaded {total_uploaded} data points for '{metric_name}'"
+                    msg = f"  [green]✓[/green] Uploaded {total_uploaded} data points for '{metric_name}'"
                     if skipped > 0:
                         msg += f" (skipped {skipped} invalid)"
-                    print(msg)
+                    console.print(msg)
 
                 total_metrics += 1
 
@@ -648,11 +687,9 @@ class ExperimentUploader:
 
         return total_metrics
 
-    def _upload_files(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult) -> int:
+    def _upload_files(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult,
+                      task_id=None, update_progress=None) -> int:
         """Upload files one by one."""
-        if self.verbose:
-            print(f"  Uploading files...")
-
         files_dir = exp_info.path / "files"
         total_uploaded = 0
 
@@ -666,6 +703,9 @@ class ExperimentUploader:
                     continue
 
                 try:
+                    if update_progress:
+                        update_progress(f"Uploading {file_info['filename']}...")
+
                     # Download file to temp location
                     file_id = file_info["id"]
                     file_path = self.local.read_file(
@@ -688,7 +728,7 @@ class ExperimentUploader:
 
                     if self.verbose:
                         size_mb = file_info.get("sizeBytes", 0) / (1024 * 1024)
-                        print(f"    ✓ {file_info['filename']} ({size_mb:.1f}MB)")
+                        console.print(f"    [green]✓[/green] {file_info['filename']} ({size_mb:.1f}MB)")
 
                 except Exception as e:
                     result.failed.setdefault("files", []).append(f"{file_info['filename']}: {e}")
@@ -697,7 +737,7 @@ class ExperimentUploader:
             result.failed.setdefault("files", []).append(str(e))
 
         if self.verbose and not result.failed.get("files"):
-            print(f"  ✓ Uploaded {total_uploaded} files")
+            console.print(f"  [green]✓[/green] Uploaded {total_uploaded} files")
 
         return total_uploaded
 
@@ -718,27 +758,27 @@ def cmd_upload(args: argparse.Namespace) -> int:
     # Get remote URL (command line > config)
     remote_url = args.remote or config.remote_url
     if not remote_url:
-        print("Error: --remote URL is required (or set in config with 'ml-dash setup')")
+        console.print("[red]Error:[/red] --remote URL is required (or set in config with 'ml-dash setup')")
         return 1
 
     # Get API key (command line > config)
     api_key = args.api_key or config.api_key
     if not api_key:
-        print("Error: --api-key is required (or set in config with 'ml-dash setup')")
+        console.print("[red]Error:[/red] --api-key is required (or set in config with 'ml-dash setup')")
         return 1
 
     # Validate experiment filter requires project
     if args.experiment and not args.project:
-        print("Error: --experiment requires --project")
+        console.print("[red]Error:[/red] --experiment requires --project")
         return 1
 
     # Discover experiments
     local_path = Path(args.path)
     if not local_path.exists():
-        print(f"Error: Local storage path does not exist: {local_path}")
+        console.print(f"[red]Error:[/red] Local storage path does not exist: {local_path}")
         return 1
 
-    print(f"Scanning local storage: {local_path.absolute()}")
+    console.print(f"[bold]Scanning local storage:[/bold] {local_path.absolute()}")
     experiments = discover_experiments(
         local_path,
         project_filter=args.project,
@@ -747,18 +787,18 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
     if not experiments:
         if args.project and args.experiment:
-            print(f"No experiment found: {args.project}/{args.experiment}")
+            console.print(f"[yellow]No experiment found:[/yellow] {args.project}/{args.experiment}")
         elif args.project:
-            print(f"No experiments found in project: {args.project}")
+            console.print(f"[yellow]No experiments found in project:[/yellow] {args.project}")
         else:
-            print("No experiments found in local storage")
+            console.print("[yellow]No experiments found in local storage[/yellow]")
         return 1
 
-    print(f"Found {len(experiments)} experiment(s)")
+    console.print(f"[green]Found {len(experiments)} experiment(s)[/green]")
 
     # Display discovered experiments
     if args.verbose or args.dry_run:
-        print("\nDiscovered experiments:")
+        console.print("\n[bold]Discovered experiments:[/bold]")
         for exp in experiments:
             parts = []
             if exp.has_logs:
@@ -772,16 +812,16 @@ def cmd_upload(args: argparse.Namespace) -> int:
                 parts.append(f"{exp.file_count} files ({size_mb:.1f}MB)")
 
             details = ", ".join(parts) if parts else "metadata only"
-            print(f"  - {exp.project}/{exp.experiment} ({details})")
+            console.print(f"  [cyan]•[/cyan] {exp.project}/{exp.experiment} [dim]({details})[/dim]")
 
     # Dry-run mode: stop here
     if args.dry_run:
-        print("\nDRY RUN - No data will be uploaded")
-        print("Run without --dry-run to proceed with upload.")
+        console.print("\n[yellow bold]DRY RUN[/yellow bold] - No data will be uploaded")
+        console.print("Run without --dry-run to proceed with upload.")
         return 0
 
     # Validate experiments
-    print("\nValidating experiments...")
+    console.print("\n[bold]Validating experiments...[/bold]")
     validator = ExperimentValidator(strict=args.strict)
     validation_results = {}
     valid_experiments = []
@@ -800,89 +840,116 @@ def cmd_upload(args: argparse.Namespace) -> int:
         if args.verbose or validation.errors:
             exp_key = f"{exp.project}/{exp.experiment}"
             if validation.errors:
-                print(f"  ✗ {exp_key}:")
+                console.print(f"  [red]✗[/red] {exp_key}:")
                 for error in validation.errors:
-                    print(f"      {error}")
+                    console.print(f"      [red]{error}[/red]")
             elif validation.warnings:
-                print(f"  ⚠ {exp_key}:")
+                console.print(f"  [yellow]⚠[/yellow] {exp_key}:")
                 for warning in validation.warnings:
-                    print(f"      {warning}")
+                    console.print(f"      [yellow]{warning}[/yellow]")
 
     if invalid_experiments:
-        print(f"\n{len(invalid_experiments)} experiment(s) failed validation and will be skipped")
+        console.print(f"\n[yellow]{len(invalid_experiments)} experiment(s) failed validation and will be skipped[/yellow]")
         if args.strict:
-            print("Error: Validation failed in --strict mode")
+            console.print("[red]Error: Validation failed in --strict mode[/red]")
             return 1
 
     if not valid_experiments:
-        print("Error: No valid experiments to upload")
+        console.print("[red]Error: No valid experiments to upload[/red]")
         return 1
 
-    print(f"{len(valid_experiments)} experiment(s) ready to upload")
+    console.print(f"[green]{len(valid_experiments)} experiment(s) ready to upload[/green]")
 
     # Initialize remote client and local storage
     remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
     local_storage = LocalStorage(root_path=local_path)
 
-    # Create uploader
-    uploader = ExperimentUploader(
-        local_storage=local_storage,
-        remote_client=remote_client,
-        batch_size=args.batch_size,
-        skip_logs=args.skip_logs,
-        skip_metrics=args.skip_metrics,
-        skip_files=args.skip_files,
-        skip_params=args.skip_params,
-        verbose=args.verbose,
-    )
-
-    # Upload experiments
-    print(f"\nUploading to: {remote_url}")
+    # Upload experiments with progress tracking
+    console.print(f"\n[bold]Uploading to:[/bold] {remote_url}")
     results = []
 
-    for i, exp in enumerate(valid_experiments, start=1):
-        exp_key = f"{exp.project}/{exp.experiment}"
-        print(f"\n[{i}/{len(valid_experiments)}] Uploading {exp_key}")
+    # Create progress bar for overall upload
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+        transient=not args.verbose,  # Keep progress visible in verbose mode
+    ) as progress:
+        # Create uploader with progress tracking
+        uploader = ExperimentUploader(
+            local_storage=local_storage,
+            remote_client=remote_client,
+            batch_size=args.batch_size,
+            skip_logs=args.skip_logs,
+            skip_metrics=args.skip_metrics,
+            skip_files=args.skip_files,
+            skip_params=args.skip_params,
+            verbose=args.verbose,
+            progress=progress,
+        )
 
-        validation = validation_results[exp_key]
-        result = uploader.upload_experiment(exp, validation)
-        results.append(result)
+        for i, exp in enumerate(valid_experiments, start=1):
+            exp_key = f"{exp.project}/{exp.experiment}"
 
-        if not args.verbose:
-            # Show brief status
-            if result.success:
-                parts = []
-                if result.uploaded.get("params"):
-                    parts.append(f"{result.uploaded['params']} params")
-                if result.uploaded.get("logs"):
-                    parts.append(f"{result.uploaded['logs']} logs")
-                if result.uploaded.get("metrics"):
-                    parts.append(f"{result.uploaded['metrics']} metrics")
-                if result.uploaded.get("files"):
-                    parts.append(f"{result.uploaded['files']} files")
-                status = ", ".join(parts) if parts else "metadata only"
-                print(f"  ✓ Uploaded ({status})")
-            else:
-                print(f"  ✗ Failed")
-                if result.errors:
-                    for error in result.errors[:3]:  # Show first 3 errors
-                        print(f"      {error}")
+            # Create task for this experiment
+            task_id = progress.add_task(
+                f"[{i}/{len(valid_experiments)}] {exp_key}",
+                total=100,  # Will be updated with actual steps
+            )
 
-    # Print summary
-    print("\n" + "=" * 60)
-    print("Upload Summary")
-    print("=" * 60)
+            validation = validation_results[exp_key]
+            result = uploader.upload_experiment(exp, validation, task_id=task_id)
+            results.append(result)
+
+            # Update task to completed
+            progress.update(task_id, completed=100, total=100)
+
+            if not args.verbose:
+                # Show brief status
+                if result.success:
+                    parts = []
+                    if result.uploaded.get("params"):
+                        parts.append(f"{result.uploaded['params']} params")
+                    if result.uploaded.get("logs"):
+                        parts.append(f"{result.uploaded['logs']} logs")
+                    if result.uploaded.get("metrics"):
+                        parts.append(f"{result.uploaded['metrics']} metrics")
+                    if result.uploaded.get("files"):
+                        parts.append(f"{result.uploaded['files']} files")
+                    status = ", ".join(parts) if parts else "metadata only"
+                    console.print(f"  [green]✓[/green] Uploaded ({status})")
+                else:
+                    console.print(f"  [red]✗[/red] Failed")
+                    if result.errors:
+                        for error in result.errors[:3]:  # Show first 3 errors
+                            console.print(f"      [red]{error}[/red]")
+
+    # Print summary with rich Table
+    console.print()
 
     successful = [r for r in results if r.success]
     failed = [r for r in results if not r.success]
 
-    print(f"Successful: {len(successful)}/{len(results)} experiments")
+    # Create summary table
+    summary_table = Table(title="Upload Summary", show_header=True, header_style="bold")
+    summary_table.add_column("Status", style="cyan")
+    summary_table.add_column("Count", justify="right")
+
+    summary_table.add_row("Successful", f"[green]{len(successful)}/{len(results)}[/green]")
     if failed:
-        print(f"Failed: {len(failed)}/{len(results)} experiments")
+        summary_table.add_row("Failed", f"[red]{len(failed)}/{len(results)}[/red]")
+
+    console.print(summary_table)
+
+    # Show failed experiments
+    if failed:
+        console.print("\n[bold red]Failed Experiments:[/bold red]")
         for result in failed:
-            print(f"  ✗ {result.experiment}")
+            console.print(f"  [red]✗[/red] {result.experiment}")
             for error in result.errors:
-                print(f"      {error}")
+                console.print(f"      [dim]{error}[/dim]")
 
     # Data statistics
     total_logs = sum(r.uploaded.get("logs", 0) for r in results)
@@ -890,13 +957,19 @@ def cmd_upload(args: argparse.Namespace) -> int:
     total_files = sum(r.uploaded.get("files", 0) for r in results)
 
     if total_logs or total_metrics or total_files:
-        print("\nData Uploaded:")
+        data_table = Table(title="Data Uploaded", show_header=True, header_style="bold")
+        data_table.add_column("Type", style="cyan")
+        data_table.add_column("Count", justify="right", style="green")
+
         if total_logs:
-            print(f"  Logs: {total_logs} entries")
+            data_table.add_row("Logs", f"{total_logs} entries")
         if total_metrics:
-            print(f"  Metrics: {total_metrics} metrics")
+            data_table.add_row("Metrics", f"{total_metrics} metrics")
         if total_files:
-            print(f"  Files: {total_files} files")
+            data_table.add_row("Files", f"{total_files} files")
+
+        console.print()
+        console.print(data_table)
 
     # Return exit code
     return 0 if len(failed) == 0 else 1
