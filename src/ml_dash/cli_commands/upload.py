@@ -629,7 +629,8 @@ class ExperimentUploader:
                 metadata=metadata.get("metadata"),
             )
 
-            experiment_id = response["id"]
+            # Extract experiment ID from nested response
+            experiment_id = response.get("experiment", {}).get("id") or response.get("id")
             if self.verbose:
                 console.print(f"  [green]✓[/green] Created experiment (id: {experiment_id})")
 
