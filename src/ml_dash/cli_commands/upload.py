@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
@@ -552,6 +554,7 @@ class ExperimentUploader:
         skip_params: bool = False,
         verbose: bool = False,
         progress: Optional[Progress] = None,
+        max_concurrent_metrics: int = 5,
     ):
         """
         Initialize uploader.
@@ -566,6 +569,7 @@ class ExperimentUploader:
             skip_params: Skip uploading parameters
             verbose: Show verbose output
             progress: Optional rich Progress instance for tracking
+            max_concurrent_metrics: Maximum concurrent metric uploads (default: 5)
         """
         self.local = local_storage
         self.remote = remote_client
@@ -576,6 +580,21 @@ class ExperimentUploader:
         self.skip_params = skip_params
         self.verbose = verbose
         self.progress = progress
+        self.max_concurrent_metrics = max_concurrent_metrics
+        # Thread-safe lock for shared state updates
+        self._lock = threading.Lock()
+        # Thread-local storage for remote clients (for thread-safe HTTP requests)
+        self._thread_local = threading.local()
+
+    def _get_remote_client(self) -> RemoteClient:
+        """Get thread-local remote client for safe concurrent access."""
+        if not hasattr(self._thread_local, 'client'):
+            # Create a new client for this thread
+            self._thread_local.client = RemoteClient(
+                base_url=self.remote.base_url,
+                api_key=self.remote.api_key
+            )
+        return self._thread_local.client
 
     def upload_experiment(
         self, exp_info: ExperimentInfo, validation_result: ValidationResult, task_id=None
@@ -738,66 +757,139 @@ class ExperimentUploader:
 
         return total_uploaded
 
-    def _upload_metrics(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult,
-                        task_id=None, update_progress=None) -> int:
-        """Upload metrics in batches."""
-        total_metrics = 0
+    def _upload_single_metric(
+        self,
+        experiment_id: str,
+        metric_name: str,
+        metric_dir: Path,
+        result: UploadResult
+    ) -> Dict[str, Any]:
+        """
+        Upload a single metric (thread-safe helper).
 
-        for metric_name in exp_info.metric_names:
-            if update_progress:
-                update_progress(f"Uploading metric '{metric_name}'...")
-            if self.verbose:
-                console.print(f"  [dim]Uploading metric '{metric_name}'...[/dim]")
+        Returns:
+            Dict with 'success', 'uploaded', 'skipped', 'bytes', and 'error' keys
+        """
+        data_file = metric_dir / "data.jsonl"
+        data_batch = []
+        total_uploaded = 0
+        skipped = 0
+        bytes_uploaded = 0
 
-            metric_dir = exp_info.path / "metrics" / metric_name
-            data_file = metric_dir / "data.jsonl"
+        # Get thread-local client for safe concurrent HTTP requests
+        remote_client = self._get_remote_client()
 
-            data_batch = []
-            total_uploaded = 0
-            skipped = 0
+        try:
+            with open(data_file, "r") as f:
+                for line in f:
+                    try:
+                        data_point = json.loads(line)
 
-            try:
-                with open(data_file, "r") as f:
-                    for line in f:
-                        try:
-                            data_point = json.loads(line)
-
-                            # Validate required fields
-                            if "data" not in data_point:
-                                skipped += 1
-                                continue
-
-                            data_batch.append(data_point["data"])
-                            # Track bytes
-                            result.bytes_uploaded += len(line.encode('utf-8'))
-
-                            # Upload batch
-                            if len(data_batch) >= self.batch_size:
-                                self.remote.append_batch_to_metric(
-                                    experiment_id, metric_name, data_batch
-                                )
-                                total_uploaded += len(data_batch)
-                                data_batch = []
-
-                        except json.JSONDecodeError:
+                        # Validate required fields
+                        if "data" not in data_point:
                             skipped += 1
                             continue
 
-                # Upload remaining data points
-                if data_batch:
-                    self.remote.append_batch_to_metric(experiment_id, metric_name, data_batch)
-                    total_uploaded += len(data_batch)
+                        data_batch.append(data_point["data"])
+                        bytes_uploaded += len(line.encode('utf-8'))
 
-                if self.verbose:
-                    msg = f"  [green]✓[/green] Uploaded {total_uploaded} data points for '{metric_name}'"
-                    if skipped > 0:
-                        msg += f" (skipped {skipped} invalid)"
-                    console.print(msg)
+                        # Upload batch using thread-local client
+                        if len(data_batch) >= self.batch_size:
+                            remote_client.append_batch_to_metric(
+                                experiment_id, metric_name, data_batch
+                            )
+                            total_uploaded += len(data_batch)
+                            data_batch = []
 
-                total_metrics += 1
+                    except json.JSONDecodeError:
+                        skipped += 1
+                        continue
 
-            except IOError as e:
-                result.failed.setdefault("metrics", []).append(f"{metric_name}: {e}")
+            # Upload remaining data points using thread-local client
+            if data_batch:
+                remote_client.append_batch_to_metric(experiment_id, metric_name, data_batch)
+                total_uploaded += len(data_batch)
+
+            return {
+                'success': True,
+                'uploaded': total_uploaded,
+                'skipped': skipped,
+                'bytes': bytes_uploaded,
+                'error': None
+            }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'uploaded': 0,
+                'skipped': 0,
+                'bytes': 0,
+                'error': str(e)
+            }
+
+    def _upload_metrics(self, experiment_id: str, exp_info: ExperimentInfo, result: UploadResult,
+                        task_id=None, update_progress=None) -> int:
+        """Upload metrics in parallel with concurrency limit."""
+        if not exp_info.metric_names:
+            return 0
+
+        total_metrics = 0
+
+        # Use ThreadPoolExecutor for parallel uploads
+        with ThreadPoolExecutor(max_workers=self.max_concurrent_metrics) as executor:
+            # Submit all metric upload tasks
+            future_to_metric = {}
+            for metric_name in exp_info.metric_names:
+                metric_dir = exp_info.path / "metrics" / metric_name
+                future = executor.submit(
+                    self._upload_single_metric,
+                    experiment_id,
+                    metric_name,
+                    metric_dir,
+                    result
+                )
+                future_to_metric[future] = metric_name
+
+            # Process completed uploads as they finish
+            for future in as_completed(future_to_metric):
+                metric_name = future_to_metric[future]
+
+                # Update progress
+                if update_progress:
+                    update_progress(f"Uploading metric '{metric_name}'...")
+
+                try:
+                    upload_result = future.result()
+
+                    # Thread-safe update of shared state
+                    with self._lock:
+                        result.bytes_uploaded += upload_result['bytes']
+
+                    if upload_result['success']:
+                        total_metrics += 1
+
+                        # Thread-safe console output
+                        if self.verbose:
+                            msg = f"  [green]✓[/green] Uploaded {upload_result['uploaded']} data points for '{metric_name}'"
+                            if upload_result['skipped'] > 0:
+                                msg += f" (skipped {upload_result['skipped']} invalid)"
+                            with self._lock:
+                                console.print(msg)
+                    else:
+                        # Record failure
+                        error_msg = f"{metric_name}: {upload_result['error']}"
+                        with self._lock:
+                            result.failed.setdefault("metrics", []).append(error_msg)
+                            if self.verbose:
+                                console.print(f"  [red]✗[/red] Failed to upload '{metric_name}': {upload_result['error']}")
+
+                except Exception as e:
+                    # Handle unexpected errors
+                    error_msg = f"{metric_name}: {str(e)}"
+                    with self._lock:
+                        result.failed.setdefault("metrics", []).append(error_msg)
+                        if self.verbose:
+                            console.print(f"  [red]✗[/red] Failed to upload '{metric_name}': {e}")
 
         return total_metrics
 
