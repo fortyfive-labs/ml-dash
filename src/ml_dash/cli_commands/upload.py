@@ -49,6 +49,7 @@ class UploadResult:
     uploaded: Dict[str, int] = field(default_factory=dict)  # {"logs": 100, "metrics": 3}
     failed: Dict[str, List[str]] = field(default_factory=dict)  # {"files": ["error msg"]}
     errors: List[str] = field(default_factory=list)
+    bytes_uploaded: int = 0  # Total bytes uploaded
 
 
 @dataclass
@@ -643,6 +644,8 @@ class ExperimentUploader:
                 params = validation_result.valid_data["parameters"]
                 self.remote.set_parameters(experiment_id, params)
                 result.uploaded["params"] = len(params)
+                # Track bytes (approximate JSON size)
+                result.bytes_uploaded += len(json.dumps(params).encode('utf-8'))
 
                 if self.verbose:
                     console.print(f"  [green]✓[/green] Uploaded {len(params)} parameters")
@@ -706,6 +709,8 @@ class ExperimentUploader:
                             api_log["metadata"] = log_entry["metadata"]
 
                         logs_batch.append(api_log)
+                        # Track bytes
+                        result.bytes_uploaded += len(line.encode('utf-8'))
 
                         # Upload batch
                         if len(logs_batch) >= self.batch_size:
@@ -763,6 +768,8 @@ class ExperimentUploader:
                                 continue
 
                             data_batch.append(data_point["data"])
+                            # Track bytes
+                            result.bytes_uploaded += len(line.encode('utf-8'))
 
                             # Upload batch
                             if len(data_batch) >= self.batch_size:
@@ -832,6 +839,8 @@ class ExperimentUploader:
                         )
 
                     total_uploaded += 1
+                    # Track bytes
+                    result.bytes_uploaded += file_info.get("sizeBytes", 0)
 
                     if self.verbose:
                         size_mb = file_info.get("sizeBytes", 0) / (1024 * 1024)
@@ -1020,6 +1029,10 @@ def cmd_upload(args: argparse.Namespace) -> int:
     console.print(f"\n[bold]Uploading to:[/bold] {remote_url}")
     results = []
 
+    # Track upload timing
+    import time
+    start_time = time.time()
+
     # Create progress bar for overall upload
     with Progress(
         SpinnerColumn(),
@@ -1093,6 +1106,11 @@ def cmd_upload(args: argparse.Namespace) -> int:
                         for error in result.errors[:3]:  # Show first 3 errors
                             console.print(f"      [red]{error}[/red]")
 
+    # Calculate timing
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    total_bytes = sum(r.bytes_uploaded for r in results)
+
     # Print summary with rich Table
     console.print()
 
@@ -1107,6 +1125,19 @@ def cmd_upload(args: argparse.Namespace) -> int:
     summary_table.add_row("Successful", f"[green]{len(successful)}/{len(results)}[/green]")
     if failed:
         summary_table.add_row("Failed", f"[red]{len(failed)}/{len(results)}[/red]")
+
+    # Add timing information
+    summary_table.add_row("Total Time", f"{elapsed_time:.2f}s")
+
+    # Calculate and display upload speed
+    if total_bytes > 0 and elapsed_time > 0:
+        # Convert to appropriate unit
+        if total_bytes < 1024 * 1024:  # Less than 1 MB
+            speed_kb = (total_bytes / 1024) / elapsed_time
+            summary_table.add_row("Avg Speed", f"{speed_kb:.2f} KB/s")
+        else:  # 1 MB or more
+            speed_mb = (total_bytes / (1024 * 1024)) / elapsed_time
+            summary_table.add_row("Avg Speed", f"{speed_mb:.2f} MB/s")
 
     console.print(summary_table)
 
