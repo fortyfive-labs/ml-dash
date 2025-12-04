@@ -75,6 +75,13 @@ class LocalStorage:
         (experiment_dir / "metrics").mkdir(exist_ok=True)
         (experiment_dir / "files").mkdir(exist_ok=True)
 
+        # Create folder directory under root_path (.ml-dash) if specified
+        if folder is not None:
+            # Strip leading / to make it relative, then create under root_path
+            folder_path = folder.lstrip('/')
+            folder_dir = self.root_path / folder_path
+            folder_dir.mkdir(parents=True, exist_ok=True)
+
         # Write experiment metadata
         experiment_metadata = {
             "name": name,
