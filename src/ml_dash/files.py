@@ -69,7 +69,7 @@ class FileBuilder:
         Raises:
             RuntimeError: If experiment is not open or write-protected
             ValueError: If file_path not provided or file doesn't exist
-            ValueError: If file size exceeds 5GB limit
+            ValueError: If file size exceeds 100GB limit
 
         Examples:
             result = experiment.files(file_path="./model.pt", prefix="/models").save()
@@ -91,11 +91,11 @@ class FileBuilder:
         if not file_path.is_file():
             raise ValueError(f"Path is not a file: {self._file_path}")
 
-        # Check file size (max 5GB)
+        # Check file size (max 100GB)
         file_size = file_path.stat().st_size
-        MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024  # 5GB in bytes
+        MAX_FILE_SIZE = 100 * 1024 * 1024 * 1024  # 100GB in bytes
         if file_size > MAX_FILE_SIZE:
-            raise ValueError(f"File size ({file_size} bytes) exceeds 5GB limit")
+            raise ValueError(f"File size ({file_size} bytes) exceeds 100GB limit")
 
         # Compute checksum
         checksum = compute_sha256(str(file_path))
