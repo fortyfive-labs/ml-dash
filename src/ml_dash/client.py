@@ -581,6 +581,316 @@ class RemoteClient:
         response.raise_for_status()
         return response.json()["metrics"]
 
+    def graphql_query(self, query: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        Execute a GraphQL query.
+
+        Args:
+            query: GraphQL query string
+            variables: Optional variables for the query
+
+        Returns:
+            Query result data
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+            Exception: If GraphQL returns errors
+        """
+        response = self._client.post(
+            "/graphql",
+            json={"query": query, "variables": variables or {}}
+        )
+        response.raise_for_status()
+        result = response.json()
+
+        if "errors" in result:
+            raise Exception(f"GraphQL errors: {result['errors']}")
+
+        return result.get("data", {})
+
+    def list_projects_graphql(self, namespace_slug: str) -> List[Dict[str, Any]]:
+        """
+        List all projects in a namespace via GraphQL.
+
+        Args:
+            namespace_slug: Namespace slug
+
+        Returns:
+            List of project dicts
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        query = """
+        query Projects($namespaceSlug: String!) {
+          projects(namespaceSlug: $namespaceSlug) {
+            id
+            name
+            slug
+            description
+            tags
+          }
+        }
+        """
+        result = self.graphql_query(query, {"namespaceSlug": namespace_slug})
+        return result.get("projects", [])
+
+    def list_experiments_graphql(
+        self, namespace_slug: str, project_slug: str, status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        List experiments in a project via GraphQL.
+
+        Args:
+            namespace_slug: Namespace slug
+            project_slug: Project slug
+            status: Optional experiment status filter (RUNNING, COMPLETED, FAILED, CANCELLED)
+
+        Returns:
+            List of experiment dicts with metadata
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        query = """
+        query Experiments($namespaceSlug: String!, $projectSlug: String!, $status: ExperimentStatus) {
+          experiments(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, status: $status) {
+            id
+            name
+            description
+            tags
+            status
+            startedAt
+            endedAt
+            project {
+              slug
+            }
+            logMetadata {
+              totalLogs
+            }
+            metrics {
+              name
+              metricMetadata {
+                totalDataPoints
+              }
+            }
+            files {
+              id
+              filename
+              path
+              contentType
+              sizeBytes
+              checksum
+              description
+              tags
+              metadata
+            }
+            parameters {
+              id
+              data
+            }
+          }
+        }
+        """
+        result = self.graphql_query(query, {
+            "namespaceSlug": namespace_slug,
+            "projectSlug": project_slug,
+            "status": status
+        })
+        return result.get("experiments", [])
+
+    def get_experiment_graphql(
+        self, namespace_slug: str, project_slug: str, experiment_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a single experiment via GraphQL.
+
+        Args:
+            namespace_slug: Namespace slug
+            project_slug: Project slug
+            experiment_name: Experiment name
+
+        Returns:
+            Experiment dict with metadata, or None if not found
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        query = """
+        query Experiment($namespaceSlug: String!, $projectSlug: String!, $experimentName: String!) {
+          experiment(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, experimentName: $experimentName) {
+            id
+            name
+            description
+            tags
+            status
+            project {
+              slug
+            }
+            logMetadata {
+              totalLogs
+            }
+            metrics {
+              name
+              metricMetadata {
+                totalDataPoints
+              }
+            }
+            files {
+              id
+              filename
+              path
+              contentType
+              sizeBytes
+              checksum
+              description
+              tags
+              metadata
+            }
+            parameters {
+              id
+              data
+            }
+          }
+        }
+        """
+        result = self.graphql_query(query, {
+            "namespaceSlug": namespace_slug,
+            "projectSlug": project_slug,
+            "experimentName": experiment_name
+        })
+        return result.get("experiment")
+
+    def download_file_streaming(
+        self, experiment_id: str, file_id: str, dest_path: str
+    ) -> str:
+        """
+        Download a file with streaming for large files.
+
+        Args:
+            experiment_id: Experiment ID (Snowflake ID)
+            file_id: File ID (Snowflake ID)
+            dest_path: Destination path to save file
+
+        Returns:
+            Path to downloaded file
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+            ValueError: If checksum verification fails
+        """
+        # Get metadata first for checksum
+        file_metadata = self.get_file(experiment_id, file_id)
+        expected_checksum = file_metadata["checksum"]
+
+        # Stream download
+        with self._client.stream("GET", f"/experiments/{experiment_id}/files/{file_id}/download") as response:
+            response.raise_for_status()
+
+            with open(dest_path, "wb") as f:
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    f.write(chunk)
+
+        # Verify checksum
+        from .files import verify_checksum
+        if not verify_checksum(dest_path, expected_checksum):
+            import os
+            os.remove(dest_path)
+            raise ValueError(f"Checksum verification failed for file {file_id}")
+
+        return dest_path
+
+    def query_logs(
+        self,
+        experiment_id: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+        order: Optional[str] = None,
+        level: Optional[List[str]] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Query logs for an experiment.
+
+        Args:
+            experiment_id: Experiment ID
+            limit: Maximum number of logs to return
+            offset: Number of logs to skip
+            order_by: Field to order by (timestamp or sequenceNumber)
+            order: Sort order (asc or desc)
+            level: List of log levels to filter by
+            start_time: Filter logs after this timestamp
+            end_time: Filter logs before this timestamp
+            search: Search query for log messages
+
+        Returns:
+            Dict with logs array and pagination info
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        params: Dict[str, str] = {}
+
+        if limit is not None:
+            params["limit"] = str(limit)
+        if offset is not None:
+            params["offset"] = str(offset)
+        if order_by is not None:
+            params["orderBy"] = order_by
+        if order is not None:
+            params["order"] = order
+        if level is not None:
+            params["level"] = ",".join(level)
+        if start_time is not None:
+            params["startTime"] = start_time
+        if end_time is not None:
+            params["endTime"] = end_time
+        if search is not None:
+            params["search"] = search
+
+        response = self._client.get(f"/experiments/{experiment_id}/logs", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    def get_metric_data(
+        self,
+        experiment_id: str,
+        metric_name: str,
+        start_index: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get data points for a metric.
+
+        Args:
+            experiment_id: Experiment ID
+            metric_name: Name of the metric
+            start_index: Starting index for pagination
+            limit: Maximum number of data points to return
+
+        Returns:
+            Dict with dataPoints array and pagination info
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        params: Dict[str, str] = {}
+
+        if start_index is not None:
+            params["startIndex"] = str(start_index)
+        if limit is not None:
+            params["limit"] = str(limit)
+
+        response = self._client.get(
+            f"/experiments/{experiment_id}/metrics/{metric_name}/data",
+            params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
     def close(self):
         """Close the HTTP client."""
         self._client.close()
