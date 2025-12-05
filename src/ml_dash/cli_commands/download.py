@@ -185,9 +185,9 @@ def _get_or_generate_api_key(args: argparse.Namespace, config: Config) -> str:
         return args.api_key
     if config.api_key:
         return config.api_key
-    if args.user_name:
+    if args.username:
         from ..cli_commands.upload import generate_api_key_from_username
-        return generate_api_key_from_username(args.user_name)
+        return generate_api_key_from_username(args.username)
     return ""
 
 
@@ -493,7 +493,7 @@ def cmd_download(args: argparse.Namespace) -> int:
     config = Config()
     remote_url = args.remote or config.remote_url
     api_key = _get_or_generate_api_key(args, config)
-    namespace = args.namespace or args.user_name
+    namespace = args.namespace or args.username
 
     # Validate inputs
     if not remote_url:
@@ -501,11 +501,11 @@ def cmd_download(args: argparse.Namespace) -> int:
         return 1
 
     if not api_key:
-        console.print("[red]Error:[/red] --api-key or --user-name is required")
+        console.print("[red]Error:[/red] --api-key or --username is required")
         return 1
 
     if not namespace:
-        console.print("[red]Error:[/red] --namespace or --user-name is required")
+        console.print("[red]Error:[/red] --namespace or --username is required")
         return 1
 
     # Initialize clients
@@ -667,7 +667,7 @@ def add_parser(subparsers):
     # Remote configuration
     parser.add_argument("--remote", help="Remote server URL")
     parser.add_argument("--api-key", help="JWT authentication token")
-    parser.add_argument("--user-name", help="Username for auto-generating API key")
+    parser.add_argument("--username", help="Username for auto-generating API key")
 
     # Scope control
     parser.add_argument("--project", help="Download only this project")

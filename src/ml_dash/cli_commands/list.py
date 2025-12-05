@@ -268,19 +268,19 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     # If no API key, try to generate from username
     if not api_key:
-        if args.user_name:
+        if args.username:
             from .upload import generate_api_key_from_username
-            api_key = generate_api_key_from_username(args.user_name)
+            api_key = generate_api_key_from_username(args.username)
             if args.verbose:
-                console.print(f"[dim]Generated API key from username: {args.user_name}[/dim]")
+                console.print(f"[dim]Generated API key from username: {args.username}[/dim]")
         else:
-            console.print("[red]Error:[/red] --api-key or --user-name is required")
+            console.print("[red]Error:[/red] --api-key or --username is required")
             return 1
 
     # Get namespace (defaults to username or config)
-    namespace = args.namespace or args.user_name or config.namespace
+    namespace = args.namespace or args.username or config.namespace
     if not namespace:
-        console.print("[red]Error:[/red] --namespace or --user-name is required")
+        console.print("[red]Error:[/red] --namespace or --username is required")
         return 1
 
     # Create remote client
@@ -327,7 +327,7 @@ def add_parser(subparsers) -> None:
     # Remote configuration
     parser.add_argument("--remote", type=str, help="Remote server URL")
     parser.add_argument("--api-key", type=str, help="JWT authentication token")
-    parser.add_argument("--user-name", type=str, help="Username for auto-generating API key")
+    parser.add_argument("--username", type=str, help="Username for auto-generating API key")
     parser.add_argument("--namespace", type=str, help="Namespace slug (defaults to username)")
 
     # Filtering options

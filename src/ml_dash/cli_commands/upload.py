@@ -170,10 +170,10 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     parser.add_argument(
         "--api-key",
         type=str,
-        help="JWT token for authentication (required unless --user-name or config is set)",
+        help="JWT token for authentication (required unless --username or config is set)",
     )
     parser.add_argument(
-        "--user-name",
+        "--username",
         type=str,
         help="Username for authentication (generates API key automatically)",
     )
@@ -1000,11 +1000,11 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
     # If no API key, try to generate from username
     if not api_key:
-        if args.user_name:
-            console.print(f"[dim]Generating API key from username: {args.user_name}[/dim]")
-            api_key = generate_api_key_from_username(args.user_name)
+        if args.username:
+            console.print(f"[dim]Generating API key from username: {args.username}[/dim]")
+            api_key = generate_api_key_from_username(args.username)
         else:
-            console.print("[red]Error:[/red] --api-key or --user-name is required (or set in config)")
+            console.print("[red]Error:[/red] --api-key or --username is required (or set in config)")
             return 1
 
     # Validate experiment filter requires project
