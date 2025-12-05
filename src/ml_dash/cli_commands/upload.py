@@ -27,6 +27,7 @@ class ExperimentInfo:
     project: str
     experiment: str
     path: Path
+    folder: Optional[str] = None
     has_logs: bool = False
     has_params: bool = False
     metric_names: List[str] = field(default_factory=list)
@@ -256,6 +257,9 @@ def discover_experiments(
     """
     Discover experiments in local storage directory.
 
+    Supports both flat (local_path/project/experiment) and folder-based
+    (local_path/folder/project/experiment) hierarchies.
+
     Args:
         local_path: Root path of local storage
         project_filter: Only discover experiments in this project
@@ -271,72 +275,80 @@ def discover_experiments(
 
     experiments = []
 
-    # Iterate through projects
-    for project_dir in local_path.iterdir():
-        if not project_dir.is_dir():
-            continue
+    # Find all experiment.json files recursively
+    for exp_json in local_path.rglob("*/experiment.json"):
+        exp_dir = exp_json.parent
 
-        project_name = project_dir.name
+        # Extract project and experiment names from path
+        # Path structure: local_path / [folder] / project / experiment
+        try:
+            relative_path = exp_dir.relative_to(local_path)
+            parts = relative_path.parts
 
-        # Apply project filter
-        if project_filter and project_name != project_filter:
-            continue
+            if len(parts) < 2:
+                continue  # Need at least project/experiment
 
-        # Iterate through experiments in project
-        for exp_dir in project_dir.iterdir():
-            if not exp_dir.is_dir():
+            # Last two parts are project/experiment
+            exp_name = parts[-1]
+            project_name = parts[-2]
+
+            # Apply filters
+            if project_filter and project_name != project_filter:
                 continue
-
-            exp_name = exp_dir.name
-
-            # Apply experiment filter
             if experiment_filter and exp_name != experiment_filter:
                 continue
 
-            # Check if experiment.json exists (required)
-            exp_json = exp_dir / "experiment.json"
-            if not exp_json.exists():
-                continue
+            # Read folder from experiment.json
+            folder = None
+            try:
+                with open(exp_json, 'r') as f:
+                    metadata = json.load(f)
+                    folder = metadata.get('folder')
+            except:
+                pass
 
             # Create experiment info
             exp_info = ExperimentInfo(
                 project=project_name,
                 experiment=exp_name,
                 path=exp_dir,
+                folder=folder,
             )
+        except (ValueError, IndexError):
+            continue
 
-            # Check for parameters
-            params_file = exp_dir / "parameters.json"
-            exp_info.has_params = params_file.exists()
+        # Check for parameters
+        params_file = exp_dir / "parameters.json"
+        exp_info.has_params = params_file.exists()
 
-            # Check for logs
-            logs_file = exp_dir / "logs" / "logs.jsonl"
-            exp_info.has_logs = logs_file.exists()
+        # Check for logs
+        logs_file = exp_dir / "logs" / "logs.jsonl"
+        exp_info.has_logs = logs_file.exists()
 
-            # Check for metrics
-            metrics_dir = exp_dir / "metrics"
-            if metrics_dir.exists():
-                for metric_dir in metrics_dir.iterdir():
-                    if metric_dir.is_dir():
-                        data_file = metric_dir / "data.jsonl"
-                        if data_file.exists():
-                            exp_info.metric_names.append(metric_dir.name)
+        # Check for metrics
+        metrics_dir = exp_dir / "metrics"
+        if metrics_dir.exists():
+            for metric_dir in metrics_dir.iterdir():
+                if metric_dir.is_dir():
+                    data_file = metric_dir / "data.jsonl"
+                    if data_file.exists():
+                        exp_info.metric_names.append(metric_dir.name)
 
-            # Check for files
-            files_dir = exp_dir / "files"
-            if files_dir.exists():
-                try:
-                    # Count files recursively
-                    exp_info.file_count = sum(1 for _ in files_dir.rglob("*") if _.is_file())
+        # Check for files
+        files_dir = exp_dir / "files"
+        if files_dir.exists():
+            try:
+                # Count files recursively
+                exp_info.file_count = sum(1 for _ in files_dir.rglob("*") if _.is_file())
 
-                    # Estimate size
-                    exp_info.estimated_size = sum(
-                        f.stat().st_size for f in files_dir.rglob("*") if f.is_file()
-                    )
-                except (OSError, PermissionError):
-                    pass
+                # Estimate size
+                exp_info.estimated_size = sum(
+                    f.stat().st_size for f in files_dir.rglob("*") if f.is_file()
+                )
+            except (OSError, PermissionError):
+                pass
 
-            experiments.append(exp_info)
+        experiments.append(exp_info)
 
     return experiments
 
