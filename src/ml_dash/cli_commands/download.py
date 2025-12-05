@@ -114,15 +114,16 @@ def _format_bytes_per_sec(bytes_per_sec: float) -> str:
 
 def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
     """Convert GraphQL experiment data to ExperimentInfo."""
+    log_metadata = graphql_data.get('logMetadata') or {}
     return ExperimentInfo(
         project=graphql_data['project']['slug'],
         experiment=graphql_data['name'],
         experiment_id=graphql_data['id'],
-        has_logs=graphql_data.get('logMetadata', {}).get('totalLogs', 0) > 0,
+        has_logs=log_metadata.get('totalLogs', 0) > 0,
         has_params=graphql_data.get('parameters') is not None,
-        metric_names=[m['name'] for m in graphql_data.get('metrics', [])],
-        file_count=len(graphql_data.get('files', [])),
-        log_count=int(graphql_data.get('logMetadata', {}).get('totalLogs', 0)),
+        metric_names=[m['name'] for m in graphql_data.get('metrics', []) or []],
+        file_count=len(graphql_data.get('files', []) or []),
+        log_count=int(log_metadata.get('totalLogs', 0)),
         status=graphql_data.get('status', 'RUNNING'),
     )
 
