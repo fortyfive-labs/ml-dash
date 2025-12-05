@@ -616,7 +616,7 @@ class RemoteClient:
             namespace_slug: Namespace slug
 
         Returns:
-            List of project dicts
+            List of project dicts with experimentCount
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -633,7 +633,25 @@ class RemoteClient:
         }
         """
         result = self.graphql_query(query, {"namespaceSlug": namespace_slug})
-        return result.get("projects", [])
+        projects = result.get("projects", [])
+
+        # For each project, count experiments
+        for project in projects:
+            exp_query = """
+            query ExperimentsCount($namespaceSlug: String!, $projectSlug: String!) {
+              experiments(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
+                id
+              }
+            }
+            """
+            exp_result = self.graphql_query(exp_query, {
+                "namespaceSlug": namespace_slug,
+                "projectSlug": project['slug']
+            })
+            experiments = exp_result.get("experiments", [])
+            project['experimentCount'] = len(experiments)
+
+        return projects
 
     def list_experiments_graphql(
         self, namespace_slug: str, project_slug: str, status: Optional[str] = None
@@ -662,6 +680,7 @@ class RemoteClient:
             status
             startedAt
             endedAt
+            metadata
             project {
               slug
             }
@@ -724,6 +743,7 @@ class RemoteClient:
             description
             tags
             status
+            metadata
             project {
               slug
             }

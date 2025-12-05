@@ -649,16 +649,22 @@ class ExperimentUploader:
             if self.verbose:
                 console.print(f"  [dim]Creating experiment...[/dim]")
 
-            metadata = validation_result.valid_data.get("metadata", {})
+            exp_data = validation_result.valid_data
+
+            # Store folder path in metadata (not as folderId which expects Snowflake ID)
+            custom_metadata = exp_data.get("metadata") or {}
+            if exp_data.get("folder"):
+                custom_metadata["folder"] = exp_data["folder"]
+
             response = self.remote.create_or_update_experiment(
                 project=exp_info.project,
                 name=exp_info.experiment,
-                description=metadata.get("description"),
-                tags=metadata.get("tags"),
-                bindrs=metadata.get("bindrs"),
-                folder=metadata.get("folder"),
-                write_protected=metadata.get("write_protected", False),
-                metadata=metadata.get("metadata"),
+                description=exp_data.get("description"),
+                tags=exp_data.get("tags"),
+                bindrs=exp_data.get("bindrs"),
+                folder=None,  # Don't send folder path as folderId (expects Snowflake ID)
+                write_protected=exp_data.get("write_protected", False),
+                metadata=custom_metadata if custom_metadata else None,
             )
 
             # Extract experiment ID from nested response
@@ -924,23 +930,31 @@ class ExperimentUploader:
                     if update_progress:
                         update_progress(f"Uploading {file_info['filename']}...")
 
-                    # Download file to temp location
+                    # Get file path directly from storage without copying
                     file_id = file_info["id"]
-                    file_path = self.local.read_file(
-                        exp_info.project, exp_info.experiment, file_id
-                    )
+                    experiment_dir = self.local._get_experiment_dir(exp_info.project, exp_info.experiment)
+                    files_dir = experiment_dir / "files"
 
-                    # Upload to remote
-                    with open(file_path, "rb") as f:
-                        self.remote.upload_file(
-                            experiment_id=experiment_id,
-                            file=f,
-                            filename=file_info["filename"],
-                            prefix=file_info.get("prefix", ""),
-                            description=file_info.get("description"),
-                            tags=file_info.get("tags", []),
-                            metadata=file_info.get("metadata"),
-                        )
+                    # Construct file path
+                    file_prefix = file_info["path"].lstrip("/") if file_info["path"] else ""
+                    if file_prefix:
+                        file_path = files_dir / file_prefix / file_id / file_info["filename"]
+                    else:
+                        file_path = files_dir / file_id / file_info["filename"]
+
+                    # Upload to remote with correct parameters
+                    self.remote.upload_file(
+                        experiment_id=experiment_id,
+                        file_path=str(file_path),
+                        prefix=file_info.get("path", ""),
+                        filename=file_info["filename"],
+                        description=file_info.get("description"),
+                        tags=file_info.get("tags", []),
+                        metadata=file_info.get("metadata"),
+                        checksum=file_info["checksum"],
+                        content_type=file_info["contentType"],
+                        size_bytes=file_info["sizeBytes"],
+                    )
 
                     total_uploaded += 1
                     # Track bytes

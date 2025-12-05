@@ -42,6 +42,9 @@ class ExperimentInfo:
     estimated_size: int = 0
     log_count: int = 0
     status: str = "RUNNING"
+    folder: Optional[str] = None
+    description: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -115,6 +118,11 @@ def _format_bytes_per_sec(bytes_per_sec: float) -> str:
 def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
     """Convert GraphQL experiment data to ExperimentInfo."""
     log_metadata = graphql_data.get('logMetadata') or {}
+
+    # Extract folder from metadata if it exists
+    metadata = graphql_data.get('metadata') or {}
+    folder = metadata.get('folder') if isinstance(metadata, dict) else None
+
     return ExperimentInfo(
         project=graphql_data['project']['slug'],
         experiment=graphql_data['name'],
@@ -125,6 +133,9 @@ def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
         file_count=len(graphql_data.get('files', []) or []),
         log_count=int(log_metadata.get('totalLogs', 0)),
         status=graphql_data.get('status', 'RUNNING'),
+        folder=folder,
+        description=graphql_data.get('description'),
+        tags=graphql_data.get('tags', []) or [],
     )
 
 
@@ -261,14 +272,14 @@ class ExperimentDownloader:
 
     def _download_metadata(self, exp_info: ExperimentInfo, result: DownloadResult):
         """Download and create experiment metadata."""
-        # Create experiment directory structure
+        # Create experiment directory structure with folder path
         self.local.create_experiment(
             project=exp_info.project,
             name=exp_info.experiment,
-            description=None,  # Will be in metadata
-            tags=[],
+            description=exp_info.description,
+            tags=exp_info.tags,
             bindrs=[],
-            folder=None,
+            folder=exp_info.folder,
             metadata=None,
         )
 
