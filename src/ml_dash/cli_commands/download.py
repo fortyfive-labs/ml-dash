@@ -369,8 +369,93 @@ class ExperimentDownloader:
                             f"{metric_name}: {metric_result['error']}"
                         )
 
+    def _download_single_chunk(self, experiment_id: str, metric_name: str, chunk_number: int):
+        """Download a single chunk (for parallel downloading)."""
+        remote = self._get_remote_client()
+        try:
+            chunk_data = remote.download_metric_chunk(experiment_id, metric_name, chunk_number)
+            return {
+                'success': True,
+                'chunk_number': chunk_number,
+                'data': chunk_data.get('data', []),
+                'start_index': int(chunk_data.get('startIndex', 0)),
+                'end_index': int(chunk_data.get('endIndex', 0)),
+                'error': None
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'chunk_number': chunk_number,
+                'error': str(e),
+                'data': []
+            }
+
     def _download_single_metric(self, experiment_id: str, project: str, experiment: str, metric_name: str):
-        """Download a single metric with pagination (thread-safe)."""
+        """Download a single metric using chunk-aware approach (thread-safe)."""
+        remote = self._get_remote_client()
+
+        total_downloaded = 0
+        bytes_downloaded = 0
+
+        try:
+            # Get metric metadata to determine download strategy
+            metadata = remote.get_metric_stats(experiment_id, metric_name)
+            total_chunks = metadata.get('totalChunks', 0)
+            buffered_points = int(metadata.get('bufferedDataPoints', 0))
+
+            all_data = []
+
+            # Download chunks in parallel if they exist
+            if total_chunks > 0:
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+
+                # Download all chunks in parallel (max 10 workers)
+                with ThreadPoolExecutor(max_workers=min(10, total_chunks)) as executor:
+                    chunk_futures = {
+                        executor.submit(self._download_single_chunk, experiment_id, metric_name, i): i
+                        for i in range(total_chunks)
+                    }
+
+                    for future in as_completed(chunk_futures):
+                        result = future.result()
+                        if result['success']:
+                            all_data.extend(result['data'])
+                        else:
+                            # If a chunk fails, fall back to pagination
+                            raise Exception(f"Chunk {result['chunk_number']} download failed: {result['error']}")
+
+            # Download buffer data if exists
+            if buffered_points > 0:
+                response = remote.get_metric_data(
+                    experiment_id, metric_name,
+                    buffer_only=True
+                )
+                buffer_data = response.get('data', [])
+                all_data.extend(buffer_data)
+
+            # Sort all data by index
+            all_data.sort(key=lambda x: int(x.get('index', 0)))
+
+            # Write to local storage in batches
+            batch_size = 10000
+            for i in range(0, len(all_data), batch_size):
+                batch = all_data[i:i + batch_size]
+                self.local.append_batch_to_metric(
+                    project, experiment, metric_name,
+                    data_points=[d['data'] for d in batch]
+                )
+                total_downloaded += len(batch)
+                bytes_downloaded += sum(len(json.dumps(d)) for d in batch)
+
+            return {'success': True, 'downloaded': total_downloaded, 'bytes': bytes_downloaded, 'error': None}
+
+        except Exception as e:
+            # Fall back to pagination if chunk download fails
+            console.print(f"[yellow]Chunk download failed for {metric_name}, falling back to pagination: {e}[/yellow]")
+            return self._download_metric_with_pagination(experiment_id, project, experiment, metric_name)
+
+    def _download_metric_with_pagination(self, experiment_id: str, project: str, experiment: str, metric_name: str):
+        """Original pagination-based download (fallback method)."""
         remote = self._get_remote_client()
 
         total_downloaded = 0

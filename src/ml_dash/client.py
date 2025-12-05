@@ -881,6 +881,7 @@ class RemoteClient:
         metric_name: str,
         start_index: Optional[int] = None,
         limit: Optional[int] = None,
+        buffer_only: bool = False,
     ) -> Dict[str, Any]:
         """
         Get data points for a metric.
@@ -890,6 +891,7 @@ class RemoteClient:
             metric_name: Name of the metric
             start_index: Starting index for pagination
             limit: Maximum number of data points to return
+            buffer_only: If True, only fetch buffer data (skip chunks)
 
         Returns:
             Dict with dataPoints array and pagination info
@@ -903,10 +905,38 @@ class RemoteClient:
             params["startIndex"] = str(start_index)
         if limit is not None:
             params["limit"] = str(limit)
+        if buffer_only:
+            params["bufferOnly"] = "true"
 
         response = self._client.get(
             f"/experiments/{experiment_id}/metrics/{metric_name}/data",
             params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def download_metric_chunk(
+        self,
+        experiment_id: str,
+        metric_name: str,
+        chunk_number: int,
+    ) -> Dict[str, Any]:
+        """
+        Download a specific chunk by chunk number.
+
+        Args:
+            experiment_id: Experiment ID
+            metric_name: Name of the metric
+            chunk_number: Chunk number to download
+
+        Returns:
+            Dict with chunk data including chunkNumber, startIndex, endIndex, dataCount, and data array
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        response = self._client.get(
+            f"/experiments/{experiment_id}/metrics/{metric_name}/chunks/{chunk_number}"
         )
         response.raise_for_status()
         return response.json()
