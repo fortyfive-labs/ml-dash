@@ -21,9 +21,10 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # Import and add command parsers
-    from .cli_commands import upload, download
+    from .cli_commands import upload, download, list as list_cmd
     upload.add_parser(subparsers)
     download.add_parser(subparsers)
+    list_cmd.add_parser(subparsers)
 
     return parser
 
@@ -53,6 +54,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     elif args.command == "download":
         from .cli_commands import download
         return download.cmd_download(args)
+    elif args.command == "list":
+        from .cli_commands import list as list_cmd
+        return list_cmd.cmd_list(args)
 
     # Unknown command (shouldn't happen due to subparsers)
     parser.print_help()
