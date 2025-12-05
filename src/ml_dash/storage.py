@@ -62,8 +62,16 @@ class LocalStorage:
         Returns:
             Path to experiment directory
         """
+        # Determine base path - include folder in hierarchy if specified
+        if folder is not None:
+            # Strip leading / to make it relative, then use as base path
+            folder_path = folder.lstrip('/')
+            base_path = self.root_path / folder_path
+        else:
+            base_path = self.root_path
+
         # Create project directory
-        project_dir = self.root_path / project
+        project_dir = base_path / project
         project_dir.mkdir(parents=True, exist_ok=True)
 
         # Create experiment directory
@@ -74,13 +82,6 @@ class LocalStorage:
         (experiment_dir / "logs").mkdir(exist_ok=True)
         (experiment_dir / "metrics").mkdir(exist_ok=True)
         (experiment_dir / "files").mkdir(exist_ok=True)
-
-        # Create folder directory under root_path (.ml-dash) if specified
-        if folder is not None:
-            # Strip leading / to make it relative, then create under root_path
-            folder_path = folder.lstrip('/')
-            folder_dir = self.root_path / folder_path
-            folder_dir.mkdir(parents=True, exist_ok=True)
 
         # Write experiment metadata
         experiment_metadata = {
@@ -145,7 +146,7 @@ class LocalStorage:
             timestamp: ISO timestamp string
             metadata: Optional metadata
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         logs_dir = experiment_dir / "logs"
         logs_file = logs_dir / "logs.jsonl"
         seq_file = logs_dir / ".log_sequence"
@@ -191,7 +192,7 @@ class LocalStorage:
             metric_name: Metric name
             data: Data point
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         metric_file = experiment_dir / "metrics" / f"{metric_name}.jsonl"
 
         data_point = {
@@ -223,7 +224,7 @@ class LocalStorage:
             experiment: Experiment name
             data: Flattened parameter dict with dot notation (already flattened)
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         params_file = experiment_dir / "parameters.json"
 
         # Read existing if present
@@ -270,7 +271,7 @@ class LocalStorage:
         Returns:
             Flattened parameter dict, or None if file doesn't exist
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         params_file = experiment_dir / "parameters.json"
 
         if not params_file.exists():
@@ -322,7 +323,7 @@ class LocalStorage:
         import shutil
         from .files import generate_snowflake_id
 
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
@@ -418,7 +419,7 @@ class LocalStorage:
         Returns:
             List of file metadata dicts (only non-deleted files)
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         metadata_file = experiment_dir / "files" / ".files_metadata.json"
 
         if not metadata_file.exists():
@@ -471,7 +472,7 @@ class LocalStorage:
         import shutil
         from .files import verify_checksum
 
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
@@ -536,7 +537,7 @@ class LocalStorage:
         Raises:
             FileNotFoundError: If file not found
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         metadata_file = experiment_dir / "files" / ".files_metadata.json"
 
         if not metadata_file.exists():
@@ -595,7 +596,7 @@ class LocalStorage:
         Raises:
             FileNotFoundError: If file not found
         """
-        experiment_dir = self.root_path / project / experiment
+        experiment_dir = self._get_experiment_dir(project, experiment)
         metadata_file = experiment_dir / "files" / ".files_metadata.json"
 
         if not metadata_file.exists():
@@ -635,9 +636,52 @@ class LocalStorage:
 
         return updated_file
 
-    def _get_experiment_dir(self, project: str, experiment: str) -> Path:
-        """Get experiment directory path."""
-        return self.root_path / project / experiment
+    def _get_experiment_dir(self, project: str, experiment: str, folder: Optional[str] = None) -> Path:
+        """
+        Get experiment directory path.
+
+        If folder is not provided, tries to read it from experiment.json metadata.
+        Falls back to root_path/project/experiment if not found.
+        """
+        # If folder explicitly provided, use it
+        if folder is not None:
+            folder_path = folder.lstrip('/')
+            return self.root_path / folder_path / project / experiment
+
+        # Try to read folder from experiment metadata
+        # Check common locations where experiment might exist
+        possible_paths = []
+
+        # First, try without folder (most common case)
+        default_path = self.root_path / project / experiment
+        possible_paths.append(default_path)
+
+        # Then scan for experiment.json in subdirectories (for folder-based experiments)
+        try:
+            for item in self.root_path.rglob(f"*/{project}/{experiment}/experiment.json"):
+                exp_dir = item.parent
+                if exp_dir not in [p for p in possible_paths]:
+                    possible_paths.insert(0, exp_dir)  # Prioritize found paths
+        except:
+            pass
+
+        # Check each possible path for experiment.json with folder metadata
+        for path in possible_paths:
+            exp_json = path / "experiment.json"
+            if exp_json.exists():
+                try:
+                    with open(exp_json, 'r') as f:
+                        metadata = json.load(f)
+                        if metadata.get('folder'):
+                            folder_path = metadata['folder'].lstrip('/')
+                            return self.root_path / folder_path / project / experiment
+                except:
+                    pass
+                # Found experiment.json, use this path even if no folder metadata
+                return path
+
+        # Fallback to default path
+        return default_path
 
     def append_to_metric(
         self,
