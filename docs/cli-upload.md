@@ -18,7 +18,7 @@ The `ml-dash upload` command allows you to upload experiment data that was logge
 Upload all experiments from the default local storage directory (`./.ml-dash`):
 
 ```bash
-ml-dash upload --remote http://localhost:3000 --user-name your-username
+ml-dash upload --remote https://api.dash.ml --username your-username
 ```
 
 ### Upload Specific Project
@@ -26,7 +26,7 @@ ml-dash upload --remote http://localhost:3000 --user-name your-username
 Upload only experiments from a specific project:
 
 ```bash
-ml-dash upload --remote http://localhost:3000 --user-name your-username --project my-project
+ml-dash upload --remote https://api.dash.ml --username your-username --project my-project
 ```
 
 ### Dry Run
@@ -54,7 +54,7 @@ uv pip install ml-dash
 The simplest way to authenticate is using your username. The CLI will automatically generate an API key:
 
 ```bash
-ml-dash upload --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --remote https://api.dash.ml --username john-doe
 ```
 
 **How it works:**
@@ -68,7 +68,7 @@ ml-dash upload --remote http://localhost:3000 --user-name john-doe
 For advanced users or production environments, you can use an explicit API key:
 
 ```bash
-ml-dash upload --remote http://localhost:3000 --api-key your-jwt-token
+ml-dash upload --remote https://api.dash.ml --api-key your-jwt-token
 ```
 
 ### Configuration File
@@ -77,7 +77,7 @@ Store your credentials in `~/.ml-dash/config.json` to avoid passing them every t
 
 ```json
 {
-  "remote_url": "http://localhost:3000",
+  "remote_url": "https://api.dash.ml",
   "api_key": "your-jwt-token-here"
 }
 ```
@@ -98,7 +98,7 @@ ml-dash upload
 
 - `--remote URL` - Remote server URL (required unless set in config)
 - `--api-key TOKEN` - JWT token for authentication
-- `--user-name NAME` - Username for automatic authentication
+- `--username NAME` - Username for automatic authentication
 
 ### Filtering Options
 
@@ -130,8 +130,8 @@ ml-dash upload
 
 ```bash
 ml-dash upload \
-  --remote http://localhost:3000 \
-  --user-name john-doe \
+  --remote https://api.dash.ml \
+  --username john-doe \
   --verbose
 ```
 
@@ -143,7 +143,7 @@ Found 3 experiment(s)
 Validating experiments...
 3 experiment(s) ready to upload
 
-Uploading to: http://localhost:3000
+Uploading to: https://api.dash.ml
 [1/3] my-project/experiment-1 ━━━━━━━━━━━━━━━━━━ 100%
   ✓ Uploaded (5 params, 100 logs, 2 metrics)
 [2/3] my-project/experiment-2 ━━━━━━━━━━━━━━━━━━ 100%
@@ -172,8 +172,8 @@ Upload only parameters and metrics (skip logs and files):
 
 ```bash
 ml-dash upload \
-  --remote http://localhost:3000 \
-  --user-name john-doe \
+  --remote https://api.dash.ml \
+  --username john-doe \
   --project deep-learning \
   --skip-logs \
   --skip-files
@@ -216,8 +216,8 @@ ml-dash upload --resume --verbose
 
 ```bash
 ml-dash upload /path/to/custom/.ml-dash \
-  --remote http://localhost:3000 \
-  --user-name john-doe
+  --remote https://api.dash.ml \
+  --username john-doe
 ```
 
 ### Example 6: Upload with Strict Validation
@@ -226,8 +226,8 @@ Fail if any data validation errors occur:
 
 ```bash
 ml-dash upload \
-  --remote http://localhost:3000 \
-  --user-name john-doe \
+  --remote https://api.dash.ml \
+  --username john-doe \
   --strict
 ```
 
@@ -264,7 +264,7 @@ The CLI automatically validates experiment data before uploading. Validation is 
 Skips invalid data and continues:
 
 ```bash
-ml-dash upload --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --remote https://api.dash.ml --username john-doe
 ```
 
 **Behavior:**
@@ -279,7 +279,7 @@ ml-dash upload --remote http://localhost:3000 --user-name john-doe
 Fails on any validation error:
 
 ```bash
-ml-dash upload --strict --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --strict --remote https://api.dash.ml --username john-doe
 ```
 
 **Behavior:**
@@ -324,10 +324,10 @@ Logs and metrics are uploaded in batches for efficiency:
 
 ```bash
 # Default batch size (100)
-ml-dash upload --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --remote https://api.dash.ml --username john-doe
 
 # Custom batch size
-ml-dash upload --batch-size 500 --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --batch-size 500 --remote https://api.dash.ml --username john-doe
 ```
 
 **Performance considerations:**
@@ -363,7 +363,7 @@ Interrupted uploads can be resumed without re-uploading completed experiments.
 
 **First attempt (interrupted):**
 ```bash
-ml-dash upload --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --remote https://api.dash.ml --username john-doe
 # ...uploads 3 experiments successfully...
 # ...network error on experiment 4...
 # State saved to .ml-dash-upload-state.json. Use --resume to retry failed uploads.
@@ -396,7 +396,7 @@ The state file is a JSON file:
 ```json
 {
   "local_path": "/path/to/.ml-dash",
-  "remote_url": "http://localhost:3000",
+  "remote_url": "https://api.dash.ml",
   "completed_experiments": [
     "project1/exp1",
     "project1/exp2",
@@ -439,7 +439,7 @@ with Experiment(
 
 ```bash
 # Later, when online - upload all experiments
-ml-dash upload --remote http://localhost:3000 --user-name john-doe
+ml-dash upload --remote https://api.dash.ml --username john-doe
 ```
 
 ### Workflow 2: Selective Upload
@@ -451,8 +451,8 @@ Upload only successful experiments:
 ml-dash upload \
   --project image-classification \
   --experiment resnet-training-final \
-  --remote http://localhost:3000 \
-  --user-name john-doe
+  --remote https://api.dash.ml \
+  --username john-doe
 ```
 
 ### Workflow 3: Data Migration
@@ -466,7 +466,7 @@ Move experiments from one server to another:
 # Step 2: Upload to new server
 ml-dash upload \
   --remote http://new-server.com \
-  --user-name john-doe
+  --username john-doe
 ```
 
 ### Workflow 4: Backup Strategy
@@ -480,7 +480,7 @@ Regular backups from local to remote:
 # Upload all new/modified experiments
 ml-dash upload \
   --remote http://backup-server.com \
-  --user-name john-doe \
+  --username john-doe \
   --verbose
 
 # The CLI automatically skips already-uploaded experiments
@@ -522,27 +522,27 @@ jobs:
 
 ### Authentication Errors
 
-**Error:** `Error: --api-key or --user-name is required`
+**Error:** `Error: --api-key or --username is required`
 
 **Solution:** Provide authentication credentials:
 ```bash
-ml-dash upload --user-name your-username --remote http://localhost:3000
+ml-dash upload --username your-username --remote https://api.dash.ml
 ```
 
 Or create a config file at `~/.ml-dash/config.json`:
 ```json
 {
-  "remote_url": "http://localhost:3000",
+  "remote_url": "https://api.dash.ml",
   "api_key": "your-jwt-token"
 }
 ```
 
 ### Connection Errors
 
-**Error:** Connection refused to `http://localhost:3000`
+**Error:** Connection refused to `https://api.dash.ml`
 
 **Solutions:**
-- Verify the server is running: `curl http://localhost:3000/health`
+- Verify the server is running: `curl https://api.dash.ml/health`
 - Check the remote URL is correct
 - Ensure no firewall is blocking the connection
 - Try with verbose mode: `ml-dash upload -v`
@@ -648,7 +648,7 @@ import argparse
 
 args = argparse.Namespace(
     path="./.ml-dash",
-    remote="http://localhost:3000",
+    remote="https://api.dash.ml",
     api_key=None,
     user_name="john-doe",
     project=None,
@@ -700,7 +700,7 @@ Avoid passing credentials on command line:
 ```json
 // ~/.ml-dash/config.json
 {
-  "remote_url": "http://localhost:3000",
+  "remote_url": "https://api.dash.ml",
   "api_key": "your-token"
 }
 ```

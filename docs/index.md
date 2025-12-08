@@ -136,6 +136,17 @@ complete-examples
 
 ```{toctree}
 :maxdepth: 2
+:caption: CLI Tools
+:hidden:
+
+Command-Line Interface <cli>
+Upload Command <cli-upload>
+Download Command <cli-download>
+List Command <cli-list>
+```
+
+```{toctree}
+:maxdepth: 2
 :caption: API Reference
 :hidden:
 
