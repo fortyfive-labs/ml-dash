@@ -6,6 +6,11 @@ from typing import Optional, Dict, Any, List
 from pathlib import Path
 import json
 from datetime import datetime
+import threading
+import time
+import fcntl
+import sys
+from contextlib import contextmanager
 
 
 class LocalStorage:
@@ -36,6 +41,49 @@ class LocalStorage:
         """
         self.root_path = Path(root_path)
         self.root_path.mkdir(parents=True, exist_ok=True)
+
+    @contextmanager
+    def _file_lock(self, lock_file: Path):
+        """
+        Context manager for file-based locking (works across processes and threads).
+
+        Args:
+            lock_file: Path to the lock file
+
+        Yields:
+            File handle with exclusive lock
+        """
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = None
+
+        try:
+            # Open lock file
+            lock_fd = open(lock_file, 'a')
+
+            # Acquire exclusive lock (blocking)
+            # Use fcntl on Unix-like systems
+            if hasattr(fcntl, 'flock'):
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+            elif hasattr(fcntl, 'lockf'):
+                fcntl.lockf(lock_fd.fileno(), fcntl.LOCK_EX)
+            else:
+                # Fallback for systems without fcntl (like Windows)
+                # Use simple file existence as lock (not perfect but better than nothing)
+                pass
+
+            yield lock_fd
+
+        finally:
+            # Release lock and close file
+            if lock_fd:
+                try:
+                    if hasattr(fcntl, 'flock'):
+                        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                    elif hasattr(fcntl, 'lockf'):
+                        fcntl.lockf(lock_fd.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                lock_fd.close()
 
     def create_experiment(
         self,
@@ -97,28 +145,39 @@ class LocalStorage:
         }
 
         experiment_file = experiment_dir / "experiment.json"
-        if not experiment_file.exists():
-            # Only create if doesn't exist (don't overwrite)
-            with open(experiment_file, "w") as f:
-                json.dump(experiment_metadata, f, indent=2)
-        else:
-            # Update existing experiment
-            with open(experiment_file, "r") as f:
-                existing = json.load(f)
-            # Merge updates
-            if description is not None:
-                existing["description"] = description
-            if tags is not None:
-                existing["tags"] = tags
-            if bindrs is not None:
-                existing["bindrs"] = bindrs
-            if folder is not None:
-                existing["folder"] = folder
-            if metadata is not None:
-                existing["metadata"] = metadata
-            existing["updated_at"] = datetime.utcnow().isoformat() + "Z"
-            with open(experiment_file, "w") as f:
-                json.dump(existing, f, indent=2)
+
+        # File-based lock for concurrent experiment creation/update
+        lock_file = experiment_dir / ".experiment.lock"
+        with self._file_lock(lock_file):
+            if not experiment_file.exists():
+                # Only create if doesn't exist (don't overwrite)
+                with open(experiment_file, "w") as f:
+                    json.dump(experiment_metadata, f, indent=2)
+            else:
+                # Update existing experiment
+                try:
+                    with open(experiment_file, "r") as f:
+                        existing = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    # File might be corrupted or empty, recreate it
+                    with open(experiment_file, "w") as f:
+                        json.dump(experiment_metadata, f, indent=2)
+                    return experiment_dir
+
+                # Merge updates
+                if description is not None:
+                    existing["description"] = description
+                if tags is not None:
+                    existing["tags"] = tags
+                if bindrs is not None:
+                    existing["bindrs"] = bindrs
+                if folder is not None:
+                    existing["folder"] = folder
+                if metadata is not None:
+                    existing["metadata"] = metadata
+                existing["updated_at"] = datetime.utcnow().isoformat() + "Z"
+                with open(experiment_file, "w") as f:
+                    json.dump(existing, f, indent=2)
 
         return experiment_dir
 
@@ -151,30 +210,33 @@ class LocalStorage:
         logs_file = logs_dir / "logs.jsonl"
         seq_file = logs_dir / ".log_sequence"
 
-        # Read and increment sequence counter
-        sequence_number = 0
-        if seq_file.exists():
-            try:
-                sequence_number = int(seq_file.read_text().strip())
-            except (ValueError, IOError):
-                sequence_number = 0
+        # File-based lock for concurrent log writes (prevents sequence collision)
+        lock_file = logs_dir / ".log_sequence.lock"
+        with self._file_lock(lock_file):
+            # Read and increment sequence counter
+            sequence_number = 0
+            if seq_file.exists():
+                try:
+                    sequence_number = int(seq_file.read_text().strip())
+                except (ValueError, IOError):
+                    sequence_number = 0
 
-        log_entry = {
-            "sequenceNumber": sequence_number,
-            "timestamp": timestamp,
-            "level": level,
-            "message": message,
-        }
+            log_entry = {
+                "sequenceNumber": sequence_number,
+                "timestamp": timestamp,
+                "level": level,
+                "message": message,
+            }
 
-        if metadata:
-            log_entry["metadata"] = metadata
+            if metadata:
+                log_entry["metadata"] = metadata
 
-        # Write log immediately
-        with open(logs_file, "a") as f:
-            f.write(json.dumps(log_entry) + "\n")
+            # Write log immediately
+            with open(logs_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
 
-        # Update sequence counter
-        seq_file.write_text(str(sequence_number + 1))
+            # Update sequence counter
+            seq_file.write_text(str(sequence_number + 1))
 
     def write_metric_data(
         self,
@@ -227,34 +289,50 @@ class LocalStorage:
         experiment_dir = self._get_experiment_dir(project, experiment)
         params_file = experiment_dir / "parameters.json"
 
-        # Read existing if present
-        if params_file.exists():
-            with open(params_file, "r") as f:
-                existing_doc = json.load(f)
+        # File-based lock for concurrent parameter writes (prevents data loss and version conflicts)
+        lock_file = experiment_dir / ".parameters.lock"
+        with self._file_lock(lock_file):
+            # Read existing if present
+            if params_file.exists():
+                try:
+                    with open(params_file, "r") as f:
+                        existing_doc = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    # Corrupted file, recreate
+                    existing_doc = None
 
-            # Merge with existing data
-            existing_data = existing_doc.get("data", {})
-            existing_data.update(data)
+                if existing_doc:
+                    # Merge with existing data
+                    existing_data = existing_doc.get("data", {})
+                    existing_data.update(data)
 
-            # Increment version
-            version = existing_doc.get("version", 1) + 1
+                    # Increment version
+                    version = existing_doc.get("version", 1) + 1
 
-            params_doc = {
-                "version": version,
-                "data": existing_data,
-                "updatedAt": datetime.utcnow().isoformat() + "Z"
-            }
-        else:
-            # Create new parameters document
-            params_doc = {
-                "version": 1,
-                "data": data,
-                "createdAt": datetime.utcnow().isoformat() + "Z",
-                "updatedAt": datetime.utcnow().isoformat() + "Z"
-            }
+                    params_doc = {
+                        "version": version,
+                        "data": existing_data,
+                        "updatedAt": datetime.utcnow().isoformat() + "Z"
+                    }
+                else:
+                    # Create new if corrupted
+                    params_doc = {
+                        "version": 1,
+                        "data": data,
+                        "createdAt": datetime.utcnow().isoformat() + "Z",
+                        "updatedAt": datetime.utcnow().isoformat() + "Z"
+                    }
+            else:
+                # Create new parameters document
+                params_doc = {
+                    "version": 1,
+                    "data": data,
+                    "createdAt": datetime.utcnow().isoformat() + "Z",
+                    "updatedAt": datetime.utcnow().isoformat() + "Z"
+                }
 
-        with open(params_file, "w") as f:
-            json.dump(params_doc, f, indent=2)
+            with open(params_file, "w") as f:
+                json.dump(params_doc, f, indent=2)
 
     def read_parameters(
         self,
@@ -361,42 +439,45 @@ class LocalStorage:
             "deletedAt": None
         }
 
-        # Read existing metadata
-        files_metadata = {"files": []}
-        if metadata_file.exists():
-            try:
-                with open(metadata_file, "r") as f:
-                    files_metadata = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                files_metadata = {"files": []}
+        # File-based lock for concurrent safety (works across processes/threads/instances)
+        lock_file = files_dir / ".files_metadata.lock"
+        with self._file_lock(lock_file):
+            # Read existing metadata
+            files_metadata = {"files": []}
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file, "r") as f:
+                        files_metadata = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    files_metadata = {"files": []}
 
-        # Check if file with same prefix+filename exists (overwrite behavior)
-        existing_index = None
-        for i, existing_file in enumerate(files_metadata["files"]):
-            if (existing_file["path"] == prefix and
-                existing_file["filename"] == filename and
-                existing_file["deletedAt"] is None):
-                existing_index = i
-                break
+            # Check if file with same prefix+filename exists (overwrite behavior)
+            existing_index = None
+            for i, existing_file in enumerate(files_metadata["files"]):
+                if (existing_file["path"] == prefix and
+                    existing_file["filename"] == filename and
+                    existing_file["deletedAt"] is None):
+                    existing_index = i
+                    break
 
-        if existing_index is not None:
-            # Overwrite: remove old file and update metadata
-            old_file = files_metadata["files"][existing_index]
-            old_prefix = old_file["path"].lstrip("/") if old_file["path"] else ""
-            if old_prefix:
-                old_file_dir = files_dir / old_prefix / old_file["id"]
+            if existing_index is not None:
+                # Overwrite: remove old file and update metadata
+                old_file = files_metadata["files"][existing_index]
+                old_prefix = old_file["path"].lstrip("/") if old_file["path"] else ""
+                if old_prefix:
+                    old_file_dir = files_dir / old_prefix / old_file["id"]
+                else:
+                    old_file_dir = files_dir / old_file["id"]
+                if old_file_dir.exists():
+                    shutil.rmtree(old_file_dir)
+                files_metadata["files"][existing_index] = file_metadata
             else:
-                old_file_dir = files_dir / old_file["id"]
-            if old_file_dir.exists():
-                shutil.rmtree(old_file_dir)
-            files_metadata["files"][existing_index] = file_metadata
-        else:
-            # New file: append to list
-            files_metadata["files"].append(file_metadata)
+                # New file: append to list
+                files_metadata["files"].append(file_metadata)
 
-        # Write updated metadata
-        with open(metadata_file, "w") as f:
-            json.dump(files_metadata, f, indent=2)
+            # Write updated metadata
+            with open(metadata_file, "w") as f:
+                json.dump(files_metadata, f, indent=2)
 
         return file_metadata
 
@@ -543,27 +624,30 @@ class LocalStorage:
         if not metadata_file.exists():
             raise FileNotFoundError(f"File {file_id} not found")
 
-        # Read metadata
-        with open(metadata_file, "r") as f:
-            files_metadata = json.load(f)
+        # File-based lock for concurrent safety (works across processes/threads/instances)
+        lock_file = files_dir / ".files_metadata.lock"
+        with self._file_lock(lock_file):
+            # Read metadata
+            with open(metadata_file, "r") as f:
+                files_metadata = json.load(f)
 
-        # Find and soft delete file
-        file_found = False
-        for file_meta in files_metadata.get("files", []):
-            if file_meta["id"] == file_id:
-                if file_meta.get("deletedAt") is not None:
-                    raise FileNotFoundError(f"File {file_id} already deleted")
-                file_meta["deletedAt"] = datetime.utcnow().isoformat() + "Z"
-                file_meta["updatedAt"] = file_meta["deletedAt"]
-                file_found = True
-                break
+            # Find and soft delete file
+            file_found = False
+            for file_meta in files_metadata.get("files", []):
+                if file_meta["id"] == file_id:
+                    if file_meta.get("deletedAt") is not None:
+                        raise FileNotFoundError(f"File {file_id} already deleted")
+                    file_meta["deletedAt"] = datetime.utcnow().isoformat() + "Z"
+                    file_meta["updatedAt"] = file_meta["deletedAt"]
+                    file_found = True
+                    break
 
-        if not file_found:
-            raise FileNotFoundError(f"File {file_id} not found")
+            if not file_found:
+                raise FileNotFoundError(f"File {file_id} not found")
 
-        # Write updated metadata
-        with open(metadata_file, "w") as f:
-            json.dump(files_metadata, f, indent=2)
+            # Write updated metadata
+            with open(metadata_file, "w") as f:
+                json.dump(files_metadata, f, indent=2)
 
         return {
             "id": file_id,
@@ -602,37 +686,40 @@ class LocalStorage:
         if not metadata_file.exists():
             raise FileNotFoundError(f"File {file_id} not found")
 
-        # Read metadata
-        with open(metadata_file, "r") as f:
-            files_metadata = json.load(f)
+        # File-based lock for concurrent safety (works across processes/threads/instances)
+        lock_file = files_dir / ".files_metadata.lock"
+        with self._file_lock(lock_file):
+            # Read metadata
+            with open(metadata_file, "r") as f:
+                files_metadata = json.load(f)
 
-        # Find and update file
-        file_found = False
-        updated_file = None
-        for file_meta in files_metadata.get("files", []):
-            if file_meta["id"] == file_id:
-                if file_meta.get("deletedAt") is not None:
-                    raise FileNotFoundError(f"File {file_id} has been deleted")
+            # Find and update file
+            file_found = False
+            updated_file = None
+            for file_meta in files_metadata.get("files", []):
+                if file_meta["id"] == file_id:
+                    if file_meta.get("deletedAt") is not None:
+                        raise FileNotFoundError(f"File {file_id} has been deleted")
 
-                # Update fields
-                if description is not None:
-                    file_meta["description"] = description
-                if tags is not None:
-                    file_meta["tags"] = tags
-                if metadata is not None:
-                    file_meta["metadata"] = metadata
+                    # Update fields
+                    if description is not None:
+                        file_meta["description"] = description
+                    if tags is not None:
+                        file_meta["tags"] = tags
+                    if metadata is not None:
+                        file_meta["metadata"] = metadata
 
-                file_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
-                file_found = True
-                updated_file = file_meta
-                break
+                    file_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
+                    file_found = True
+                    updated_file = file_meta
+                    break
 
-        if not file_found:
-            raise FileNotFoundError(f"File {file_id} not found")
+            if not file_found:
+                raise FileNotFoundError(f"File {file_id} not found")
 
-        # Write updated metadata
-        with open(metadata_file, "w") as f:
-            json.dump(files_metadata, f, indent=2)
+            # Write updated metadata
+            with open(metadata_file, "w") as f:
+                json.dump(files_metadata, f, indent=2)
 
         return updated_file
 
@@ -725,42 +812,58 @@ class LocalStorage:
         data_file = metric_dir / "data.jsonl"
         metadata_file = metric_dir / "metadata.json"
 
-        # Load or initialize metadata
-        if metadata_file.exists():
-            with open(metadata_file, "r") as f:
-                metric_meta = json.load(f)
-        else:
-            metric_meta = {
-                "metricId": f"local-metric-{metric_name}",
-                "name": metric_name,
-                "description": description,
-                "tags": tags or [],
-                "metadata": metadata,
-                "totalDataPoints": 0,
-                "nextIndex": 0,
+        # File-based lock for concurrent metric appends (prevents index collision and count errors)
+        lock_file = metric_dir / ".metadata.lock"
+        with self._file_lock(lock_file):
+            # Load or initialize metadata
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file, "r") as f:
+                        metric_meta = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    # Corrupted metadata, reinitialize
+                    metric_meta = {
+                        "metricId": f"local-metric-{metric_name}",
+                        "name": metric_name,
+                        "description": description,
+                        "tags": tags or [],
+                        "metadata": metadata,
+                        "totalDataPoints": 0,
+                        "nextIndex": 0,
+                        "createdAt": datetime.utcnow().isoformat() + "Z"
+                    }
+            else:
+                metric_meta = {
+                    "metricId": f"local-metric-{metric_name}",
+                    "name": metric_name,
+                    "description": description,
+                    "tags": tags or [],
+                    "metadata": metadata,
+                    "totalDataPoints": 0,
+                    "nextIndex": 0,
+                    "createdAt": datetime.utcnow().isoformat() + "Z"
+                }
+
+            # Get next index
+            index = metric_meta["nextIndex"]
+
+            # Append data point to JSONL file
+            data_entry = {
+                "index": index,
+                "data": data,
                 "createdAt": datetime.utcnow().isoformat() + "Z"
             }
 
-        # Get next index
-        index = metric_meta["nextIndex"]
+            with open(data_file, "a") as f:
+                f.write(json.dumps(data_entry) + "\n")
 
-        # Append data point to JSONL file
-        data_entry = {
-            "index": index,
-            "data": data,
-            "createdAt": datetime.utcnow().isoformat() + "Z"
-        }
+            # Update metadata
+            metric_meta["nextIndex"] = index + 1
+            metric_meta["totalDataPoints"] = metric_meta["totalDataPoints"] + 1
+            metric_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
 
-        with open(data_file, "a") as f:
-            f.write(json.dumps(data_entry) + "\n")
-
-        # Update metadata
-        metric_meta["nextIndex"] = index + 1
-        metric_meta["totalDataPoints"] = metric_meta["totalDataPoints"] + 1
-        metric_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
-
-        with open(metadata_file, "w") as f:
-            json.dump(metric_meta, f, indent=2)
+            with open(metadata_file, "w") as f:
+                json.dump(metric_meta, f, indent=2)
 
         return {
             "metricId": metric_meta["metricId"],
@@ -806,42 +909,58 @@ class LocalStorage:
         data_file = metric_dir / "data.jsonl"
         metadata_file = metric_dir / "metadata.json"
 
-        # Load or initialize metadata
-        if metadata_file.exists():
-            with open(metadata_file, "r") as f:
-                metric_meta = json.load(f)
-        else:
-            metric_meta = {
-                "metricId": f"local-metric-{metric_name}",
-                "name": metric_name,
-                "description": description,
-                "tags": tags or [],
-                "metadata": metadata,
-                "totalDataPoints": 0,
-                "nextIndex": 0,
-                "createdAt": datetime.utcnow().isoformat() + "Z"
-            }
-
-        start_index = metric_meta["nextIndex"]
-        end_index = start_index + len(data_points) - 1
-
-        # Append data points to JSONL file
-        with open(data_file, "a") as f:
-            for i, data in enumerate(data_points):
-                data_entry = {
-                    "index": start_index + i,
-                    "data": data,
+        # File-based lock for concurrent batch appends (prevents index collision and count errors)
+        lock_file = metric_dir / ".metadata.lock"
+        with self._file_lock(lock_file):
+            # Load or initialize metadata
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file, "r") as f:
+                        metric_meta = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    # Corrupted metadata, reinitialize
+                    metric_meta = {
+                        "metricId": f"local-metric-{metric_name}",
+                        "name": metric_name,
+                        "description": description,
+                        "tags": tags or [],
+                        "metadata": metadata,
+                        "totalDataPoints": 0,
+                        "nextIndex": 0,
+                        "createdAt": datetime.utcnow().isoformat() + "Z"
+                    }
+            else:
+                metric_meta = {
+                    "metricId": f"local-metric-{metric_name}",
+                    "name": metric_name,
+                    "description": description,
+                    "tags": tags or [],
+                    "metadata": metadata,
+                    "totalDataPoints": 0,
+                    "nextIndex": 0,
                     "createdAt": datetime.utcnow().isoformat() + "Z"
                 }
-                f.write(json.dumps(data_entry) + "\n")
 
-        # Update metadata
-        metric_meta["nextIndex"] = end_index + 1
-        metric_meta["totalDataPoints"] = metric_meta["totalDataPoints"] + len(data_points)
-        metric_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
+            start_index = metric_meta["nextIndex"]
+            end_index = start_index + len(data_points) - 1
 
-        with open(metadata_file, "w") as f:
-            json.dump(metric_meta, f, indent=2)
+            # Append data points to JSONL file
+            with open(data_file, "a") as f:
+                for i, data in enumerate(data_points):
+                    data_entry = {
+                        "index": start_index + i,
+                        "data": data,
+                        "createdAt": datetime.utcnow().isoformat() + "Z"
+                    }
+                    f.write(json.dumps(data_entry) + "\n")
+
+            # Update metadata
+            metric_meta["nextIndex"] = end_index + 1
+            metric_meta["totalDataPoints"] = metric_meta["totalDataPoints"] + len(data_points)
+            metric_meta["updatedAt"] = datetime.utcnow().isoformat() + "Z"
+
+            with open(metadata_file, "w") as f:
+                json.dump(metric_meta, f, indent=2)
 
         return {
             "metricId": metric_meta["metricId"],
