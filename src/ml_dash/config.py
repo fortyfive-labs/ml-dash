@@ -117,3 +117,17 @@ class Config:
     def batch_size(self, size: int):
         """Set default batch size."""
         self.set("default_batch_size", size)
+
+    @property
+    def device_secret(self) -> Optional[str]:
+        """Get device secret for OAuth device flow."""
+        return self.get("device_secret")
+
+    @device_secret.setter
+    def device_secret(self, secret: str):
+        """Set device secret."""
+        self.set("device_secret", secret)
+
+
+# Global config instance
+config = Config()

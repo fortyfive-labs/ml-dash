@@ -9,15 +9,33 @@ import httpx
 class RemoteClient:
     """Client for communicating with ML-Dash server."""
 
-    def __init__(self, base_url: str, api_key: str):
+    def __init__(self, base_url: str, api_key: Optional[str] = None):
         """
         Initialize remote client.
 
         Args:
             base_url: Base URL of ML-Dash server (e.g., "http://localhost:3000")
-            api_key: JWT token for authentication
+            api_key: JWT token for authentication (optional - auto-loads from storage if not provided)
+
+        Raises:
+            AuthenticationError: If no api_key provided and no token found in storage
         """
         self.base_url = base_url.rstrip("/")
+
+        # If no api_key provided, try to load from storage
+        if not api_key:
+            from .auth.token_storage import get_token_storage
+            from .auth.exceptions import AuthenticationError
+
+            storage = get_token_storage()
+            api_key = storage.load("ml-dash-token")
+
+            if not api_key:
+                raise AuthenticationError(
+                    "Not authenticated. Run 'ml-dash login' to authenticate, "
+                    "or provide an explicit api_key parameter."
+                )
+
         self.api_key = api_key
         self._client = httpx.Client(
             base_url=self.base_url,
