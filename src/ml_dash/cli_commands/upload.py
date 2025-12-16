@@ -108,43 +108,6 @@ class UploadState:
             return None
 
 
-def generate_api_key_from_username(user_name: str) -> str:
-    """
-    Generate a deterministic API key (JWT) from username.
-
-    This is a temporary solution until proper user authentication is implemented.
-    Generates a unique user ID from the username and creates a JWT token.
-
-    Args:
-        user_name: Username to generate API key from
-
-    Returns:
-        JWT token string
-    """
-    import hashlib
-    import time
-    import jwt
-
-    # Generate deterministic user ID from username (first 10 digits of SHA256 hash)
-    user_id = str(int(hashlib.sha256(user_name.encode()).hexdigest()[:16], 16))[:10]
-
-    # JWT payload
-    payload = {
-        "userId": user_id,
-        "userName": user_name,
-        "iat": int(time.time()),
-        "exp": int(time.time()) + (30 * 24 * 60 * 60)  # 30 days expiration
-    }
-
-    # Secret key for signing (should match server's JWT_SECRET)
-    secret = "your-secret-key-change-this-in-production"
-
-    # Generate JWT
-    token = jwt.encode(payload, secret, algorithm="HS256")
-
-    return token
-
-
 def add_parser(subparsers) -> argparse.ArgumentParser:
     """Add upload command parser."""
     parser = subparsers.add_parser(
@@ -170,12 +133,7 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     parser.add_argument(
         "--api-key",
         type=str,
-        help="JWT token for authentication (required unless --username or config is set)",
-    )
-    parser.add_argument(
-        "--username",
-        type=str,
-        help="Username for authentication (generates API key automatically)",
+        help="JWT token for authentication (optional - auto-loads from 'ml-dash login' if not provided)",
     )
 
     # Scope control
@@ -995,17 +953,9 @@ def cmd_upload(args: argparse.Namespace) -> int:
         console.print("[red]Error:[/red] --remote URL is required (or set in config)")
         return 1
 
-    # Get API key (command line > config > generate from username)
+    # Get API key (command line > config > auto-load from storage)
+    # RemoteClient will auto-load from storage if api_key is None
     api_key = args.api_key or config.api_key
-
-    # If no API key, try to generate from username
-    if not api_key:
-        if args.username:
-            console.print(f"[dim]Generating API key from username: {args.username}[/dim]")
-            api_key = generate_api_key_from_username(args.username)
-        else:
-            console.print("[red]Error:[/red] --api-key or --username is required (or set in config)")
-            return 1
 
     # Validate experiment filter requires project
     if args.experiment and not args.project:

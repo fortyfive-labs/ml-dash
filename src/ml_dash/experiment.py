@@ -139,7 +139,6 @@ class Experiment:
         # Mode configuration
         remote: Optional[str] = None,
         api_key: Optional[str] = None,
-        user_name: Optional[str] = None,
         local_path: Optional[str] = None,
         # Internal parameters
         _write_protected: bool = False,
@@ -156,8 +155,7 @@ class Experiment:
             folder: Optional folder path (e.g., "/experiments/baseline")
             metadata: Optional metadata dict
             remote: Remote API URL (e.g., "http://localhost:3000")
-            api_key: JWT token for authentication (if not provided, will be generated from user_name)
-            user_name: Username for authentication (generates API key if api_key not provided)
+            api_key: JWT token for authentication (auto-loaded from storage if not provided)
             local_path: Local storage root path (for local mode)
             _write_protected: Internal parameter - if True, experiment becomes immutable after creation
         """
@@ -170,10 +168,6 @@ class Experiment:
         self._write_protected = _write_protected
         self.metadata = metadata
 
-        # Generate API key from username if not provided
-        if remote and not api_key and user_name:
-            api_key = self._generate_api_key_from_username(user_name)
-
         # Determine operation mode
         if remote and local_path:
             self.mode = OperationMode.HYBRID
@@ -183,7 +177,7 @@ class Experiment:
             self.mode = OperationMode.LOCAL
         else:
             raise ValueError(
-                "Must specify either 'remote' (with api_key/user_name) or 'local_path'"
+                "Must specify either 'remote' (with api_key) or 'local_path'"
             )
 
         # Initialize backend
@@ -194,51 +188,13 @@ class Experiment:
         self._is_open = False
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
-            if not api_key:
-                raise ValueError("Either api_key or user_name is required for remote mode")
+            # api_key can be None - RemoteClient will auto-load from storage
             self._client = RemoteClient(base_url=remote, api_key=api_key)
 
         if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
             if not local_path:
                 raise ValueError("local_path is required for local mode")
             self._storage = LocalStorage(root_path=Path(local_path))
-
-    @staticmethod
-    def _generate_api_key_from_username(user_name: str) -> str:
-        """
-        Generate a deterministic API key (JWT) from username.
-
-        This is a temporary solution until proper user authentication is implemented.
-        Generates a unique user ID from the username and creates a JWT token.
-
-        Args:
-            user_name: Username to generate API key from
-
-        Returns:
-            JWT token string
-        """
-        import hashlib
-        import time
-        import jwt
-
-        # Generate deterministic user ID from username (first 10 digits of SHA256 hash)
-        user_id = str(int(hashlib.sha256(user_name.encode()).hexdigest()[:16], 16))[:10]
-
-        # JWT payload
-        payload = {
-            "userId": user_id,
-            "userName": user_name,
-            "iat": int(time.time()),
-            "exp": int(time.time()) + (30 * 24 * 60 * 60)  # 30 days expiration
-        }
-
-        # Secret key for signing (should match server's JWT_SECRET)
-        secret = "your-secret-key-change-this-in-production"
-
-        # Generate JWT
-        token = jwt.encode(payload, secret, algorithm="HS256")
-
-        return token
 
     def _open(self) -> "Experiment":
         """

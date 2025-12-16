@@ -16,6 +16,25 @@ from ml_dash import Experiment
 REMOTE_SERVER_URL = "http://localhost:3000"
 TEST_USERNAME = "test-user"
 
+# Generate test JWT token for remote experiments
+def _generate_test_api_key():
+    """Generate a test JWT token for testing."""
+    import time
+    import jwt
+
+    payload = {
+        "userId": "1234567890",
+        "userName": TEST_USERNAME,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + (30 * 24 * 60 * 60)  # 30 days
+    }
+
+    # Test secret key (matches server test configuration)
+    secret = "your-secret-key-change-this-in-production"
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+TEST_API_KEY = _generate_test_api_key()
+
 
 @pytest.fixture
 def temp_project(tmp_path):
@@ -52,12 +71,12 @@ def remote_experiment():
 
     Returns a function that creates remote experiments with localhost:3000.
     Use the @pytest.mark.remote marker for tests that require a running server.
-    The Experiment will automatically generate a JWT token from the username.
+    Uses a pre-generated test JWT token for authentication.
     """
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
         defaults = {
             "remote": REMOTE_SERVER_URL,
-            "user_name": TEST_USERNAME,
+            "api_key": TEST_API_KEY,
         }
         defaults.update(kwargs)
         return Experiment(name=name, project=project, **defaults)

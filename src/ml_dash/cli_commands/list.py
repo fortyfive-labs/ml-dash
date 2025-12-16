@@ -263,24 +263,13 @@ def cmd_list(args: argparse.Namespace) -> int:
         console.print("[red]Error:[/red] --remote URL is required (or set in config)")
         return 1
 
-    # Get API key (command line > config > generate from username)
+    # Get API key (command line > config > auto-loaded from storage)
     api_key = args.api_key or config.api_key
 
-    # If no API key, try to generate from username
-    if not api_key:
-        if args.username:
-            from .upload import generate_api_key_from_username
-            api_key = generate_api_key_from_username(args.username)
-            if args.verbose:
-                console.print(f"[dim]Generated API key from username: {args.username}[/dim]")
-        else:
-            console.print("[red]Error:[/red] --api-key or --username is required")
-            return 1
-
-    # Get namespace (defaults to username or config)
-    namespace = args.namespace or args.username or config.namespace
+    # Get namespace (required)
+    namespace = args.namespace
     if not namespace:
-        console.print("[red]Error:[/red] --namespace or --username is required")
+        console.print("[red]Error:[/red] --namespace is required")
         return 1
 
     # Create remote client
@@ -326,9 +315,17 @@ def add_parser(subparsers) -> None:
 
     # Remote configuration
     parser.add_argument("--remote", type=str, help="Remote server URL")
-    parser.add_argument("--api-key", type=str, help="JWT authentication token")
-    parser.add_argument("--username", type=str, help="Username for auto-generating API key")
-    parser.add_argument("--namespace", type=str, help="Namespace slug (defaults to username)")
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        help="JWT authentication token (auto-loaded from storage if not provided)"
+    )
+    parser.add_argument(
+        "--namespace",
+        type=str,
+        required=True,
+        help="Namespace slug to query"
+    )
 
     # Filtering options
     parser.add_argument("--project", type=str, help="List experiments in this project")

@@ -1,6 +1,6 @@
 [project]
 name = "ml-dash"
-version = "0.5.9"
+version = "0.6.0"
 description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -30,12 +30,17 @@ dependencies = [
     "imageio-ffmpeg>=0.4.9",
     "scikit-image>=0.21.0",
     "rich>=13.0.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.scripts]
 ml-dash = "ml_dash.cli:main"
 
 [project.optional-dependencies]
+auth = [
+    "keyring>=25.0.0",
+    "qrcode>=8.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

@@ -21,7 +21,13 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # Import and add command parsers
-    from .cli_commands import upload, download, list as list_cmd
+    from .cli_commands import upload, download, list as list_cmd, login, logout
+
+    # Authentication commands
+    login.add_parser(subparsers)
+    logout.add_parser(subparsers)
+
+    # Data commands
     upload.add_parser(subparsers)
     download.add_parser(subparsers)
     list_cmd.add_parser(subparsers)
@@ -48,7 +54,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     # Route to command handlers
-    if args.command == "upload":
+    if args.command == "login":
+        from .cli_commands import login
+        return login.cmd_login(args)
+    elif args.command == "logout":
+        from .cli_commands import logout
+        return logout.cmd_logout(args)
+    elif args.command == "upload":
         from .cli_commands import upload
         return upload.cmd_upload(args)
     elif args.command == "download":

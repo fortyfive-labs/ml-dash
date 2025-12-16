@@ -12,7 +12,6 @@ from ml_dash.cli_commands.upload import (
     ExperimentValidator,
     ExperimentUploader,
     UploadState,
-    generate_api_key_from_username,
     cmd_upload,
 )
 from ml_dash.storage import LocalStorage
@@ -223,43 +222,6 @@ class TestExperimentValidator:
 
         # In strict mode, warnings become errors
         assert result.is_valid is False
-
-
-class TestUsernameAuthentication:
-    """Tests for username-based authentication."""
-
-    def test_generate_api_key_deterministic(self):
-        """Test that same username generates same API key."""
-        key1 = generate_api_key_from_username("testuser")
-        key2 = generate_api_key_from_username("testuser")
-
-        assert key1 == key2
-
-    def test_generate_api_key_different_users(self):
-        """Test that different usernames generate different API keys."""
-        key1 = generate_api_key_from_username("user1")
-        key2 = generate_api_key_from_username("user2")
-
-        assert key1 != key2
-
-    def test_generate_api_key_format(self):
-        """Test that generated API key is a valid JWT format."""
-        key = generate_api_key_from_username("testuser")
-
-        # JWT format is three base64 strings separated by dots
-        parts = key.split(".")
-        assert len(parts) == 3
-
-    def test_generate_api_key_contains_username(self):
-        """Test that generated JWT contains username in payload."""
-        import jwt
-
-        key = generate_api_key_from_username("testuser")
-
-        # Decode without verification to check payload
-        payload = jwt.decode(key, options={"verify_signature": False})
-        assert payload["userName"] == "testuser"
-        assert "userId" in payload
 
 
 class TestUploadState:

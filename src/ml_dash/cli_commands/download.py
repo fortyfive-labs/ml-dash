@@ -179,18 +179,6 @@ def discover_experiments(
     return all_experiments
 
 
-def _get_or_generate_api_key(args: argparse.Namespace, config: Config) -> str:
-    """Get API key from args, config, or generate from username."""
-    if args.api_key:
-        return args.api_key
-    if config.api_key:
-        return config.api_key
-    if args.username:
-        from ..cli_commands.upload import generate_api_key_from_username
-        return generate_api_key_from_username(args.username)
-    return ""
-
-
 # ============================================================================
 # Experiment Downloader
 # ============================================================================
@@ -577,23 +565,15 @@ def cmd_download(args: argparse.Namespace) -> int:
     # Load configuration
     config = Config()
     remote_url = args.remote or config.remote_url
-    api_key = _get_or_generate_api_key(args, config)
-    namespace = args.namespace or args.username
+    api_key = args.api_key or config.api_key  # RemoteClient will auto-load if None
+    namespace = args.namespace
 
     # Validate inputs
     if not remote_url:
         console.print("[red]Error:[/red] --remote is required (or set in config)")
         return 1
 
-    if not api_key:
-        console.print("[red]Error:[/red] --api-key or --username is required")
-        return 1
-
-    if not namespace:
-        console.print("[red]Error:[/red] --namespace or --username is required")
-        return 1
-
-    # Initialize clients
+    # Initialize clients (RemoteClient will auto-load token if api_key is None)
     remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
     local_storage = LocalStorage(root_path=Path(args.path))
 
@@ -751,13 +731,12 @@ def add_parser(subparsers):
 
     # Remote configuration
     parser.add_argument("--remote", help="Remote server URL")
-    parser.add_argument("--api-key", help="JWT authentication token")
-    parser.add_argument("--username", help="Username for auto-generating API key")
+    parser.add_argument("--api-key", help="JWT authentication token (optional - auto-loads from 'ml-dash login')")
 
     # Scope control
     parser.add_argument("--project", help="Download only this project")
     parser.add_argument("--experiment", help="Download specific experiment (requires --project)")
-    parser.add_argument("--namespace", help="Namespace slug (defaults to username)")
+    parser.add_argument("--namespace", required=True, help="Namespace slug to download from")
 
     # Data filtering
     parser.add_argument("--skip-logs", action="store_true", help="Don't download logs")
