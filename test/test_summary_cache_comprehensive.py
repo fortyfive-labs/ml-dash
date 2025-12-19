@@ -23,9 +23,9 @@ class TestSummaryCacheLocal:
         data = metric.read()
 
         assert len(data["data"]) == 1
-        assert data["data"][0]["data"]["loss/count"] == 10
-        assert "loss/mean" in data["data"][0]["data"]
-        assert "loss/std" in data["data"][0]["data"]
+        assert data["data"][0]["data"]["loss.count"] == 10
+        assert "loss.mean" in data["data"][0]["data"]
+        assert "loss.std" in data["data"][0]["data"]
 
         exp.run.complete()
 
@@ -47,7 +47,7 @@ class TestSummaryCacheLocal:
         data = exp.metrics("train").read()
 
         assert len(data["data"]) == 1
-        assert data["data"][0]["data"]["loss/count"] == 10
+        assert data["data"][0]["data"]["loss.count"] == 10
         assert data["data"][0]["data"]["lr"] == 0.001
 
         exp.run.complete()
@@ -74,8 +74,8 @@ class TestSummaryCacheLocal:
         data = metric.read()
 
         assert len(data["data"]) == 2
-        assert data["data"][0]["data"]["loss/mean"] == pytest.approx(0.5)
-        assert data["data"][1]["data"]["loss/mean"] == pytest.approx(0.3)
+        assert data["data"][0]["data"]["loss.mean"] == pytest.approx(0.5)
+        assert data["data"][1]["data"]["loss.mean"] == pytest.approx(0.3)
 
         exp.run.complete()
 
@@ -107,8 +107,8 @@ class TestSummaryCacheLocal:
         data = train_metric.read()
 
         assert len(data["data"]) == 5
-        assert data["data"][0]["data"]["loss/count"] == 11  # 0-10 inclusive
-        assert data["data"][4]["data"]["loss/count"] == 9   # 41-49
+        assert data["data"][0]["data"]["loss.count"] == 11  # 0-10 inclusive
+        assert data["data"][4]["data"]["loss.count"] == 9   # 41-49
 
         exp.run.complete()
 
@@ -132,7 +132,7 @@ class TestSummaryCacheRemote:
         # Verify
         data = metric.read()
         assert len(data["data"]) == 1
-        assert data["data"][0]["data"]["loss/count"] == 10
+        assert data["data"][0]["data"]["loss.count"] == 10
 
         exp.run.complete()
 
@@ -151,7 +151,7 @@ class TestSummaryCacheRemote:
         # Verify
         data = exp.metrics("train").read()
         assert len(data["data"]) == 1
-        assert data["data"][0]["data"]["loss/count"] == 10
+        assert data["data"][0]["data"]["loss.count"] == 10
         assert data["data"][0]["data"]["lr"] == 0.001
 
         exp.run.complete()
@@ -175,8 +175,8 @@ class TestSummaryCacheRemote:
         # Verify
         data = metric.read()
         assert len(data["data"]) == 2
-        assert data["data"][0]["data"]["loss/mean"] == pytest.approx(0.5)
-        assert data["data"][1]["data"]["loss/mean"] == pytest.approx(0.3)
+        assert data["data"][0]["data"]["loss.mean"] == pytest.approx(0.5)
+        assert data["data"][1]["data"]["loss.mean"] == pytest.approx(0.3)
 
         exp.run.complete()
 
@@ -205,7 +205,7 @@ class TestSummaryCacheRemote:
         # Verify
         data = train_metric.read()
         assert len(data["data"]) == 5
-        assert data["data"][0]["data"]["loss/count"] == 11
+        assert data["data"][0]["data"]["loss.count"] == 11
 
         exp.run.complete()
 
