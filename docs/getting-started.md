@@ -5,7 +5,7 @@ Get started with ML-Dash in under 5 minutes.
 ## Installation
 
 ```bash
-pip install ml-dash
+pip install ml-dash==0.6.2rc1
 ```
 
 ## Quick Start with Remote Mode

@@ -17,7 +17,8 @@ from .client import RemoteClient
 from .storage import LocalStorage
 from .log import LogLevel, LogBuilder
 from .params import ParametersBuilder
-from .files import FileBuilder
+from .files import FilesAccessor, BindrsBuilder
+from .run import RUN
 
 
 class OperationMode(Enum):
@@ -121,28 +122,13 @@ class RunManager:
                 "Set folder before calling start() or entering 'with' block."
             )
 
-        # Process template variables if present
+        # Check if this is a template (contains {RUN.) or static folder
         if value and '{RUN.' in value:
-            # Generate unique run ID (timestamp-based)
-            from datetime import datetime
-            run_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-            # Simple string replacement for template variables
-            # Supports: {RUN.name}, {RUN.project}, {RUN.id}, {RUN.timestamp}
-            replacements = {
-                '{RUN.name}': f"{self._experiment.name}_{run_timestamp}",  # Unique name with timestamp
-                '{RUN.project}': self._experiment.project,
-                '{RUN.id}': run_timestamp,  # Just the timestamp
-                '{RUN.timestamp}': run_timestamp,  # Alias for id
-            }
-
-            # Replace all template variables
-            for template, replacement in replacements.items():
-                if template in value:
-                    value = value.replace(template, replacement)
-
-        # Update the folder on the experiment
-        self._experiment.folder = value
+            # Store the template - it will be formatted when the run starts
+            self._experiment._folder_template = value
+        else:
+            # Static folder - set directly
+            self._experiment.folder = value
 
     def __enter__(self) -> "Experiment":
         """Context manager entry - starts the experiment."""
@@ -240,7 +226,7 @@ class Experiment:
         self.project = project
         self.description = description
         self.tags = tags
-        self.bindrs = bindrs
+        self._bindrs_list = bindrs
         self.folder = folder
         self._write_protected = _write_protected
         self.metadata = metadata
@@ -264,6 +250,7 @@ class Experiment:
         self._experiment_data: Optional[Dict[str, Any]] = None
         self._is_open = False
         self._metrics_manager: Optional['MetricsManager'] = None  # Cached metrics manager
+        self._folder_template: Optional[str] = None  # Template for folder path
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
             # api_key can be None - RemoteClient will auto-load from storage
@@ -284,6 +271,16 @@ class Experiment:
         if self._is_open:
             return self
 
+        # Initialize RUN with experiment values
+        RUN.name = self.name
+        RUN.project = self.project
+        RUN.description = self.description
+        RUN._init_run()  # Generate id and timestamp
+
+        # Format folder template if present
+        if self._folder_template:
+            self.folder = RUN._format(self._folder_template)
+
         if self._client:
             # Remote mode: create/update experiment via API
             response = self._client.create_or_update_experiment(
@@ -291,7 +288,7 @@ class Experiment:
                 name=self.name,
                 description=self.description,
                 tags=self.tags,
-                bindrs=self.bindrs,
+                bindrs=self._bindrs_list,
                 folder=self.folder,
                 write_protected=self._write_protected,
                 metadata=self.metadata,
@@ -306,7 +303,7 @@ class Experiment:
                 name=self.name,
                 description=self.description,
                 tags=self.tags,
-                bindrs=self.bindrs,
+                bindrs=self._bindrs_list,
                 folder=self.folder,
                 metadata=self.metadata,
             )
@@ -340,6 +337,9 @@ class Experiment:
                 print(f"Warning: Failed to update experiment status: {e}")
 
         self._is_open = False
+
+        # Reset RUN for next experiment
+        RUN._reset()
 
     @property
     def run(self) -> RunManager:
@@ -545,39 +545,86 @@ class Experiment:
         else:
             print(formatted_message, file=sys.stdout)
 
-    def files(self, **kwargs) -> FileBuilder:
+    @property
+    def files(self) -> FilesAccessor:
         """
-        Get a FileBuilder for fluent file operations.
+        Get a FilesAccessor for fluent file operations.
 
         Returns:
-            FileBuilder instance for chaining
+            FilesAccessor instance for chaining
 
         Raises:
             RuntimeError: If experiment is not open
 
         Examples:
             # Upload file
-            experiment.files(file_path="./model.pt", prefix="/models").save()
+            experiment.files("checkpoints").save(net, to="checkpoint.pt")
 
             # List files
-            files = experiment.files().list()
-            files = experiment.files(prefix="/models").list()
+            files = experiment.files("/some/location").list()
+            files = experiment.files("/models").list()
 
             # Download file
-            experiment.files(file_id="123").download()
+            experiment.files("some.text").download()
+            experiment.files("some.text").download(to="./model.pt")
 
-            # Delete file
-            experiment.files(file_id="123").delete()
+            # Download Files via Glob Pattern
+            file_paths = experiment.files("images").list("*.png")
+            experiment.files("images").download("*.png")
+
+            # This is equivalent to downloading to a directory
+            experiment.files.download("images/*.png", to="local_images")
+
+            # Delete files
+            experiment.files("some.text").delete()
+            experiment.files.delete("some.text")
+
+            # Specific File Types
+            dxp.files.save_text("content", to="view.yaml")
+            dxp.files.save_json(dict(hey="yo"), to="config.json")
+            dxp.files.save_blob(b"xxx", to="data.bin")
         """
         if not self._is_open:
             raise RuntimeError(
                 "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
                 "Example:\n"
                 "  with dxp.run:\n"
-                "      dxp.files().save()"
+                "      dxp.files('path').save()"
             )
 
-        return FileBuilder(self, **kwargs)
+        return FilesAccessor(self)
+
+    def bindrs(self, bindr_name: str) -> BindrsBuilder:
+        """
+        Get a BindrsBuilder for working with file collections (bindrs).
+
+        Bindrs are collections of files that can span multiple prefixes.
+
+        Args:
+            bindr_name: Name of the bindr (collection)
+
+        Returns:
+            BindrsBuilder instance for chaining
+
+        Raises:
+            RuntimeError: If experiment is not open
+
+        Examples:
+            # List files in a bindr
+            file_paths = experiment.bindrs("some-bindr").list()
+
+        Note:
+            This is a placeholder for future bindr functionality.
+        """
+        if not self._is_open:
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      files = dxp.bindrs('my-bindr').list()"
+            )
+
+        return BindrsBuilder(self, bindr_name)
 
     def _upload_file(
         self,

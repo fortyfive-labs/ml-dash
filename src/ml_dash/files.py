@@ -6,6 +6,7 @@ Provides fluent API for file upload, download, list, and delete operations.
 
 import hashlib
 import mimetypes
+import fnmatch
 from typing import Dict, Any, List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
@@ -19,37 +20,51 @@ class FileBuilder:
 
     Usage:
         # Upload file
-        experiment.files(file_path="./model.pt", prefix="/models").save()
+        experiment.files("checkpoints").save(net, to="checkpoint.pt")
 
         # List files
-        files = experiment.files().list()
-        files = experiment.files(prefix="/models").list()
+        files = experiment.files("/some/location").list()
+        files = experiment.files("/models").list()
 
         # Download file
-        experiment.files(file_id="123").download()
-        experiment.files(file_id="123", dest_path="./model.pt").download()
+        experiment.files("some.text").download()
+        experiment.files("some.text").download(to="./model.pt")
 
-        # Delete file
-        experiment.files(file_id="123").delete()
+        # Download Files via Glob Pattern
+        file_paths = experiment.files("images").list("*.png")
+        experiment.files("images").download("*.png")
+
+        # Delete files
+        experiment.files("some.text").delete()
+
+    Specific File Types:
+        dxp.files.save_text("content", to="view.yaml")
+        dxp.files.save_json(dict(hey="yo"), to="config.json")
+        dxp.files.save_blob(b"xxx", to="data.bin")
     """
 
-    def __init__(self, experiment: 'Experiment', **kwargs):
+    def __init__(self, experiment: 'Experiment', path: Optional[str] = None, **kwargs):
         """
         Initialize file builder.
 
         Args:
             experiment: Parent experiment instance
-            **kwargs: File operation parameters
-                - file_path: Path to file to upload
-                - prefix: Logical path prefix (default: "/")
+            path: File path or prefix for operations. Can be:
+                - A prefix/directory (e.g., "checkpoints", "/models")
+                - A file path (e.g., "some.text", "images/photo.png")
+            **kwargs: Additional file operation parameters (for backwards compatibility)
+                - file_path: Path to file to upload (deprecated, use save(to=))
+                - prefix: Logical path prefix (deprecated, use path argument)
                 - description: Optional description
                 - tags: Optional list of tags
                 - bindrs: Optional list of bindrs
                 - metadata: Optional metadata dict
                 - file_id: File ID for download/delete/update operations
-                - dest_path: Destination path for download
+                - dest_path: Destination path for download (deprecated, use download(to=))
         """
         self._experiment = experiment
+        self._path = path
+        # Backwards compatibility
         self._file_path = kwargs.get('file_path')
         self._prefix = kwargs.get('prefix', '/')
         self._description = kwargs.get('description')
@@ -59,9 +74,37 @@ class FileBuilder:
         self._file_id = kwargs.get('file_id')
         self._dest_path = kwargs.get('dest_path')
 
-    def save(self) -> Dict[str, Any]:
+        # If path is provided, determine if it's a file or prefix
+        if path:
+            # Normalize path
+            path = path.lstrip('/')
+            self._normalized_path = '/' + path if not path.startswith('/') else path
+
+    def save(
+        self,
+        obj: Optional[Any] = None,
+        *,
+        to: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Upload and save the file.
+        Upload and save a file or object.
+
+        Args:
+            obj: Object to save. Can be:
+                - None: Uses file_path from constructor (backwards compatibility)
+                - str: Path to an existing file
+                - bytes: Binary data to save
+                - dict/list: JSON-serializable data
+                - PyTorch model/state_dict: Saved with torch.save()
+                - matplotlib figure: Saved as image
+                - Any picklable object: Saved with pickle
+            to: Target filename (required when obj is not a file path)
+            description: Optional description (overrides constructor)
+            tags: Optional list of tags (overrides constructor)
+            metadata: Optional metadata dict (overrides constructor)
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
@@ -72,8 +115,19 @@ class FileBuilder:
             ValueError: If file size exceeds 100GB limit
 
         Examples:
-            result = experiment.files(file_path="./model.pt", prefix="/models").save()
-            # Returns: {"id": "123", "path": "/models", "filename": "model.pt", ...}
+            # Save existing file
+            experiment.files("models").save("./model.pt")
+            experiment.files("models").save(to="model.pt")  # copies from self._file_path
+
+            # Save PyTorch model
+            experiment.files("checkpoints").save(model, to="checkpoint.pt")
+            experiment.files("checkpoints").save(model.state_dict(), to="weights.pt")
+
+            # Save dict as JSON
+            experiment.files("configs").save({"lr": 0.001}, to="config.json")
+
+            # Save bytes
+            experiment.files("data").save(b"binary data", to="data.bin")
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -81,47 +135,326 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        if not self._file_path:
-            raise ValueError("file_path is required for save() operation")
+        # Use provided values or fall back to constructor values
+        desc = description if description is not None else self._description
+        file_tags = tags if tags is not None else self._tags
+        file_metadata = metadata if metadata is not None else self._metadata
 
-        file_path = Path(self._file_path)
-        if not file_path.exists():
-            raise ValueError(f"File not found: {self._file_path}")
+        # Determine prefix from path
+        prefix = self._prefix
+        if self._path:
+            prefix = '/' + self._path.lstrip('/')
 
-        if not file_path.is_file():
-            raise ValueError(f"Path is not a file: {self._file_path}")
+        # Handle different object types
+        if obj is None:
+            # Backwards compatibility: use file_path from constructor
+            if not self._file_path:
+                raise ValueError("No file or object provided. Pass a file path or object to save().")
+            return self._save_file(
+                file_path=self._file_path,
+                prefix=prefix,
+                description=desc,
+                tags=file_tags,
+                metadata=file_metadata
+            )
+
+        if isinstance(obj, str) and Path(obj).exists():
+            # obj is a path to an existing file
+            return self._save_file(
+                file_path=obj,
+                prefix=prefix,
+                description=desc,
+                tags=file_tags,
+                metadata=file_metadata
+            )
+
+        if isinstance(obj, bytes):
+            # Save bytes directly
+            if not to:
+                raise ValueError("'to' parameter is required when saving bytes")
+            return self._save_bytes(
+                data=obj,
+                filename=to,
+                prefix=prefix,
+                description=desc,
+                tags=file_tags,
+                metadata=file_metadata
+            )
+
+        if isinstance(obj, (dict, list)):
+            # Try JSON first
+            if not to:
+                raise ValueError("'to' parameter is required when saving dict/list")
+            return self._save_json(
+                content=obj,
+                filename=to,
+                prefix=prefix,
+                description=desc,
+                tags=file_tags,
+                metadata=file_metadata
+            )
+
+        # Check for PyTorch model
+        try:
+            import torch
+            if isinstance(obj, (torch.nn.Module, dict)) or hasattr(obj, 'state_dict'):
+                if not to:
+                    raise ValueError("'to' parameter is required when saving PyTorch model")
+                return self._save_torch(
+                    model=obj,
+                    filename=to,
+                    prefix=prefix,
+                    description=desc,
+                    tags=file_tags,
+                    metadata=file_metadata
+                )
+        except ImportError:
+            pass
+
+        # Check for matplotlib figure
+        try:
+            import matplotlib.pyplot as plt
+            from matplotlib.figure import Figure
+            if isinstance(obj, Figure):
+                if not to:
+                    raise ValueError("'to' parameter is required when saving matplotlib figure")
+                return self._save_fig(
+                    fig=obj,
+                    filename=to,
+                    prefix=prefix,
+                    description=desc,
+                    tags=file_tags,
+                    metadata=file_metadata
+                )
+        except ImportError:
+            pass
+
+        # Fall back to pickle
+        if not to:
+            raise ValueError("'to' parameter is required when saving object")
+        return self._save_pickle(
+            content=obj,
+            filename=to,
+            prefix=prefix,
+            description=desc,
+            tags=file_tags,
+            metadata=file_metadata
+        )
+
+    def _save_file(
+        self,
+        file_path: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Internal method to save an existing file."""
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            raise ValueError(f"File not found: {file_path}")
+
+        if not file_path_obj.is_file():
+            raise ValueError(f"Path is not a file: {file_path}")
 
         # Check file size (max 100GB)
-        file_size = file_path.stat().st_size
+        file_size = file_path_obj.stat().st_size
         MAX_FILE_SIZE = 100 * 1024 * 1024 * 1024  # 100GB in bytes
         if file_size > MAX_FILE_SIZE:
             raise ValueError(f"File size ({file_size} bytes) exceeds 100GB limit")
 
         # Compute checksum
-        checksum = compute_sha256(str(file_path))
+        checksum = compute_sha256(str(file_path_obj))
 
         # Detect MIME type
-        content_type = get_mime_type(str(file_path))
+        content_type = get_mime_type(str(file_path_obj))
 
         # Get filename
-        filename = file_path.name
+        filename = file_path_obj.name
 
         # Upload through experiment
         return self._experiment._upload_file(
-            file_path=str(file_path),
-            prefix=self._prefix,
+            file_path=str(file_path_obj),
+            prefix=prefix,
             filename=filename,
-            description=self._description,
-            tags=self._tags,
-            metadata=self._metadata,
+            description=description,
+            tags=tags or [],
+            metadata=metadata,
             checksum=checksum,
             content_type=content_type,
             size_bytes=file_size
         )
 
-    def list(self) -> List[Dict[str, Any]]:
+    def _save_bytes(
+        self,
+        data: bytes,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Save bytes data to a file."""
+        import tempfile
+        import os
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        try:
+            with open(temp_path, 'wb') as f:
+                f.write(data)
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=description,
+                tags=tags,
+                metadata=metadata
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def _save_json(
+        self,
+        content: Any,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Save JSON content to a file."""
+        import json
+        import tempfile
+        import os
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        try:
+            with open(temp_path, 'w') as f:
+                json.dump(content, f, indent=2)
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=description,
+                tags=tags,
+                metadata=metadata
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def _save_torch(
+        self,
+        model: Any,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Save PyTorch model to a file."""
+        import tempfile
+        import os
+        import torch
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        try:
+            torch.save(model, temp_path)
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=description,
+                tags=tags,
+                metadata=metadata
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def _save_fig(
+        self,
+        fig: Any,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Save matplotlib figure to a file."""
+        import tempfile
+        import os
+        import matplotlib.pyplot as plt
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        try:
+            fig.savefig(temp_path, **kwargs)
+            plt.close(fig)
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=description,
+                tags=tags,
+                metadata=metadata
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def _save_pickle(
+        self,
+        content: Any,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Save Python object to a pickle file."""
+        import pickle
+        import tempfile
+        import os
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        try:
+            with open(temp_path, 'wb') as f:
+                pickle.dump(content, f)
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=description,
+                tags=tags,
+                metadata=metadata
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def list(self, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        List files with optional filters.
+        List files with optional glob pattern filtering.
+
+        Args:
+            pattern: Optional glob pattern to filter files (e.g., "*.png", "model_*.pt")
 
         Returns:
             List of file metadata dicts
@@ -131,62 +464,169 @@ class FileBuilder:
 
         Examples:
             files = experiment.files().list()  # All files
-            files = experiment.files(prefix="/models").list()  # Filter by prefix
-            files = experiment.files(tags=["checkpoint"]).list()  # Filter by tags
+            files = experiment.files("/models").list()  # Files in /models prefix
+            files = experiment.files("images").list("*.png")  # PNG files in images
+            files = experiment.files().list("**/*.pt")  # All .pt files
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
-        return self._experiment._list_files(
-            prefix=self._prefix if self._prefix != '/' else None,
+        # Determine prefix filter - support both new (path) and old (prefix) API
+        prefix = None
+        if self._path:
+            prefix = '/' + self._path.lstrip('/')
+        elif self._prefix and self._prefix != '/':
+            prefix = self._prefix
+
+        # Get all files matching prefix
+        files = self._experiment._list_files(
+            prefix=prefix,
             tags=self._tags if self._tags else None
         )
 
-    def download(self) -> str:
-        """
-        Download file with automatic checksum verification.
+        # Apply glob pattern if provided
+        if pattern:
+            pattern = pattern.lstrip('/')
+            filtered = []
+            for f in files:
+                filename = f.get('filename', '')
+                full_path = f.get('path', '/').rstrip('/') + '/' + filename
+                full_path = full_path.lstrip('/')
 
-        If dest_path not provided, downloads to current directory with original filename.
+                # Match against filename or full path
+                if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(full_path, pattern):
+                    filtered.append(f)
+            return filtered
+
+        return files
+
+    def download(
+        self,
+        pattern: Optional[str] = None,
+        *,
+        to: Optional[str] = None
+    ) -> Union[str, List[str]]:
+        """
+        Download file(s) with automatic checksum verification.
+
+        Args:
+            pattern: Optional glob pattern for batch download (e.g., "*.png")
+            to: Destination path. For single files, this is the file path.
+                For patterns, this is the destination directory.
 
         Returns:
-            Path to downloaded file
+            For single file: Path to downloaded file
+            For pattern: List of paths to downloaded files
 
         Raises:
             RuntimeError: If experiment is not open
-            ValueError: If file_id not provided
-            ValueError: If checksum verification fails
+            ValueError: If file not found or checksum verification fails
 
         Examples:
-            # Download to current directory with original filename
+            # Download single file
+            path = experiment.files("model.pt").download()
+            path = experiment.files("model.pt").download(to="./local_model.pt")
+
+            # Download by file ID (backwards compatibility)
             path = experiment.files(file_id="123").download()
 
-            # Download to custom path
-            path = experiment.files(file_id="123", dest_path="./model.pt").download()
+            # Download multiple files matching pattern
+            paths = experiment.files("images").download("*.png")
+            paths = experiment.files("images").download("*.png", to="./local_images")
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
-        if not self._file_id:
-            raise ValueError("file_id is required for download() operation")
+        # If file_id is set (backwards compatibility)
+        if self._file_id:
+            return self._experiment._download_file(
+                file_id=self._file_id,
+                dest_path=to or self._dest_path
+            )
 
-        return self._experiment._download_file(
-            file_id=self._file_id,
-            dest_path=self._dest_path
-        )
+        # If pattern is provided, download multiple files
+        if pattern:
+            files = self.list(pattern)
+            if not files:
+                raise ValueError(f"No files found matching pattern: {pattern}")
 
-    def delete(self) -> Dict[str, Any]:
+            downloaded = []
+            dest_dir = Path(to) if to else Path('.')
+            if to and not dest_dir.exists():
+                dest_dir.mkdir(parents=True, exist_ok=True)
+
+            for f in files:
+                file_id = f.get('id')
+                filename = f.get('filename', 'file')
+                dest_path = str(dest_dir / filename)
+                path = self._experiment._download_file(
+                    file_id=file_id,
+                    dest_path=dest_path
+                )
+                downloaded.append(path)
+
+            return downloaded
+
+        # Download single file by path
+        if self._path:
+            # Find file by path
+            files = self._experiment._list_files(prefix=None, tags=None)
+            matching = []
+            search_path = self._path.lstrip('/')
+
+            for f in files:
+                filename = f.get('filename', '')
+                prefix = f.get('path', '/').lstrip('/')
+                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
+                full_path = full_path.lstrip('/')
+
+                if full_path == search_path or filename == search_path:
+                    matching.append(f)
+
+            if not matching:
+                raise ValueError(f"File not found: {self._path}")
+
+            if len(matching) > 1:
+                # If multiple matches, prefer exact path match
+                exact = [f for f in matching if
+                         (f.get('path', '/').lstrip('/').rstrip('/') + '/' + f.get('filename', '')).lstrip('/') == search_path]
+                if exact:
+                    matching = exact[:1]
+                else:
+                    matching = matching[:1]
+
+            file_info = matching[0]
+            return self._experiment._download_file(
+                file_id=file_info['id'],
+                dest_path=to
+            )
+
+        raise ValueError("No file path or pattern specified")
+
+    def delete(self, pattern: Optional[str] = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
-        Delete file (soft delete).
+        Delete file(s) (soft delete).
+
+        Args:
+            pattern: Optional glob pattern for batch delete (e.g., "*.png")
 
         Returns:
-            Dict with id and deletedAt timestamp
+            For single file: Dict with id and deletedAt timestamp
+            For pattern: List of deletion results
 
         Raises:
             RuntimeError: If experiment is not open or write-protected
-            ValueError: If file_id not provided
+            ValueError: If file not found
 
         Examples:
+            # Delete single file
+            result = experiment.files("some.text").delete()
+
+            # Delete by file ID (backwards compatibility)
             result = experiment.files(file_id="123").delete()
+
+            # Delete multiple files matching pattern
+            results = experiment.files("images").delete("*.png")
         """
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
@@ -194,10 +634,52 @@ class FileBuilder:
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
-        if not self._file_id:
-            raise ValueError("file_id is required for delete() operation")
+        # If file_id is set (backwards compatibility)
+        if self._file_id:
+            return self._experiment._delete_file(file_id=self._file_id)
 
-        return self._experiment._delete_file(file_id=self._file_id)
+        # If pattern is provided, delete multiple files
+        if pattern:
+            files = self.list(pattern)
+            if not files:
+                raise ValueError(f"No files found matching pattern: {pattern}")
+
+            results = []
+            for f in files:
+                file_id = f.get('id')
+                result = self._experiment._delete_file(file_id=file_id)
+                results.append(result)
+            return results
+
+        # Delete single file by path
+        if self._path:
+            files = self._experiment._list_files(prefix=None, tags=None)
+            matching = []
+            search_path = self._path.lstrip('/')
+
+            for f in files:
+                filename = f.get('filename', '')
+                prefix = f.get('path', '/').lstrip('/')
+                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
+                full_path = full_path.lstrip('/')
+
+                if full_path == search_path or filename == search_path:
+                    matching.append(f)
+
+            if not matching:
+                raise ValueError(f"File not found: {self._path}")
+
+            # Delete all matching files
+            if len(matching) == 1:
+                return self._experiment._delete_file(file_id=matching[0]['id'])
+
+            results = []
+            for f in matching:
+                result = self._experiment._delete_file(file_id=f['id'])
+                results.append(result)
+            return results
+
+        raise ValueError("No file path or pattern specified")
 
     def update(self) -> Dict[str, Any]:
         """
@@ -234,271 +716,230 @@ class FileBuilder:
             metadata=self._metadata
         )
 
-    def save_json(self, content: Any, file_name: str) -> Dict[str, Any]:
+    # Convenience methods for specific file types
+
+    def save_json(
+        self,
+        content: Any,
+        file_name: Optional[str] = None,
+        *,
+        to: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Save JSON content to a file.
 
         Args:
             content: Content to save as JSON (dict, list, or any JSON-serializable object)
-            file_name: Name of the file to create
+            file_name: Name of the file to create (deprecated, use 'to')
+            to: Target filename (preferred)
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
-        Raises:
-            RuntimeError: If experiment is not open or write-protected
-            ValueError: If content is not JSON-serializable
-
         Examples:
             config = {"model": "resnet50", "lr": 0.001}
-            result = experiment.files(prefix="/configs").save_json(config, "config.json")
+            result = experiment.files("configs").save_json(config, to="config.json")
         """
-        import json
-        import tempfile
-        import os
+        filename = to or file_name
+        if not filename:
+            raise ValueError("'to' parameter is required")
 
-        if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
-        if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+        return self._save_json(
+            content=content,
+            filename=filename,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
 
-        # Create temporary file with desired filename
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, file_name)
-        try:
-            # Write JSON content to temp file
-            with open(temp_path, 'w') as f:
-                json.dump(content, f, indent=2)
+    def save_text(self, content: str, *, to: str) -> Dict[str, Any]:
+        """
+        Save text content to a file.
 
-            # Save using existing save() method
-            original_file_path = self._file_path
-            self._file_path = temp_path
+        Args:
+            content: Text content to save
+            to: Target filename
 
-            # Upload and get result
-            result = self.save()
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
 
-            # Restore original file_path
-            self._file_path = original_file_path
+        Examples:
+            result = experiment.files().save_text("Hello, world!", to="greeting.txt")
+            result = experiment.files("configs").save_text(yaml_content, to="view.yaml")
+        """
+        if not to:
+            raise ValueError("'to' parameter is required")
 
-            return result
-        finally:
-            # Clean up temp file and directory
-            try:
-                os.unlink(temp_path)
-                os.rmdir(temp_dir)
-            except Exception:
-                pass
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
-    def save_torch(self, model: Any, file_name: str) -> Dict[str, Any]:
+        return self._save_bytes(
+            data=content.encode('utf-8'),
+            filename=to,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
+
+    def save_blob(self, data: bytes, *, to: str) -> Dict[str, Any]:
+        """
+        Save binary data to a file.
+
+        Args:
+            data: Binary data to save
+            to: Target filename
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Examples:
+            result = experiment.files("data").save_blob(binary_data, to="model.bin")
+        """
+        if not to:
+            raise ValueError("'to' parameter is required")
+
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
+
+        return self._save_bytes(
+            data=data,
+            filename=to,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
+
+    def save_torch(
+        self,
+        model: Any,
+        file_name: Optional[str] = None,
+        *,
+        to: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Save PyTorch model to a file.
 
         Args:
             model: PyTorch model or state dict to save
-            file_name: Name of the file to create (should end with .pt or .pth)
+            file_name: Name of the file to create (deprecated, use 'to')
+            to: Target filename (preferred)
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
-        Raises:
-            RuntimeError: If experiment is not open or write-protected
-            ImportError: If torch is not installed
-            ValueError: If model cannot be saved
-
         Examples:
-            import torch
-            model = torch.nn.Linear(10, 5)
-            result = experiment.files(prefix="/models").save_torch(model, "model.pt")
-
-            # Or save state dict
-            result = experiment.files(prefix="/models").save_torch(model.state_dict(), "model.pth")
+            result = experiment.files("models").save_torch(model, to="model.pt")
+            result = experiment.files("models").save_torch(model.state_dict(), to="weights.pth")
         """
-        import tempfile
-        import os
+        filename = to or file_name
+        if not filename:
+            raise ValueError("'to' parameter is required")
 
-        try:
-            import torch
-        except ImportError:
-            raise ImportError("PyTorch is not installed. Install it with: pip install torch")
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
-        if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+        return self._save_torch(
+            model=model,
+            filename=filename,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
 
-        if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
-
-        # Create temporary file with desired filename
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, file_name)
-
-        try:
-            # Save model to temp file
-            torch.save(model, temp_path)
-
-            # Save using existing save() method
-            original_file_path = self._file_path
-            self._file_path = temp_path
-
-            # Upload and get result
-            result = self.save()
-
-            # Restore original file_path
-            self._file_path = original_file_path
-
-            return result
-        finally:
-            # Clean up temp file and directory
-            try:
-                os.unlink(temp_path)
-                os.rmdir(temp_dir)
-            except Exception:
-                pass
-
-    def save_pkl(self, content: Any, file_name: str) -> Dict[str, Any]:
+    def save_pkl(
+        self,
+        content: Any,
+        file_name: Optional[str] = None,
+        *,
+        to: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Save Python object to a pickle file.
 
         Args:
             content: Python object to pickle (must be pickle-serializable)
-            file_name: Name of the file to create (should end with .pkl or .pickle)
+            file_name: Name of the file to create (deprecated, use 'to')
+            to: Target filename (preferred)
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
-        Raises:
-            RuntimeError: If experiment is not open or write-protected
-            ValueError: If content cannot be pickled
-
         Examples:
             data = {"model": "resnet50", "weights": np.array([1, 2, 3])}
-            result = experiment.files(prefix="/data").save_pkl(data, "data.pkl")
-
-            # Or save any Python object
-            result = experiment.files(prefix="/models").save_pkl(trained_model, "model.pickle")
+            result = experiment.files("data").save_pkl(data, to="data.pkl")
         """
-        import pickle
-        import tempfile
-        import os
+        filename = to or file_name
+        if not filename:
+            raise ValueError("'to' parameter is required")
 
-        if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
-        if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+        return self._save_pickle(
+            content=content,
+            filename=filename,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
 
-        # Create temporary file with desired filename
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, file_name)
-        try:
-            # Write pickled content to temp file
-            with open(temp_path, 'wb') as f:
-                pickle.dump(content, f)
-
-            # Save using existing save() method
-            original_file_path = self._file_path
-            self._file_path = temp_path
-
-            # Upload and get result
-            result = self.save()
-
-            # Restore original file_path
-            self._file_path = original_file_path
-
-            return result
-        finally:
-            # Clean up temp file and directory
-            try:
-                os.unlink(temp_path)
-                os.rmdir(temp_dir)
-            except Exception:
-                pass
-
-    def save_fig(self, fig: Optional[Any] = None, file_name: str = "figure.png", **kwargs) -> Dict[str, Any]:
+    def save_fig(
+        self,
+        fig: Optional[Any] = None,
+        file_name: Optional[str] = None,
+        *,
+        to: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
         Save matplotlib figure to a file.
 
         Args:
             fig: Matplotlib figure object. If None, uses plt.gcf() (current figure)
-            file_name: Name of file to create (extension determines format: .png, .pdf, .svg, .jpg)
-            **kwargs: Additional arguments passed to fig.savefig():
-                - dpi: Resolution (int or 'figure')
-                - transparent: Make background transparent (bool)
-                - bbox_inches: 'tight' to auto-crop (str or Bbox)
-                - quality: JPEG quality 0-100 (int)
-                - format: Override format detection (str)
+            file_name: Name of file to create (deprecated, use 'to')
+            to: Target filename (preferred)
+            **kwargs: Additional arguments passed to fig.savefig()
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
-        Raises:
-            RuntimeError: If experiment not open or write-protected
-            ImportError: If matplotlib not installed
-
         Examples:
-            import matplotlib.pyplot as plt
-
-            # Use current figure
             plt.plot([1, 2, 3], [1, 4, 9])
-            result = experiment.files(prefix="/plots").save_fig(file_name="plot.png")
-
-            # Specify figure explicitly
-            fig, ax = plt.subplots()
-            ax.plot([1, 2, 3])
-            result = experiment.files(prefix="/plots").save_fig(fig=fig, file_name="plot.pdf", dpi=150)
+            result = experiment.files("plots").save_fig(to="plot.png")
         """
-        import tempfile
-        import os
-
         try:
             import matplotlib.pyplot as plt
         except ImportError:
             raise ImportError("Matplotlib is not installed. Install it with: pip install matplotlib")
 
-        if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+        filename = to or file_name
+        if not filename:
+            raise ValueError("'to' parameter is required")
 
-        if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
-
-        # Get figure
         if fig is None:
             fig = plt.gcf()
 
-        # Create temporary file with desired filename
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, file_name)
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
-        try:
-            # Save figure to temp file
-            fig.savefig(temp_path, **kwargs)
-
-            # Close figure to prevent memory leaks
-            plt.close(fig)
-
-            # Save using existing save() method
-            original_file_path = self._file_path
-            self._file_path = temp_path
-
-            # Upload and get result
-            result = self.save()
-
-            # Restore original file_path
-            self._file_path = original_file_path
-
-            return result
-        finally:
-            # Clean up temp file and directory
-            try:
-                os.unlink(temp_path)
-                os.rmdir(temp_dir)
-            except Exception:
-                pass
+        return self._save_fig(
+            fig=fig,
+            filename=filename,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata,
+            **kwargs
+        )
 
     def save_video(
         self,
         frame_stack: Union[List, Any],
-        file_name: str,
+        file_name: Optional[str] = None,
+        *,
+        to: Optional[str] = None,
         fps: int = 20,
         **imageio_kwargs
     ) -> Dict[str, Any]:
@@ -506,42 +947,18 @@ class FileBuilder:
         Save video frame stack to a file.
 
         Args:
-            frame_stack: List of numpy arrays or stacked array (shape: [N, H, W] or [N, H, W, C])
-            file_name: Name of file to create (extension determines format: .mp4, .gif, .avi, .webm)
+            frame_stack: List of numpy arrays or stacked array
+            file_name: Name of file to create (deprecated, use 'to')
+            to: Target filename (preferred)
             fps: Frames per second (default: 20)
-            **imageio_kwargs: Additional arguments passed to imageio.v3.imwrite():
-                - codec: Video codec (e.g., 'libx264', 'h264')
-                - quality: Quality level (int, higher is better)
-                - pixelformat: Pixel format (e.g., 'yuv420p')
-                - macro_block_size: Macro block size for encoding
+            **imageio_kwargs: Additional arguments passed to imageio
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
-        Raises:
-            RuntimeError: If experiment not open or write-protected
-            ImportError: If imageio or scikit-image not installed
-            ValueError: If frame_stack is empty or invalid format
-
         Examples:
-            import numpy as np
-
-            # Grayscale frames (float values 0-1)
             frames = [np.random.rand(480, 640) for _ in range(30)]
-            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4")
-
-            # RGB frames with custom FPS
-            frames = [np.random.rand(480, 640, 3) for _ in range(60)]
-            result = experiment.files(prefix="/videos").save_video(frames, "output.mp4", fps=30)
-
-            # Save as GIF
-            frames = [np.random.rand(200, 200) for _ in range(20)]
-            result = experiment.files(prefix="/videos").save_video(frames, "animation.gif")
-
-            # With custom codec and quality
-            result = experiment.files(prefix="/videos").save_video(
-                frames, "output.mp4", fps=30, codec='libx264', quality=8
-            )
+            result = experiment.files("videos").save_video(frames, to="output.mp4")
         """
         import tempfile
         import os
@@ -556,51 +973,39 @@ class FileBuilder:
         except ImportError:
             raise ImportError("scikit-image is not installed. Install it with: pip install scikit-image")
 
-        if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
-
-        if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+        filename = to or file_name
+        if not filename:
+            raise ValueError("'to' parameter is required")
 
         # Validate frame_stack
         try:
-            # Handle both list and numpy array
             if len(frame_stack) == 0:
                 raise ValueError("frame_stack is empty")
         except TypeError:
             raise ValueError("frame_stack must be a list or numpy array")
 
-        # Create temporary file with desired filename
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
+
         temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, file_name)
+        temp_path = os.path.join(temp_dir, filename)
 
         try:
-            # Convert frames to uint8 format (handles float32/64, grayscale, RGB, etc.)
-            # img_as_ubyte automatically scales [0.0, 1.0] floats to [0, 255] uint8
             frames_ubyte = img_as_ubyte(frame_stack)
-
-            # Encode video to temp file
             try:
                 iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
             except iio.core.NeedDownloadError:
-                # Auto-download FFmpeg if not available
                 import imageio.plugins.ffmpeg
                 imageio.plugins.ffmpeg.download()
                 iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
 
-            # Save using existing save() method
-            original_file_path = self._file_path
-            self._file_path = temp_path
-
-            # Upload and get result
-            result = self.save()
-
-            # Restore original file_path
-            self._file_path = original_file_path
-
-            return result
+            return self._save_file(
+                file_path=temp_path,
+                prefix=prefix,
+                description=self._description,
+                tags=self._tags,
+                metadata=self._metadata
+            )
         finally:
-            # Clean up temp file and directory
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
@@ -611,31 +1016,16 @@ class FileBuilder:
         """
         Duplicate an existing file to a new path within the same experiment.
 
-        Useful for checkpoint rotation patterns where you save versioned checkpoints
-        and maintain a "latest" or "best" pointer.
-
         Args:
             source: Source file - either file ID (str) or metadata dict with 'id' key
             to: Target path like "models/latest.pt" or "/checkpoints/best.pt"
 
         Returns:
-            File metadata dict for the duplicated file with id, path, filename, checksum, etc.
-
-        Raises:
-            RuntimeError: If experiment is not open or write-protected
-            ValueError: If source file not found or target path invalid
+            File metadata dict for the duplicated file
 
         Examples:
-            # Using file ID
-            dxp.files().duplicate("file-id-123", to="models/latest.pt")
-
-            # Using metadata dict from save_torch
-            snapshot = dxp.files(prefix="/models").save_torch(model, f"model_{epoch:05d}.pt")
+            snapshot = dxp.files("models").save_torch(model, to=f"model_{epoch:05d}.pt")
             dxp.files().duplicate(snapshot, to="models/latest.pt")
-
-            # Checkpoint rotation pattern
-            snap = dxp.files(prefix="/checkpoints").save_torch(model, f"model_{epoch:05d}.pt")
-            dxp.files().duplicate(snap, to="checkpoints/best.pt")
         """
         import tempfile
         import os
@@ -669,40 +1059,246 @@ class FileBuilder:
         if not target_filename:
             raise ValueError(f"Invalid target path '{to}': must include filename")
 
-        # Download source file to temp location
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, target_filename)
 
         try:
-            # Download the source file
             downloaded_path = self._experiment._download_file(
                 file_id=source_id,
                 dest_path=temp_path
             )
 
-            # Save to new location using existing save() method
-            original_file_path = self._file_path
-            original_prefix = self._prefix
-
-            self._file_path = downloaded_path
-            self._prefix = target_prefix
-
-            # Upload and get result
-            result = self.save()
-
-            # Restore original values
-            self._file_path = original_file_path
-            self._prefix = original_prefix
-
-            return result
+            return self._save_file(
+                file_path=downloaded_path,
+                prefix=target_prefix,
+                description=self._description,
+                tags=self._tags,
+                metadata=self._metadata
+            )
         finally:
-            # Clean up temp file and directory
             try:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+
+class FilesAccessor:
+    """
+    Accessor that enables both callable and attribute-style access to file operations.
+
+    This allows:
+        experiment.files("path")          # Returns FileBuilder
+        experiment.files.save(...)        # Direct method call
+        experiment.files.download(...)    # Direct method call
+    """
+
+    def __init__(self, experiment: 'Experiment'):
+        self._experiment = experiment
+        self._builder = FileBuilder(experiment)
+
+    def __call__(self, path: Optional[str] = None, **kwargs) -> FileBuilder:
+        """Create a FileBuilder with the given path."""
+        return FileBuilder(self._experiment, path=path, **kwargs)
+
+    # Direct methods that don't require a path first
+
+    def save(
+        self,
+        obj: Optional[Any] = None,
+        *,
+        to: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Save a file directly.
+
+        Examples:
+            experiment.files.save("./model.pt")
+            experiment.files.save(model, to="checkpoints/model.pt")
+        """
+        # Parse 'to' to extract prefix and filename
+        if to:
+            to_path = to.lstrip('/')
+            if '/' in to_path:
+                prefix, filename = to_path.rsplit('/', 1)
+                prefix = '/' + prefix
+            else:
+                prefix = '/'
+                filename = to_path
+            return FileBuilder(self._experiment, path=prefix, **kwargs).save(obj, to=filename)
+
+        if isinstance(obj, str) and Path(obj).exists():
+            # obj is a file path, extract prefix from it
+            return FileBuilder(self._experiment, **kwargs).save(obj)
+
+        raise ValueError("'to' parameter is required when not saving an existing file path")
+
+    def download(
+        self,
+        path: str,
+        *,
+        to: Optional[str] = None
+    ) -> Union[str, List[str]]:
+        """
+        Download file(s) directly.
+
+        Examples:
+            experiment.files.download("model.pt")
+            experiment.files.download("images/*.png", to="local_images")
+        """
+        path = path.lstrip('/')
+
+        # Check if path contains glob pattern
+        if '*' in path or '?' in path:
+            # Extract prefix and pattern
+            if '/' in path:
+                parts = path.split('/')
+                # Find where the pattern starts
+                prefix_parts = []
+                pattern_parts = []
+                in_pattern = False
+                for part in parts:
+                    if '*' in part or '?' in part:
+                        in_pattern = True
+                    if in_pattern:
+                        pattern_parts.append(part)
+                    else:
+                        prefix_parts.append(part)
+
+                prefix = '/'.join(prefix_parts) if prefix_parts else None
+                pattern = '/'.join(pattern_parts)
+            else:
+                prefix = None
+                pattern = path
+
+            return FileBuilder(self._experiment, path=prefix).download(pattern, to=to)
+
+        # Single file download
+        return FileBuilder(self._experiment, path=path).download(to=to)
+
+    def delete(self, path: str) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        Delete file(s) directly.
+
+        Examples:
+            experiment.files.delete("some.text")
+            experiment.files.delete("images/*.png")
+        """
+        path = path.lstrip('/')
+
+        # Check if path contains glob pattern
+        if '*' in path or '?' in path:
+            # Extract prefix and pattern
+            if '/' in path:
+                parts = path.split('/')
+                prefix_parts = []
+                pattern_parts = []
+                in_pattern = False
+                for part in parts:
+                    if '*' in part or '?' in part:
+                        in_pattern = True
+                    if in_pattern:
+                        pattern_parts.append(part)
+                    else:
+                        prefix_parts.append(part)
+
+                prefix = '/'.join(prefix_parts) if prefix_parts else None
+                pattern = '/'.join(pattern_parts)
+            else:
+                prefix = None
+                pattern = path
+
+            return FileBuilder(self._experiment, path=prefix).delete(pattern)
+
+        # Single file delete
+        return FileBuilder(self._experiment, path=path).delete()
+
+    def list(self, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List files directly.
+
+        Examples:
+            files = experiment.files.list()
+            files = experiment.files.list("*.pt")
+        """
+        return FileBuilder(self._experiment).list(pattern)
+
+    def save_text(self, content: str, *, to: str) -> Dict[str, Any]:
+        """
+        Save text content to a file.
+
+        Examples:
+            experiment.files.save_text("content", to="view.yaml")
+        """
+        to_path = to.lstrip('/')
+        if '/' in to_path:
+            prefix, filename = to_path.rsplit('/', 1)
+            prefix = '/' + prefix
+        else:
+            prefix = '/'
+            filename = to_path
+        return FileBuilder(self._experiment, path=prefix).save_text(content, to=filename)
+
+    def save_json(self, content: Any, *, to: str) -> Dict[str, Any]:
+        """
+        Save JSON content to a file.
+
+        Examples:
+            experiment.files.save_json({"key": "value"}, to="config.json")
+        """
+        to_path = to.lstrip('/')
+        if '/' in to_path:
+            prefix, filename = to_path.rsplit('/', 1)
+            prefix = '/' + prefix
+        else:
+            prefix = '/'
+            filename = to_path
+        return FileBuilder(self._experiment, path=prefix).save_json(content, to=filename)
+
+    def save_blob(self, data: bytes, *, to: str) -> Dict[str, Any]:
+        """
+        Save binary data to a file.
+
+        Examples:
+            experiment.files.save_blob(b"data", to="data.bin")
+        """
+        to_path = to.lstrip('/')
+        if '/' in to_path:
+            prefix, filename = to_path.rsplit('/', 1)
+            prefix = '/' + prefix
+        else:
+            prefix = '/'
+            filename = to_path
+        return FileBuilder(self._experiment, path=prefix).save_blob(data, to=filename)
+
+
+class BindrsBuilder:
+    """
+    Fluent interface for bindr (collection) operations.
+
+    Usage:
+        file_paths = experiment.bindrs("some-bindr").list()
+    """
+
+    def __init__(self, experiment: 'Experiment', bindr_name: str):
+        self._experiment = experiment
+        self._bindr_name = bindr_name
+
+    def list(self) -> List[Dict[str, Any]]:
+        """
+        List files in this bindr.
+
+        Returns:
+            List of file metadata dicts belonging to this bindr
+        """
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+
+        # Get all files and filter by bindr
+        all_files = self._experiment._list_files(prefix=None, tags=None)
+        return [f for f in all_files if self._bindr_name in f.get('bindrs', [])]
 
 
 def compute_sha256(file_path: str) -> str:
