@@ -2,7 +2,9 @@
 
 Upload and manage experiment artifacts - models, plots, configs, and results. Files are automatically checksummed and organized with metadata.
 
-## Basic Upload
+## Fluent Interface Overview
+
+The files API uses a fluent interface that supports multiple styles:
 
 ```{code-block} python
 :linenos:
@@ -10,12 +12,94 @@ Upload and manage experiment artifacts - models, plots, configs, and results. Fi
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    result = experiment.files("model.pth", prefix="/models")
+        local_path=".ml-dash").run as dxp:
+
+    # Upload file to a prefix
+    dxp.files("checkpoints").save(net, to="checkpoint.pt")
+
+    # List files in a location
+    files = dxp.files("/models").list()
+
+    # Download a file
+    dxp.files("some.text").download()
+    dxp.files("some.text").download(to="./local_copy.text")
+
+    # Download using glob patterns
+    file_paths = dxp.files("images").list("*.png")
+    dxp.files("images").download("*.png", to="local_images")
+
+    # Delete files
+    dxp.files("some.text").delete()
+    dxp.files.delete("some.text")
+    dxp.files.delete("images/*.png")
+
+    # Specific file types
+    dxp.files.save_text("content", to="view.yaml")
+    dxp.files.save_json(dict(hey="yo"), to="config.json")
+    dxp.files.save_blob(b"xxx", to="data.bin")
+```
+
+## Basic Upload
+
+### Save Existing File
+
+```{code-block} python
+:linenos:
+
+from ml_dash import Experiment
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Save a file to a prefix
+    result = dxp.files("models").save("./model.pth")
 
     print(f"Uploaded: {result['filename']}")
     print(f"Size: {result['sizeBytes']} bytes")
     print(f"Checksum: {result['checksum']}")
+```
+
+### Save Objects Directly
+
+Save Python objects directly without creating intermediate files:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Save dict/list as JSON
+    config = {"model": "resnet50", "lr": 0.001}
+    dxp.files("configs").save(config, to="config.json")
+
+    # Save bytes directly
+    dxp.files("data").save(b"binary data", to="data.bin")
+
+    # Save PyTorch model (auto-detected)
+    import torch
+    model = torch.nn.Linear(10, 5)
+    dxp.files("checkpoints").save(model, to="checkpoint.pt")
+    dxp.files("checkpoints").save(model.state_dict(), to="weights.pt")
+```
+
+### Direct Method Style
+
+You can also use the direct method style:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Save with path included in 'to'
+    dxp.files.save(config, to="configs/settings.json")
+
+    # Convenience methods
+    dxp.files.save_text("yaml content", to="configs/view.yaml")
+    dxp.files.save_json({"key": "value"}, to="data/config.json")
+    dxp.files.save_blob(b"\x00\x01\x02", to="binary/data.bin")
 ```
 
 ## Organizing Files
@@ -26,99 +110,119 @@ Use paths to organize files logically:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".ml-dash").run as dxp:
+
     # Models
-    experiment.files("model.pth", prefix="/models")
-    experiment.files("best_model.pth", prefix="/models/checkpoints")
+    dxp.files("models").save("model.pth")
+    dxp.files("models/checkpoints").save("best_model.pth")
 
     # Visualizations
-    experiment.files("loss_curve.png", prefix="/visualizations")
-    experiment.files("confusion_matrix.png", prefix="/visualizations")
+    dxp.files("visualizations").save("loss_curve.png")
 
     # Configuration
-    experiment.files("config.json", prefix="/config")
+    dxp.files("config").save("config.json")
 
     # Results
-    experiment.files("results.csv", prefix="/results")
+    dxp.files("results").save("results.csv")
 ```
 
-## Downloading Files
+## Listing Files
 
-Download files from experiments:
-
-```{code-block} python
-:linenos:
-
-from ml_dash import Experiment
-
-with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    # Upload a file first
-    upload_result = experiment.files(
-        file_path="model.pth",
-        prefix="/models"
-    ).save()
-
-    file_id = upload_result["id"]
-
-    # Download to specific path
-    downloaded_path = experiment.files(
-        file_id=file_id,
-        dest_path="./downloaded_model.pth"
-    ).download()
-
-    print(f"Downloaded to: {downloaded_path}")
-```
-
-### Download to Current Directory
-
-If `dest_path` is not specified, the file will be downloaded to the current directory with its original filename:
+### List All Files
 
 ```{code-block} python
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".ml-dash").run as dxp:
+
     # List all files
-    files = experiment.files().list()
-
-    # Download first file using original filename
-    if files:
-        file_id = files[0]["id"]
-        downloaded_path = experiment.files(file_id=file_id).download()
-        print(f"Downloaded: {downloaded_path}")
-```
-
-### List and Download
-
-List files and download specific ones:
-
-```{code-block} python
-:linenos:
-
-with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    # List all files
-    files = experiment.files().list()
+    files = dxp.files().list()
 
     for file_info in files:
         print(f"File: {file_info['filename']}")
         print(f"  Path: {file_info['path']}")
         print(f"  Size: {file_info['sizeBytes']} bytes")
         print(f"  ID: {file_info['id']}")
+```
 
-    # Download a specific file by ID
-    best_model = next(
-        (f for f in files if "best" in f.get("tags", [])),
-        None
-    )
+### List by Prefix
 
-    if best_model:
-        downloaded = experiment.files(
-            file_id=best_model["id"],
-            dest_path="./best_model.pth"
-        ).download()
-        print(f"Downloaded best model to: {downloaded}")
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # List files in specific prefix
+    model_files = dxp.files("/models").list()
+    config_files = dxp.files("/configs").list()
+```
+
+### List with Glob Pattern
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # List files matching pattern
+    png_files = dxp.files("images").list("*.png")
+    model_files = dxp.files().list("*.pt")
+    all_configs = dxp.files().list("**/*.json")
+```
+
+## Downloading Files
+
+### Download Single File
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Download by filename/path
+    dxp.files("model.pt").download()  # Downloads to current directory
+    dxp.files("model.pt").download(to="./local_model.pt")  # Custom destination
+
+    # Download from specific prefix
+    dxp.files("models/best.pt").download(to="./best_model.pt")
+```
+
+### Download with Glob Pattern
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Download all PNG files from images prefix
+    paths = dxp.files("images").download("*.png", to="./local_images")
+
+    # Direct style with path/pattern
+    paths = dxp.files.download("images/*.png", to="local_images")
+
+    print(f"Downloaded {len(paths)} files")
+```
+
+### Download by File ID (Legacy)
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Upload a file first
+    upload_result = dxp.files("models").save("model.pth")
+    file_id = upload_result["id"]
+
+    # Download by ID
+    downloaded_path = dxp.files(file_id=file_id).download()
+    print(f"Downloaded to: {downloaded_path}")
 ```
 
 ### Checksum Verification
@@ -129,23 +233,50 @@ Downloads automatically verify checksums to ensure file integrity:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    # Upload
-    upload_result = experiment.files(
-        file_path="model.pth",
-        prefix="/models"
-    ).save()
+        local_path=".ml-dash").run as dxp:
 
+    # Upload
+    upload_result = dxp.files("models").save("model.pth")
     original_checksum = upload_result["checksum"]
     print(f"Original checksum: {original_checksum}")
 
     # Download (checksum verified automatically)
-    downloaded = experiment.files(
-        file_id=upload_result["id"],
-        dest_path="./verified_model.pth"
-    ).download()
-
+    downloaded = dxp.files("model.pth").download(to="./verified_model.pth")
     print(f"Download verified and saved to: {downloaded}")
+```
+
+## Deleting Files
+
+### Delete Single File
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Delete by filename/path
+    result = dxp.files("some.text").delete()
+
+    # Direct style
+    result = dxp.files.delete("some.text")
+```
+
+### Delete with Glob Pattern
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Delete all PNG files from images prefix
+    results = dxp.files("images").delete("*.png")
+
+    # Direct style
+    results = dxp.files.delete("images/*.png")
+
+    print(f"Deleted {len(results)} files")
 ```
 
 ## File Metadata
@@ -156,10 +287,11 @@ Add description, tags, and custom metadata:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    experiment.files(
-        "best_model.pth",
-        prefix="/models",
+        local_path=".ml-dash").run as dxp:
+
+    result = dxp.files("models").save(
+        model,
+        to="best_model.pth",
         description="Best model from epoch 50",
         tags=["checkpoint", "best"],
         metadata={
@@ -168,6 +300,62 @@ with Experiment(name="my-experiment", project="project",
             "optimizer_state": True
         }
     )
+```
+
+## Saving Specific File Types
+
+### Save Text
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    # Save text content
+    yaml_content = """
+    model:
+      architecture: resnet50
+      pretrained: true
+    """
+    dxp.files("configs").save_text(yaml_content, to="model.yaml")
+
+    # Or using direct style
+    dxp.files.save_text(yaml_content, to="configs/model.yaml")
+```
+
+### Save JSON
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    config = {"model": "resnet50", "lr": 0.001}
+
+    # Save JSON
+    dxp.files("configs").save_json(config, to="config.json")
+
+    # Or direct style
+    dxp.files.save_json(config, to="configs/training.json")
+```
+
+### Save Binary Data
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as dxp:
+
+    binary_data = b"\x00\x01\x02\x03"
+
+    # Save blob
+    dxp.files("data").save_blob(binary_data, to="weights.bin")
+
+    # Or direct style
+    dxp.files.save_blob(binary_data, to="data/embeddings.bin")
 ```
 
 ## Training with Checkpoints
@@ -181,9 +369,10 @@ import torch
 from ml_dash import Experiment
 
 with Experiment(name="resnet-training", project="cv",
-        local_path=".ml-dash").run as experiment:
-    experiment.params.set(model="resnet50", epochs=100)
-    experiment.log("Starting training")
+        local_path=".ml-dash").run as dxp:
+
+    dxp.params.set(model="resnet50", epochs=100)
+    dxp.log("Starting training")
 
     best_accuracy = 0.0
 
@@ -191,18 +380,15 @@ with Experiment(name="resnet-training", project="cv",
         train_loss = train_one_epoch(model, train_loader)
         val_loss, val_accuracy = validate(model, val_loader)
 
-        # Metric metrics
-        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
+        # Log metrics
+        dxp.metrics("train_loss").append(value=train_loss, epoch=epoch)
+        dxp.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
-            checkpoint_path = f"checkpoint_epoch_{epoch + 1}.pth"
-            torch.save(model.state_dict(), checkpoint_path)
-
-            experiment.files(
-                checkpoint_path,
-                prefix="/checkpoints",
+            dxp.files("checkpoints").save(
+                model.state_dict(),
+                to=f"checkpoint_epoch_{epoch + 1}.pt",
                 tags=["checkpoint"],
                 metadata={"epoch": epoch + 1, "val_accuracy": val_accuracy}
             )
@@ -211,18 +397,17 @@ with Experiment(name="resnet-training", project="cv",
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy
 
-            torch.save(model.state_dict(), "best_model.pth")
-            experiment.files(
-                "best_model.pth",
-                prefix="/models",
+            dxp.files("models").save(
+                model.state_dict(),
+                to="best_model.pt",
                 description=f"Best model (accuracy: {best_accuracy:.4f})",
                 tags=["best"],
                 metadata={"epoch": epoch + 1, "accuracy": best_accuracy}
             )
 
-            experiment.log(f"New best model saved (accuracy: {best_accuracy:.4f})")
+            dxp.log(f"New best model saved (accuracy: {best_accuracy:.4f})")
 
-    experiment.log("Training complete")
+    dxp.log("Training complete")
 ```
 
 ## Saving Visualizations
@@ -237,7 +422,8 @@ import numpy as np
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".ml-dash").run as dxp:
+
     # Generate plot
     losses = [0.5, 0.4, 0.3, 0.25, 0.2]
     plt.plot(losses)
@@ -246,18 +432,14 @@ with Experiment(name="my-experiment", project="project",
     plt.ylabel("Loss")
 
     # Save directly (auto-closes figure)
-    experiment.files(
-        prefix="/visualizations",
-        description="Training loss over epochs",
-        tags=["plot"]
-    ).save_fig("loss_curve.png")
+    dxp.files("visualizations").save_fig(to="loss_curve.png")
 
     # Save as PDF with custom DPI
     xs = np.linspace(-5, 5, 100)
     plt.plot(xs, np.cos(xs), label='Cosine')
     plt.legend()
-    experiment.files(prefix="/visualizations").save_fig(
-        "cosine_function.pdf",
+    dxp.files("visualizations").save_fig(
+        to="cosine_function.pdf",
         dpi=150,
         transparent=True,
         bbox_inches='tight'
@@ -277,26 +459,19 @@ import numpy as np
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    # Generate frame stack
-    def im(x, y):
-        canvas = np.zeros((200, 200))
-        for i in range(200):
-            for j in range(200):
-                if x - 5 < i < x + 5 and y - 5 < j < y + 5:
-                    canvas[i, j] = 1
-        return canvas
+        local_path=".ml-dash").run as dxp:
 
-    frames = [im(100 + i, 80) for i in range(20)]
+    # Generate frame stack
+    frames = [np.random.rand(200, 200) for _ in range(20)]
 
     # Save as MP4 (default 20 FPS)
-    experiment.files(prefix="/videos").save_video(frames, "animation.mp4")
+    dxp.files("videos").save_video(frames, to="animation.mp4")
 
     # Save with custom FPS
-    experiment.files(prefix="/videos").save_video(frames, "animation.mp4", fps=30)
+    dxp.files("videos").save_video(frames, to="animation.mp4", fps=30)
 
     # Save as GIF
-    experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+    dxp.files("videos").save_video(frames, to="animation.gif")
 ```
 
 ### Frame Format Support
@@ -308,81 +483,21 @@ with Experiment(name="my-experiment", project="project",
 
 # Grayscale frames (H×W)
 frames = [np.random.rand(480, 640) for _ in range(30)]
-experiment.files(prefix="/videos").save_video(frames, "grayscale.mp4")
+dxp.files("videos").save_video(frames, to="grayscale.mp4")
 
 # RGB frames (H×W×3)
 frames = [np.random.rand(480, 640, 3) for _ in range(30)]
-experiment.files(prefix="/videos").save_video(frames, "rgb.mp4")
+dxp.files("videos").save_video(frames, to="rgb.mp4")
 
 # Stacked array (N×H×W or N×H×W×C)
 frames = np.random.rand(30, 480, 640, 3)
-experiment.files(prefix="/videos").save_video(frames, "stacked.mp4")
+dxp.files("videos").save_video(frames, to="stacked.mp4")
 ```
 
 **Frame value ranges:**
 - Float values (0.0 to 1.0) - automatically scaled to 0-255
 - Uint8 values (0 to 255) - used directly
 - Other formats - automatically converted
-
-### Custom Video Options
-
-Pass additional encoding parameters:
-
-```{code-block} python
-:linenos:
-
-# Custom codec and quality
-experiment.files(prefix="/videos").save_video(
-    frames,
-    "high_quality.mp4",
-    fps=30,
-    codec='libx264',
-    quality=8,
-    pixelformat='yuv420p'
-)
-
-# Animated GIF with custom duration
-experiment.files(prefix="/videos").save_video(
-    frames,
-    "animation.gif",
-    fps=10,
-    duration=0.1  # 100ms per frame
-)
-```
-
-**Note:** Video encoding dependencies (`imageio`, `imageio-ffmpeg`, `scikit-image`) are included in the base installation.
-
-## Uploading Configuration
-
-Save config files alongside parameters:
-
-```{code-block} python
-:linenos:
-
-import json
-from ml_dash import Experiment
-
-config = {
-    "model": {"architecture": "resnet50", "pretrained": True},
-    "training": {"epochs": 100, "batch_size": 32, "lr": 0.001}
-}
-
-with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
-    # Metric as parameters
-    experiment.params.set(**config)
-
-    # Also save as file
-    with open("config.json", "w") as f:
-        json.dump(config, f, indent=2)
-
-    experiment.files(
-        "config.json",
-        prefix="/config",
-        description="Experiment configuration",
-        tags=["config"]
-    )
-```
 
 ## Storage Format
 
@@ -411,16 +526,11 @@ Each file is stored as: `files/{prefix}/{snowflake_id}/{filename}`
 - **snowflake_id**: Unique identifier generated for each file
 - **filename**: Original filename
 
-The prefix is automatically created from the `prefix` parameter when calling `experiment.files()`. This structure ensures:
-- Files with same name in different prefixes don't collide
-- Easy organization by file type or purpose
-- Unique identification via snowflake IDs
-
 **Remote mode** - Files uploaded to S3, metadata in MongoDB:
 - Files stored: `s3://bucket/files/{namespace}/{project}/{experiment}/{prefix}/{file_id}/filename`
 - Metadata: path, size, SHA256 checksum, tags, description
 
-**File size limit:** 5GB per file
+**File size limit:** 100GB per file
 
 ---
 

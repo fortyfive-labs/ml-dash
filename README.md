@@ -25,14 +25,14 @@ A simple and flexible SDK for ML experiment tracking and data storage.
 <td>
 
 ```bash
-uv add ml-dash
+uv add ml-dash==0.6.2rc1
 ```
 
 </td>
 <td>
 
 ```bash
-pip install ml-dash
+pip install ml-dash==0.6.2rc1
 ```
 
 </td>

@@ -51,6 +51,7 @@ from .client import RemoteClient
 from .storage import LocalStorage
 from .log import LogLevel, LogBuilder
 from .params import ParametersBuilder
+from .run import RUN
 from .auto_start import dxp
 
 __version__ = "0.1.0"
@@ -65,6 +66,7 @@ __all__ = [
     "LogLevel",
     "LogBuilder",
     "ParametersBuilder",
+    "RUN",
     "dxp",
 ]
 

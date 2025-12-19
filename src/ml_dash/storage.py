@@ -627,7 +627,8 @@ class LocalStorage:
             FileNotFoundError: If file not found
         """
         experiment_dir = self._get_experiment_dir(project, experiment)
-        metadata_file = experiment_dir / "files" / ".files_metadata.json"
+        files_dir = experiment_dir / "files"
+        metadata_file = files_dir / ".files_metadata.json"
 
         if not metadata_file.exists():
             raise FileNotFoundError(f"File {file_id} not found")
@@ -689,7 +690,8 @@ class LocalStorage:
             FileNotFoundError: If file not found
         """
         experiment_dir = self._get_experiment_dir(project, experiment)
-        metadata_file = experiment_dir / "files" / ".files_metadata.json"
+        files_dir = experiment_dir / "files"
+        metadata_file = files_dir / ".files_metadata.json"
 
         if not metadata_file.exists():
             raise FileNotFoundError(f"File {file_id} not found")
