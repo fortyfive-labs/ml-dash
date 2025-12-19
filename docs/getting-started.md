@@ -143,17 +143,13 @@ with Experiment(name="my-experiment", project="project",
     # model.save("model.pth")
 
     # Upload the model file
-    experiment.files(
-        file_prefix="model.pth",
-        prefix="/models"
-    ).save()
+    experiment.files("models").save("model.pth")
 
     # Upload a config file with metadata
-    experiment.files(
-        file_prefix="config.yaml",
-        prefix="/configs",
+    experiment.files("configs").save(
+        "config.yaml",
         metadata={"version": "1.0"}
-    ).save()
+    )
 ```
 
 ## Custom Remote Experiments

@@ -194,15 +194,14 @@ def train_and_evaluate(model, train_loader, val_loader, experiment):
 # Compare architectures
 for arch in ["cnn", "resnet", "vit"]:
     with Experiment(name=f"comparison-{arch}", project="arch-comp",
-        local_path=".ml-dash".run as experiment:
+        local_path=".ml-dash").run as experiment:
         experiment.params.set(architecture=arch, dataset="cifar10")
 
         model = create_model(arch)
         final_acc = train_and_evaluate(model, train_loader, val_loader, experiment)
 
         # Save best model
-        torch.save(model.state_dict(), f"{arch}_model.pth")
-        experiment.files(f"{arch}_model.pth", prefix="/models")
+        experiment.files("models").save_torch(model.state_dict(), to=f"{arch}_model.pth")
 ```
 
 ---

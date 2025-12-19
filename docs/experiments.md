@@ -202,7 +202,7 @@ with Experiment(name="demo", project="test",
     experiment.metrics("loss").append(value=0.5, epoch=1)
 
     # File uploads
-    experiment.files(file_path="model.pth", prefix="/models").save()
+    experiment.files("models").save("model.pth")
 ```
 
 ## Storage Structure

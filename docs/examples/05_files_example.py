@@ -48,36 +48,33 @@ def main():
         print("\n1. Uploading model file...")
 
         # Upload model
-        result = experiment.files(
-            file_path="temp_files/model.txt",
-            prefix="/models",
+        result = experiment.files("models").save(
+            "temp_files/model.txt",
             description="Trained model weights",
             tags=["model", "final"]
-        ).save()
+        )
         print(f"   ✓ Uploaded: {result['filename']} ({result['sizeBytes']} bytes)")
         print(f"   Checksum: {result['checksum']}")
 
         print("\n2. Uploading configuration...")
 
         # Upload config
-        result = experiment.files(
-            file_path="temp_files/config.json",
-            prefix="/config",
+        result = experiment.files("config").save(
+            "temp_files/config.json",
             description="Training configuration",
             tags=["config"]
-        ).save()
+        )
         print(f"   ✓ Uploaded: {result['filename']}")
 
         print("\n3. Uploading results...")
 
         # Upload results
-        result = experiment.files(
-            file_path="temp_files/results.txt",
-            prefix="/results",
+        result = experiment.files("results").save(
+            "temp_files/results.txt",
             description="Training results per epoch",
             tags=["results", "metrics"],
             metadata={"epochs": 10, "format": "csv"}
-        ).save()
+        )
         print(f"   ✓ Uploaded: {result['filename']}")
 
         print("\n4. Listing all files...")

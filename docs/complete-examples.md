@@ -17,11 +17,10 @@ def train_simple_model():
     with Experiment(
         name="simple-training",
         project="tutorials",
-        local_prefix="./experiments",
         description="Simple training example",
         tags=["tutorial", "simple"],
         local_path=".ml-dash"
-    .run as experiment:
+    ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
             learning_rate=0.001,
@@ -118,11 +117,10 @@ def train_mnist():
     with Experiment(
         name="mnist-pytorch",
         project="computer-vision",
-        local_prefix="./experiments",
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
         local_path=".ml-dash"
-    .run as experiment:
+    ).run as experiment:
         # Metric configuration
         experiment.params.set({
             "model": {
@@ -210,9 +208,8 @@ def train_mnist():
             if val_accuracy > best_accuracy:
                 best_accuracy = val_accuracy
                 torch.save(model.state_dict(), "best_model.pth")
-                experiment.files(
+                experiment.files("models").save(
                     "best_model.pth",
-                    prefix="/models",
                     description=f"Best model (accuracy: {best_accuracy:.4f})",
                     tags=["best"],
                     metadata={"epoch": epoch, "accuracy": best_accuracy}
@@ -221,9 +218,8 @@ def train_mnist():
 
         # Save final model
         torch.save(model.state_dict(), "final_model.pth")
-        experiment.files(
+        experiment.files("models").save(
             "final_model.pth",
-            prefix="/models",
             description="Final model after all epochs",
             tags=["final"]
         )
@@ -274,11 +270,10 @@ def hyperparameter_search():
         with Experiment(
             name=experiment_name,
             project="hyperparameter-search",
-            local_prefix="./experiments",
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-        local_path=".ml-dash"
-        .run as experiment:
+            local_path=".ml-dash"
+        ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
                 learning_rate=lr,
@@ -346,11 +341,10 @@ def compare_architectures():
         with Experiment(
             name=f"comparison-{arch}",
             project="architecture-comparison",
-            local_prefix="./experiments",
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
-        local_path=".ml-dash"
-        .run as experiment:
+            local_path=".ml-dash"
+        ).run as experiment:
             # Configuration
             experiment.params.set(
                 architecture=arch,
@@ -394,11 +388,10 @@ def train_with_debug():
     with Experiment(
         name="debug-training",
         project="debugging",
-        local_prefix="./experiments",
         description="Training with debug logging",
         tags=["debug"],
         local_path=".ml-dash"
-    .run as experiment:
+    ).run as experiment:
         experiment.params.set(
             learning_rate=0.001,
             batch_size=32,
