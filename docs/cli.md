@@ -4,8 +4,10 @@ ML-Dash provides a powerful command-line interface for managing experiments betw
 
 ## Overview
 
-The ML-Dash CLI includes three main commands:
+The ML-Dash CLI includes four main commands:
 
+- **`login`** - Authenticate with ML-Dash server using OAuth2 device flow
+- **`logout`** - Clear stored authentication credentials
 - **`upload`** - Upload local experiments to a remote server
 - **`download`** - Download experiments from a remote server to local storage
 - **`list`** - Discover and browse projects and experiments on a remote server
@@ -28,73 +30,85 @@ ml-dash --help
 
 ## Quick Start
 
-### Upload Experiments
+### 1. Authenticate
 
-Upload all local experiments to a remote server:
-
-```bash
-ml-dash upload --remote https://api.dash.ml --username tom
-```
-
-### Download Experiments
-
-Download experiments from a remote server:
+Before using CLI commands, authenticate with the ML-Dash server:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username tom --project my-project
+ml-dash login
 ```
 
-### List Available Experiments
+This opens your browser for secure OAuth2 authentication. Your credentials are stored securely in your system keychain.
+
+### 2. Upload Experiments
+
+Upload all local experiments to the remote server:
+
+```bash
+ml-dash upload
+```
+
+### 3. Download Experiments
+
+Download experiments from the remote server:
+
+```bash
+ml-dash download ./data --project my-project
+```
+
+### 4. List Available Experiments
 
 Discover what's available on the remote server:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom
+ml-dash list
 ```
 
 ## Authentication
 
-All CLI commands support three authentication methods:
+ML-Dash uses secure OAuth2 device flow for authentication.
 
-### 1. Username-based Authentication (Recommended)
-
-The simplest approach - automatically generates a JWT token from your username:
+### Login (One-time Setup)
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --username john-doe
+ml-dash login
 ```
 
-**Benefits:**
-- No manual token management
-- Deterministic - same username always produces the same token
-- Token used only for the current session (not stored)
-- Perfect for development and personal use
+This command:
+1. Opens your browser for authentication
+2. Displays a verification code if browser doesn't open
+3. Stores your authentication token securely in your system keychain
+4. Sets the default remote URL to https://api.dash.ml
 
-### 2. API Key Authentication
-
-For production environments or when you have an explicit API key:
+**Custom Server:**
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --api-key your-jwt-token
+ml-dash login --remote https://your-server.com
 ```
 
-### 3. Configuration File
+### Logout
 
-Store credentials in `~/.ml-dash/config.json` to avoid passing them every time:
+Clear stored credentials:
+
+```bash
+ml-dash logout
+```
+
+### Alternative: API Key Authentication
+
+For CI/CD or when you have an explicit API key:
+
+```bash
+ml-dash upload --api-key your-jwt-token
+```
+
+Or store it in `~/.ml-dash/config.json`:
 
 ```json
 {
   "remote_url": "https://api.dash.ml",
   "api_key": "your-jwt-token-here"
 }
-```
-
-Then simply run commands without authentication flags:
-
-```bash
-ml-dash upload
-ml-dash download ./data
-ml-dash list
 ```
 
 ## Common Workflows
@@ -104,11 +118,14 @@ ml-dash list
 Work offline, then sync when ready:
 
 ```bash
-# 1. Run experiments locally (no internet needed)
+# 1. Authenticate once (stores credentials)
+ml-dash login
+
+# 2. Run experiments locally (no internet needed)
 python train.py  # Uses local ML-Dash storage
 
-# 2. Upload when internet is available
-ml-dash upload --remote https://dash.example.com --username john
+# 3. Upload when internet is available
+ml-dash upload
 ```
 
 ### Download → Analyze → Re-upload
@@ -117,13 +134,13 @@ Download experiments, run additional analysis, then upload results:
 
 ```bash
 # 1. Download existing experiments
-ml-dash download ./analysis --remote https://dash.example.com --username john --project training-runs
+ml-dash download ./analysis --project training-runs
 
 # 2. Run analysis (adds metrics/files to experiments)
 python analyze.py
 
 # 3. Upload updated experiments
-ml-dash upload ./analysis --remote https://dash.example.com --username john
+ml-dash upload ./analysis
 ```
 
 ### Backup and Migration
@@ -132,10 +149,12 @@ Backup experiments or migrate between servers:
 
 ```bash
 # Backup from production
-ml-dash download ./backup --remote https://prod.example.com --username john
+ml-dash login --remote https://prod.example.com
+ml-dash download ./backup
 
 # Restore to development
-ml-dash upload ./backup --remote https://api.dash.ml --username john
+ml-dash login --remote https://api.dash.ml
+ml-dash upload ./backup
 ```
 
 ### Discovery and Selective Download
@@ -144,14 +163,13 @@ Find what you need, then download it:
 
 ```bash
 # 1. List all projects
-ml-dash list --remote https://dash.example.com --username john
+ml-dash list
 
 # 2. List experiments in a project
-ml-dash list --remote https://dash.example.com --username john --project vision-models
+ml-dash list --project vision-models
 
 # 3. Download specific experiment
-ml-dash download ./data --remote https://dash.example.com --username john \
-  --project vision-models --experiment resnet-50-baseline
+ml-dash download ./data --project vision-models --experiment resnet-50-baseline
 ```
 
 ## Performance Features
@@ -167,8 +185,7 @@ The download command uses parallel processing for optimal performance:
 Example with custom parallelism:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username tom \
-  --max-concurrent-metrics 10 --max-concurrent-files 5
+ml-dash download ./data --max-concurrent-metrics 10 --max-concurrent-files 5
 ```
 
 ### Resume Interrupted Transfers
@@ -177,10 +194,10 @@ Both upload and download support resuming interrupted operations:
 
 ```bash
 # Upload with resume
-ml-dash upload --remote https://api.dash.ml --username tom --resume
+ml-dash upload --resume
 
 # Download with resume
-ml-dash download ./data --remote https://api.dash.ml --username tom --resume
+ml-dash download ./data --resume
 ```
 
 State is automatically saved to `.ml-dash-upload-state.json` or `.ml-dash-download-state.json`.
@@ -231,32 +248,32 @@ Discover and browse projects and experiments on a remote server.
 
 All commands support these common options:
 
-- `--remote URL` - Remote server URL (required unless set in config)
-- `--api-key TOKEN` - JWT authentication token
-- `--username NAME` - Username for auto-generating API key
-- `--namespace SLUG` - Namespace slug (defaults to username)
+- `--remote URL` - Remote server URL (defaults to https://api.dash.ml)
+- `--api-key TOKEN` - JWT authentication token (optional if logged in)
 - `-v, --verbose` - Detailed progress output
 - `--help` - Show command-specific help
 
 ## Tips and Best Practices
 
-### 1. Use Username Authentication for Development
+### 1. Authenticate Once
 
-For local development and personal use, username authentication is the simplest:
+Run `ml-dash login` once to authenticate. Credentials are securely stored and reused:
 
 ```bash
-ml-dash upload --username $(whoami)
+ml-dash login
 ```
 
-### 2. Set Up Configuration File for Production
+### 2. Use API Keys for CI/CD
 
-Create `~/.ml-dash/config.json` to avoid repeating credentials:
+For automated environments, use API keys instead of interactive login:
 
-```json
-{
-  "remote_url": "https://dash.example.com",
-  "api_key": "eyJhbGc..."
-}
+```bash
+# Set environment variable
+export ML_DASH_API_KEY="your-jwt-token"
+ml-dash upload
+
+# Or use config file
+echo '{"api_key": "your-jwt-token"}' > ~/.ml-dash/config.json
 ```
 
 ### 3. Use Dry-Run Before Large Operations
@@ -325,13 +342,17 @@ uv run python -m ml_dash.cli --help
 
 If you get authentication errors:
 
-1. Verify your username matches the server's user database
+1. Try logging in again: `ml-dash login`
 2. Check that the remote URL is correct
 3. Ensure the server is running and accessible
+4. Verify your authentication token hasn't expired
 
 ```bash
-# Test connection
-curl https://api.dash.ml/health
+# Check if you're logged in
+ml-dash list
+
+# Re-authenticate if needed
+ml-dash logout && ml-dash login
 ```
 
 ### Slow Uploads/Downloads

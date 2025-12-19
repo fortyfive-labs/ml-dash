@@ -1,4 +1,11 @@
-"""Files example - Upload models and artifacts."""
+"""
+Files Example - Upload models and artifacts
+
+This example demonstrates file upload with ML-Dash in local mode (no authentication required).
+
+Usage:
+    python 05_files_example.py
+"""
 import sys
 sys.path.insert(0, '../../src')
 

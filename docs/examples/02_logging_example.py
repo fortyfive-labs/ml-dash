@@ -1,4 +1,11 @@
-"""Logging example - Structured logging with different levels."""
+"""
+Logging Example - Structured logging with different levels
+
+This example demonstrates logging with ML-Dash in local mode (no authentication required).
+
+Usage:
+    python 02_logging_example.py
+"""
 import sys
 sys.path.insert(0, '../../src')
 

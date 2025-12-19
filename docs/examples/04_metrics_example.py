@@ -1,4 +1,11 @@
-"""Metrics example - Time-series metrics metricing."""
+"""
+Metrics Example - Time-series data tracking
+
+This example demonstrates metric tracking with ML-Dash in local mode (no authentication required).
+
+Usage:
+    python 04_metrics_example.py
+"""
 import sys
 sys.path.insert(0, '../../src')
 

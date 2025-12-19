@@ -8,10 +8,50 @@ Get started with ML-Dash in under 5 minutes.
 pip install ml-dash
 ```
 
-## Your First Experiment
+## Quick Start with Remote Mode
 
+The fastest way to get started is using the pre-configured `dxp` singleton with remote tracking:
 
-Local mode stores everything on your filesystem - perfect for getting started:
+### 1. Authenticate
+
+```bash
+ml-dash login
+```
+
+This opens your browser for secure OAuth2 authentication. Your token is stored securely in your system keychain.
+
+### 2. Start Tracking
+
+```{code-block} python
+:linenos:
+
+from ml_dash import dxp
+
+# Start experiment (uploads to https://api.dash.ml by default)
+with dxp.run:
+    # Log messages
+    dxp.log().info("Training started")
+
+    # Track parameters
+    dxp.params.set(
+        learning_rate=0.001,
+        batch_size=32,
+        epochs=10
+    )
+
+    # Track metrics over time
+    for epoch in range(10):
+        loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
+        dxp.metrics("loss").append(value=loss, epoch=epoch)
+
+    dxp.log().info("Training completed")
+```
+
+That's it! Your experiment is now tracked on the ML-Dash server.
+
+## Local Mode (No Authentication)
+
+Local mode stores everything on your filesystem - perfect for offline work:
 
 ```{code-block} python
 :linenos:
@@ -22,21 +62,21 @@ from ml_dash import Experiment
 with Experiment(name="my-first-experiment", project="tutorial",
         local_path=".ml-dash").run as experiment:
     # Log messages
-    experiment.log("Training started")
+    experiment.log().info("Training started")
 
-    # Metric parameters
+    # Track parameters
     experiment.params.set(
         learning_rate=0.001,
         batch_size=32,
         epochs=10
     )
 
-    # Metric metrics over time
+    # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
         experiment.metrics("loss").append(value=loss, epoch=epoch)
 
-    experiment.log("Training completed")
+    experiment.log().info("Training completed")
 ```
 
 That's it! Your experiment data is now saved in `.ml-dash/tutorial/my-first-experiment/`.
@@ -116,27 +156,28 @@ with Experiment(name="my-experiment", project="project",
     ).save()
 ```
 
-## Remote Mode
+## Custom Remote Experiments
 
-To collaborate with your team, switch to remote mode by pointing to a ML-Dash server:
+Need more control? Create your own experiments with custom names:
 
 ```{code-block} python
 :linenos:
 
 from ml_dash import Experiment
 
+# First authenticate: ml-dash login
+
 with Experiment(
     name="my-experiment",
     project="team-project",
-    remote="https://api.dash.ml",
-    user_name="your-name"
+    remote="https://api.dash.ml"  # token auto-loaded from keychain
 ).run as experiment:
     # Use exactly the same API as local mode!
-    experiment.log("Running on remote server")
+    experiment.log().info("Running on remote server")
     experiment.params.set(learning_rate=0.001)
 ```
 
-The API is identical - just add `remote` and `user_name` parameters.
+The API is identical across local and remote modes!
 
 ## Next Steps
 

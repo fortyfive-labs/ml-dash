@@ -1,4 +1,11 @@
-"""Parameters example - Metric hyperparameters and configuration."""
+"""
+Parameters Example - Track hyperparameters and configuration
+
+This example demonstrates parameter tracking with ML-Dash in local mode (no authentication required).
+
+Usage:
+    python 03_parameters_example.py
+"""
 import sys
 sys.path.insert(0, '../../src')
 

@@ -1,11 +1,12 @@
 # ML-Dash
 
-A simple and flexible SDK for ML experiment metricing and data storage.
+A simple and flexible SDK for ML experiment tracking and data storage.
 
 ## Features
 
-- **Three Usage Styles**: Decorator, context manager, or direct instantiation
+- **Three Usage Styles**: Pre-configured singleton (dxp), context manager, or direct instantiation
 - **Dual Operation Modes**: Remote (API server) or local (filesystem)
+- **OAuth2 Authentication**: Secure device flow authentication for CLI and SDK
 - **Auto-creation**: Automatically creates namespace, project, and folder hierarchy
 - **Upsert Behavior**: Updates existing experiments or creates new ones
 - **Experiment Lifecycle**: Automatic status tracking (RUNNING, COMPLETED, FAILED, CANCELLED)
@@ -38,9 +39,34 @@ pip install ml-dash
 </tr>
 </table>
 
-## Getting Started
+## Quick Start
 
-### Remote Mode (with API Server)
+### 1. Authenticate (Required for Remote Mode)
+
+```bash
+ml-dash login
+```
+
+This opens your browser for secure OAuth2 authentication. Your credentials are stored securely in your system keychain.
+
+### 2. Start Tracking Experiments
+
+#### Option A: Use the Pre-configured Singleton (Easiest)
+
+```python
+from ml_dash import dxp
+
+# Start experiment (uploads to https://api.dash.ml by default)
+with dxp.run:
+    dxp.log().info("Training started")
+    dxp.params.set(learning_rate=0.001, batch_size=32)
+
+    for epoch in range(10):
+        loss = train_one_epoch()
+        dxp.metrics("loss").append(value=loss, epoch=epoch)
+```
+
+#### Option B: Create Your Own Experiment
 
 ```python
 from ml_dash import Experiment
@@ -48,13 +74,13 @@ from ml_dash import Experiment
 with Experiment(
     name="my-experiment",
     project="my-project",
-    remote="https://api.dash.ml",
-    api_key="your-jwt-token"
-) as experiment:
-    print(f"Experiment ID: {experiment.id}")
+    remote="https://api.dash.ml"  # token auto-loaded
+).run as experiment:
+    experiment.log().info("Hello!")
+    experiment.params.set(lr=0.001)
 ```
 
-### Local Mode (Filesystem)
+#### Option C: Local Mode (No Authentication Required)
 
 ```python
 from ml_dash import Experiment
@@ -63,11 +89,11 @@ with Experiment(
     name="my-experiment",
     project="my-project",
     local_path=".ml-dash"
-) as experiment:
-    pass  # Your code here
+).run as experiment:
+    experiment.log().info("Running locally")
 ```
 
-See [examples/](examples/) for more complete examples.
+See [docs/getting-started.md](docs/getting-started.md) for more examples.
 
 ## Development Setup
 
