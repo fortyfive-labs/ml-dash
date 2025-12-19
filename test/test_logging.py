@@ -451,3 +451,8 @@ class TestLogEdgeCases:
         with remote_experiment(name="rapid-log-remote", project="test").run as experiment:
             for i in range(100):
                 experiment.log(f"Rapid remote message {i}")
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

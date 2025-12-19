@@ -67,6 +67,83 @@ class RunManager:
         """Mark experiment as cancelled (status: CANCELLED)."""
         self._experiment._close(status="CANCELLED")
 
+    @property
+    def folder(self) -> Optional[str]:
+        """
+        Get the current folder for this experiment.
+
+        Returns:
+            Current folder path or None
+
+        Example:
+            current_folder = exp.run.folder
+        """
+        return self._experiment.folder
+
+    @folder.setter
+    def folder(self, value: Optional[str]) -> None:
+        """
+        Set the folder for this experiment before initialization.
+
+        This can ONLY be set before the experiment is started (initialized).
+        Once the experiment is opened, the folder cannot be changed.
+
+        Supports template variables:
+        - {RUN.name} - Experiment name
+        - {RUN.project} - Project name
+
+        Args:
+            value: Folder path with optional template variables
+                   (e.g., "experiments/{RUN.name}" or None)
+
+        Raises:
+            RuntimeError: If experiment is already initialized/open
+
+        Examples:
+            from ml_dash import dxp
+
+            # Static folder
+            dxp.run.folder = "experiments/vision/resnet"
+
+            # Template with experiment name
+            dxp.run.folder = "/iclr_2024/{RUN.name}"
+
+            # Template with multiple variables
+            dxp.run.folder = "{RUN.project}/experiments/{RUN.name}"
+
+            # Now start the experiment
+            with dxp.run:
+                dxp.params.set(lr=0.001)
+        """
+        if self._experiment._is_open:
+            raise RuntimeError(
+                "Cannot change folder after experiment is initialized. "
+                "Set folder before calling start() or entering 'with' block."
+            )
+
+        # Process template variables if present
+        if value and '{RUN.' in value:
+            # Generate unique run ID (timestamp-based)
+            from datetime import datetime
+            run_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+            # Simple string replacement for template variables
+            # Supports: {RUN.name}, {RUN.project}, {RUN.id}, {RUN.timestamp}
+            replacements = {
+                '{RUN.name}': f"{self._experiment.name}_{run_timestamp}",  # Unique name with timestamp
+                '{RUN.project}': self._experiment.project,
+                '{RUN.id}': run_timestamp,  # Just the timestamp
+                '{RUN.timestamp}': run_timestamp,  # Alias for id
+            }
+
+            # Replace all template variables
+            for template, replacement in replacements.items():
+                if template in value:
+                    value = value.replace(template, replacement)
+
+        # Update the folder on the experiment
+        self._experiment.folder = value
+
     def __enter__(self) -> "Experiment":
         """Context manager entry - starts the experiment."""
         return self.start()
@@ -105,7 +182,7 @@ class Experiment:
     experiment = Experiment(
         name="my-experiment",
         project="my-project",
-        remote="http://localhost:3000",
+        remote="https://api.dash.ml",
         api_key="your-jwt-token"
     )
 
@@ -154,7 +231,7 @@ class Experiment:
             bindrs: Optional list of bindrs
             folder: Optional folder path (e.g., "/experiments/baseline")
             metadata: Optional metadata dict
-            remote: Remote API URL (e.g., "http://localhost:3000")
+            remote: Remote API URL (e.g., "https://api.dash.ml")
             api_key: JWT token for authentication (auto-loaded from storage if not provided)
             local_path: Local storage root path (for local mode)
             _write_protected: Internal parameter - if True, experiment becomes immutable after creation
@@ -186,6 +263,7 @@ class Experiment:
         self._experiment_id: Optional[str] = None
         self._experiment_data: Optional[Dict[str, Any]] = None
         self._is_open = False
+        self._metrics_manager: Optional['MetricsManager'] = None  # Cached metrics manager
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
             # api_key can be None - RemoteClient will auto-load from storage
@@ -306,7 +384,12 @@ class Experiment:
             RuntimeError: If experiment is not open
         """
         if not self._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      dxp.params.set(lr=0.001)"
+            )
 
         return ParametersBuilder(self)
 
@@ -351,7 +434,12 @@ class Experiment:
             ValueError: If log level is invalid
         """
         if not self._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      dxp.log().info('Training started')"
+            )
 
         # Fluent mode: return LogBuilder
         if message is None:
@@ -380,7 +468,7 @@ class Experiment:
     ) -> None:
         """
         Internal method to write a log entry immediately.
-        No buffering - writes directly to storage/remote.
+        No buffering - writes directly to storage/remote AND stdout/stderr.
 
         Args:
             message: Log message
@@ -397,6 +485,9 @@ class Experiment:
         if metadata:
             log_entry["metadata"] = metadata
 
+        # Mirror to stdout/stderr before writing to storage
+        self._print_log(message, level, metadata)
+
         # Write immediately (no buffering)
         if self._client:
             # Remote mode: send to API (wrapped in array for batch API)
@@ -410,11 +501,49 @@ class Experiment:
             self._storage.write_log(
                 project=self.project,
                 experiment=self.name,
+                folder=self.folder,
                 message=log_entry["message"],
                 level=log_entry["level"],
                 metadata=log_entry.get("metadata"),
                 timestamp=log_entry["timestamp"]
             )
+
+    def _print_log(
+        self,
+        message: str,
+        level: str,
+        metadata: Optional[Dict[str, Any]]
+    ) -> None:
+        """
+        Print log to stdout or stderr based on level.
+
+        ERROR and FATAL go to stderr, all others go to stdout.
+
+        Args:
+            message: Log message
+            level: Log level
+            metadata: Optional metadata dict
+        """
+        import sys
+
+        # Format the log message
+        level_upper = level.upper()
+
+        # Build metadata string if present
+        metadata_str = ""
+        if metadata:
+            # Format metadata as key=value pairs
+            pairs = [f"{k}={v}" for k, v in metadata.items()]
+            metadata_str = f" [{', '.join(pairs)}]"
+
+        # Format: [LEVEL] message [key=value, ...]
+        formatted_message = f"[{level_upper}] {message}{metadata_str}"
+
+        # Route to stdout or stderr based on level
+        if level in ("error", "fatal"):
+            print(formatted_message, file=sys.stderr)
+        else:
+            print(formatted_message, file=sys.stdout)
 
     def files(self, **kwargs) -> FileBuilder:
         """
@@ -441,7 +570,12 @@ class Experiment:
             experiment.files(file_id="123").delete()
         """
         if not self._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      dxp.files().save()"
+            )
 
         return FileBuilder(self, **kwargs)
 
@@ -496,6 +630,7 @@ class Experiment:
             result = self._storage.write_file(
                 project=self.project,
                 experiment=self.name,
+                folder=self.folder,
                 file_path=file_path,
                 prefix=prefix,
                 filename=filename,
@@ -672,6 +807,7 @@ class Experiment:
             self._storage.write_parameters(
                 project=self.project,
                 experiment=self.name,
+                folder=self.folder,
                 data=flattened_params
             )
 
@@ -743,7 +879,10 @@ class Experiment:
                 "Use 'with Experiment(...).run as experiment:' or call experiment.run.start() first."
             )
 
-        return MetricsManager(self)
+        # Cache the MetricsManager instance to preserve MetricBuilder cache across calls
+        if self._metrics_manager is None:
+            self._metrics_manager = MetricsManager(self)
+        return self._metrics_manager
 
     def _append_to_metric(
         self,
@@ -784,6 +923,7 @@ class Experiment:
             result = self._storage.append_to_metric(
                 project=self.project,
                 experiment=self.name,
+                folder=self.folder,
                 metric_name=name,
                 data=data,
                 description=description,
@@ -955,7 +1095,7 @@ def ml_dash_experiment(
         @ml_dash_experiment(
             name="my-experiment",
             project="my-project",
-            remote="http://localhost:3000",
+            remote="https://api.dash.ml",
             api_key="your-token"
         )
         def train_model():

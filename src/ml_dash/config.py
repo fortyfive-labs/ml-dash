@@ -91,7 +91,7 @@ class Config:
     @property
     def remote_url(self) -> Optional[str]:
         """Get default remote URL."""
-        return self.get("remote_url")
+        return self.get("remote_url", "https://api.dash.ml")
 
     @remote_url.setter
     def remote_url(self, url: str):

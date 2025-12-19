@@ -208,7 +208,7 @@ def cmd_login(args) -> int:
             "You can now use ml-dash commands without --api-key.\n\n"
             "Examples:\n"
             "  ml-dash upload ./experiments\n"
-            "  ml-dash download --namespace user ./output\n"
+            "  ml-dash download ./output\n"
             "  ml-dash list"
         )
 

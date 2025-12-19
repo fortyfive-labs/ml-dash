@@ -20,7 +20,11 @@ class RemoteClient:
         Raises:
             AuthenticationError: If no api_key provided and no token found in storage
         """
-        self.base_url = base_url.rstrip("/")
+        # Store original base URL for GraphQL (no /api prefix)
+        self.graphql_base_url = base_url.rstrip("/")
+
+        # Add /api prefix to base URL for REST API calls
+        self.base_url = base_url.rstrip("/") + "/api"
 
         # If no api_key provided, try to load from storage
         if not api_key:
@@ -37,12 +41,23 @@ class RemoteClient:
                 )
 
         self.api_key = api_key
+
+        # REST API client (with /api prefix)
         self._client = httpx.Client(
             base_url=self.base_url,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 # Note: Don't set Content-Type here as default
                 # It will be set per-request (json or multipart)
+            },
+            timeout=30.0,
+        )
+
+        # GraphQL client (without /api prefix)
+        self._graphql_client = httpx.Client(
+            base_url=self.graphql_base_url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
             },
             timeout=30.0,
         )
@@ -614,7 +629,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
             Exception: If GraphQL returns errors
         """
-        response = self._client.post(
+        response = self._graphql_client.post(
             "/graphql",
             json={"query": query, "variables": variables or {}}
         )
@@ -626,12 +641,11 @@ class RemoteClient:
 
         return result.get("data", {})
 
-    def list_projects_graphql(self, namespace_slug: str) -> List[Dict[str, Any]]:
+    def list_projects_graphql(self) -> List[Dict[str, Any]]:
         """
-        List all projects in a namespace via GraphQL.
+        List all projects via GraphQL.
 
-        Args:
-            namespace_slug: Namespace slug
+        Namespace is automatically inferred from JWT token on the server.
 
         Returns:
             List of project dicts with experimentCount
@@ -640,8 +654,8 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Projects($namespaceSlug: String!) {
-          projects(namespaceSlug: $namespaceSlug) {
+        query Projects {
+          projects {
             id
             name
             slug
@@ -650,35 +664,33 @@ class RemoteClient:
           }
         }
         """
-        result = self.graphql_query(query, {"namespaceSlug": namespace_slug})
+        result = self.graphql_query(query, {})
         projects = result.get("projects", [])
 
         # For each project, count experiments
         for project in projects:
             exp_query = """
-            query ExperimentsCount($namespaceSlug: String!, $projectSlug: String!) {
-              experiments(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
+            query ExperimentsCount($projectSlug: String!) {
+              experiments(projectSlug: $projectSlug) {
                 id
               }
             }
             """
-            exp_result = self.graphql_query(exp_query, {
-                "namespaceSlug": namespace_slug,
-                "projectSlug": project['slug']
-            })
+            exp_result = self.graphql_query(exp_query, {"projectSlug": project['slug']})
             experiments = exp_result.get("experiments", [])
             project['experimentCount'] = len(experiments)
 
         return projects
 
     def list_experiments_graphql(
-        self, namespace_slug: str, project_slug: str, status: Optional[str] = None
+        self, project_slug: str, status: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         List experiments in a project via GraphQL.
 
+        Namespace is automatically inferred from JWT token on the server.
+
         Args:
-            namespace_slug: Namespace slug
             project_slug: Project slug
             status: Optional experiment status filter (RUNNING, COMPLETED, FAILED, CANCELLED)
 
@@ -689,8 +701,8 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Experiments($namespaceSlug: String!, $projectSlug: String!, $status: ExperimentStatus) {
-          experiments(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, status: $status) {
+        query Experiments($projectSlug: String!, $status: ExperimentStatus) {
+          experiments(projectSlug: $projectSlug, status: $status) {
             id
             name
             description
@@ -729,21 +741,22 @@ class RemoteClient:
           }
         }
         """
-        result = self.graphql_query(query, {
-            "namespaceSlug": namespace_slug,
-            "projectSlug": project_slug,
-            "status": status
-        })
+        variables = {"projectSlug": project_slug}
+        if status is not None:
+            variables["status"] = status
+
+        result = self.graphql_query(query, variables)
         return result.get("experiments", [])
 
     def get_experiment_graphql(
-        self, namespace_slug: str, project_slug: str, experiment_name: str
+        self, project_slug: str, experiment_name: str
     ) -> Optional[Dict[str, Any]]:
         """
         Get a single experiment via GraphQL.
 
+        Namespace is automatically inferred from JWT token on the server.
+
         Args:
-            namespace_slug: Namespace slug
             project_slug: Project slug
             experiment_name: Experiment name
 
@@ -754,8 +767,8 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Experiment($namespaceSlug: String!, $projectSlug: String!, $experimentName: String!) {
-          experiment(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, experimentName: $experimentName) {
+        query Experiment($projectSlug: String!, $experimentName: String!) {
+          experiment(projectSlug: $projectSlug, experimentName: $experimentName) {
             id
             name
             description
@@ -792,11 +805,12 @@ class RemoteClient:
           }
         }
         """
-        result = self.graphql_query(query, {
-            "namespaceSlug": namespace_slug,
+        variables = {
             "projectSlug": project_slug,
             "experimentName": experiment_name
-        })
+        }
+
+        result = self.graphql_query(query, variables)
         return result.get("experiment")
 
     def download_file_streaming(
@@ -960,8 +974,9 @@ class RemoteClient:
         return response.json()
 
     def close(self):
-        """Close the HTTP client."""
+        """Close the HTTP clients."""
         self._client.close()
+        self._graphql_client.close()
 
     def __enter__(self):
         """Context manager entry."""

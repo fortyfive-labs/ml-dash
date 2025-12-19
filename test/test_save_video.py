@@ -167,3 +167,8 @@ class TestVideoEdgeCases:
 
             assert result['filename'] == 'uint8.mp4'
             assert result['sizeBytes'] > 0
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

@@ -386,3 +386,8 @@ class TestParameterCombinations:
         assert params["experiment.name"] == "baseline"
         assert params["paths.data"] == "/data/train"
         assert params["hyperparameters.lr"] == 0.001
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

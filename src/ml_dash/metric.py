@@ -6,9 +6,163 @@ validation losses, system measurements, etc.
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from collections import defaultdict
+import statistics
 
 if TYPE_CHECKING:
     from .experiment import Experiment
+
+
+class SummaryCache:
+    """
+    Buffer for collecting metric values and computing statistics periodically.
+
+    Inspired by ml-logger's SummaryCache design:
+    - Lazy computation: Store raw values, compute stats on demand
+    - Hierarchical naming: Stats get suffixes (loss.mean, loss.std)
+    - Robust handling: Converts None → NaN, filters before stats
+    """
+
+    def __init__(self, metric_builder: 'MetricBuilder'):
+        """
+        Initialize SummaryCache.
+
+        Args:
+            metric_builder: Parent MetricBuilder instance
+        """
+        self._metric_builder = metric_builder
+        self._buffer: Dict[str, List[float]] = defaultdict(list)
+        self._metadata: Dict[str, Any] = {}  # For set() metadata
+
+    def store(self, **kwargs) -> None:
+        """
+        Store values in buffer without immediate logging (deferred computation).
+
+        Args:
+            **kwargs: Metric values to buffer (e.g., loss=0.5, accuracy=0.9)
+
+        Example:
+            cache.store(loss=0.5, accuracy=0.9)
+            cache.store(loss=0.48)  # Accumulates
+        """
+        for key, value in kwargs.items():
+            # Handle None values gracefully
+            if value is None:
+                value = float('nan')
+            try:
+                self._buffer[key].append(float(value))
+            except (TypeError, ValueError):
+                # Skip non-numeric values silently
+                continue
+
+    def set(self, **kwargs) -> None:
+        """
+        Set metadata values without aggregation (replaces previous values).
+
+        Used for contextual metadata like learning rate, epoch number, etc.
+        These values are included in the final data point when summarize() is called.
+
+        Args:
+            **kwargs: Metadata to set (e.g., lr=0.001, epoch=5)
+
+        Example:
+            cache.set(lr=0.001, epoch=5)
+            cache.set(lr=0.0005)  # Replaces lr, keeps epoch
+        """
+        self._metadata.update(kwargs)
+
+    def _compute_stats(self) -> Dict[str, float]:
+        """
+        Compute statistics from buffered values (idempotent, read-only).
+
+        Returns:
+            Dict with hierarchical metric names (key.mean, key.std, etc.)
+
+        Note: This is idempotent - can be called multiple times without side effects.
+        """
+        stats_data = {}
+
+        for key, values in self._buffer.items():
+            if not values:
+                continue
+
+            # Filter out NaN values (ml-logger pattern)
+            clean_values = [v for v in values if not (isinstance(v, float) and v != v)]
+
+            if not clean_values:
+                continue
+
+            # Compute statistics with hierarchical naming
+            stats_data[f"{key}.mean"] = statistics.mean(clean_values)
+            stats_data[f"{key}.min"] = min(clean_values)
+            stats_data[f"{key}.max"] = max(clean_values)
+            stats_data[f"{key}.count"] = len(clean_values)
+
+            # Std dev requires at least 2 values
+            if len(clean_values) >= 2:
+                stats_data[f"{key}.std"] = statistics.stdev(clean_values)
+            else:
+                stats_data[f"{key}.std"] = 0.0
+
+        return stats_data
+
+    def summarize(self, clear: bool = True) -> None:
+        """
+        Compute statistics from buffered values and log them (non-idempotent).
+
+        Args:
+            clear: If True (default), clear buffer after computing statistics.
+                  This creates a "rolling window" behavior matching ml-logger's "tiled" mode.
+
+        Example:
+            # After storing 10 loss values and setting lr=0.001:
+            cache.store(loss=0.5)
+            cache.set(lr=0.001, epoch=5)
+            cache.summarize()
+            # Logs: {lr: 0.001, epoch: 5, loss.mean: 0.5, loss.std: 0.0, ...}
+
+        Note: This is non-idempotent - calling it multiple times has side effects.
+        """
+        if not self._buffer and not self._metadata:
+            return
+
+        # Compute statistics (delegated to idempotent method)
+        stats_data = self._compute_stats()
+
+        # Merge metadata with statistics
+        output_data = {**self._metadata, **stats_data}
+
+        if not output_data:
+            return
+
+        # Append combined data as a single metric data point
+        self._metric_builder.append(**output_data)
+
+        # Clear buffer if requested (default behavior for "tiled" mode)
+        if clear:
+            self._buffer.clear()
+            self._metadata.clear()  # Also clear metadata
+
+    def peek(self, *keys: str, limit: int = 5) -> Dict[str, List[float]]:
+        """
+        Non-destructive inspection of buffered values (idempotent, read-only).
+
+        Args:
+            *keys: Optional specific keys to peek at. If empty, shows all.
+            limit: Number of most recent values to show (default 5)
+
+        Returns:
+            Dict of buffered values (truncated to last `limit` items)
+
+        Example:
+            cache.peek('loss', limit=3)  # {'loss': [0.5, 0.48, 0.52]}
+        """
+        keys_to_show = keys if keys else self._buffer.keys()
+        return {
+            k: self._buffer[k][-limit:] if limit else self._buffer[k]
+            for k in keys_to_show
+            if k in self._buffer and self._buffer[k]
+        }
 
 
 class MetricsManager:
@@ -39,11 +193,12 @@ class MetricsManager:
             experiment: Parent Experiment instance
         """
         self._experiment = experiment
+        self._metric_builders: Dict[str, 'MetricBuilder'] = {}  # Cache for MetricBuilder instances
 
     def __call__(self, name: str, description: Optional[str] = None,
                  tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None) -> 'MetricBuilder':
         """
-        Get a MetricBuilder for a specific metric name.
+        Get a MetricBuilder for a specific metric name (cached for reuse).
 
         Args:
             name: Metric name (unique within experiment)
@@ -52,12 +207,20 @@ class MetricsManager:
             metadata: Optional structured metadata
 
         Returns:
-            MetricBuilder instance for the named metric
+            MetricBuilder instance for the named metric (same instance on repeated calls)
 
         Examples:
             experiment.metrics("loss").append(value=0.5, step=1)
+
+        Note:
+            MetricBuilder instances are cached by name, so repeated calls with the
+            same name return the same instance. This ensures summary_cache works
+            correctly when called multiple times within a loop.
         """
-        return MetricBuilder(self._experiment, name, description, tags, metadata)
+        # Cache key includes name only (description/tags/metadata are set once on first call)
+        if name not in self._metric_builders:
+            self._metric_builders[name] = MetricBuilder(self._experiment, name, description, tags, metadata)
+        return self._metric_builders[name]
 
     def append(self, name: Optional[str] = None, data: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """
@@ -157,6 +320,7 @@ class MetricBuilder:
         self._description = description
         self._tags = tags
         self._metadata = metadata
+        self._summary_cache = None  # Lazy initialization
 
     def append(self, **kwargs) -> 'MetricBuilder':
         """
@@ -290,3 +454,28 @@ class MetricBuilder:
                 print(f"{metric['name']}: {metric['totalDataPoints']} points")
         """
         return self._experiment._list_metrics()
+
+    @property
+    def summary_cache(self) -> SummaryCache:
+        """
+        Get summary cache for this metric (lazy initialization).
+
+        The summary cache allows buffering values and computing statistics
+        periodically, which is much more efficient than logging every value.
+
+        Returns:
+            SummaryCache instance for this metric
+
+        Example:
+            metric = experiment.metrics("train")
+            # Store values every batch
+            metric.summary_cache.store(loss=0.5)
+            metric.summary_cache.store(loss=0.48)
+            # Set metadata
+            metric.summary_cache.set(lr=0.001, epoch=1)
+            # Compute stats and log periodically
+            metric.summary_cache.summarize()
+        """
+        if self._summary_cache is None:
+            self._summary_cache = SummaryCache(self)
+        return self._summary_cache

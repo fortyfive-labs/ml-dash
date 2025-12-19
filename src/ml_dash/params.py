@@ -6,6 +6,7 @@ Nested dicts are flattened to dot-notation: {"model": {"lr": 0.001}} → {"model
 """
 
 from typing import Dict, Any, Optional, TYPE_CHECKING
+import inspect
 
 if TYPE_CHECKING:
     from .experiment import Experiment
@@ -62,13 +63,21 @@ class ParametersBuilder:
             experiment.parameters().set(**{"model.lr": 0.001, "model.batch_size": 32})
         """
         if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      dxp.params.set(lr=0.001)"
+            )
 
         if self._experiment._write_protected:
             raise RuntimeError("Experiment is write-protected and cannot be modified.")
 
+        # Convert class objects to dicts (for params_proto support)
+        processed_kwargs = self._process_class_objects(kwargs)
+
         # Flatten the kwargs
-        flattened = self.flatten_dict(kwargs)
+        flattened = self.flatten_dict(processed_kwargs)
 
         if not flattened:
             # No parameters to set, just return
@@ -78,6 +87,43 @@ class ParametersBuilder:
         self._experiment._write_params(flattened)
 
         return self
+
+    def log(self, **kwargs) -> 'ParametersBuilder':
+        """
+        Alias for set(). Sets/merges parameters.
+
+        This method exists for better parameter organization and semantic clarity.
+        It behaves exactly the same as set().
+
+        Nested dicts are automatically flattened:
+            log(model={"lr": 0.001, "batch_size": 32})
+            → {"model.lr": 0.001, "model.batch_size": 32}
+
+        Args:
+            **kwargs: Parameters to set (can be nested dicts)
+
+        Returns:
+            Self for potential chaining
+
+        Raises:
+            RuntimeError: If experiment is not open
+            RuntimeError: If experiment is write-protected
+
+        Examples:
+            # Set parameters using log() - same as set()
+            experiment.params.log(
+                learning_rate=0.001,
+                batch_size=32,
+                model="resnet50"
+            )
+
+            # Track parameter changes during training
+            for epoch in range(10):
+                if epoch == 5:
+                    experiment.params.log(learning_rate=0.0001)  # Log LR decay
+        """
+        # Just call set() - they behave exactly the same
+        return self.set(**kwargs)
 
     def get(self, flatten: bool = True) -> Dict[str, Any]:
         """
@@ -103,7 +149,12 @@ class ParametersBuilder:
             # → {"model": {"lr": 0.001, "batch_size": 32}, "optimizer": "adam"}
         """
         if not self._experiment._is_open:
-            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+            raise RuntimeError(
+                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+                "Example:\n"
+                "  with dxp.run:\n"
+                "      dxp.params.get()"
+            )
 
         # Read parameters through experiment
         params = self._experiment._read_params()
@@ -185,4 +236,42 @@ class ParametersBuilder:
             # Set the final value
             current[parts[-1]] = value
 
+        return result
+
+    @staticmethod
+    def _process_class_objects(d: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert class objects to dicts by extracting their attributes.
+
+        This enables passing configuration classes directly:
+            dxp.params.log(Args=Args)  # Args is a class
+            → {"Args": {"batch_size": 64, "lr": 0.001, ...}}
+
+        Args:
+            d: Dictionary that may contain class objects as values
+
+        Returns:
+            Dictionary with class objects converted to attribute dicts
+
+        Examples:
+            >>> class Args:
+            ...     batch_size = 64
+            ...     lr = 0.001
+            >>> _process_class_objects({"Args": Args})
+            {"Args": {"batch_size": 64, "lr": 0.001}}
+        """
+        result = {}
+        for key, value in d.items():
+            if inspect.isclass(value):
+                # Extract class attributes (skip private/magic and callables)
+                attrs = {}
+                for attr_name, attr_value in vars(value).items():
+                    if not attr_name.startswith('_') and not callable(attr_value):
+                        # Recursively handle nested types
+                        if isinstance(attr_value, type):
+                            continue  # Skip type annotations
+                        attrs[attr_name] = attr_value
+                result[key] = attrs
+            else:
+                result[key] = value
         return result

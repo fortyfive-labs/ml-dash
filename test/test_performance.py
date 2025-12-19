@@ -268,3 +268,8 @@ class TestMetricReadPerformance:
 
         # Verify total data points (after context closes)
         assert int(stats["totalDataPoints"]) == total_metrics
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

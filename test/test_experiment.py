@@ -25,7 +25,8 @@ class TestExperimentCreation:
         """Test experiment creation using context manager in remote mode."""
         with remote_experiment(name="test-ctx-remote", project="test-ws-remote").run as experiment:
             assert experiment._is_open
-            assert experiment.name == "test-ctx-remote"
+            # Name has timestamp suffix for uniqueness
+            assert experiment.name.startswith("test-ctx-remote-")
             assert experiment.project == "test-ws-remote"
             experiment.log("Test message from remote")
 
@@ -77,7 +78,8 @@ class TestExperimentCreation:
             experiment.log("Experiment with metadata")
 
         # Verify metadata
-        experiment_file = temp_project / "meta-ws" / "meta-experiment" / "experiment.json"
+        # When folder is set, files go to: root_path / folder / project / experiment
+        experiment_file = temp_project / "experiments" / "meta" / "meta-ws" / "meta-experiment" / "experiment.json"
         assert experiment_file.exists()
 
         with open(experiment_file) as f:
@@ -117,7 +119,8 @@ class TestExperimentProperties:
     def test_experiment_properties_remote(self, remote_experiment):
         """Test accessing experiment properties in remote mode."""
         with remote_experiment(name="props-test-remote", project="props-ws-remote").run as experiment:
-            assert experiment.name == "props-test-remote"
+            # Name has timestamp suffix for uniqueness
+            assert experiment.name.startswith("props-test-remote-")
             assert experiment.project == "props-ws-remote"
             assert experiment._is_open
 
@@ -318,7 +321,8 @@ class TestExperimentEdgeCases:
         ).run as experiment:
             experiment.log("Deeply nested experiment")
 
-        experiment_file = temp_project / "nested-ws" / "nested-experiment" / "experiment.json"
+        # When folder is set, files go to: root_path / folder / project / experiment
+        experiment_file = temp_project / "a" / "b" / "c" / "d" / "e" / "f" / "g" / "h" / "nested-ws" / "nested-experiment" / "experiment.json"
         with open(experiment_file) as f:
             metadata = json.load(f)
             assert metadata["folder"] == "/a/b/c/d/e/f/g/h"
@@ -351,3 +355,8 @@ class TestExperimentEdgeCases:
         experiment = local_experiment(name="not-opened", project="test-ws")
         # Attempting operations before opening should handle gracefully
         # The actual behavior depends on implementation
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

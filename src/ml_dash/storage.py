@@ -189,9 +189,10 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        message: str,
-        level: str,
-        timestamp: str,
+        folder: Optional[str] = None,
+        message: str = "",
+        level: str = "info",
+        timestamp: str = "",
         metadata: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -200,12 +201,13 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
+            folder: Optional folder path
             message: Log message
             level: Log level
             timestamp: ISO timestamp string
             metadata: Optional metadata
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(project, experiment, folder)
         logs_dir = experiment_dir / "logs"
         logs_file = logs_dir / "logs.jsonl"
         seq_file = logs_dir / ".log_sequence"
@@ -269,7 +271,8 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        data: Dict[str, Any],
+        folder: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
     ):
         """
         Write/merge parameters. Always merges with existing parameters.
@@ -284,9 +287,12 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
+            folder: Optional folder path
             data: Flattened parameter dict with dot notation (already flattened)
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        if data is None:
+            data = {}
+        experiment_dir = self._get_experiment_dir(project, experiment, folder)
         params_file = experiment_dir / "parameters.json"
 
         # File-based lock for concurrent parameter writes (prevents data loss and version conflicts)
@@ -366,15 +372,16 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        file_path: str,
-        prefix: str,
-        filename: str,
-        description: Optional[str],
-        tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]],
-        checksum: str,
-        content_type: str,
-        size_bytes: int
+        folder: Optional[str] = None,
+        file_path: str = "",
+        prefix: str = "",
+        filename: str = "",
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        checksum: str = "",
+        content_type: str = "",
+        size_bytes: int = 0
     ) -> Dict[str, Any]:
         """
         Write file to local storage.
@@ -385,6 +392,7 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
+            folder: Optional folder path
             file_path: Source file path
             prefix: Logical path prefix
             filename: Original filename
@@ -401,7 +409,7 @@ class LocalStorage:
         import shutil
         from .files import generate_snowflake_id
 
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(project, experiment, folder)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
@@ -774,8 +782,9 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        metric_name: Optional[str],
-        data: Dict[str, Any],
+        folder: Optional[str] = None,
+        metric_name: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None
@@ -791,6 +800,7 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
+            folder: Optional folder path
             metric_name: Metric name (None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
@@ -800,7 +810,9 @@ class LocalStorage:
         Returns:
             Dict with metricId, index, bufferedDataPoints, chunkSize
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        if data is None:
+            data = {}
+        experiment_dir = self._get_experiment_dir(project, experiment, folder)
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 

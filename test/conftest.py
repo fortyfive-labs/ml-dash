@@ -18,15 +18,17 @@ TEST_USERNAME = "test-user"
 
 # Generate test JWT token for remote experiments
 def _generate_test_api_key():
-    """Generate a test JWT token for testing."""
-    import time
+    """Generate a test JWT token for testing using OIDC standard claims."""
     import jwt
 
+    # Use OIDC standard claims matching vuer-auth token format
     payload = {
-        "userId": "1234567890",
-        "userName": TEST_USERNAME,
-        "iat": int(time.time()),
-        "exp": int(time.time()) + (30 * 24 * 60 * 60)  # 30 days
+        "sub": "test-user-id-12345",
+        "email": "test@example.com",
+        "name": "Test User",
+        "username": TEST_USERNAME,
+        "given_name": "Test",
+        "family_name": "User",
     }
 
     # Test secret key (matches server test configuration)
@@ -72,14 +74,23 @@ def remote_experiment():
     Returns a function that creates remote experiments with localhost:3000.
     Use the @pytest.mark.remote marker for tests that require a running server.
     Uses a pre-generated test JWT token for authentication.
+
+    Generates unique experiment names using timestamps to avoid collisions between test runs.
     """
+    import time
+
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
+        # Add timestamp suffix to experiment name to make it unique
+        # This prevents collisions from previous test runs
+        timestamp_suffix = str(int(time.time() * 1000000))  # microsecond precision
+        unique_name = f"{name}-{timestamp_suffix}"
+
         defaults = {
             "remote": REMOTE_SERVER_URL,
             "api_key": TEST_API_KEY,
         }
         defaults.update(kwargs)
-        return Experiment(name=name, project=project, **defaults)
+        return Experiment(name=unique_name, project=project, **defaults)
 
     return _create_experiment
 

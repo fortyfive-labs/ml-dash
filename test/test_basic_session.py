@@ -1,6 +1,7 @@
 """Tests for basic experiment operations."""
 import json
 from pathlib import Path
+import pytest
 
 
 def test_experiment_creation_with_context_manager(local_experiment, temp_project):
@@ -27,7 +28,8 @@ def test_experiment_with_metadata(local_experiment, temp_project):
         experiment.log("Experiment created with metadata")
 
     # Verify metadata was saved
-    experiment_dir = temp_project / "computer-vision" / "mnist-baseline"
+    # When folder is set, files go to: root_path / folder / project / experiment
+    experiment_dir = temp_project / "experiments" / "mnist" / "computer-vision" / "mnist-baseline"
     experiment_file = experiment_dir / "experiment.json"
 
     assert experiment_file.exists()
@@ -112,3 +114,8 @@ def test_experiment_error_handling(local_experiment, temp_project):
     assert experiment_dir.exists()
     assert (experiment_dir / "logs" / "logs.jsonl").exists()
     assert (experiment_dir / "parameters.json").exists()
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

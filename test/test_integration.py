@@ -66,7 +66,8 @@ class TestCompleteWorkflows:
             experiment.log("Experiment completed successfully", level="info")
 
         # Verify everything was created
-        experiment_dir = temp_project / "experiments" / "ml-experiment"
+        # When folder is set, files go to: root_path / folder / project / experiment
+        experiment_dir = temp_project / "experiments" / "2024" / "experiments" / "ml-experiment"
         assert (experiment_dir / "experiment.json").exists()
         assert (experiment_dir / "parameters.json").exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
@@ -262,10 +263,10 @@ class TestMultiExperimentPipeline:
             experiment.log("Evaluation complete", level="info")
 
         # Verify all stages
-        project_dir = temp_project / "pipeline"
-        assert (project_dir / "01-preprocessing").exists()
-        assert (project_dir / "02-training").exists()
-        assert (project_dir / "03-evaluation").exists()
+        # When folder is set, files go to: root_path / folder / project / experiment
+        assert (temp_project / "pipeline" / "stage-1" / "pipeline" / "01-preprocessing").exists()
+        assert (temp_project / "pipeline" / "stage-2" / "pipeline" / "02-training").exists()
+        assert (temp_project / "pipeline" / "stage-3" / "pipeline" / "03-evaluation").exists()
 
     @pytest.mark.remote
     def test_pipeline_remote(self, remote_experiment, sample_files):
@@ -396,7 +397,8 @@ class TestAllFeaturesCombined:
             experiment.log("Comprehensive test complete", level="info")
 
         # Verify everything exists
-        experiment_dir = temp_project / "full-test" / "kitchen-sink"
+        # When folder is set, files go to: root_path / folder / project / experiment
+        experiment_dir = temp_project / "tests" / "comprehensive" / "full-test" / "kitchen-sink"
         assert (experiment_dir / "experiment.json").exists()
         assert (experiment_dir / "parameters.json").exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
@@ -507,3 +509,8 @@ class TestRealWorldScenarios:
                     experiment.log(f"Progress: {step}/100 steps", metadata={"step": step})
 
             experiment.log("Long-running experiment complete")
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

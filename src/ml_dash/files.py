@@ -607,6 +607,103 @@ class FileBuilder:
             except Exception:
                 pass
 
+    def duplicate(self, source: Union[str, Dict[str, Any]], to: str) -> Dict[str, Any]:
+        """
+        Duplicate an existing file to a new path within the same experiment.
+
+        Useful for checkpoint rotation patterns where you save versioned checkpoints
+        and maintain a "latest" or "best" pointer.
+
+        Args:
+            source: Source file - either file ID (str) or metadata dict with 'id' key
+            to: Target path like "models/latest.pt" or "/checkpoints/best.pt"
+
+        Returns:
+            File metadata dict for the duplicated file with id, path, filename, checksum, etc.
+
+        Raises:
+            RuntimeError: If experiment is not open or write-protected
+            ValueError: If source file not found or target path invalid
+
+        Examples:
+            # Using file ID
+            dxp.files().duplicate("file-id-123", to="models/latest.pt")
+
+            # Using metadata dict from save_torch
+            snapshot = dxp.files(prefix="/models").save_torch(model, f"model_{epoch:05d}.pt")
+            dxp.files().duplicate(snapshot, to="models/latest.pt")
+
+            # Checkpoint rotation pattern
+            snap = dxp.files(prefix="/checkpoints").save_torch(model, f"model_{epoch:05d}.pt")
+            dxp.files().duplicate(snap, to="checkpoints/best.pt")
+        """
+        import tempfile
+        import os
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.run.start() or context manager.")
+
+        if self._experiment._write_protected:
+            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+
+        # Extract source file ID
+        if isinstance(source, str):
+            source_id = source
+        elif isinstance(source, dict) and 'id' in source:
+            source_id = source['id']
+        else:
+            raise ValueError("source must be a file ID (str) or metadata dict with 'id' key")
+
+        if not source_id:
+            raise ValueError("Invalid source: file ID is empty")
+
+        # Parse target path into prefix and filename
+        to = to.lstrip('/')
+        if '/' in to:
+            target_prefix, target_filename = to.rsplit('/', 1)
+            target_prefix = '/' + target_prefix
+        else:
+            target_prefix = '/'
+            target_filename = to
+
+        if not target_filename:
+            raise ValueError(f"Invalid target path '{to}': must include filename")
+
+        # Download source file to temp location
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, target_filename)
+
+        try:
+            # Download the source file
+            downloaded_path = self._experiment._download_file(
+                file_id=source_id,
+                dest_path=temp_path
+            )
+
+            # Save to new location using existing save() method
+            original_file_path = self._file_path
+            original_prefix = self._prefix
+
+            self._file_path = downloaded_path
+            self._prefix = target_prefix
+
+            # Upload and get result
+            result = self.save()
+
+            # Restore original values
+            self._file_path = original_file_path
+            self._prefix = original_prefix
+
+            return result
+        finally:
+            # Clean up temp file and directory
+            try:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
 
 def compute_sha256(file_path: str) -> str:
     """

@@ -157,7 +157,7 @@ def test_dxp_works_like_normal_experiment():
     assert hasattr(dxp, 'params')
     assert hasattr(dxp, 'log')
     assert hasattr(dxp, 'metrics')
-    assert hasattr(dxp, 'file')
+    assert hasattr(dxp, 'files')
 
     # Should be able to use all methods
     dxp.log("Test log")
@@ -181,3 +181,8 @@ def test_dxp_immutable_config():
 
     # The experiment is already started, so it uses local storage
     assert dxp._storage is not None
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

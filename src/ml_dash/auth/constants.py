@@ -1,7 +1,7 @@
 """Authentication constants for ml-dash."""
 
-# Hardcoded vuer-auth server URL
-VUER_AUTH_URL = "https://auth.ml-dash.com"
+# Vuer-auth server URL
+VUER_AUTH_URL = "https://auth.vuer.ai"
 
 # OAuth client ID for ml-dash
 CLIENT_ID = "ml-dash-client"

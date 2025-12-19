@@ -110,3 +110,8 @@ class TestOptionalMetricName:
             # Verify it went to "None" metric (converted to string by server)
             stats = experiment.metrics(None).stats()
             assert stats["name"] == "None"
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

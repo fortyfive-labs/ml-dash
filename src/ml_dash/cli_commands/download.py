@@ -52,7 +52,6 @@ class DownloadState:
     """State for resuming interrupted downloads."""
     remote_url: str
     local_path: str
-    namespace: str
     completed_experiments: List[str] = field(default_factory=list)
     failed_experiments: List[str] = field(default_factory=list)
     in_progress_experiment: Optional[str] = None
@@ -141,7 +140,6 @@ def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
 
 def discover_experiments(
     remote_client: RemoteClient,
-    namespace: str,
     project_filter: Optional[str] = None,
     experiment_filter: Optional[str] = None,
 ) -> List[ExperimentInfo]:
@@ -150,7 +148,6 @@ def discover_experiments(
 
     Args:
         remote_client: Remote API client
-        namespace: Namespace slug
         project_filter: Optional project slug filter
         experiment_filter: Optional experiment name filter
 
@@ -159,21 +156,21 @@ def discover_experiments(
     """
     # Specific experiment requested
     if project_filter and experiment_filter:
-        exp_data = remote_client.get_experiment_graphql(namespace, project_filter, experiment_filter)
+        exp_data = remote_client.get_experiment_graphql(project_filter, experiment_filter)
         if exp_data:
             return [_experiment_from_graphql(exp_data)]
         return []
 
     # Project filter - get all experiments in project
     if project_filter:
-        experiments_data = remote_client.list_experiments_graphql(namespace, project_filter)
+        experiments_data = remote_client.list_experiments_graphql(project_filter)
         return [_experiment_from_graphql(exp) for exp in experiments_data]
 
     # No filter - get all projects and their experiments
-    projects = remote_client.list_projects_graphql(namespace)
+    projects = remote_client.list_projects_graphql()
     all_experiments = []
     for project in projects:
-        experiments_data = remote_client.list_experiments_graphql(namespace, project['slug'])
+        experiments_data = remote_client.list_experiments_graphql(project['slug'])
         all_experiments.extend([_experiment_from_graphql(exp) for exp in experiments_data])
 
     return all_experiments
@@ -566,7 +563,6 @@ def cmd_download(args: argparse.Namespace) -> int:
     config = Config()
     remote_url = args.remote or config.remote_url
     api_key = args.api_key or config.api_key  # RemoteClient will auto-load if None
-    namespace = args.namespace
 
     # Validate inputs
     if not remote_url:
@@ -587,21 +583,19 @@ def cmd_download(args: argparse.Namespace) -> int:
             console.print("[yellow]No previous state found, starting fresh[/yellow]")
             state = DownloadState(
                 remote_url=remote_url,
-                local_path=str(args.path),
-                namespace=namespace
+                local_path=str(args.path)
             )
     else:
         state = DownloadState(
             remote_url=remote_url,
-            local_path=str(args.path),
-            namespace=namespace
+            local_path=str(args.path)
         )
 
     # Discover experiments
     console.print("[bold]Discovering experiments on remote server...[/bold]")
     try:
         experiments = discover_experiments(
-            remote_client, namespace, args.project, args.experiment
+            remote_client, args.project, args.experiment
         )
     except Exception as e:
         console.print(f"[red]Failed to discover experiments: {e}[/red]")
@@ -736,7 +730,6 @@ def add_parser(subparsers):
     # Scope control
     parser.add_argument("--project", help="Download only this project")
     parser.add_argument("--experiment", help="Download specific experiment (requires --project)")
-    parser.add_argument("--namespace", required=True, help="Namespace slug to download from")
 
     # Data filtering
     parser.add_argument("--skip-logs", action="store_true", help="Don't download logs")

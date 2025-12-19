@@ -1,33 +1,56 @@
 """
-Auto-start module for ML-Dash SDK.
+Pre-configured experiment singleton for ML-Dash SDK.
 
-Provides a pre-configured, auto-started experiment singleton named 'dxp'.
+Provides a pre-configured experiment singleton named 'dxp' in remote mode.
+Requires authentication - run 'ml-dash login' first.
+Requires manual start using 'with' statement or explicit start() call.
 
 Usage:
-    from ml_dash.auto_start import dxp
+    # First, authenticate
+    # $ ml-dash login
 
-    # Ready to use immediately - no need to open/start
-    dxp.log("Hello from dxp!")
-    dxp.params.set(lr=0.001)
-    dxp.metrics("loss").append(step=0, value=0.5)
+    from ml_dash import dxp
 
-    # Automatically closed on Python exit
+    # Use with statement (recommended)
+    with dxp.run:
+        dxp.log().info("Hello from dxp!")
+        dxp.params.set(lr=0.001)
+        dxp.metrics("loss").append(step=0, value=0.5)
+    # Automatically completes on exit from with block
+
+    # Or start/complete manually
+    dxp.run.start()
+    dxp.log().info("Training...")
+    dxp.run.complete()
 """
 
 import atexit
 from .experiment import Experiment
+from .auth.token_storage import get_token_storage
+from .auth.exceptions import AuthenticationError
 
-# Create pre-configured singleton experiment
+# Check if user is authenticated
+_storage = get_token_storage()
+_token = _storage.load("ml-dash-token")
+
+if not _token:
+    raise AuthenticationError(
+        "Not authenticated. Please run 'ml-dash login' to authenticate before using dxp.\n\n"
+        "To login:\n"
+        "  ml-dash login\n\n"
+        "Or use Experiment() with explicit api_key parameter."
+    )
+
+# Create pre-configured singleton experiment in remote mode
+# Uses default remote server (https://api.dash.ml)
+# Token is auto-loaded from storage
 dxp = Experiment(
     name="dxp",
     project="scratch",
-    local_path=".ml-dash"
+    remote="https://api.dash.ml",
 )
 
-# Auto-start the experiment on import
-dxp.run.start()
-
-# Register cleanup handler to complete experiment on Python exit
+# Register cleanup handler to complete experiment on Python exit (if still open)
 def _cleanup():
     """Complete the dxp experiment on exit if still open."""
     if dxp._is_open:

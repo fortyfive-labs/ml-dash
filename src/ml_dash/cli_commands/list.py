@@ -58,7 +58,6 @@ def _get_status_style(status: str) -> str:
 
 def list_projects(
     remote_client: RemoteClient,
-    namespace: str,
     output_json: bool = False,
     verbose: bool = False
 ) -> int:
@@ -67,7 +66,6 @@ def list_projects(
 
     Args:
         remote_client: Remote API client
-        namespace: Namespace slug
         output_json: Output as JSON
         verbose: Show verbose output
 
@@ -76,12 +74,11 @@ def list_projects(
     """
     try:
         # Get projects via GraphQL
-        projects = remote_client.list_projects_graphql(namespace)
+        projects = remote_client.list_projects_graphql()
 
         if output_json:
             # JSON output
             output = {
-                "namespace": namespace,
                 "projects": projects,
                 "count": len(projects)
             }
@@ -90,10 +87,10 @@ def list_projects(
 
         # Human-readable output
         if not projects:
-            console.print(f"[yellow]No projects found for namespace: {namespace}[/yellow]")
+            console.print(f"[yellow]No projects found[/yellow]")
             return 0
 
-        console.print(f"\n[bold]Projects for {namespace}[/bold]\n")
+        console.print(f"\n[bold]Projects[/bold]\n")
 
         # Create table
         table = Table(box=box.ROUNDED)
@@ -128,7 +125,6 @@ def list_projects(
 
 def list_experiments(
     remote_client: RemoteClient,
-    namespace: str,
     project: str,
     status_filter: Optional[str] = None,
     tags_filter: Optional[List[str]] = None,
@@ -141,7 +137,6 @@ def list_experiments(
 
     Args:
         remote_client: Remote API client
-        namespace: Namespace slug
         project: Project slug
         status_filter: Filter by status (COMPLETED, RUNNING, FAILED, ARCHIVED)
         tags_filter: Filter by tags
@@ -155,7 +150,7 @@ def list_experiments(
     try:
         # Get experiments via GraphQL
         experiments = remote_client.list_experiments_graphql(
-            namespace, project, status=status_filter
+            project, status=status_filter
         )
 
         # Filter by tags if specified
@@ -168,7 +163,6 @@ def list_experiments(
         if output_json:
             # JSON output
             output = {
-                "namespace": namespace,
                 "project": project,
                 "experiments": experiments,
                 "count": len(experiments)
@@ -266,12 +260,6 @@ def cmd_list(args: argparse.Namespace) -> int:
     # Get API key (command line > config > auto-loaded from storage)
     api_key = args.api_key or config.api_key
 
-    # Get namespace (required)
-    namespace = args.namespace
-    if not namespace:
-        console.print("[red]Error:[/red] --namespace is required")
-        return 1
-
     # Create remote client
     try:
         remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
@@ -288,7 +276,6 @@ def cmd_list(args: argparse.Namespace) -> int:
 
         return list_experiments(
             remote_client=remote_client,
-            namespace=namespace,
             project=args.project,
             status_filter=args.status,
             tags_filter=tags_filter,
@@ -299,7 +286,6 @@ def cmd_list(args: argparse.Namespace) -> int:
     else:
         return list_projects(
             remote_client=remote_client,
-            namespace=namespace,
             output_json=args.json,
             verbose=args.verbose
         )
@@ -320,13 +306,6 @@ def add_parser(subparsers) -> None:
         type=str,
         help="JWT authentication token (auto-loaded from storage if not provided)"
     )
-    parser.add_argument(
-        "--namespace",
-        type=str,
-        required=True,
-        help="Namespace slug to query"
-    )
-
     # Filtering options
     parser.add_argument("--project", type=str, help="List experiments in this project")
     parser.add_argument("--status", type=str,

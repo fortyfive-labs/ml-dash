@@ -389,3 +389,8 @@ class TestMetricEdgeCases:
         assert len(data_points) == 3
         assert data_points[0]["data"]["value"] == 1.0
         assert data_points[2]["data"]["value"] == 0.8
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

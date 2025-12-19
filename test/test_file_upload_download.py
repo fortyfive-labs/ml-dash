@@ -453,3 +453,8 @@ class TestFileUploadDownloadEdgeCases:
 
         # Verify size
         assert Path(downloaded).stat().st_size == 1024 * 100
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

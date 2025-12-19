@@ -16,6 +16,7 @@ from ml_dash.cli_commands.upload import (
 )
 from ml_dash.storage import LocalStorage
 from ml_dash.client import RemoteClient
+from conftest import TEST_API_KEY  # Import the test API key
 
 
 class TestExperimentDiscovery:
@@ -311,7 +312,7 @@ class TestUploadIntegration:
         args = argparse.Namespace(
             path=str(local_path),
             remote="http://localhost:3000",
-            api_key=None,
+            api_key=TEST_API_KEY,  # Use test API key for authentication
             user_name="test-cli-user",
             project=None,
             experiment=None,
@@ -409,7 +410,7 @@ class TestUploadIntegration:
         args = argparse.Namespace(
             path=str(local_path),
             remote="http://localhost:3000",
-            api_key=None,
+            api_key=TEST_API_KEY,  # Use test API key for authentication
             user_name="test-cli-user",
             project=None,
             experiment=None,
@@ -454,7 +455,7 @@ class TestUploadIntegration:
         args = argparse.Namespace(
             path=str(local_path),
             remote="http://localhost:3000",
-            api_key=None,
+            api_key=TEST_API_KEY,  # Use test API key for authentication
             user_name="test-cli-user",
             project=None,
             experiment=None,
@@ -600,3 +601,8 @@ class TestCLIErrors:
 
         result = cmd_upload(args)
         assert result == 1  # Error
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))

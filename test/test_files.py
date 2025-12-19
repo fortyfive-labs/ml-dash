@@ -388,3 +388,8 @@ class TestFileOrganization:
         assert "/models/v1" in versions
         assert "/models/v2" in versions
         assert "/models/v3" in versions
+
+if __name__ == "__main__":
+    """Run all tests with pytest."""
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))
