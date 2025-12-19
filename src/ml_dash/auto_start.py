@@ -26,24 +26,11 @@ Usage:
 
 import atexit
 from .experiment import Experiment
-from .auth.token_storage import get_token_storage
-from .auth.exceptions import AuthenticationError
-
-# Check if user is authenticated
-_storage = get_token_storage()
-_token = _storage.load("ml-dash-token")
-
-if not _token:
-    raise AuthenticationError(
-        "Not authenticated. Please run 'ml-dash login' to authenticate before using dxp.\n\n"
-        "To login:\n"
-        "  ml-dash login\n\n"
-        "Or use Experiment() with explicit api_key parameter."
-    )
 
 # Create pre-configured singleton experiment in remote mode
 # Uses default remote server (https://api.dash.ml)
-# Token is auto-loaded from storage
+# Token is auto-loaded from storage when first used
+# If not authenticated, operations will fail with AuthenticationError
 dxp = Experiment(
     name="dxp",
     project="scratch",

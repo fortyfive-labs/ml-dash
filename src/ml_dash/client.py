@@ -17,8 +17,9 @@ class RemoteClient:
             base_url: Base URL of ML-Dash server (e.g., "http://localhost:3000")
             api_key: JWT token for authentication (optional - auto-loads from storage if not provided)
 
-        Raises:
-            AuthenticationError: If no api_key provided and no token found in storage
+        Note:
+            If no api_key is provided, token will be loaded from storage on first API call.
+            If still not found, AuthenticationError will be raised at that time.
         """
         # Store original base URL for GraphQL (no /api prefix)
         self.graphql_base_url = base_url.rstrip("/")
@@ -29,38 +30,52 @@ class RemoteClient:
         # If no api_key provided, try to load from storage
         if not api_key:
             from .auth.token_storage import get_token_storage
-            from .auth.exceptions import AuthenticationError
 
             storage = get_token_storage()
             api_key = storage.load("ml-dash-token")
 
-            if not api_key:
-                raise AuthenticationError(
-                    "Not authenticated. Run 'ml-dash login' to authenticate, "
-                    "or provide an explicit api_key parameter."
-                )
-
         self.api_key = api_key
+        self._rest_client = None
+        self._gql_client = None
 
-        # REST API client (with /api prefix)
-        self._client = httpx.Client(
-            base_url=self.base_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                # Note: Don't set Content-Type here as default
-                # It will be set per-request (json or multipart)
-            },
-            timeout=30.0,
-        )
+    def _ensure_authenticated(self):
+        """Check if authenticated, raise error if not."""
+        if not self.api_key:
+            from .auth.exceptions import AuthenticationError
+            raise AuthenticationError(
+                "Not authenticated. Run 'ml-dash login' to authenticate, "
+                "or provide an explicit api_key parameter."
+            )
 
-        # GraphQL client (without /api prefix)
-        self._graphql_client = httpx.Client(
-            base_url=self.graphql_base_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-            },
-            timeout=30.0,
-        )
+    @property
+    def _client(self):
+        """Lazy REST API client (with /api prefix)."""
+        if self._rest_client is None:
+            self._ensure_authenticated()
+            self._rest_client = httpx.Client(
+                base_url=self.base_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    # Note: Don't set Content-Type here as default
+                    # It will be set per-request (json or multipart)
+                },
+                timeout=30.0,
+            )
+        return self._rest_client
+
+    @property
+    def _graphql_client(self):
+        """Lazy GraphQL client (without /api prefix)."""
+        if self._gql_client is None:
+            self._ensure_authenticated()
+            self._gql_client = httpx.Client(
+                base_url=self.graphql_base_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                timeout=30.0,
+            )
+        return self._gql_client
 
     def create_or_update_experiment(
         self,
