@@ -386,19 +386,15 @@ Upload, download, and manage files associated with experiments.
 
 ```python
 # Upload a file
-result = exp.files(
-    file_path="./model.pt",
-    prefix="/models"
-).save()
+result = exp.files("models").save("./model.pt")
 
 # Upload with metadata
-result = exp.files(
-    file_path="./model.pt",
-    prefix="/models",
+result = exp.files("models").save(
+    "./model.pt",
     description="Best model checkpoint",
     tags=["best", "checkpoint"],
     metadata={"epoch": 50, "accuracy": 0.95}
-).save()
+)
 ```
 
 ### Enhanced File Operations
@@ -413,7 +409,7 @@ config = {
     "batch_size": 32
 }
 
-result = exp.files(prefix="/configs").save_json(config, "config.json")
+result = exp.files("configs").save_json(config, to="config.json")
 ```
 
 #### Save PyTorch Models
@@ -423,13 +419,10 @@ import torch
 
 # Save PyTorch model
 model = torch.nn.Linear(10, 5)
-result = exp.files(prefix="/models").save_torch(model, "model.pt")
+result = exp.files("models").save_torch(model, to="model.pt")
 
 # Save state dict
-result = exp.files(prefix="/models").save_torch(
-    model.state_dict(),
-    "model.pth"
-)
+result = exp.files("models").save_torch(model.state_dict(), to="model.pth")
 ```
 
 #### Save Pickle Objects
@@ -437,7 +430,7 @@ result = exp.files(prefix="/models").save_torch(
 ```python
 # Save any Python object as pickle
 data = {"results": [1, 2, 3], "metadata": {"version": "1.0"}}
-result = exp.files(prefix="/data").save_pkl(data, "data.pkl")
+result = exp.files("data").save_pkl(data, to="data.pkl")
 ```
 
 #### Save Matplotlib Figures
@@ -450,14 +443,14 @@ plt.plot([1, 2, 3], [1, 4, 9])
 plt.title("Sample Plot")
 
 # Save current figure
-result = exp.files(prefix="/plots").save_fig(file_name="plot.png")
+result = exp.files("plots").save_fig(to="plot.png")
 
 # Save specific figure with custom DPI
 fig, ax = plt.subplots()
 ax.plot([1, 2, 3])
-result = exp.files(prefix="/plots").save_fig(
+result = exp.files("plots").save_fig(
     fig=fig,
-    file_name="plot.pdf",
+    to="plot.pdf",
     dpi=150,
     bbox_inches='tight'
 )
@@ -472,18 +465,18 @@ import numpy as np
 frames = [np.random.rand(480, 640) for _ in range(30)]
 
 # Save as MP4 (default 20 FPS)
-result = exp.files(prefix="/videos").save_video(frames, "output.mp4")
+result = exp.files("videos").save_video(frames, to="output.mp4")
 
 # Save with custom FPS
-result = exp.files(prefix="/videos").save_video(frames, "output.mp4", fps=30)
+result = exp.files("videos").save_video(frames, to="output.mp4", fps=30)
 
 # Save as GIF
-result = exp.files(prefix="/videos").save_video(frames, "animation.gif")
+result = exp.files("videos").save_video(frames, to="animation.gif")
 
 # Save with custom codec and quality
-result = exp.files(prefix="/videos").save_video(
+result = exp.files("videos").save_video(
     frames,
-    "high_quality.mp4",
+    to="high_quality.mp4",
     fps=30,
     codec='libx264',
     quality=8
@@ -494,12 +487,11 @@ result = exp.files(prefix="/videos").save_video(
 
 ```python
 # Upload file with bindrs for advanced organization
-result = exp.files(
-    file_path="./model.pt",
-    prefix="/models",
+result = exp.files("models").save(
+    "./model.pt",
     bindrs=["v1", "best", "production"],
     description="Production model v1"
-).save()
+)
 ```
 
 ### Listing Files
@@ -509,7 +501,7 @@ result = exp.files(
 files = exp.files().list()
 
 # List files by prefix
-files = exp.files(prefix="/models").list()
+files = exp.files("models").list()
 
 # List files by tags
 files = exp.files(tags=["checkpoint"]).list()
@@ -560,8 +552,7 @@ result = exp.files(file_id="123").delete()
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `file_path` | `str` | Path to file to upload |
-| `prefix` | `str` | Logical path prefix (default: "/") |
+| `path` | `str` | Logical path/prefix (e.g., "models", "configs") |
 | `description` | `str` | File description |
 | `tags` | `List[str]` | File tags |
 | `bindrs` | `List[str]` | File bindrs |
@@ -601,11 +592,11 @@ dxp.log("Starting quick experiment")
 dxp.params.set(lr=0.001, batch_size=32)
 
 # Log metrics
-dxp.metrics(name="loss").append(step=0, value=0.5)
-dxp.metrics(name="loss").append(step=1, value=0.4)
+dxp.metrics("loss").append(step=0, value=0.5)
+dxp.metrics("loss").append(step=1, value=0.4)
 
 # Upload files
-dxp.files(file_path="model.pt", prefix="/models").save()
+dxp.files("models").save("model.pt")
 
 # Automatically completed on Python exit
 ```
@@ -628,11 +619,11 @@ dxp.params.set(
 # Log training progress
 for epoch in range(10):
     loss = train_epoch()
-    dxp.metrics(name="loss").append(step=epoch, value=loss)
+    dxp.metrics("loss").append(step=epoch, value=loss)
     dxp.log(f"Epoch {epoch} completed", loss=loss)
 
 # Save results
-dxp.files(prefix="/results").save_json(results, "results.json")
+dxp.files("results").save_json(results, to="results.json")
 ```
 
 #### Prototyping Scripts
@@ -651,10 +642,10 @@ dxp.log("Training started")
 model = train_model()
 
 # Save model
-dxp.files(prefix="/models").save_torch(model, "model.pt")
+dxp.files("models").save_torch(model, to="model.pt")
 
 # Log final metrics
-dxp.metrics(name="accuracy").append(value=0.95, step=10)
+dxp.metrics("accuracy").append(value=0.95, step=10)
 dxp.log("Training completed")
 
 # No cleanup needed - automatically handled!
@@ -758,12 +749,12 @@ for epoch in range(10):
     loss = train_epoch(model)
     acc = evaluate(model)
 
-    dxp.metrics(name="loss").append(step=epoch, value=loss)
-    dxp.metrics(name="accuracy").append(step=epoch, value=acc)
+    dxp.metrics("loss").append(step=epoch, value=loss)
+    dxp.metrics("accuracy").append(step=epoch, value=acc)
     dxp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
 
 # Save results
-dxp.files(prefix="/models").save_torch(model.state_dict(), "final.pt")
+dxp.files("models").save_torch(model.state_dict(), to="final.pt")
 dxp.log("Experiment completed!")
 
 # Automatically saved on exit!
@@ -808,7 +799,7 @@ with Experiment(
         "dataset": "cifar10",
         "lr": 0.001
     }
-    exp.files(prefix="/configs").save_json(config, "config.json")
+    exp.files("configs").save_json(config, to="config.json")
 
     # 3. Training loop
     exp.log("Training started", level="info")
@@ -835,14 +826,14 @@ with Experiment(
 
         # Save checkpoints
         if val_acc > best_acc:
-            exp.files(prefix="/models").save_torch(
+            exp.files("models").save_torch(
                 model.state_dict(),
-                f"checkpoint_epoch_{epoch}.pt"
+                to=f"checkpoint_epoch_{epoch}.pt"
             )
             exp.log(f"New best model saved at epoch {epoch}", level="info")
 
     # 4. Save final model
-    exp.files(prefix="/models").save_torch(model, "final_model.pt")
+    exp.files("models").save_torch(model, to="final_model.pt")
 
     exp.log("Training completed", level="info")
 ```
@@ -909,9 +900,9 @@ def train_model(experiment):
         experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     # Save model
-    experiment.files(prefix="/models").save_json(
+    experiment.files("models").save_json(
         {"final_loss": loss},
-        "results.json"
+        to="results.json"
     )
 
     return {"final_loss": loss}
@@ -949,9 +940,9 @@ with Experiment(
     exp.metrics("training_loss").append(value=0.5, step=100)
 
     # Files stored in S3
-    exp.files(prefix="/models").save_json(
+    exp.files("models").save_json(
         {"config": "bert-base"},
-        "model_config.json"
+        to="model_config.json"
     )
 
     exp.log("Data synced to team server", level="info")
@@ -1036,10 +1027,10 @@ data = exp.metrics("loss").read(0, 100)
 stats = exp.metrics("loss").stats()
 
 # Files
-exp.files(file_path="model.pt", prefix="/models").save()
-exp.files(prefix="/configs").save_json(config, "config.json")
-exp.files(prefix="/models").save_torch(model, "model.pt")
-files = exp.files(prefix="/models").list()
+exp.files("models").save("model.pt")
+exp.files("configs").save_json(config, to="config.json")
+exp.files("models").save_torch(model, to="model.pt")
+files = exp.files("models").list()
 path = exp.files(file_id="123").download()
 exp.files(file_id="123").delete()
 
@@ -1048,7 +1039,7 @@ from ml_dash.auto_start import dxp
 
 dxp.log("Already started!")              # Ready to use immediately
 dxp.params.set(lr=0.001)                 # Set parameters
-dxp.metrics("loss").append(value=0.5)     # Log metrics
-dxp.files(file_path="model.pt").save()    # Upload files
+dxp.metrics("loss").append(value=0.5)    # Log metrics
+dxp.files("models").save("model.pt")     # Upload files
 # Auto-completed on Python exit
 ```

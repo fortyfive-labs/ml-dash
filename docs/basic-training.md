@@ -27,7 +27,7 @@ def train_simple_model():
         description="Basic training loop example",
         tags=["tutorial", "simple"],
         local_path=".ml-dash"
-    .run as experiment:
+    ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
             learning_rate=0.001,
@@ -67,12 +67,11 @@ def train_simple_model():
         with open("model.pth", "w") as f:
             f.write("model weights")
 
-        experiment.files(
-            file_path="model.pth",
-            prefix="/models",
+        experiment.files("models").save(
+            "model.pth",
             description="Final trained model",
             tags=["final"]
-        ).save()
+        )
 
         experiment.log("Training complete!", level="info")
         print(f"✓ Experiment metriced successfully")
@@ -117,7 +116,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(name="...", project="...".run as experiment:
+with Experiment(name="...", project="...", local_path=".ml-dash").run as experiment:
     # Your code here
 ```
 

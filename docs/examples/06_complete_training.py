@@ -126,16 +126,15 @@ def main():
                     f.write(f"Best model at epoch {best_epoch}\n")
                     f.write(f"Validation accuracy: {best_val_acc:.4f}\n")
 
-                experiment.files(
-                    file_path=model_path,
-                    prefix="/models",
+                experiment.files("models").save(
+                    model_path,
                     description=f"Best model (val_acc={best_val_acc:.4f})",
                     tags=["best", "checkpoint"],
                     metadata={
                         "epoch": best_epoch,
                         "val_accuracy": best_val_acc
                     }
-                ).save()
+                )
 
                 experiment.log(
                     f"New best model saved (val_acc={best_val_acc:.4f})",
@@ -149,12 +148,11 @@ def main():
             f.write(f"Final model after {config['training']['epochs']} epochs\n")
             f.write(f"Best validation accuracy: {best_val_acc:.4f} at epoch {best_epoch}\n")
 
-        experiment.files(
-            file_path=final_model_path,
-            prefix="/models",
+        experiment.files("models").save(
+            final_model_path,
             description="Final model after all epochs",
             tags=["final"]
-        ).save()
+        )
 
         # 5. Save results summary
         print("[5/6] Saving results...")
@@ -168,12 +166,11 @@ def main():
             f.write(f"Best validation accuracy: {best_val_acc:.4f}\n")
             f.write(f"Best epoch: {best_epoch}\n")
 
-        experiment.files(
-            file_path=results_path,
-            prefix="/results",
+        experiment.files("results").save(
+            results_path,
             description="Training results summary",
             tags=["results", "summary"]
-        ).save()
+        )
 
         # Clean up temp files
         import shutil

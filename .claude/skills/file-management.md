@@ -26,54 +26,50 @@ keywords:
 ## Basic Upload
 
 ```python
-result = experiment.files("model.pth", prefix="/models").save()
+result = experiment.files("models").save("model.pth")
 
 print(f"Uploaded: {result['filename']}")
 print(f"Size: {result['sizeBytes']} bytes")
 print(f"Checksum: {result['checksum']}")
 ```
 
-## Organizing Files with Prefixes
+## Organizing Files with Paths
 
 ```python
 # Models
-experiment.files("model.pth", prefix="/models").save()
-experiment.files("best_model.pth", prefix="/models/checkpoints").save()
+experiment.files("models").save("model.pth")
+experiment.files("models/checkpoints").save("best_model.pth")
 
 # Visualizations
-experiment.files("loss_curve.png", prefix="/visualizations").save()
+experiment.files("visualizations").save("loss_curve.png")
 
 # Configuration
-experiment.files("config.json", prefix="/config").save()
+experiment.files("config").save("config.json")
 ```
 
 ## File Metadata
 
 ```python
-experiment.files(
+experiment.files("models").save(
     "best_model.pth",
-    prefix="/models",
     description="Best model from epoch 50",
     tags=["checkpoint", "best"],
     metadata={
         "epoch": 50,
         "val_accuracy": 0.95
     }
-).save()
+)
 ```
 
 ## Downloading Files
 
 ```python
 # Upload first
-upload_result = experiment.files("model.pth", prefix="/models").save()
+upload_result = experiment.files("models").save("model.pth")
 file_id = upload_result["id"]
 
 # Download to specific path
-downloaded = experiment.files(
-    file_id=file_id,
-    dest_path="./downloaded_model.pth"
-).download()
+downloaded = experiment.files(file_id=file_id).download(dest_path="./downloaded_model.pth")
 
 # Download with original filename
 downloaded = experiment.files(file_id=file_id).download()
@@ -90,7 +86,7 @@ for f in files:
 # Download specific file
 best = next((f for f in files if "best" in f.get("tags", [])), None)
 if best:
-    experiment.files(file_id=best["id"], dest_path="./best.pth").download()
+    experiment.files(file_id=best["id"]).download(dest_path="./best.pth")
 ```
 
 ## Saving Matplotlib Figures
@@ -102,11 +98,11 @@ plt.plot([0.5, 0.4, 0.3, 0.2])
 plt.title("Training Loss")
 
 # save_fig auto-closes figure
-experiment.files(prefix="/visualizations").save_fig("loss_curve.png")
+experiment.files("visualizations").save_fig(to="loss_curve.png")
 
 # With custom options
-experiment.files(prefix="/visualizations").save_fig(
-    "plot.pdf",
+experiment.files("visualizations").save_fig(
+    to="plot.pdf",
     dpi=150,
     transparent=True,
     bbox_inches='tight'
@@ -122,13 +118,13 @@ import numpy as np
 frames = [np.random.rand(480, 640, 3) for _ in range(30)]
 
 # Save as MP4 (default 20 FPS)
-experiment.files(prefix="/videos").save_video(frames, "animation.mp4")
+experiment.files("videos").save_video(frames, to="animation.mp4")
 
 # Custom FPS
-experiment.files(prefix="/videos").save_video(frames, "animation.mp4", fps=30)
+experiment.files("videos").save_video(frames, to="animation.mp4", fps=30)
 
 # Save as GIF
-experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+experiment.files("videos").save_video(frames, to="animation.gif")
 ```
 
 ### Frame Format Support
@@ -143,15 +139,13 @@ experiment.files(prefix="/videos").save_video(frames, "animation.gif")
 # Using the singleton
 from ml_dash import dxp
 
-dxp.files.save_torch(model, "model.pt")
-dxp.files.save_torch(model.state_dict(), "model_state.pt")
+dxp.files("models").save_torch(model, to="model.pt")
+dxp.files("models").save_torch(model.state_dict(), to="model_state.pt")
 ```
 
 ## Training Checkpoint Pattern
 
 ```python
-import torch
-
 best_accuracy = 0.0
 
 for epoch in range(100):
@@ -163,25 +157,23 @@ for epoch in range(100):
 
     # Save checkpoint every 10 epochs
     if (epoch + 1) % 10 == 0:
-        torch.save(model.state_dict(), f"checkpoint_{epoch+1}.pth")
-        experiment.files(
-            f"checkpoint_{epoch+1}.pth",
-            prefix="/checkpoints",
+        experiment.files("checkpoints").save_torch(
+            model.state_dict(),
+            to=f"checkpoint_{epoch+1}.pth",
             tags=["checkpoint"],
             metadata={"epoch": epoch + 1}
-        ).save()
+        )
 
     # Save best model
     if val_accuracy > best_accuracy:
         best_accuracy = val_accuracy
-        torch.save(model.state_dict(), "best_model.pth")
-        experiment.files(
-            "best_model.pth",
-            prefix="/models",
+        experiment.files("models").save_torch(
+            model.state_dict(),
+            to="best_model.pth",
             description=f"Best (acc: {best_accuracy:.4f})",
             tags=["best"],
             metadata={"epoch": epoch + 1, "accuracy": best_accuracy}
-        ).save()
+        )
 ```
 
 ## Storage Structure
