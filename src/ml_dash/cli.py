@@ -9,7 +9,11 @@ def create_parser() -> argparse.ArgumentParser:
     """Create the main CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="ml-dash",
-        description="ML-Dash: ML experiment tracking and data storage CLI",
+        description=(
+            "ML-Dash: ML experiment tracking and data storage CLI\n\n"
+            "View your experiments, statistics, and plots online at:\n"
+            "  https://dash.ml\n"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

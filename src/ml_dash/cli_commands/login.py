@@ -28,7 +28,13 @@ def add_parser(subparsers):
     parser = subparsers.add_parser(
         "login",
         help="Authenticate with ml-dash using device authorization flow",
-        description="Login to ml-dash server using OAuth2 device authorization flow",
+        description=(
+            "Login to ml-dash server using OAuth2 device authorization flow.\n\n"
+            "After logging in, you can:\n"
+            "  • Upload/download experiments via CLI\n"
+            "  • View projects, experiments, and statistics at https://dash.ml\n"
+            "  • Create interactive plots and dashboards\n"
+        ),
     )
 
     parser.add_argument(
@@ -206,7 +212,10 @@ def cmd_login(args) -> int:
             "[bold green]✓ Logged in successfully![/bold green]\n\n"
             "Your authentication token has been securely stored.\n"
             "You can now use ml-dash commands without --api-key.\n\n"
-            "Examples:\n"
+            "[bold cyan]View your data online:[/bold cyan]\n"
+            "  [link=https://dash.ml]https://dash.ml[/link]\n\n"
+            "Access your projects, experiments, statistics, and interactive plots.\n\n"
+            "[bold]CLI Commands:[/bold]\n"
             "  ml-dash upload ./experiments\n"
             "  ml-dash download ./output\n"
             "  ml-dash list"
