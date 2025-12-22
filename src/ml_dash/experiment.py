@@ -283,18 +283,80 @@ class Experiment:
 
         if self._client:
             # Remote mode: create/update experiment via API
-            response = self._client.create_or_update_experiment(
-                project=self.project,
-                name=self.name,
-                description=self.description,
-                tags=self.tags,
-                bindrs=self._bindrs_list,
-                folder=self.folder,
-                write_protected=self._write_protected,
-                metadata=self.metadata,
-            )
-            self._experiment_data = response
-            self._experiment_id = response["experiment"]["id"]
+            try:
+                response = self._client.create_or_update_experiment(
+                    project=self.project,
+                    name=self.name,
+                    description=self.description,
+                    tags=self.tags,
+                    bindrs=self._bindrs_list,
+                    folder=self.folder,
+                    write_protected=self._write_protected,
+                    metadata=self.metadata,
+                )
+                self._experiment_data = response
+                self._experiment_id = response["experiment"]["id"]
+
+                # Display message about viewing data online
+                try:
+                    from rich.console import Console
+                    console = Console()
+                    console.print(
+                        f"[dim]✓ Experiment started: [bold]{self.name}[/bold] (project: {self.project})[/dim]\n"
+                        f"[dim]View your data, statistics, and plots online at:[/dim] "
+                        f"[link=https://dash.ml]https://dash.ml[/link]"
+                    )
+                except ImportError:
+                    # Fallback if rich is not available
+                    print(f"✓ Experiment started: {self.name} (project: {self.project})")
+                    print(f"View your data at: https://dash.ml")
+
+            except Exception as e:
+                # Check if it's an authentication error
+                from .auth.exceptions import AuthenticationError
+                if isinstance(e, AuthenticationError):
+                    try:
+                        from rich.console import Console
+                        from rich.panel import Panel
+                        console = Console()
+
+                        message = (
+                            "[bold red]Authentication Required[/bold red]\n\n"
+                            "You need to authenticate before using remote experiments.\n\n"
+                            "[bold]To authenticate:[/bold]\n"
+                            "  [cyan]ml-dash login[/cyan]\n\n"
+                            "[dim]This will open your browser for secure OAuth2 authentication.\n"
+                            "Your token will be stored securely in your system keychain.[/dim]\n\n"
+                            "[bold]Alternative:[/bold]\n"
+                            "  Use [cyan]local_path[/cyan] instead of [cyan]remote[/cyan] for offline experiments"
+                        )
+
+                        panel = Panel(
+                            message,
+                            title="[bold yellow]⚠ Not Authenticated[/bold yellow]",
+                            border_style="yellow",
+                            expand=False,
+                        )
+                        console.print("\n")
+                        console.print(panel)
+                        console.print("\n")
+                    except ImportError:
+                        # Fallback if rich is not available
+                        print("\n" + "=" * 60)
+                        print("⚠ Authentication Required")
+                        print("=" * 60)
+                        print("\nYou need to authenticate before using remote experiments.\n")
+                        print("To authenticate:")
+                        print("  ml-dash login\n")
+                        print("Alternative:")
+                        print("  Use local_path instead of remote for offline experiments\n")
+                        print("=" * 60 + "\n")
+
+                    import sys
+                    sys.exit(1)
+                else:
+                    # Re-raise other exceptions
+                    raise
 
         if self._storage:
             # Local mode: create experiment directory structure
@@ -332,6 +394,34 @@ class Experiment:
                     experiment_id=self._experiment_id,
                     status=status
                 )
+
+                # Display completion message with link to view results
+                status_emoji = {
+                    "COMPLETED": "✓",
+                    "FAILED": "✗",
+                    "CANCELLED": "⊘"
+                }.get(status, "•")
+
+                status_color = {
+                    "COMPLETED": "green",
+                    "FAILED": "red",
+                    "CANCELLED": "yellow"
+                }.get(status, "white")
+
+                try:
+                    from rich.console import Console
+                    console = Console()
+                    console.print(
+                        f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
+                        f"[bold]{self.name}[/bold] (project: {self.project})[/{status_color}]\n"
+                        f"[dim]View results, statistics, and plots online at:[/dim] "
+                        f"[link=https://dash.ml]https://dash.ml[/link]"
+                    )
+                except ImportError:
+                    # Fallback if rich is not available
+                    print(f"{status_emoji} Experiment {status.lower()}: {self.name} (project: {self.project})")
+                    print(f"View results at: https://dash.ml")
+
             except Exception as e:
                 # Log error but don't fail the close operation
                 print(f"Warning: Failed to update experiment status: {e}")
