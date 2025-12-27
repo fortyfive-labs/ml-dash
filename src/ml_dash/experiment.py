@@ -653,7 +653,7 @@ class Experiment:
         Examples:
             # Upload file - supports flexible syntax
             experiment.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
-            experiment.files(prefix="checkpoints").upload("./model.pt")
+            experiment.files(dir="checkpoints").upload("./model.pt")
             experiment.files().upload("./model.pt", to="models/model.pt")  # root
 
             # List files

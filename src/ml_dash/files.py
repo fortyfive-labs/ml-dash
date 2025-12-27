@@ -23,14 +23,14 @@ class FileBuilder:
         dxp.files("models").upload("./local_model.pt")
         dxp.files("checkpoints").upload("./model.pt", to="latest.pt")
 
-        # Save objects as files
-        dxp.files("models").save_torch(model, to="checkpoint.pt")
-        dxp.files("configs").save_json({"lr": 0.001}, to="config.json")
-        dxp.files("data").save_blob(b"binary data", to="data.bin")
+        # Save objects as files (using keyword dir argument)
+        dxp.files(dir="models").save_torch(model, to="checkpoint.pt")
+        dxp.files(dir="configs").save_json({"lr": 0.001}, to="config.json")
+        dxp.files(dir="data").save_blob(b"binary data", to="data.bin")
 
         # List files
-        files = experiment.files("/some/location").list()
-        files = experiment.files("/models").list()
+        files = experiment.files(dir="some/location").list()
+        files = experiment.files(dir="models").list()
 
         # Download file
         dxp.files("some.text").download()
@@ -974,8 +974,8 @@ class FilesAccessor:
     Accessor that enables both callable and attribute-style access to file operations.
 
     This allows:
-        dxp.files("prefix")          # Returns FileBuilder
-        dxp.files(prefix="prefix")   # Keyword argument form
+        dxp.files("models")          # Returns FileBuilder
+        dxp.files(dir="models")      # Keyword argument form
         experiment.files.upload(...)        # Direct method call
         experiment.files.download(...)    # Direct method call
     """
@@ -984,23 +984,23 @@ class FilesAccessor:
         self._experiment = experiment
         self._builder = FileBuilder(experiment)
 
-    def __call__(self, prefix: Optional[str] = None, **kwargs) -> FileBuilder:
+    def __call__(self, dir: Optional[str] = None, **kwargs) -> FileBuilder:
         """
-        Create a FileBuilder with the given prefix.
+        Create a FileBuilder with the given directory.
 
         Supports flexible argument styles:
         - Positional: files("models")
-        - Keyword: files(prefix="models")
+        - Keyword: files(dir="models")
         - No args (root): files()
 
         Args:
-            prefix: Path/prefix for file operations
+            dir: Directory/path for file operations
             **kwargs: Additional FileBuilder options
 
         Returns:
             FileBuilder instance
         """
-        return FileBuilder(self._experiment, path=prefix, **kwargs)
+        return FileBuilder(self._experiment, path=dir, **kwargs)
 
     # Direct methods that don't require a path first
 
