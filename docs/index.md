@@ -95,6 +95,36 @@ def train(lr=0.001, batch_size=32, n_steps=10):
 
 ```
 
+## AI-Powered Development with Claude Skills 🤖
+
+ML-Dash includes **Claude skills** for Claude Code to provide intelligent suggestions, code generation, and best practices directly in your IDE.
+
+### Using Claude Skills
+
+If you have Claude Code installed:
+
+1. **Open this project in Claude Code**
+   ```bash
+   claude-code open
+   ```
+
+2. **Use skill commands** - Claude will automatically suggest relevant skills based on your code:
+   - Type `@ml-dash` to mention the skill context
+   - Ask questions about using parameters, metrics, or files
+   - Get code examples tailored to your use case
+
+### Available Skills
+
+**params-proto** - Working with configuration classes
+- Pass params-proto classes directly to `params.log()`
+- Automatic attribute extraction and flattening
+- Type-hinted configuration patterns
+- Integration examples with training loops
+
+For more information, visit [Claude Code Documentation](https://claude.com/claude-code).
+
+---
+
 Refer to the [Getting Started Guide](getting-started.md) and the Examples section for more detailed usage examples:
 
 - [Basic Training Loop](basic-training.md) - Simple training loop with ML-Dash

@@ -35,12 +35,12 @@ def test_summary_cache_store_and_summarize(experiment):
 
     data = metric.read()
     assert len(data["data"]) == 1
-    assert "loss/mean" in data["data"][0]["data"]
-    assert "loss/min" in data["data"][0]["data"]
-    assert "loss/max" in data["data"][0]["data"]
-    assert "loss/std" in data["data"][0]["data"]
-    assert "loss/count" in data["data"][0]["data"]
-    assert data["data"][0]["data"]["loss/count"] == 10
+    assert "loss.mean" in data["data"][0]["data"]
+    assert "loss.min" in data["data"][0]["data"]
+    assert "loss.max" in data["data"][0]["data"]
+    assert "loss.std" in data["data"][0]["data"]
+    assert "loss.count" in data["data"][0]["data"]
+    assert data["data"][0]["data"]["loss.count"] == 10
 
 
 def test_summary_cache_rolling_window(experiment):
@@ -63,8 +63,8 @@ def test_summary_cache_rolling_window(experiment):
 
     data = metric.read()
     assert len(data["data"]) == 2
-    assert data["data"][0]["data"]["loss/mean"] == pytest.approx(0.5)
-    assert data["data"][1]["data"]["loss/mean"] == pytest.approx(0.3)
+    assert data["data"][0]["data"]["loss.mean"] == pytest.approx(0.5)
+    assert data["data"][1]["data"]["loss.mean"] == pytest.approx(0.3)
 
 
 def test_summary_cache_cumulative(experiment):
@@ -85,8 +85,8 @@ def test_summary_cache_cumulative(experiment):
 
     data = metric.read()
     assert len(data["data"]) == 2
-    assert data["data"][0]["data"]["loss/count"] == 1
-    assert data["data"][1]["data"]["loss/count"] == 2  # Cumulative
+    assert data["data"][0]["data"]["loss.count"] == 1
+    assert data["data"][1]["data"]["loss.count"] == 2  # Cumulative
 
 
 def test_summary_cache_set_metadata(experiment):
@@ -110,8 +110,8 @@ def test_summary_cache_set_metadata(experiment):
     assert len(data["data"]) == 1
     assert data["data"][0]["data"]["lr"] == 0.001
     assert data["data"][0]["data"]["epoch"] == 1
-    assert "loss/mean" in data["data"][0]["data"]
-    assert data["data"][0]["data"]["loss/count"] == 5
+    assert "loss.mean" in data["data"][0]["data"]
+    assert data["data"][0]["data"]["loss.count"] == 5
 
     # Second interval - metadata should be replaced
     for i in range(3):
@@ -127,7 +127,7 @@ def test_summary_cache_set_metadata(experiment):
     assert len(data["data"]) == 2
     assert data["data"][1]["data"]["lr"] == 0.0005  # Replaced
     assert data["data"][1]["data"]["epoch"] == 2  # Replaced
-    assert data["data"][1]["data"]["loss/count"] == 3
+    assert data["data"][1]["data"]["loss.count"] == 3
 
 
 def test_summary_cache_multiple_metrics(experiment):
@@ -149,8 +149,8 @@ def test_summary_cache_multiple_metrics(experiment):
 
     data = metric.read()
     assert len(data["data"]) == 1
-    assert "loss/mean" in data["data"][0]["data"]
-    assert "accuracy/mean" in data["data"][0]["data"]
+    assert "loss.mean" in data["data"][0]["data"]
+    assert "accuracy.mean" in data["data"][0]["data"]
 
 
 def test_summary_cache_peek(experiment):
@@ -176,7 +176,7 @@ def test_summary_cache_peek(experiment):
     experiment.run.start()
 
     data = metric.read()
-    assert data["data"][0]["data"]["loss/count"] == 10  # All 10 values still there
+    assert data["data"][0]["data"]["loss.count"] == 10  # All 10 values still there
 
 
 def test_summary_cache_nan_handling(experiment):
@@ -195,10 +195,10 @@ def test_summary_cache_nan_handling(experiment):
 
     data = metric.read()
     # Only non-None values should be counted
-    assert data["data"][0]["data"]["loss/count"] == 2
-    assert data["data"][0]["data"]["accuracy/count"] == 2
-    assert data["data"][0]["data"]["loss/mean"] == pytest.approx(0.45)
-    assert data["data"][0]["data"]["accuracy/mean"] == pytest.approx(0.875)
+    assert data["data"][0]["data"]["loss.count"] == 2
+    assert data["data"][0]["data"]["accuracy.count"] == 2
+    assert data["data"][0]["data"]["loss.mean"] == pytest.approx(0.45)
+    assert data["data"][0]["data"]["accuracy.mean"] == pytest.approx(0.875)
 
 if __name__ == "__main__":
     """Run all tests with pytest."""

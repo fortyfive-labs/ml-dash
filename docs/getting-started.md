@@ -175,6 +175,23 @@ with Experiment(
 
 The API is identical across local and remote modes!
 
+## Getting Help with Claude Code
+
+If you have [Claude Code](https://claude.com/claude-code) installed, you can get intelligent help directly in your IDE:
+
+```bash
+claude-code open
+```
+
+Then ask questions like:
+- "How do I log parameters from a config class?"
+- "Show me an example of tracking metrics during training"
+- "How do I upload files with metadata?"
+
+Claude will provide code examples and best practices tailored to ML-Dash, powered by integrated **Claude skills** (.claude/skills/).
+
+---
+
 ## Next Steps
 
 - **Learn the basics**: Read the [Overview](overview.md) to understand core concepts

@@ -13,12 +13,14 @@ import functools
 from pathlib import Path
 from datetime import datetime
 
+from jinja2.nodes import Expr
+
 from .client import RemoteClient
 from .storage import LocalStorage
 from .log import LogLevel, LogBuilder
 from .params import ParametersBuilder
 from .files import FilesAccessor, BindrsBuilder
-from .run import RUN
+from .run import EXP
 
 
 class OperationMode(Enum):
@@ -90,12 +92,12 @@ class RunManager:
         Once the experiment is opened, the folder cannot be changed.
 
         Supports template variables:
-        - {RUN.name} - Experiment name
-        - {RUN.project} - Project name
+        - {EXP.name} - Experiment name
+        - {EXP.project} - Project name
 
         Args:
             value: Folder path with optional template variables
-                   (e.g., "experiments/{RUN.name}" or None)
+                   (e.g., "experiments/{EXP.name}" or None)
 
         Raises:
             RuntimeError: If experiment is already initialized/open
@@ -107,10 +109,10 @@ class RunManager:
             dxp.run.folder = "experiments/vision/resnet"
 
             # Template with experiment name
-            dxp.run.folder = "/iclr_2024/{RUN.name}"
+            dxp.run.folder = "/iclr_2024/{EXP.name}"
 
             # Template with multiple variables
-            dxp.run.folder = "{RUN.project}/experiments/{RUN.name}"
+            dxp.run.folder = "{EXP.project}/experiments/{EXP.name}"
 
             # Now start the experiment
             with dxp.run:
@@ -122,13 +124,19 @@ class RunManager:
                 "Set folder before calling start() or entering 'with' block."
             )
 
-        # Check if this is a template (contains {RUN.) or static folder
-        if value and '{RUN.' in value:
-            # Store the template - it will be formatted when the run starts
-            self._experiment._folder_template = value
-        else:
-            # Static folder - set directly
-            self._experiment.folder = value
+        if value:
+            # Sync RUN with this experiment's values
+            EXP.name = self._experiment.name
+            EXP.project = self._experiment.project
+            EXP.description = self._experiment.description
+            # Generate id/timestamp if not already set
+            if EXP.id is None:
+                EXP._init_run()
+            # Format with RUN - no-op if no placeholders
+            value = value.format(RUN=EXP)
+
+        # Update the folder on the experiment
+        self._experiment.folder = value
 
     def __enter__(self) -> "Experiment":
         """Context manager entry - starts the experiment."""
@@ -231,6 +239,11 @@ class Experiment:
         self._write_protected = _write_protected
         self.metadata = metadata
 
+        # Initialize RUN with experiment values
+        EXP.name = name
+        EXP.project = project
+        EXP.description = description
+
         # Determine operation mode
         if remote and local_path:
             self.mode = OperationMode.HYBRID
@@ -250,7 +263,6 @@ class Experiment:
         self._experiment_data: Optional[Dict[str, Any]] = None
         self._is_open = False
         self._metrics_manager: Optional['MetricsManager'] = None  # Cached metrics manager
-        self._folder_template: Optional[str] = None  # Template for folder path
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
             # api_key can be None - RemoteClient will auto-load from storage
@@ -271,15 +283,9 @@ class Experiment:
         if self._is_open:
             return self
 
-        # Initialize RUN with experiment values
-        RUN.name = self.name
-        RUN.project = self.project
-        RUN.description = self.description
-        RUN._init_run()  # Generate id and timestamp
-
-        # Format folder template if present
-        if self._folder_template:
-            self.folder = RUN._format(self._folder_template)
+        # Ensure EXP.id is generated when run starts
+        if EXP.id is None:
+            EXP._init_run()
 
         if self._client:
             # Remote mode: create/update experiment via API
@@ -429,7 +435,7 @@ class Experiment:
         self._is_open = False
 
         # Reset RUN for next experiment
-        RUN._reset()
+        EXP._reset()
 
     @property
     def run(self) -> RunManager:

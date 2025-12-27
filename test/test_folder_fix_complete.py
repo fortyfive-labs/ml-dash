@@ -21,18 +21,18 @@ def test_all_operations_use_folder_field():
         exp = Experiment(
             name="test_exp",
             project="test_project",
-            folder="/iclr_2024/{RUN.name}",
+            folder="/iclr_2024/{EXP.name}",
             local_path=tmpdir
         )
 
         with exp.run:
             # When folder template is passed to constructor, it stays as template
             # The storage layer resolves it internally
-            assert exp.folder == "/iclr_2024/{RUN.name}"
+            assert exp.folder == "/iclr_2024/{EXP.name}"
 
             # Expected base path - template should be resolved in storage
-            # The {RUN.name} gets replaced with experiment name
-            expected_base = Path(tmpdir) / "iclr_2024" / "{RUN.name}" / "test_project" / "test_exp"
+            # The {EXP.name} gets replaced with experiment name
+            expected_base = Path(tmpdir) / "iclr_2024" / "{EXP.name}" / "test_project" / "test_exp"
 
             # 1. Test parameters
             exp.params.log(batch_size=128, lr=0.001)
@@ -93,7 +93,7 @@ def test_all_operations_use_folder_field():
             with open(experiment_file) as f:
                 exp_data = json.load(f)
             assert exp_data["name"] == "test_exp"
-            assert exp_data["folder"] == "/iclr_2024/{RUN.name}"
+            assert exp_data["folder"] == "/iclr_2024/{EXP.name}"
 
         print(f"✓ All operations correctly saved to: {expected_base}")
 
