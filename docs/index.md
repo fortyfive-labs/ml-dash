@@ -2,6 +2,8 @@
 
 ## Claude Skill (AI Assistants)
 
+Add the params-proto skill to Claude Code:
+
 ```
 # add https://raw.githubusercontent.com/fortyfive-labs/ml-dash/main/.claude/skills/params-proto.md as a skill
 ```
