@@ -106,7 +106,7 @@ def train(lr=0.001, batch_size=32, n_steps=10):
     dxp.metrics("eval").append(loss=eval_loss, accuracy=eval_accuracy, step=step)
 
     # this allows you to upload the file.
-    dxp.files.save_torch(net, "model_last.pt")
+    dxp.folder.save_torch(net, "model_last.pt")
 
 ```
 

@@ -13,8 +13,6 @@ import functools
 from pathlib import Path
 from datetime import datetime
 
-from jinja2.nodes import Expr
-
 from .client import RemoteClient
 from .storage import LocalStorage
 from .log import LogLevel, LogBuilder
@@ -81,7 +79,7 @@ class RunManager:
         Example:
             current_folder = exp.run.folder
         """
-        return self._experiment.folder
+        return self._experiment._folder_path
 
     @folder.setter
     def folder(self, value: Optional[str]) -> None:
@@ -133,10 +131,10 @@ class RunManager:
             if EXP.id is None:
                 EXP._init_run()
             # Format with RUN - no-op if no placeholders
-            value = value.format(RUN=EXP)
+            value = value.format(EXP=EXP)
 
         # Update the folder on the experiment
-        self._experiment.folder = value
+        self._experiment._folder_path = value
 
     def __enter__(self) -> "Experiment":
         """Context manager entry - starts the experiment."""
@@ -235,7 +233,7 @@ class Experiment:
         self.description = description
         self.tags = tags
         self._bindrs_list = bindrs
-        self.folder = folder
+        self._folder_path = folder
         self._write_protected = _write_protected
         self.metadata = metadata
 
@@ -296,7 +294,7 @@ class Experiment:
                     description=self.description,
                     tags=self.tags,
                     bindrs=self._bindrs_list,
-                    folder=self.folder,
+                    folder=self._folder_path,
                     write_protected=self._write_protected,
                     metadata=self.metadata,
                 )
@@ -372,7 +370,7 @@ class Experiment:
                 description=self.description,
                 tags=self.tags,
                 bindrs=self._bindrs_list,
-                folder=self.folder,
+                folder=self._folder_path,
                 metadata=self.metadata,
             )
 
@@ -597,7 +595,7 @@ class Experiment:
             self._storage.write_log(
                 project=self.project,
                 experiment=self.name,
-                folder=self.folder,
+                folder=self._folder_path,
                 message=log_entry["message"],
                 level=log_entry["level"],
                 metadata=log_entry.get("metadata"),
@@ -653,8 +651,10 @@ class Experiment:
             RuntimeError: If experiment is not open
 
         Examples:
-            # Upload file
-            experiment.files("checkpoints").save(net, to="checkpoint.pt")
+            # Upload file - supports flexible syntax
+            experiment.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
+            experiment.files(prefix="checkpoints").upload("./model.pt")
+            experiment.files().upload("./model.pt", to="models/model.pt")  # root
 
             # List files
             files = experiment.files("/some/location").list()
@@ -664,7 +664,7 @@ class Experiment:
             experiment.files("some.text").download()
             experiment.files("some.text").download(to="./model.pt")
 
-            # Download Files via Glob Pattern
+            # Download files via glob pattern
             file_paths = experiment.files("images").list("*.png")
             experiment.files("images").download("*.png")
 
@@ -675,7 +675,7 @@ class Experiment:
             experiment.files("some.text").delete()
             experiment.files.delete("some.text")
 
-            # Specific File Types
+            # Specific file types
             dxp.files.save_text("content", to="view.yaml")
             dxp.files.save_json(dict(hey="yo"), to="config.json")
             dxp.files.save_blob(b"xxx", to="data.bin")
@@ -685,7 +685,7 @@ class Experiment:
                 "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
                 "Example:\n"
                 "  with dxp.run:\n"
-                "      dxp.files('path').save()"
+                "      dxp.files('path').upload()"
             )
 
         return FilesAccessor(self)
@@ -773,7 +773,7 @@ class Experiment:
             result = self._storage.write_file(
                 project=self.project,
                 experiment=self.name,
-                folder=self.folder,
+                folder=self._folder_path,
                 file_path=file_path,
                 prefix=prefix,
                 filename=filename,
@@ -950,7 +950,7 @@ class Experiment:
             self._storage.write_parameters(
                 project=self.project,
                 experiment=self.name,
-                folder=self.folder,
+                folder=self._folder_path,
                 data=flattened_params
             )
 
@@ -1066,7 +1066,7 @@ class Experiment:
             result = self._storage.append_to_metric(
                 project=self.project,
                 experiment=self.name,
-                folder=self.folder,
+                folder=self._folder_path,
                 metric_name=name,
                 data=data,
                 description=description,

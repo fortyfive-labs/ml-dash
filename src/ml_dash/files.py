@@ -36,7 +36,7 @@ class FileBuilder:
         dxp.files("some.text").download()
         dxp.files("some.text").download(to="./model.pt")
 
-        # Download Files via Glob Pattern
+        # Download files via glob pattern
         file_paths = experiment.files("images").list("*.png")
         dxp.files("images").download("*.png")
 
@@ -974,8 +974,9 @@ class FilesAccessor:
     Accessor that enables both callable and attribute-style access to file operations.
 
     This allows:
-        dxp.files("path")          # Returns FileBuilder
-        experiment.files.save(...)        # Direct method call
+        dxp.files("prefix")          # Returns FileBuilder
+        dxp.files(prefix="prefix")   # Keyword argument form
+        experiment.files.upload(...)        # Direct method call
         experiment.files.download(...)    # Direct method call
     """
 
@@ -983,9 +984,23 @@ class FilesAccessor:
         self._experiment = experiment
         self._builder = FileBuilder(experiment)
 
-    def __call__(self, path: Optional[str] = None, **kwargs) -> FileBuilder:
-        """Create a FileBuilder with the given path."""
-        return FileBuilder(self._experiment, path=path, **kwargs)
+    def __call__(self, prefix: Optional[str] = None, **kwargs) -> FileBuilder:
+        """
+        Create a FileBuilder with the given prefix.
+
+        Supports flexible argument styles:
+        - Positional: files("models")
+        - Keyword: files(prefix="models")
+        - No args (root): files()
+
+        Args:
+            prefix: Path/prefix for file operations
+            **kwargs: Additional FileBuilder options
+
+        Returns:
+            FileBuilder instance
+        """
+        return FileBuilder(self._experiment, path=prefix, **kwargs)
 
     # Direct methods that don't require a path first
 
