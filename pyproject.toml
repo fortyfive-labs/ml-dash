@@ -31,7 +31,7 @@ dependencies = [
     "scikit-image>=0.21.0",
     "rich>=13.0.0",
     "cryptography>=42.0.0",
-    "params-proto>=3.0.0rc12",
+    "params-proto>=3.0.0rc18",
 ]
 
 [project.scripts]

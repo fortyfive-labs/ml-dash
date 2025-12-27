@@ -48,6 +48,37 @@ with Experiment(name="my-experiment", project="project",
     # ...
 ```
 
+## Class Objects Support
+
+Pass configuration classes directly (perfect for `params-proto`):
+
+```{code-block} python
+:linenos:
+
+class TrainingConfig:
+    learning_rate = 0.001
+    batch_size = 32
+    epochs = 100
+
+class ModelConfig:
+    architecture = "resnet50"
+    hidden_size = 768
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # Pass class objects directly
+    experiment.params.log(training=TrainingConfig, model=ModelConfig)
+
+    # Stored as:
+    # training.learning_rate = 0.001
+    # training.batch_size = 32
+    # training.epochs = 100
+    # model.architecture = "resnet50"
+    # model.hidden_size = 768
+```
+
+Private attributes (starting with `_`) are automatically skipped.
+
 ## Updating Parameters
 
 Call `parameters().set()` multiple times - values merge and overwrite:
@@ -131,6 +162,24 @@ with Experiment(name="my-experiment", project="project",
     experiment.params.set(**asdict(config))
 ```
 
+**From params-proto (or any class):**
+
+```{code-block} python
+:linenos:
+
+from ml_dash import Experiment
+
+# Works with params_proto or any Python class
+class Args:
+    batch_size = 64
+    learning_rate = 0.001
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    # Pass class directly - automatically extracts attributes
+    experiment.params.log(Args=Args)
+```
+
 ## Complete Training Configuration
 
 ```{code-block} python
@@ -158,6 +207,48 @@ with Experiment(name="resnet-imagenet", project="cv",
         }
     })
 ```
+
+## Retrieving Parameters
+
+Get parameters during or after an experiment:
+
+```{code-block} python
+:linenos:
+
+with Experiment(name="my-experiment", project="project",
+        local_path=".ml-dash").run as experiment:
+    experiment.params.set(learning_rate=0.001, batch_size=32)
+
+    # Retrieve flattened parameters
+    params = experiment.params.get()
+    print(params)
+    # → {"learning_rate": 0.001, "batch_size": 32}
+
+    # Retrieve as nested dictionary
+    params_nested = experiment.params.get(flatten=False)
+    print(params_nested)
+    # → {"learning_rate": 0.001, "batch_size": 32}
+```
+
+## API Methods
+
+### `set()` / `log()`
+
+Both methods do the same thing - set or merge parameters:
+
+- **Nested dicts** are automatically flattened to dot notation
+- **Class objects** are converted to dictionaries by extracting their attributes
+- **Multiple calls** merge parameters (later values override earlier ones)
+- Returns self for potential chaining
+
+The `log()` method exists for semantic clarity but behaves identically to `set()`.
+
+### `get()`
+
+Retrieve current parameters:
+
+- **`flatten=True` (default)**: Returns flattened dict with dot notation
+- **`flatten=False`**: Returns nested dict structure
 
 ## Storage Format
 
