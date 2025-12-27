@@ -115,7 +115,7 @@ If you have Claude Code installed:
 
 ### Available Skills
 
-**params-proto-support** - Working with configuration classes
+**params-proto** - Working with configuration classes
 - Pass params-proto classes directly to `params.log()`
 - Automatic attribute extraction and flattening
 - Type-hinted configuration patterns
