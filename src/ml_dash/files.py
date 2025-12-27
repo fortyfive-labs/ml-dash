@@ -20,28 +20,28 @@ class FileBuilder:
 
     Usage:
         # Upload existing file from disk
-        experiment.files("models").upload("./local_model.pt")
-        experiment.files("checkpoints").upload("./model.pt", to="latest.pt")
+        dxp.files("models").upload("./local_model.pt")
+        dxp.files("checkpoints").upload("./model.pt", to="latest.pt")
 
         # Save objects as files
-        experiment.files("models").save_torch(model, to="checkpoint.pt")
-        experiment.files("configs").save_json({"lr": 0.001}, to="config.json")
-        experiment.files("data").save_blob(b"binary data", to="data.bin")
+        dxp.files("models").save_torch(model, to="checkpoint.pt")
+        dxp.files("configs").save_json({"lr": 0.001}, to="config.json")
+        dxp.files("data").save_blob(b"binary data", to="data.bin")
 
         # List files
         files = experiment.files("/some/location").list()
         files = experiment.files("/models").list()
 
         # Download file
-        experiment.files("some.text").download()
-        experiment.files("some.text").download(to="./model.pt")
+        dxp.files("some.text").download()
+        dxp.files("some.text").download(to="./model.pt")
 
         # Download Files via Glob Pattern
         file_paths = experiment.files("images").list("*.png")
-        experiment.files("images").download("*.png")
+        dxp.files("images").download("*.png")
 
         # Delete files
-        experiment.files("some.text").delete()
+        dxp.files("some.text").delete()
 
     Specific Save Methods:
         experiment.files.save_text("content", to="view.yaml")
@@ -119,13 +119,13 @@ class FileBuilder:
 
         Examples:
             # Upload with original filename
-            experiment.files("models").upload("./local_model.pt")
+            dxp.files("models").upload("./local_model.pt")
 
             # Upload with new filename
-            experiment.files("models").upload("./local_model.pt", to="remote_model.pt")
+            dxp.files("models").upload("./local_model.pt", to="remote_model.pt")
 
             # Upload with metadata
-            experiment.files("checkpoints").upload(
+            dxp.files("checkpoints").upload(
                 "./checkpoint.pt",
                 to="epoch_10.pt",
                 description="Best model at epoch 10",
@@ -641,34 +641,28 @@ class FileBuilder:
     def save_json(
         self,
         content: Any,
-        fname: Optional[str] = None,
         *,
-        to: Optional[str] = None
+        to: str
     ) -> Dict[str, Any]:
         """
         Save JSON content to a file.
 
         Args:
             content: Content to save as JSON (dict, list, or any JSON-serializable object)
-            fname: Name of the file to create (deprecated, use 'to')
-            to: Target filename (preferred)
+            to: Target filename
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
         Examples:
             config = {"model": "resnet50", "lr": 0.001}
-            result = experiment.files("configs").save_json(config, to="config.json")
+            result = dxp.files("configs").save_json(config, to="config.json")
         """
-        filename = to or fname
-        if not filename:
-            raise ValueError("'to' parameter is required")
-
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         return self._save_json(
             content=content,
-            filename=filename,
+            filename=to,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -690,9 +684,6 @@ class FileBuilder:
             result = experiment.files().save_text("Hello, world!", to="greeting.txt")
             result = experiment.files("configs").save_text(yaml_content, to="view.yaml")
         """
-        if not to:
-            raise ValueError("'to' parameter is required")
-
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         return self._save_bytes(
@@ -718,9 +709,6 @@ class FileBuilder:
         Examples:
             result = experiment.files("data").save_blob(binary_data, to="model.bin")
         """
-        if not to:
-            raise ValueError("'to' parameter is required")
-
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         return self._save_bytes(
@@ -735,34 +723,29 @@ class FileBuilder:
     def save_torch(
         self,
         model: Any,
-        fname: Optional[str] = None,
         *,
-        to: Optional[str] = None
+        to: str
     ) -> Dict[str, Any]:
         """
         Save PyTorch model to a file.
 
         Args:
             model: PyTorch model or state dict to save
-            fname: Name of the file to create (deprecated, use 'to')
-            to: Target filename (preferred)
+            to: Target filename
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
         Examples:
-            result = experiment.files("models").save_torch(model, to="model.pt")
-            result = experiment.files("models").save_torch(model.state_dict(), to="weights.pth")
+            result = dxp.files("models").save_torch(model, to="model.pt")
+            result = dxp.files("models").save_torch(model.state_dict(), to="weights.pth")
         """
-        filename = to or fname
-        if not filename:
-            raise ValueError("'to' parameter is required")
 
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         return self._save_torch(
             model=model,
-            filename=filename,
+            filename=to,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -772,34 +755,28 @@ class FileBuilder:
     def save_pkl(
         self,
         content: Any,
-        fname: Optional[str] = None,
         *,
-        to: Optional[str] = None
+        to: str
     ) -> Dict[str, Any]:
         """
         Save Python object to a pickle file.
 
         Args:
             content: Python object to pickle (must be pickle-serializable)
-            fname: Name of the file to create (deprecated, use 'to')
-            to: Target filename (preferred)
+            to: Target filename
 
         Returns:
             File metadata dict with id, path, filename, checksum, etc.
 
         Examples:
             data = {"model": "resnet50", "weights": np.array([1, 2, 3])}
-            result = experiment.files("data").save_pkl(data, to="data.pkl")
+            result = dxp.files("data").save_pkl(data, to="data.pkl")
         """
-        filename = to or fname
-        if not filename:
-            raise ValueError("'to' parameter is required")
-
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         return self._save_pickle(
             content=content,
-            filename=filename,
+            filename=to,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -809,9 +786,8 @@ class FileBuilder:
     def save_fig(
         self,
         fig: Optional[Any] = None,
-        fname: Optional[str] = None,
         *,
-        to: Optional[str] = None,
+        to: str,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -819,8 +795,7 @@ class FileBuilder:
 
         Args:
             fig: Matplotlib figure object. If None, uses plt.gcf() (current figure)
-            fname: Name of file to create (deprecated, use 'to')
-            to: Target filename (preferred)
+            to: Target filename
             **kwargs: Additional arguments passed to fig.savefig()
 
         Returns:
@@ -828,16 +803,12 @@ class FileBuilder:
 
         Examples:
             plt.plot([1, 2, 3], [1, 4, 9])
-            result = experiment.files("plots").save_fig(to="plot.png")
+            result = dxp.files("plots").save_fig(to="plot.png")
         """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
             raise ImportError("Matplotlib is not installed. Install it with: pip install matplotlib")
-
-        filename = to or fname
-        if not filename:
-            raise ValueError("'to' parameter is required")
 
         if fig is None:
             fig = plt.gcf()
@@ -846,7 +817,7 @@ class FileBuilder:
 
         return self._save_fig(
             fig=fig,
-            filename=filename,
+            filename=to,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -857,9 +828,8 @@ class FileBuilder:
     def save_video(
         self,
         frame_stack: Union[List, Any],
-        fname: Optional[str] = None,
         *,
-        to: Optional[str] = None,
+        to: str,
         fps: int = 20,
         **imageio_kwargs
     ) -> Dict[str, Any]:
@@ -868,8 +838,7 @@ class FileBuilder:
 
         Args:
             frame_stack: List of numpy arrays or stacked array
-            fname: Name of file to create (deprecated, use 'to')
-            to: Target filename (preferred)
+            to: Target filename
             fps: Frames per second (default: 20)
             **imageio_kwargs: Additional arguments passed to imageio
 
@@ -878,7 +847,7 @@ class FileBuilder:
 
         Examples:
             frames = [np.random.rand(480, 640) for _ in range(30)]
-            result = experiment.files("videos").save_video(frames, to="output.mp4")
+            result = dxp.files("videos").save_video(frames, to="output.mp4")
         """
         import tempfile
         import os
@@ -893,10 +862,6 @@ class FileBuilder:
         except ImportError:
             raise ImportError("scikit-image is not installed. Install it with: pip install scikit-image")
 
-        filename = to or fname
-        if not filename:
-            raise ValueError("'to' parameter is required")
-
         # Validate frame_stack
         try:
             if len(frame_stack) == 0:
@@ -907,7 +872,7 @@ class FileBuilder:
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
         temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, filename)
+        temp_path = os.path.join(temp_dir, to)
 
         try:
             frames_ubyte = img_as_ubyte(frame_stack)
@@ -989,7 +954,7 @@ class FileBuilder:
             )
 
             return self._save_file(
-                file_path=downloaded_path,
+                fpath=downloaded_path,
                 prefix=target_prefix,
                 description=self._description,
                 tags=self._tags,
@@ -1009,7 +974,7 @@ class FilesAccessor:
     Accessor that enables both callable and attribute-style access to file operations.
 
     This allows:
-        experiment.files("path")          # Returns FileBuilder
+        dxp.files("path")          # Returns FileBuilder
         experiment.files.save(...)        # Direct method call
         experiment.files.download(...)    # Direct method call
     """
