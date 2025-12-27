@@ -35,13 +35,13 @@ with Experiment(name="my-experiment", project="project",
 
     # Delete files
     dxp.files("some.text").delete()
-    dxp.folder.delete("some.text")
-    dxp.folder.delete("images/*.png")
+    dxp.file.delete("some.text")
+    dxp.file.delete("images/*.png")
 
     # Specific file types
-    dxp.folder.save_text("content", to="view.yaml")
-    dxp.folder.save_json(dict(hey="yo"), to="config.json")
-    dxp.folder.save_blob(b"xxx", to="data.bin")
+    dxp.file.save_text("content", to="view.yaml")
+    dxp.file.save_json(dict(hey="yo"), to="config.json")
+    dxp.file.save_blob(b"xxx", to="data.bin")
 ```
 
 ## Basic Upload
@@ -99,12 +99,12 @@ with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
     # Upload file directly
-    dxp.folder.upload("./model.pt", to="models/model.pt")
+    dxp.file.upload("./model.pt", to="models/model.pt")
 
     # Save objects directly
-    dxp.folder.save_text("yaml content", to="configs/view.yaml")
-    dxp.folder.save_json({"key": "value"}, to="data/config.json")
-    dxp.folder.save_blob(b"\x00\x01\x02", to="binary/data.bin")
+    dxp.file.save_text("yaml content", to="configs/view.yaml")
+    dxp.file.save_json({"key": "value"}, to="data/config.json")
+    dxp.file.save_blob(b"\x00\x01\x02", to="binary/data.bin")
 ```
 
 ## Organizing Files
@@ -208,7 +208,7 @@ with Experiment(name="my-experiment", project="project",
     paths = dxp.files("images").download("*.png", to="./local_images")
 
     # Direct style with path/pattern
-    paths = dxp.folder.download("images/*.png", to="local_images")
+    paths = dxp.file.download("images/*.png", to="local_images")
 
     print(f"Downloaded {len(paths)} files")
 ```
@@ -264,7 +264,7 @@ with Experiment(name="my-experiment", project="project",
     result = dxp.files("some.text").delete()
 
     # Direct style
-    result = dxp.folder.delete("some.text")
+    result = dxp.file.delete("some.text")
 ```
 
 ### Delete with Glob Pattern
@@ -279,7 +279,7 @@ with Experiment(name="my-experiment", project="project",
     results = dxp.files("images").delete("*.png")
 
     # Direct style
-    results = dxp.folder.delete("images/*.png")
+    results = dxp.file.delete("images/*.png")
 
     print(f"Deleted {len(results)} files")
 ```
@@ -326,7 +326,7 @@ with Experiment(name="my-experiment", project="project",
     dxp.files("configs").save_text(yaml_content, to="model.yaml")
 
     # Or using direct style
-    dxp.folder.save_text(yaml_content, to="configs/model.yaml")
+    dxp.file.save_text(yaml_content, to="configs/model.yaml")
 ```
 
 ### Save JSON
@@ -343,7 +343,7 @@ with Experiment(name="my-experiment", project="project",
     dxp.files("configs").save_json(config, to="config.json")
 
     # Or direct style
-    dxp.folder.save_json(config, to="configs/training.json")
+    dxp.file.save_json(config, to="configs/training.json")
 ```
 
 ### Save Binary Data

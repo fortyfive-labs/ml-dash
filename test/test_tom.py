@@ -8,7 +8,7 @@ def train_simple_model():
     with Experiment(
         name="hyperparameter-schema-test-5",
         project="tutorials",
-        folder='/tmp/ml_dash/examples',
+        prefix='/tmp/ml_dash/examples',
         description="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
         tags=["sweep", "best"],
         # remote='http://localhost:3000',

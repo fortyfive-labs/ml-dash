@@ -69,32 +69,32 @@ class RunManager:
         self._experiment._close(status="CANCELLED")
 
     @property
-    def folder(self) -> Optional[str]:
+    def prefix(self) -> Optional[str]:
         """
-        Get the current folder for this experiment.
+        Get the current folder prefix for this experiment.
 
         Returns:
-            Current folder path or None
+            Current folder prefix path or None
 
         Example:
-            current_folder = exp.run.folder
+            current_prefix = exp.run.prefix
         """
         return self._experiment._folder_path
 
-    @folder.setter
-    def folder(self, value: Optional[str]) -> None:
+    @prefix.setter
+    def prefix(self, value: Optional[str]) -> None:
         """
-        Set the folder for this experiment before initialization.
+        Set the folder prefix for this experiment before initialization.
 
         This can ONLY be set before the experiment is started (initialized).
-        Once the experiment is opened, the folder cannot be changed.
+        Once the experiment is opened, the prefix cannot be changed.
 
         Supports template variables:
         - {EXP.name} - Experiment name
         - {EXP.project} - Project name
 
         Args:
-            value: Folder path with optional template variables
+            value: Folder prefix path with optional template variables
                    (e.g., "experiments/{EXP.name}" or None)
 
         Raises:
@@ -104,13 +104,13 @@ class RunManager:
             from ml_dash import dxp
 
             # Static folder
-            dxp.run.folder = "experiments/vision/resnet"
+            dxp.run.prefix = "experiments/vision/resnet"
 
             # Template with experiment name
-            dxp.run.folder = "/iclr_2024/{EXP.name}"
+            dxp.run.prefix = "iclr_2024/{EXP.name}"
 
             # Template with multiple variables
-            dxp.run.folder = "{EXP.project}/experiments/{EXP.name}"
+            dxp.run.prefix = "{EXP.project}/experiments/{EXP.name}"
 
             # Now start the experiment
             with dxp.run:
@@ -118,8 +118,8 @@ class RunManager:
         """
         if self._experiment._is_open:
             raise RuntimeError(
-                "Cannot change folder after experiment is initialized. "
-                "Set folder before calling start() or entering 'with' block."
+                "Cannot change prefix after experiment is initialized. "
+                "Set prefix before calling start() or entering 'with' block."
             )
 
         if value:
@@ -197,13 +197,13 @@ class Experiment:
 
     def __init__(
         self,
-        name: str,
-        project: str,
+        project: Optional[str] = None,
+        prefix: Optional[str] = None,
         *,
+        owner: Optional[str] = None,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
-        folder: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         # Mode configuration
         remote: Optional[str] = None,
@@ -216,29 +216,39 @@ class Experiment:
         Initialize an ML-Dash experiment.
 
         Args:
-            name: Experiment name (unique within project)
-            project: Project name
+            owner: Owner/user (defaults to DASH_USER env var)
+            project: Project name (defaults to DASH_PROJECT env var)
+            prefix: Experiment prefix path like "folder_1/folder_2/.../exp_name" (defaults to DASH_PREFIX env var)
             description: Optional experiment description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            folder: Optional folder path (e.g., "/experiments/baseline")
             metadata: Optional metadata dict
             remote: Remote API URL (e.g., "https://api.dash.ml")
             api_key: JWT token for authentication (auto-loaded from storage if not provided)
             local_path: Local storage root path (for local mode)
             _write_protected: Internal parameter - if True, experiment becomes immutable after creation
         """
-        self.name = name
-        self.project = project
+        import os
+
+        # Resolve defaults from environment variables
+        self.owner = owner or os.getenv('DASH_USER', 'scratch')
+        self.project = project or os.getenv('DASH_PROJECT', 'scratch')
+        self._folder_path = prefix or os.getenv('DASH_PREFIX')
+
+        # Extract experiment name from last segment of prefix
+        if self._folder_path:
+            self.name = self._folder_path.rstrip('/').split('/')[-1]
+        else:
+            raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
+
         self.description = description
         self.tags = tags
         self._bindrs_list = bindrs
-        self._folder_path = folder
         self._write_protected = _write_protected
         self.metadata = metadata
 
-        # Initialize RUN with experiment values
-        EXP.name = name
+        # Initialize EXP with experiment values
+        EXP.name = self.name
         EXP.project = project
         EXP.description = description
 
@@ -294,7 +304,7 @@ class Experiment:
                     description=self.description,
                     tags=self.tags,
                     bindrs=self._bindrs_list,
-                    folder=self._folder_path,
+                    prefix=self._folder_path,
                     write_protected=self._write_protected,
                     metadata=self.metadata,
                 )
@@ -365,12 +375,12 @@ class Experiment:
         if self._storage:
             # Local mode: create experiment directory structure
             self._storage.create_experiment(
+                owner=self.owner,
                 project=self.project,
-                name=self.name,
+                prefix=self._folder_path,
                 description=self.description,
                 tags=self.tags,
                 bindrs=self._bindrs_list,
-                folder=self._folder_path,
                 metadata=self.metadata,
             )
 
@@ -595,7 +605,7 @@ class Experiment:
             self._storage.write_log(
                 project=self.project,
                 experiment=self.name,
-                folder=self._folder_path,
+                prefix=self._folder_path,
                 message=log_entry["message"],
                 level=log_entry["level"],
                 metadata=log_entry.get("metadata"),
@@ -653,7 +663,7 @@ class Experiment:
         Examples:
             # Upload file - supports flexible syntax
             experiment.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
-            experiment.files(dir="checkpoints").upload("./model.pt")
+            experiment.files(prefix="checkpoints").upload("./model.pt")
             experiment.files().upload("./model.pt", to="models/model.pt")  # root
 
             # List files
@@ -773,9 +783,9 @@ class Experiment:
             result = self._storage.write_file(
                 project=self.project,
                 experiment=self.name,
-                folder=self._folder_path,
+                prefix=self._folder_path,
                 file_path=file_path,
-                prefix=prefix,
+                path=prefix,
                 filename=filename,
                 description=description,
                 tags=tags,
@@ -950,7 +960,7 @@ class Experiment:
             self._storage.write_parameters(
                 project=self.project,
                 experiment=self.name,
-                folder=self._folder_path,
+                prefix=self._folder_path,
                 data=flattened_params
             )
 
@@ -1066,7 +1076,7 @@ class Experiment:
             result = self._storage.append_to_metric(
                 project=self.project,
                 experiment=self.name,
-                folder=self._folder_path,
+                prefix=self._folder_path,
                 metric_name=name,
                 data=data,
                 description=description,

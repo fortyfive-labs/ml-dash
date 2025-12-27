@@ -61,7 +61,7 @@ def local_experiment(temp_project):
             "local_path": str(temp_project),
         }
         defaults.update(kwargs)
-        return Experiment(name=name, project=project, **defaults)
+        return Experiment(name, project=project, **defaults)
 
     return _create_experiment
 
@@ -90,7 +90,7 @@ def remote_experiment():
             "api_key": TEST_API_KEY,
         }
         defaults.update(kwargs)
-        return Experiment(name=unique_name, project=project, **defaults)
+        return Experiment(unique_name, project=project, **defaults)
 
     return _create_experiment
 

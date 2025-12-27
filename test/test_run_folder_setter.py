@@ -10,7 +10,7 @@ from ml_dash import Experiment
 def test_folder_setter_before_init():
     """Test that folder can be set before initialization."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test", project="test", local_path=tmpdir)
+        exp = Experiment("test", project="test", local_path=tmpdir)
 
         # Should be able to set folder before initialization
         exp.run.folder = "experiments/vision"
@@ -27,7 +27,7 @@ def test_folder_setter_before_init():
 def test_folder_setter_fails_after_init():
     """Test that folder cannot be set after initialization."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test", project="test", local_path=tmpdir)
+        exp = Experiment("test", project="test", local_path=tmpdir)
 
         with exp.run:
             # Try to set folder after initialization - should fail
@@ -47,7 +47,7 @@ def test_folder_getter():
             name="test",
             project="test",
             local_path=tmpdir,
-            folder="initial/folder"
+            prefix="initial/folder"
         )
 
         # Getter should work before initialization

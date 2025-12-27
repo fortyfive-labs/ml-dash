@@ -55,7 +55,7 @@ Experiment(
 | `description` | `str` | `None` | Human-readable description of the experiment |
 | `tags` | `List[str]` | `None` | Tags for categorization and search |
 | `bindrs` | `List[str]` | `None` | Binders for advanced organization |
-| `folder` | `str` | `None` | Logical folder path (e.g., "/experiments/baseline") |
+| `prefix` | `str` | `None` | Logical folder path for organization (e.g., "experiments/baseline") |
 | `metadata` | `Dict[str, Any]` | `None` | Additional structured metadata |
 
 #### Mode Configuration

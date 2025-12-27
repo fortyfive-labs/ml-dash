@@ -32,8 +32,9 @@ from .experiment import Experiment
 # Token is auto-loaded from storage when first used
 # If not authenticated, operations will fail with AuthenticationError
 dxp = Experiment(
-    name="dxp",
+    owner="scratch",
     project="scratch",
+    prefix="dxp",
     remote="https://api.dash.ml",
 )
 

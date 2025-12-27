@@ -21,7 +21,7 @@ def test_all_operations_use_folder_field():
         exp = Experiment(
             name="test_exp",
             project="test_project",
-            folder="/iclr_2024/{EXP.name}",
+            prefix="/iclr_2024/{EXP.name}",
             local_path=tmpdir
         )
 
@@ -100,7 +100,7 @@ def test_folder_consistency_with_static_path():
         exp = Experiment(
             name="static_exp",
             project="proj",
-            folder="/custom/path",
+            prefix="/custom/path",
             local_path=tmpdir
         )
 
