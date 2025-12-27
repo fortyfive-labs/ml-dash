@@ -14,8 +14,13 @@ from ml_dash import Experiment
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
-    # Upload file to a prefix
-    dxp.files("checkpoints").save(net, to="checkpoint.pt")
+    # Upload file from disk
+    dxp.files("checkpoints").upload("./model.pt")
+    dxp.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
+
+    # Save objects as files
+    dxp.files("models").save_torch(model, to="model.pt")
+    dxp.files("configs").save_json(config, to="config.json")
 
     # List files in a location
     files = dxp.files("/models").list()
@@ -41,7 +46,7 @@ with Experiment(name="my-experiment", project="project",
 
 ## Basic Upload
 
-### Save Existing File
+### Upload Existing File
 
 ```{code-block} python
 :linenos:
@@ -51,15 +56,15 @@ from ml_dash import Experiment
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
-    # Save a file to a prefix
-    result = dxp.files("models").save("./model.pth")
+    # Upload a file to a prefix
+    result = dxp.files("models").upload("./model.pth")
 
     print(f"Uploaded: {result['filename']}")
     print(f"Size: {result['sizeBytes']} bytes")
     print(f"Checksum: {result['checksum']}")
 ```
 
-### Save Objects Directly
+### Save Objects as Files
 
 Save Python objects directly without creating intermediate files:
 
@@ -71,21 +76,21 @@ with Experiment(name="my-experiment", project="project",
 
     # Save dict/list as JSON
     config = {"model": "resnet50", "lr": 0.001}
-    dxp.files("configs").save(config, to="config.json")
+    dxp.files("configs").save_json(config, to="config.json")
 
     # Save bytes directly
-    dxp.files("data").save(b"binary data", to="data.bin")
+    dxp.files("data").save_blob(b"binary data", to="data.bin")
 
-    # Save PyTorch model (auto-detected)
+    # Save PyTorch model
     import torch
     model = torch.nn.Linear(10, 5)
-    dxp.files("checkpoints").save(model, to="checkpoint.pt")
-    dxp.files("checkpoints").save(model.state_dict(), to="weights.pt")
+    dxp.files("checkpoints").save_torch(model, to="checkpoint.pt")
+    dxp.files("checkpoints").save_torch(model.state_dict(), to="weights.pt")
 ```
 
 ### Direct Method Style
 
-You can also use the direct method style:
+You can also use the direct method style without specifying a prefix:
 
 ```{code-block} python
 :linenos:
@@ -93,10 +98,10 @@ You can also use the direct method style:
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
-    # Save with path included in 'to'
-    dxp.files.save(config, to="configs/settings.json")
+    # Upload file directly
+    dxp.files.upload("./model.pt", to="models/model.pt")
 
-    # Convenience methods
+    # Save objects directly
     dxp.files.save_text("yaml content", to="configs/view.yaml")
     dxp.files.save_json({"key": "value"}, to="data/config.json")
     dxp.files.save_blob(b"\x00\x01\x02", to="binary/data.bin")
@@ -113,17 +118,17 @@ with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
     # Models
-    dxp.files("models").save("model.pth")
-    dxp.files("models/checkpoints").save("best_model.pth")
+    dxp.files("models").upload("model.pth")
+    dxp.files("models/checkpoints").upload("best_model.pth")
 
     # Visualizations
-    dxp.files("visualizations").save("loss_curve.png")
+    dxp.files("visualizations").upload("loss_curve.png")
 
     # Configuration
-    dxp.files("config").save("config.json")
+    dxp.files("config").save_json(config, to="config.json")
 
     # Results
-    dxp.files("results").save("results.csv")
+    dxp.files("results").upload("results.csv")
 ```
 
 ## Listing Files
@@ -217,7 +222,7 @@ with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
     # Upload a file first
-    upload_result = dxp.files("models").save("model.pth")
+    upload_result = dxp.files("models").upload("./model.pth")
     file_id = upload_result["id"]
 
     # Download by ID
@@ -236,7 +241,7 @@ with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
     # Upload
-    upload_result = dxp.files("models").save("model.pth")
+    upload_result = dxp.files("models").upload("./model.pth")
     original_checksum = upload_result["checksum"]
     print(f"Original checksum: {original_checksum}")
 
@@ -289,7 +294,7 @@ Add description, tags, and custom metadata:
 with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
-    result = dxp.files("models").save(
+    result = dxp.files("models").save_torch(
         model,
         to="best_model.pth",
         description="Best model from epoch 50",
@@ -386,7 +391,7 @@ with Experiment(name="resnet-training", project="cv",
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
-            dxp.files("checkpoints").save(
+            dxp.files("checkpoints").save_torch(
                 model.state_dict(),
                 to=f"checkpoint_epoch_{epoch + 1}.pt",
                 tags=["checkpoint"],
@@ -397,7 +402,7 @@ with Experiment(name="resnet-training", project="cv",
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy
 
-            dxp.files("models").save(
+            dxp.files("models").save_torch(
                 model.state_dict(),
                 to="best_model.pt",
                 description=f"Best model (accuracy: {best_accuracy:.4f})",
