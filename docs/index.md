@@ -121,6 +121,20 @@ If you have Claude Code installed:
 - Type-hinted configuration patterns
 - Integration examples with training loops
 
+#### For AI Assistants
+
+To use the params-proto skill in Claude Code, either type:
+
+```
+# add https://raw.githubusercontent.com/fortyfive-labs/ml-dash/main/.claude/skills/params-proto.md as a skill
+```
+
+Or add this import to your project's `CLAUDE.md` file:
+
+```
+@import https://raw.githubusercontent.com/fortyfive-labs/ml-dash/main/.claude/skills/params-proto.md
+```
+
 For more information, visit [Claude Code Documentation](https://claude.com/claude-code).
 
 ---
