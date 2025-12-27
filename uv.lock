@@ -904,7 +904,7 @@ requires-dist = [
     { name = "linkify-it-py", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9.0" },
     { name = "myst-parser", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "params-proto", specifier = ">=3.0.0rc12" },
+    { name = "params-proto", specifier = ">=3.0.0rc18" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
@@ -1285,7 +1285,7 @@ wheels = [
 
 [[package]]
 name = "params-proto"
-version = "3.0.0rc14"
+version = "3.0.0rc18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -1295,9 +1295,9 @@ dependencies = [
     { name = "termcolor", version = "3.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "waterbear" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f3/10/f9735c73395a16c76bbfb58383d565a40dca63b59117edb3c1fa3daff6d2/params_proto-3.0.0rc14.tar.gz", hash = "sha256:ef6795137464a29f3f44f1aa557778220377a97c995481d6f624d8021792894d", size = 946770, upload-time = "2025-12-18T20:46:16.012Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/dd/2a118f1802fcd8626f0b724bd04293b16dd6bae1ab55db014fd14c38c542/params_proto-3.0.0rc18.tar.gz", hash = "sha256:ac761bf2cfee2d9dfd79c6701b87041d0df12d7fbbce2a6e69959f457624a09c", size = 950568, upload-time = "2025-12-27T03:02:50.984Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/4c/98c39e7ac670728d94f98ecf9fbb1cbba093b512d50ab1e83fae8a45a74f/params_proto-3.0.0rc14-py3-none-any.whl", hash = "sha256:5e4a8ba69ae78f3b4786f60746ae6bc92964ce81cbc1fac19c659dd145df2d7f", size = 57327, upload-time = "2025-12-18T20:46:14.562Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/70/308e965f72f4c120069ea6f8e0081617ad449db4e57b8efb033b6e5b3efc/params_proto-3.0.0rc18-py3-none-any.whl", hash = "sha256:f7cbf16f74985c0f7dadc154519c0af1a5fed6864a7040cd8142b10e04931021", size = 57577, upload-time = "2025-12-27T03:02:49.749Z" },
 ]
 
 [[package]]

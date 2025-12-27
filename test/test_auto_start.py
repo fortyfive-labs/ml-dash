@@ -130,7 +130,7 @@ def test_dxp_files(tmp_path):
     test_file.write_text("Test content")
 
     # Upload file
-    result = dxp.files(file_path=str(test_file), prefix="/test").save()
+    result = dxp.files("test").upload(str(test_file))
 
     assert result["filename"] == "test.txt"
     assert result["path"] == "/test"

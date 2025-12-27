@@ -15,7 +15,7 @@ import tempfile
 def test_template_with_run_name():
     """Test template with {EXP.name} variable."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="my-experiment", project="test", local_path=tmpdir)
+        exp = Experiment("my-experiment", project="test", local_path=tmpdir)
         exp.run.folder = "iclr_2024/{EXP.name}"
 
         # EXP.name is just the experiment name (no timestamp)
@@ -31,7 +31,7 @@ def test_template_with_run_name():
 def test_template_with_run_id():
     """Test template with {EXP.id} for unique folders."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="my-experiment", project="test", local_path=tmpdir)
+        exp = Experiment("my-experiment", project="test", local_path=tmpdir)
         exp.run.folder = "iclr_2024/{EXP.name}.{EXP.id}"
 
         # Should include both name and numeric id
@@ -52,7 +52,7 @@ def test_template_with_run_id():
 def test_template_with_run_project():
     """Test template with {EXP.project} variable."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="exp1", project="vision", local_path=tmpdir)
+        exp = Experiment("exp1", project="vision", local_path=tmpdir)
         exp.run.folder = "{EXP.project}/experiments/{EXP.name}"
 
         # Verify template was expanded
@@ -87,7 +87,7 @@ def test_template_with_dxp():
 def test_template_with_multiple_vars():
     """Test template with multiple variables."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="resnet50", project="vision", local_path=tmpdir)
+        exp = Experiment("resnet50", project="vision", local_path=tmpdir)
         exp.run.folder = "experiments/{EXP.project}/models/{EXP.name}/runs"
 
         # Verify both project and name are present
@@ -102,7 +102,7 @@ def test_template_with_multiple_vars():
 def test_static_folder_still_works():
     """Test that static folders without templates still work."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test", project="test", local_path=tmpdir)
+        exp = Experiment("test", project="test", local_path=tmpdir)
         exp.run.folder = "static/folder/path"
 
         assert exp.run.folder == "static/folder/path"
@@ -116,7 +116,7 @@ def test_static_folder_still_works():
 def test_unknown_template_variable():
     """Test that unknown template variables raise AttributeError."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test", project="test", local_path=tmpdir)
+        exp = Experiment("test", project="test", local_path=tmpdir)
 
         # Unknown variables raise AttributeError
         try:

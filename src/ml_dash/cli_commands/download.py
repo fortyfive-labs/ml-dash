@@ -42,7 +42,7 @@ class ExperimentInfo:
     estimated_size: int = 0
     log_count: int = 0
     status: str = "RUNNING"
-    folder: Optional[str] = None
+    prefix: Optional[str] = None
     description: Optional[str] = None
     tags: List[str] = field(default_factory=list)
 
@@ -118,9 +118,9 @@ def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
     """Convert GraphQL experiment data to ExperimentInfo."""
     log_metadata = graphql_data.get('logMetadata') or {}
 
-    # Extract folder from metadata if it exists
+    # Extract prefix from metadata if it exists
     metadata = graphql_data.get('metadata') or {}
-    folder = metadata.get('folder') if isinstance(metadata, dict) else None
+    prefix = metadata.get('prefix') if isinstance(metadata, dict) else None
 
     return ExperimentInfo(
         project=graphql_data['project']['slug'],
@@ -132,7 +132,7 @@ def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
         file_count=len(graphql_data.get('files', []) or []),
         log_count=int(log_metadata.get('totalLogs', 0)),
         status=graphql_data.get('status', 'RUNNING'),
-        folder=folder,
+        prefix=prefix,
         description=graphql_data.get('description'),
         tags=graphql_data.get('tags', []) or [],
     )
@@ -257,14 +257,19 @@ class ExperimentDownloader:
 
     def _download_metadata(self, exp_info: ExperimentInfo, result: DownloadResult):
         """Download and create experiment metadata."""
-        # Create experiment directory structure with folder path
+        # Create experiment directory structure with prefix (folder + experiment name)
+        # Construct full prefix: folder/experiment_name
+        if exp_info.prefix:
+            full_prefix = f"{exp_info.prefix}/{exp_info.experiment}"
+        else:
+            full_prefix = exp_info.experiment
+
         self.local.create_experiment(
             project=exp_info.project,
-            name=exp_info.experiment,
+            prefix=full_prefix,
             description=exp_info.description,
             tags=exp_info.tags,
             bindrs=[],
-            folder=exp_info.folder,
             metadata=None,
         )
 

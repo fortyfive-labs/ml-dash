@@ -21,15 +21,11 @@ def test_all_operations_use_folder_field():
         exp = Experiment(
             name="test_exp",
             project="test_project",
-            folder="/iclr_2024/{EXP.name}",
+            prefix="/iclr_2024/{EXP.name}",
             local_path=tmpdir
         )
 
         with exp.run:
-            # When folder template is passed to constructor, it stays as template
-            # The storage layer resolves it internally
-            assert exp.folder == "/iclr_2024/{EXP.name}"
-
             # Expected base path - template should be resolved in storage
             # The {EXP.name} gets replaced with experiment name
             expected_base = Path(tmpdir) / "iclr_2024" / "{EXP.name}" / "test_project" / "test_exp"
@@ -57,7 +53,7 @@ def test_all_operations_use_folder_field():
             # 3. Test files
             test_file = Path(tmpdir) / "test_upload.txt"
             test_file.write_text("test content")
-            exp.files(file_path=str(test_file), prefix="models").save()
+            exp.files("models").upload(str(test_file))
 
             files_dir = expected_base / "files" / "models"
             assert files_dir.exists(), f"files directory not at {files_dir}"
@@ -69,7 +65,7 @@ def test_all_operations_use_folder_field():
             with open(metadata_file) as f:
                 files_meta = json.load(f)
             assert len(files_meta["files"]) == 1
-            assert files_meta["files"][0]["path"] == "models"
+            assert files_meta["files"][0]["path"] == "/models"
 
             # 4. Test metrics - use correct API: metrics.append()
             exp.metrics.append(loss=0.5, accuracy=0.95, step=1)
@@ -104,7 +100,7 @@ def test_folder_consistency_with_static_path():
         exp = Experiment(
             name="static_exp",
             project="proj",
-            folder="/custom/path",
+            prefix="/custom/path",
             local_path=tmpdir
         )
 
@@ -118,7 +114,7 @@ def test_folder_consistency_with_static_path():
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")
-            exp.files(file_path=str(test_file)).save()
+            exp.files().upload(str(test_file))
 
             # Verify all in same location
             assert (expected_base / "parameters.json").exists()
@@ -149,7 +145,7 @@ def test_no_folder_field_still_works():
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")
-            exp.files(file_path=str(test_file)).save()
+            exp.files().upload(str(test_file))
 
             # All should be in the default location
             assert (expected_base / "parameters.json").exists()
