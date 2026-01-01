@@ -84,7 +84,7 @@ class RemoteClient:
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
-        folder: Optional[str] = None,
+        prefix: Optional[str] = None,
         write_protected: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -97,12 +97,12 @@ class RemoteClient:
             description: Optional description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            folder: Optional folder path
+            prefix: Optional folder path (prefix for organization)
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
 
         Returns:
-            Response dict with experiment, project, folder, and namespace data
+            Response dict with experiment, project, prefix, and namespace data
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -117,8 +117,8 @@ class RemoteClient:
             payload["tags"] = tags
         if bindrs is not None:
             payload["bindrs"] = bindrs
-        if folder is not None:
-            payload["folder"] = folder
+        if prefix is not None:
+            payload["prefix"] = prefix
         if write_protected:
             payload["writeProtected"] = write_protected
         if metadata is not None:

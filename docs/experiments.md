@@ -109,7 +109,7 @@ with Experiment(
 - `description`: Human-readable experiment description
 - `tags`: List of tags for categorization (e.g., ["baseline", "production"])
 - `bindrs`: List of bindrs for resource/team association (e.g., ["gpu-1", "team-ml"])
-- `folder`: Hierarchical folder path for organization
+- `prefix`: Hierarchical folder path for organization (referred to as "folder" in the directory structure)
 
 ## Experiment Status Lifecycle
 

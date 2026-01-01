@@ -27,7 +27,7 @@ class ExperimentInfo:
     project: str
     experiment: str
     path: Path
-    folder: Optional[str] = None
+    prefix: Optional[str] = None
     has_logs: bool = False
     has_params: bool = False
     metric_names: List[str] = field(default_factory=list)
@@ -256,12 +256,12 @@ def discover_experiments(
             if experiment_filter and exp_name != experiment_filter:
                 continue
 
-            # Read folder from experiment.json
-            folder = None
+            # Read prefix from experiment.json
+            prefix = None
             try:
                 with open(exp_json, 'r') as f:
                     metadata = json.load(f)
-                    folder = metadata.get('folder')
+                    prefix = metadata.get('prefix')
             except:
                 pass
 
@@ -270,7 +270,7 @@ def discover_experiments(
                 project=project_name,
                 experiment=exp_name,
                 path=exp_dir,
-                folder=folder,
+                prefix=prefix,
             )
         except (ValueError, IndexError):
             continue
@@ -609,10 +609,10 @@ class ExperimentUploader:
 
             exp_data = validation_result.valid_data
 
-            # Store folder path in metadata (not as folderId which expects Snowflake ID)
+            # Store prefix path in metadata (not as folderId which expects Snowflake ID)
             custom_metadata = exp_data.get("metadata") or {}
-            if exp_data.get("folder"):
-                custom_metadata["folder"] = exp_data["folder"]
+            if exp_data.get("prefix"):
+                custom_metadata["prefix"] = exp_data["prefix"]
 
             response = self.remote.create_or_update_experiment(
                 project=exp_info.project,
@@ -620,7 +620,7 @@ class ExperimentUploader:
                 description=exp_data.get("description"),
                 tags=exp_data.get("tags"),
                 bindrs=exp_data.get("bindrs"),
-                folder=None,  # Don't send folder path as folderId (expects Snowflake ID)
+                prefix=None,  # Don't send prefix path as folderId (expects Snowflake ID)
                 write_protected=exp_data.get("write_protected", False),
                 metadata=custom_metadata if custom_metadata else None,
             )

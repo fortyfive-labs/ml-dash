@@ -20,7 +20,7 @@ class TestDuplicateLocal:
 
         try:
             # Upload original file
-            original = exp.files(file_path=temp_path, prefix="/checkpoints").save()
+            original = exp.files("checkpoints").upload(temp_path)
 
             # Duplicate to new location
             duplicate = exp.files().duplicate(original['id'], to="models/latest.pt")
@@ -57,7 +57,7 @@ class TestDuplicateLocal:
 
         try:
             # Upload and get metadata
-            snapshot = exp.files(file_path=temp_path, prefix="/checkpoints").save()
+            snapshot = exp.files("checkpoints").upload(temp_path)
 
             # Duplicate using metadata dict
             latest = exp.files().duplicate(snapshot, to="checkpoints/best.pt")
@@ -85,7 +85,7 @@ class TestDuplicateLocal:
             temp_path = f.name
 
         try:
-            original = exp.files(file_path=temp_path).save()
+            original = exp.files().upload(temp_path)
 
             # Test different path formats
             test_cases = [
@@ -151,12 +151,12 @@ class TestDuplicateLocal:
 
         try:
             # Upload first version and duplicate to "latest"
-            v1 = exp.files(file_path=temp_path1).save()
+            v1 = exp.files().upload(temp_path1)
             latest1 = exp.files().duplicate(v1, to="models/latest.pt")
             checksum1 = latest1['checksum']
 
             # Upload second version and duplicate to same "latest" location
-            v2 = exp.files(file_path=temp_path2).save()
+            v2 = exp.files().upload(temp_path2)
             latest2 = exp.files().duplicate(v2, to="models/latest.pt")
             checksum2 = latest2['checksum']
 
@@ -195,7 +195,7 @@ class TestDuplicateRemote:
 
         try:
             # Upload and duplicate
-            original = exp.files(file_path=temp_path, prefix="/models").save()
+            original = exp.files("models").upload(temp_path)
             duplicate = exp.files().duplicate(original, to="models/latest.pt")
 
             # Verify

@@ -12,13 +12,13 @@ def test_params_log_is_alias_for_set():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Test with set()
-        exp1 = Experiment(name="test-set", project="test", local_path=tmpdir)
+        exp1 = Experiment("test-set", project="test", local_path=tmpdir)
         with exp1.run:
             exp1.params.set(a=1, b=2, c=3)
             params1 = exp1.params.get()
 
         # Test with log()
-        exp2 = Experiment(name="test-log", project="test", local_path=tmpdir)
+        exp2 = Experiment("test-log", project="test", local_path=tmpdir)
         with exp2.run:
             exp2.params.log(a=1, b=2, c=3)
             params2 = exp2.params.get()
@@ -34,7 +34,7 @@ def test_params_log_chaining():
     """Test that params.log() supports chaining."""
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test-chain", project="test", local_path=tmpdir)
+        exp = Experiment("test-chain", project="test", local_path=tmpdir)
         with exp.run:
             # Should support chaining
             result = exp.params.log(a=1).log(b=2)
@@ -55,7 +55,7 @@ def test_params_log_nested():
     """Test that params.log() handles nested dicts."""
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="test-nested", project="test", local_path=tmpdir)
+        exp = Experiment("test-nested", project="test", local_path=tmpdir)
         with exp.run:
             exp.params.log(
                 model={"type": "resnet50", "layers": 50},
@@ -78,7 +78,7 @@ def demo_params_log():
     print("="*60)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(name="demo", project="demo", local_path=tmpdir)
+        exp = Experiment("demo", project="demo", local_path=tmpdir)
 
         with exp.run:
             print("\n1. Setting initial parameters with params.log():")

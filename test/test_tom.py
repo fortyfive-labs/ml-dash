@@ -8,7 +8,7 @@ def train_simple_model():
     with Experiment(
         name="hyperparameter-schema-test-5",
         project="tutorials",
-        folder='/tmp/ml_dash/examples',
+        prefix='/tmp/ml_dash/examples',
         description="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
         tags=["sweep", "best"],
         # remote='http://localhost:3000',
@@ -138,35 +138,32 @@ def train_simple_model():
         with open("model.pth", "w") as f:
             f.write("model weights")
 
-        experiment.files(
-            file_path="model.pth",
-            prefix="/models",
+        experiment.files("models").upload(
+            "model.pth",
             description="Final trained model",
             tags=["final"]
-        ).save()
-        experiment.files(
-            file_path="/Users/57block/fortyfive/ml-dash/test/selfie.jpeg",
-            prefix="/plots",
+        )
+        experiment.files("plots").upload(
+            "/Users/57block/fortyfive/ml-dash/test/selfie.jpeg",
             description="Final trained model",
             tags=["final"]
-        ).save()  
-        experiment.files(
-            file_path="/Users/57block/fortyfive/ml-dash/test/view.yaml",
+        )
+        experiment.files().upload(
+            "/Users/57block/fortyfive/ml-dash/test/view.yaml",
             description="Final trained model",
             tags=["final"]
-        ).save()     
-        experiment.files(
-            file_path="/Users/57block/fortyfive/ml-dash/test/video.mp4",
-            prefix="/videos",
+        )
+        experiment.files("videos").upload(
+            "/Users/57block/fortyfive/ml-dash/test/video.mp4",
             description="Final trained model",
             tags=["final"]
-        ).save()  
-        experiment.files(
-            file_path="./README.md",
+        )
+        experiment.files().upload(
+            "./README.md",
             description="Best model checkpoint",
             tags=["best", "checkpoint"],
             metadata={"epoch": 50, "val_accuracy": 0.96, "f1_score": 0.96}
-        ).save()
+        )
 
         experiment.log("Training complete!", level="info")
         print(f"✓ Experiment completed successfully with 18 metrics tracked")
