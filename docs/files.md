@@ -99,12 +99,12 @@ with Experiment(name="my-experiment", project="project",
         local_path=".ml-dash").run as dxp:
 
     # Upload file directly
-    dxp.file.upload("./model.pt", to="models/model.pt")
+    dxp.files.upload("./model.pt", to="models/model.pt")
 
     # Save objects directly
-    dxp.file.save_text("yaml content", to="configs/view.yaml")
-    dxp.file.save_json({"key": "value"}, to="data/config.json")
-    dxp.file.save_blob(b"\x00\x01\x02", to="binary/data.bin")
+    dxp.files.save_text("yaml content", to="configs/view.yaml")
+    dxp.files.save_json({"key": "value"}, to="data/config.json")
+    dxp.files.save_blob(b"\x00\x01\x02", to="binary/data.bin")
 ```
 
 ## Organizing Files
