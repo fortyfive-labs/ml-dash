@@ -55,13 +55,23 @@ def local_experiment(temp_project):
     Create a test experiment in local mode.
 
     Returns a function that creates experiments with default config but allows overrides.
+    Uses the new API: Experiment(project=..., prefix=...) where name is extracted from prefix.
     """
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
         defaults = {
             "local_path": str(temp_project),
         }
         defaults.update(kwargs)
-        return Experiment(name, project=project, **defaults)
+        # Convert old-style 'folder' to 'prefix' if present
+        if 'folder' in defaults:
+            # Combine folder and name to create prefix
+            folder = defaults.pop('folder')
+            prefix = f"{folder.strip('/')}/{name}" if folder else name
+            defaults['prefix'] = prefix
+        else:
+            # Use name as prefix (experiment name is extracted from last segment)
+            defaults.setdefault('prefix', name)
+        return Experiment(project=project, **defaults)
 
     return _create_experiment
 
@@ -76,6 +86,7 @@ def remote_experiment():
     Uses a pre-generated test JWT token for authentication.
 
     Generates unique experiment names using timestamps to avoid collisions between test runs.
+    Uses the new API: Experiment(project=..., prefix=...) where name is extracted from prefix.
     """
     import time
 
@@ -90,7 +101,14 @@ def remote_experiment():
             "api_key": TEST_API_KEY,
         }
         defaults.update(kwargs)
-        return Experiment(unique_name, project=project, **defaults)
+        # Convert old-style 'folder' to 'prefix' if present
+        if 'folder' in defaults:
+            folder = defaults.pop('folder')
+            prefix = f"{folder.strip('/')}/{unique_name}" if folder else unique_name
+            defaults['prefix'] = prefix
+        else:
+            defaults.setdefault('prefix', unique_name)
+        return Experiment(project=project, **defaults)
 
     return _create_experiment
 

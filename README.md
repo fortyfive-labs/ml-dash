@@ -72,12 +72,12 @@ with dxp.run:
 from ml_dash import Experiment
 
 with Experiment(
-    name="my-experiment",
-    project="my-project",
-    remote="https://api.dash.ml"  # token auto-loaded
+  project="my-project",
+  prefix="my-experiment",
+  remote="https://api.dash.ml",  # token auto-loaded
 ).run as experiment:
-    experiment.log().info("Hello!")
-    experiment.params.set(lr=0.001)
+  experiment.log.info("Hello!")
+  experiment.params.set(lr=0.001)
 ```
 
 #### Option C: Local Mode (No Authentication Required)
@@ -86,11 +86,10 @@ with Experiment(
 from ml_dash import Experiment
 
 with Experiment(
-    name="my-experiment",
-    project="my-project",
-    local_path=".ml-dash"
+  project="my-project", prefix="my-experiment", local_path=".ml-dash"
 ).run as experiment:
-    experiment.log().info("Running locally")
+  experiment.log().info("Running locally")
+
 ```
 
 See [docs/getting-started.md](docs/getting-started.md) for more examples.

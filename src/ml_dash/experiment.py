@@ -603,8 +603,8 @@ class Experiment:
         if self._storage:
             # Local mode: write to file immediately
             self._storage.write_log(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 message=log_entry["message"],
                 level=log_entry["level"],
@@ -781,8 +781,8 @@ class Experiment:
         if self._storage:
             # Local mode: copy to local storage
             result = self._storage.write_file(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 file_path=file_path,
                 path=prefix,
@@ -958,8 +958,8 @@ class Experiment:
         if self._storage:
             # Local mode: write to file
             self._storage.write_parameters(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 data=flattened_params
             )
@@ -984,8 +984,9 @@ class Experiment:
         if self._storage:
             # Local mode: read from file
             params = self._storage.read_parameters(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name
+                prefix=self._folder_path
             )
 
         return params
@@ -1074,8 +1075,8 @@ class Experiment:
         if self._storage:
             # Local mode: append to local storage
             result = self._storage.append_to_metric(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 metric_name=name,
                 data=data,
@@ -1123,8 +1124,9 @@ class Experiment:
         if self._storage:
             # Local mode: append batch to local storage
             result = self._storage.append_batch_to_metric(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name,
                 data_points=data_points,
                 description=description,
@@ -1165,8 +1167,9 @@ class Experiment:
         if self._storage:
             # Local mode: read from local storage
             result = self._storage.read_metric_data(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name,
                 start_index=start_index,
                 limit=limit
@@ -1196,8 +1199,9 @@ class Experiment:
         if self._storage:
             # Local mode: get stats from local storage
             result = self._storage.get_metric_stats(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name
             )
 
@@ -1219,8 +1223,9 @@ class Experiment:
         if self._storage:
             # Local mode: list from local storage
             result = self._storage.list_metrics(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name
+                prefix=self._folder_path
             )
 
         return result or []

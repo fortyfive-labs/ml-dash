@@ -22,7 +22,7 @@ def cleanup_dxp():
     # Configure dxp for local mode testing
     dxp._storage = LocalStorage(root_path=ml_dash_dir)
     dxp._client = None  # Disable remote
-    dxp.folder = None
+    dxp._folder_path = "dxp"  # Set prefix for local mode
 
     # Reopen dxp for the test
     dxp.run.start()
@@ -54,7 +54,8 @@ def test_dxp_logging():
     dxp.log("Another message", level="info")
 
     # Verify logs exist in .ml-dash directory
-    experiment_dir = Path(".ml-dash") / "scratch" / "dxp"
+    # New structure: root / owner / project / prefix
+    experiment_dir = Path(".ml-dash") / "scratch" / "scratch" / "dxp"
     logs_file = experiment_dir / "logs" / "logs.jsonl"
 
     assert logs_file.exists()
@@ -86,7 +87,8 @@ def test_dxp_parameters():
     assert params["model.layers"] == 50
 
     # Verify parameters file exists
-    experiment_dir = Path(".ml-dash") / "scratch" / "dxp"
+    # New structure: root / owner / project / prefix
+    experiment_dir = Path(".ml-dash") / "scratch" / "scratch" / "dxp"
     params_file = experiment_dir / "parameters.json"
     assert params_file.exists()
 
@@ -105,7 +107,8 @@ def test_dxp_metrics():
     dxp.run.start()
 
     # Verify metrics exist (stored as metrics/<name>/data.jsonl)
-    experiment_dir = Path(".ml-dash") / "scratch" / "dxp"
+    # New structure: root / owner / project / prefix
+    experiment_dir = Path(".ml-dash") / "scratch" / "scratch" / "dxp"
     metrics_dir = experiment_dir / "metrics"
 
     assert metrics_dir.exists()
@@ -137,7 +140,8 @@ def test_dxp_files(tmp_path):
     file_id = result["id"]
 
     # Verify file exists in experiment (files are stored as files/<prefix>/<file_id>/<filename>)
-    experiment_dir = Path(".ml-dash") / "scratch" / "dxp"
+    # New structure: root / owner / project / prefix
+    experiment_dir = Path(".ml-dash") / "scratch" / "scratch" / "dxp"
     uploaded_file = experiment_dir / "files" / "test" / file_id / "test.txt"
     assert uploaded_file.exists()
     assert uploaded_file.read_text() == "Test content"
@@ -171,7 +175,8 @@ def test_dxp_works_like_normal_experiment():
     dxp.metrics("test_metric").append(step=0, value=1.0)
 
     # Verify data was saved
-    experiment_dir = Path(".ml-dash") / "scratch" / "dxp"
+    # New structure: root / owner / project / prefix
+    experiment_dir = Path(".ml-dash") / "scratch" / "scratch" / "dxp"
     assert experiment_dir.exists()
     assert (experiment_dir / "experiment.json").exists()
 

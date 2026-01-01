@@ -133,6 +133,9 @@ class LocalStorage:
         (experiment_dir / "metrics").mkdir(exist_ok=True)
         (experiment_dir / "files").mkdir(exist_ok=True)
 
+        # Extract experiment name from prefix (last segment)
+        name = prefix_clean.split('/')[-1] if prefix_clean else "untitled"
+
         # Write experiment metadata
         experiment_metadata = {
             "name": name,
@@ -189,9 +192,9 @@ class LocalStorage:
 
     def write_log(
         self,
+        owner: str,
         project: str,
-        experiment: str,
-        prefix: Optional[str] = None,
+        prefix: str,
         message: str = "",
         level: str = "info",
         timestamp: str = "",
@@ -201,15 +204,15 @@ class LocalStorage:
         Write a single log entry immediately to JSONL file.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
-            prefix: Optional folder path (prefix for organization)
+            prefix: Experiment prefix (folder_1/folder_2/.../exp_name)
             message: Log message
             level: Log level
             timestamp: ISO timestamp string
             metadata: Optional metadata
         """
-        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         logs_dir = experiment_dir / "logs"
         logs_file = logs_dir / "logs.jsonl"
         seq_file = logs_dir / ".log_sequence"
@@ -271,9 +274,9 @@ class LocalStorage:
 
     def write_parameters(
         self,
+        owner: str,
         project: str,
-        experiment: str,
-        prefix: Optional[str] = None,
+        prefix: str,
         data: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -287,14 +290,14 @@ class LocalStorage:
         }
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
-            prefix: Optional folder path (prefix for organization)
+            prefix: Experiment prefix path
             data: Flattened parameter dict with dot notation (already flattened)
         """
         if data is None:
             data = {}
-        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         params_file = experiment_dir / "parameters.json"
 
         # File-based lock for concurrent parameter writes (prevents data loss and version conflicts)
@@ -344,20 +347,22 @@ class LocalStorage:
 
     def read_parameters(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Read parameters from local file.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix path
 
         Returns:
             Flattened parameter dict, or None if file doesn't exist
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         params_file = experiment_dir / "parameters.json"
 
         if not params_file.exists():
@@ -746,9 +751,9 @@ class LocalStorage:
 
     def append_to_metric(
         self,
+        owner: str,
         project: str,
-        experiment: str,
-        prefix: Optional[str] = None,
+        prefix: str,
         metric_name: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
@@ -759,14 +764,14 @@ class LocalStorage:
         Append a single data point to a metric in local storage.
 
         Storage format:
-        .ml-dash/{project}/{experiment}/metrics/{metric_name}/
+        root/{owner}/{project}/{prefix}/metrics/{metric_name}/
             data.jsonl  # Data points (one JSON object per line)
             metadata.json  # Metric metadata (name, description, tags, stats)
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
-            prefix: Optional folder path (prefix for organization)
+            prefix: Experiment prefix path
             metric_name: Metric name (None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
@@ -778,7 +783,7 @@ class LocalStorage:
         """
         if data is None:
             data = {}
-        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 
@@ -852,8 +857,9 @@ class LocalStorage:
 
     def append_batch_to_metric(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         metric_name: Optional[str],
         data_points: List[Dict[str, Any]],
         description: Optional[str] = None,
@@ -864,8 +870,9 @@ class LocalStorage:
         Append multiple data points to a metric in local storage (batch).
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix path
             metric_name: Metric name (None for unnamed metrics)
             data_points: List of data points
             description: Optional metric description
@@ -875,7 +882,7 @@ class LocalStorage:
         Returns:
             Dict with metricId, startIndex, endIndex, count
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 
@@ -951,8 +958,9 @@ class LocalStorage:
 
     def read_metric_data(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         metric_name: str,
         start_index: int = 0,
         limit: int = 1000
@@ -961,8 +969,9 @@ class LocalStorage:
         Read data points from a metric in local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix path
             metric_name: Metric name
             start_index: Starting index
             limit: Max points to read
@@ -970,7 +979,7 @@ class LocalStorage:
         Returns:
             Dict with data, startIndex, endIndex, total, hasMore
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metric_dir = experiment_dir / "metrics" / metric_name
         data_file = metric_dir / "data.jsonl"
 
@@ -1011,22 +1020,24 @@ class LocalStorage:
 
     def get_metric_stats(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         metric_name: str
     ) -> Dict[str, Any]:
         """
         Get metric statistics from local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix path
             metric_name: Metric name
 
         Returns:
             Dict with metric stats
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metric_dir = experiment_dir / "metrics" / metric_name
         metadata_file = metric_dir / "metadata.json"
 
@@ -1055,20 +1066,22 @@ class LocalStorage:
 
     def list_metrics(
         self,
+        owner: str,
         project: str,
-        experiment: str
+        prefix: str
     ) -> List[Dict[str, Any]]:
         """
         List all metrics in an experiment from local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix path
 
         Returns:
             List of metric summaries
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metrics_dir = experiment_dir / "metrics"
 
         if not metrics_dir.exists():

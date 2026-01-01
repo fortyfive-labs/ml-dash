@@ -11,25 +11,26 @@ def test_experiment_creation_with_context_manager(local_experiment, temp_project
         experiment.params.set(message="Hello World")
 
     # Verify experiment directory was created
-    experiment_dir = temp_project / "tutorials" / "hello-ml-dash"
+    # New structure: root / owner / project / prefix (owner defaults to "scratch")
+    experiment_dir = temp_project / "scratch" / "tutorials" / "hello-ml-dash"
     assert experiment_dir.exists()
     assert (experiment_dir / "experiment.json").exists()
 
 
 def test_experiment_with_metadata(local_experiment, temp_project):
-    """Test experiment creation with description, tags, and folder."""
+    """Test experiment creation with description, tags, and prefix."""
     with local_experiment(
         name="mnist-baseline",
         project="computer-vision",
         description="Baseline CNN for MNIST classification",
         tags=["mnist", "cnn", "baseline"],
-        folder="/experiments/mnist",
+        prefix="experiments/mnist/mnist-baseline",
     ).run as experiment:
         experiment.log("Experiment created with metadata")
 
     # Verify metadata was saved
-    # When folder is set, files go to: root_path / folder / project / experiment
-    experiment_dir = temp_project / "experiments" / "mnist" / "computer-vision" / "mnist-baseline"
+    # New structure: root / owner / project / prefix (owner defaults to "scratch")
+    experiment_dir = temp_project / "scratch" / "computer-vision" / "experiments" / "mnist" / "mnist-baseline"
     experiment_file = experiment_dir / "experiment.json"
 
     assert experiment_file.exists()
@@ -40,7 +41,7 @@ def test_experiment_with_metadata(local_experiment, temp_project):
         assert metadata["description"] == "Baseline CNN for MNIST classification"
         assert "mnist" in metadata["tags"]
         assert "cnn" in metadata["tags"]
-        assert metadata["folder"] == "/experiments/mnist"
+        assert metadata["prefix"] == "experiments/mnist/mnist-baseline"
 
 
 def test_experiment_manual_open_close(local_experiment, temp_project):
@@ -62,7 +63,8 @@ def test_experiment_manual_open_close(local_experiment, temp_project):
     assert not experiment._is_open
 
     # Verify data was saved
-    experiment_dir = temp_project / "test" / "manual-experiment"
+    # New structure: root / owner / project / prefix
+    experiment_dir = temp_project / "scratch" / "test" / "manual-experiment"
     assert experiment_dir.exists()
 
 
@@ -87,7 +89,8 @@ def test_experiments_same_project(local_experiment, temp_project):
         experiment.log("Experiment 2")
 
     # Verify both experiments exist
-    project_dir = temp_project / "shared"
+    # New structure: root / owner / project / prefix
+    project_dir = temp_project / "scratch" / "shared"
     assert (project_dir / "experiment-1").exists()
     assert (project_dir / "experiment-2").exists()
 
@@ -110,7 +113,8 @@ def test_experiment_error_handling(local_experiment, temp_project):
         pass
 
     # Experiment should still be closed and data saved
-    experiment_dir = temp_project / "test" / "error-test"
+    # New structure: root / owner / project / prefix
+    experiment_dir = temp_project / "scratch" / "test" / "error-test"
     assert experiment_dir.exists()
     assert (experiment_dir / "logs" / "logs.jsonl").exists()
     assert (experiment_dir / "parameters.json").exists()
