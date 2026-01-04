@@ -12,7 +12,7 @@ def test_experiment_creation_with_context_manager(local_experiment, temp_project
 
     # Verify experiment directory was created
     # New structure: root / owner / project / prefix (owner defaults to "scratch")
-    experiment_dir = temp_project / "scratch" / "tutorials" / "hello-ml-dash"
+    experiment_dir = temp_project /  "tutorials" / "hello-ml-dash"
     assert experiment_dir.exists()
     assert (experiment_dir / "experiment.json").exists()
 
@@ -30,7 +30,7 @@ def test_experiment_with_metadata(local_experiment, temp_project):
 
     # Verify metadata was saved
     # New structure: root / owner / project / prefix (owner defaults to "scratch")
-    experiment_dir = temp_project / "scratch" / "computer-vision" / "experiments" / "mnist" / "mnist-baseline"
+    experiment_dir = temp_project /  "computer-vision" / "experiments" / "mnist" / "mnist-baseline"
     experiment_file = experiment_dir / "experiment.json"
 
     assert experiment_file.exists()
@@ -64,7 +64,7 @@ def test_experiment_manual_open_close(local_experiment, temp_project):
 
     # Verify data was saved
     # New structure: root / owner / project / prefix
-    experiment_dir = temp_project / "scratch" / "test" / "manual-experiment"
+    experiment_dir = temp_project /  "test" / "manual-experiment"
     assert experiment_dir.exists()
 
 
@@ -90,7 +90,7 @@ def test_experiments_same_project(local_experiment, temp_project):
 
     # Verify both experiments exist
     # New structure: root / owner / project / prefix
-    project_dir = temp_project / "scratch" / "shared"
+    project_dir = temp_project /  "shared"
     assert (project_dir / "experiment-1").exists()
     assert (project_dir / "experiment-2").exists()
 
@@ -114,7 +114,7 @@ def test_experiment_error_handling(local_experiment, temp_project):
 
     # Experiment should still be closed and data saved
     # New structure: root / owner / project / prefix
-    experiment_dir = temp_project / "scratch" / "test" / "error-test"
+    experiment_dir = temp_project /  "test" / "error-test"
     assert experiment_dir.exists()
     assert (experiment_dir / "logs" / "logs.jsonl").exists()
     assert (experiment_dir / "parameters.json").exists()

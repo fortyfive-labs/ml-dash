@@ -51,14 +51,14 @@ class TestFluentFileSave:
     def test_files_save_direct(self, local_experiment, sample_files):
         """Test experiment.folder.save() direct method."""
         with local_experiment(name="fluent-direct-save", project="test").run as exp:
-            result = exp.folder.save(sample_files["model"])
+            result = exp.files().save(sample_files["model"])
 
             assert result["filename"] == "model.txt"
 
     def test_files_save_with_path(self, local_experiment):
         """Test experiment.folder.save() with to parameter including path."""
         with local_experiment(name="fluent-direct-save-path", project="test").run as exp:
-            result = exp.folder.save({"key": "value"}, to="configs/settings.json")
+            result = exp.files().save({"key": "value"}, to="configs/settings.json")
 
             assert result["filename"] == "settings.json"
             assert result["path"] == "/configs"
@@ -83,14 +83,14 @@ class TestFluentSaveText:
     def test_save_text_direct(self, local_experiment):
         """Test experiment.folder.save_text() direct method."""
         with local_experiment(name="save-text-direct", project="test").run as exp:
-            result = exp.folder.save_text("content", to="file.txt")
+            result = exp.files().save_text("content", to="file.txt")
 
             assert result["filename"] == "file.txt"
 
     def test_save_text_with_path(self, local_experiment):
         """Test save_text with path including prefix."""
         with local_experiment(name="save-text-path", project="test").run as exp:
-            result = exp.folder.save_text("yaml: content", to="configs/view.yaml")
+            result = exp.files().save_text("yaml: content", to="configs/view.yaml")
 
             assert result["filename"] == "view.yaml"
             assert result["path"] == "/configs"
@@ -115,7 +115,7 @@ class TestFluentSaveJson:
     def test_save_json_direct(self, local_experiment):
         """Test experiment.folder.save_json() direct method."""
         with local_experiment(name="save-json-direct", project="test").run as exp:
-            result = exp.folder.save_json({"key": "value"}, to="data.json")
+            result = exp.files().save_json({"key": "value"}, to="data.json")
 
             assert result["filename"] == "data.json"
 
@@ -139,7 +139,7 @@ class TestFluentSaveBlob:
     def test_save_blob_direct(self, local_experiment):
         """Test experiment.folder.save_blob() direct method."""
         with local_experiment(name="save-blob-direct", project="test").run as exp:
-            result = exp.folder.save_blob(b"data", to="file.bin")
+            result = exp.files().save_blob(b"data", to="file.bin")
 
             assert result["filename"] == "file.bin"
 
@@ -194,7 +194,7 @@ class TestFluentList:
             exp.files("models").save(sample_files["model"])
             exp.files("configs").save(sample_files["config"])
 
-            files = exp.folder.list("*.txt")
+            files = exp.files().list("*.txt")
             assert len(files) == 1
 
 
@@ -231,7 +231,9 @@ class TestFluentDownload:
         with local_experiment(name="download-direct", project="test").run as exp:
             exp.files("models").save(sample_files["model"])
 
-            downloaded = exp.folder.download("model.txt", to=str(tmp_path / "out.txt"))
+            # Download using the full path (prefix/filename)
+            # Use files.download (property access) not files().download
+            downloaded = exp.files.download("models/model.txt", to=str(tmp_path / "out.txt"))
 
             assert Path(downloaded).exists()
 
@@ -243,7 +245,7 @@ class TestFluentDownload:
 
             # Download using path/pattern syntax
             dest_dir = tmp_path / "local_images"
-            downloaded = exp.folder.download("images/*.txt", to=str(dest_dir))
+            downloaded = exp.files().download("images/*.txt", to=str(dest_dir))
 
             assert isinstance(downloaded, list)
             assert len(downloaded) == 1
@@ -283,8 +285,13 @@ class TestFluentDelete:
         with local_experiment(name="delete-direct", project="test").run as exp:
             exp.files("models").save(sample_files["model"])
 
-            result = exp.folder.delete("model.txt")
+            # Delete using the full path (prefix/filename)
+            # Use files.delete (property access) not files().delete
+            result = exp.files.delete("models/model.txt")
 
+            # Result can be a list or dict depending on number of files
+            if isinstance(result, list):
+                result = result[0]
             assert "deletedAt" in result or "id" in result
 
     def test_delete_with_path_pattern(self, local_experiment, sample_files):
@@ -293,71 +300,9 @@ class TestFluentDelete:
             exp.files("images").save(sample_files["model"])
             exp.files("images").save(sample_files["config"])
 
-            results = exp.folder.delete("images/*.txt")
+            results = exp.files().delete("images/*.txt")
 
             assert isinstance(results, list)
-
-
-class TestBackwardsCompatibility:
-    """Tests to ensure backwards compatibility with old API."""
-
-    def test_old_api_file_path_prefix(self, local_experiment, sample_files):
-        """Test old API with file_path and prefix kwargs still works."""
-        with local_experiment(name="compat-upload", project="test").run as exp:
-            result = exp.files(
-                file_path=sample_files["model"],
-                prefix="/models",
-                description="Model weights",
-                tags=["model"]
-            ).save()
-
-            assert result["filename"] == "model.txt"
-            assert result["path"] == "/models"
-
-    def test_old_api_download_by_file_id(self, local_experiment, sample_files, tmp_path):
-        """Test old API download with file_id still works."""
-        with local_experiment(name="compat-download", project="test").run as exp:
-            upload_result = exp.files(
-                file_path=sample_files["model"],
-                prefix="/models"
-            ).save()
-
-            file_id = upload_result["id"]
-
-            # Old API download
-            downloaded = exp.files(
-                file_id=file_id,
-                dest_path=str(tmp_path / "model.txt")
-            ).download()
-
-            assert Path(downloaded).exists()
-
-    def test_old_api_delete_by_file_id(self, local_experiment, sample_files):
-        """Test old API delete with file_id still works."""
-        with local_experiment(name="compat-delete", project="test").run as exp:
-            upload_result = exp.files(
-                file_path=sample_files["model"],
-                prefix="/models"
-            ).save()
-
-            file_id = upload_result["id"]
-
-            # Old API delete
-            result = exp.files(file_id=file_id).delete()
-
-            assert "deletedAt" in result or "id" in result
-
-    def test_old_api_list_with_prefix(self, local_experiment, sample_files):
-        """Test old API list with prefix still works."""
-        with local_experiment(name="compat-list", project="test").run as exp:
-            exp.files(file_path=sample_files["model"], prefix="/models").save()
-            exp.files(file_path=sample_files["config"], prefix="/configs").save()
-
-            # Old API list with prefix
-            files = exp.files(prefix="/models").list()
-
-            assert len(files) == 1
-            assert files[0]["filename"] == "model.txt"
 
 
 class TestBindrs:

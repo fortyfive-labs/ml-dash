@@ -825,9 +825,10 @@ class Experiment:
         if self._storage:
             # Local mode: read from metadata file
             files = self._storage.list_files(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
-                prefix=prefix,
+                prefix=self._folder_path,
+                path_prefix=prefix,
                 tags=tags
             )
 
@@ -859,8 +860,9 @@ class Experiment:
         if self._storage:
             # Local mode: copy from local storage
             return self._storage.read_file(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 file_id=file_id,
                 dest_path=dest_path
             )
@@ -889,8 +891,9 @@ class Experiment:
         if self._storage:
             # Local mode: soft delete in metadata
             result = self._storage.delete_file(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 file_id=file_id
             )
 
@@ -930,8 +933,9 @@ class Experiment:
         if self._storage:
             # Local mode: update in metadata file
             result = self._storage.update_file_metadata(
+                owner=self.owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 file_id=file_id,
                 description=description,
                 tags=tags,

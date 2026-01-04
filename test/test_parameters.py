@@ -12,7 +12,7 @@ class TestBasicParameters:
         with local_experiment(name="params-test", project="test").run as experiment:
             experiment.params.set(**sample_data["simple_params"])
 
-        params_file = temp_project / "test" / "params-test" / "parameters.json"
+        params_file = temp_project /  "test" / "params-test" / "parameters.json"
         assert params_file.exists()
 
         with open(params_file) as f:
@@ -43,7 +43,7 @@ class TestBasicParameters:
                 dict_param={"nested": "value"}
             )
 
-        params_file = temp_project / "test" / "param-types" / "parameters.json"
+        params_file = temp_project /  "test" / "param-types" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -75,7 +75,7 @@ class TestNestedParameters:
         with local_experiment(name="nested-params", project="test").run as experiment:
             experiment.params.set(**sample_data["nested_params"])
 
-        params_file = temp_project / "test" / "nested-params" / "parameters.json"
+        params_file = temp_project /  "test" / "nested-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -123,7 +123,7 @@ class TestNestedParameters:
                 }
             )
 
-        params_file = temp_project / "test" / "deep-nested" / "parameters.json"
+        params_file = temp_project /  "test" / "deep-nested" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -143,7 +143,7 @@ class TestNestedParameters:
                 }
             )
 
-        params_file = temp_project / "test" / "mixed-params" / "parameters.json"
+        params_file = temp_project /  "test" / "mixed-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -168,7 +168,7 @@ class TestParameterUpdates:
             # Add new parameter
             experiment.params.set(epochs=100)
 
-        params_file = temp_project / "test" / "param-update" / "parameters.json"
+        params_file = temp_project /  "test" / "param-update" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -191,7 +191,7 @@ class TestParameterUpdates:
             experiment.params.set(step=2, value=0.2)
             experiment.params.set(step=3, value=0.3)
 
-        params_file = temp_project / "test" / "multi-update" / "parameters.json"
+        params_file = temp_project /  "test" / "multi-update" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -204,7 +204,7 @@ class TestParameterUpdates:
             experiment.params.set(**{"model": {"name": "vgg", "layers": 16}})
             experiment.params.set(**{"model": {"name": "resnet", "layers": 50}})
 
-        params_file = temp_project / "test" / "overwrite-nested" / "parameters.json"
+        params_file = temp_project /  "test" / "overwrite-nested" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -220,7 +220,7 @@ class TestParameterEdgeCases:
         with local_experiment(name="no-params", project="test").run as experiment:
             experiment.log("No parameters")
 
-        params_file = temp_project / "test" / "no-params" / "parameters.json"
+        params_file = temp_project /  "test" / "no-params" / "parameters.json"
         if params_file.exists():
             with open(params_file) as f:
                 params_data = json.load(f)
@@ -236,7 +236,7 @@ class TestParameterEdgeCases:
                 "key with space": 4
             })
 
-        params_file = temp_project / "test" / "special-keys" / "parameters.json"
+        params_file = temp_project /  "test" / "special-keys" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -250,7 +250,7 @@ class TestParameterEdgeCases:
         with local_experiment(name="large-params", project="test").run as experiment:
             experiment.params.set(**large_params)
 
-        params_file = temp_project / "test" / "large-params" / "parameters.json"
+        params_file = temp_project /  "test" / "large-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -265,7 +265,7 @@ class TestParameterEdgeCases:
         with local_experiment(name="long-value", project="test").run as experiment:
             experiment.params.set(long_param=long_value)
 
-        params_file = temp_project / "test" / "long-value" / "parameters.json"
+        params_file = temp_project /  "test" / "long-value" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -281,7 +281,7 @@ class TestParameterEdgeCases:
                 arabic="مرحبا"
             )
 
-        params_file = temp_project / "test" / "unicode-params" / "parameters.json"
+        params_file = temp_project /  "test" / "unicode-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -300,7 +300,7 @@ class TestParameterEdgeCases:
                 scientific=1.23e-10
             )
 
-        params_file = temp_project / "test" / "numeric-edge" / "parameters.json"
+        params_file = temp_project /  "test" / "numeric-edge" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -348,7 +348,7 @@ class TestParameterCombinations:
                 }
             )
 
-        params_file = temp_project / "test" / "ml-params" / "parameters.json"
+        params_file = temp_project /  "test" / "ml-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 
@@ -379,7 +379,7 @@ class TestParameterCombinations:
                 }
             )
 
-        params_file = temp_project / "test" / "config-params" / "parameters.json"
+        params_file = temp_project /  "test" / "config-params" / "parameters.json"
         with open(params_file) as f:
             params = json.load(f)["data"]
 

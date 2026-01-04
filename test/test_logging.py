@@ -12,7 +12,7 @@ class TestBasicLogging:
         with local_experiment(name="log-test", project="test").run as experiment:
             experiment.log("Test message")
 
-        logs_file = temp_project / "test" / "log-test" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "log-test" / "logs" / "logs.jsonl"
         assert logs_file.exists()
 
         with open(logs_file) as f:
@@ -37,7 +37,7 @@ class TestBasicLogging:
             experiment.log("Message 4")
             experiment.log("Message 5")
 
-        logs_file = temp_project / "test" / "multi-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "multi-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -65,7 +65,7 @@ class TestLogLevels:
             experiment.log("Error message", level="error")
             experiment.log("Fatal message", level="fatal")
 
-        logs_file = temp_project / "test" / "log-levels" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "log-levels" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -91,7 +91,7 @@ class TestLogLevels:
         with local_experiment(name="default-level", project="test").run as experiment:
             experiment.log("Default level message")
 
-        logs_file = temp_project / "test" / "default-level" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "default-level" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert log_entry["level"] == "info"
@@ -101,7 +101,7 @@ class TestLogLevels:
         with local_experiment(name="debug-test", project="test").run as experiment:
             experiment.log("Debug info: Variable x = 42", level="debug")
 
-        logs_file = temp_project / "test" / "debug-test" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "debug-test" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert log_entry["level"] == "debug"
@@ -112,7 +112,7 @@ class TestLogLevels:
         with local_experiment(name="error-test", project="test").run as experiment:
             experiment.log("An error occurred during processing", level="error")
 
-        logs_file = temp_project / "test" / "error-test" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "error-test" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert log_entry["level"] == "error"
@@ -130,7 +130,7 @@ class TestLogMetadata:
                 metadata={"epoch": 5, "loss": 0.234, "accuracy": 0.89}
             )
 
-        logs_file = temp_project / "test" / "meta-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "meta-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
 
@@ -167,7 +167,7 @@ class TestLogMetadata:
                 }
             )
 
-        logs_file = temp_project / "test" / "nested-meta" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "nested-meta" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
 
@@ -191,7 +191,7 @@ class TestLogMetadata:
                 }
             )
 
-        logs_file = temp_project / "test" / "types-meta" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "types-meta" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
 
@@ -214,7 +214,7 @@ class TestLogSequencing:
             for i in range(10):
                 experiment.log(f"Message {i}")
 
-        logs_file = temp_project / "test" / "sequence" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "sequence" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -235,7 +235,7 @@ class TestLogSequencing:
             for i in range(5):
                 experiment.log(f"Message {i}")
 
-        logs_file = temp_project / "test" / "timestamps" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "timestamps" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -261,7 +261,7 @@ class TestProgressLogging:
                     }
                 )
 
-        logs_file = temp_project / "test" / "progress" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "progress" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -289,7 +289,7 @@ class TestProgressLogging:
                     metadata={"batch": batch, "total": total_batches}
                 )
 
-        logs_file = temp_project / "test" / "batch-progress" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "batch-progress" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -314,7 +314,7 @@ class TestErrorLogging:
                     }
                 )
 
-        logs_file = temp_project / "test" / "exception-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "exception-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
 
@@ -351,7 +351,7 @@ class TestErrorLogging:
                     metadata={"error_number": i + 1, "error_type": type(error).__name__}
                 )
 
-        logs_file = temp_project / "test" / "multi-error" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "multi-error" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -365,7 +365,7 @@ class TestErrorLogging:
             experiment.log("Gradient clipping applied", level="warn")
             experiment.log("Memory usage above threshold", level="warn")
 
-        logs_file = temp_project / "test" / "warning-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "warning-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -381,7 +381,7 @@ class TestLogEdgeCases:
         with local_experiment(name="empty-log", project="test").run as experiment:
             experiment.log("")
 
-        logs_file = temp_project / "test" / "empty-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "empty-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert log_entry["message"] == ""
@@ -392,7 +392,7 @@ class TestLogEdgeCases:
         with local_experiment(name="long-log", project="test").run as experiment:
             experiment.log(long_message)
 
-        logs_file = temp_project / "test" / "long-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "long-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert len(log_entry["message"]) == 10000
@@ -403,7 +403,7 @@ class TestLogEdgeCases:
         with local_experiment(name="special-log", project="test").run as experiment:
             experiment.log(special_message)
 
-        logs_file = temp_project / "test" / "special-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "special-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert "emoji 🚀" in log_entry["message"]
@@ -413,7 +413,7 @@ class TestLogEdgeCases:
         with local_experiment(name="empty-meta", project="test").run as experiment:
             experiment.log("Message with empty metadata", metadata={})
 
-        logs_file = temp_project / "test" / "empty-meta" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "empty-meta" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             # Empty metadata may or may not be included depending on implementation
@@ -428,7 +428,7 @@ class TestLogEdgeCases:
         with local_experiment(name="large-meta", project="test").run as experiment:
             experiment.log("Message with large metadata", metadata=large_metadata)
 
-        logs_file = temp_project / "test" / "large-meta" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "large-meta" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             log_entry = json.loads(f.readline())
             assert len(log_entry["metadata"]) == 100
@@ -439,7 +439,7 @@ class TestLogEdgeCases:
             for i in range(1000):
                 experiment.log(f"Rapid message {i}")
 
-        logs_file = temp_project / "test" / "rapid-log" / "logs" / "logs.jsonl"
+        logs_file = temp_project /  "test" / "rapid-log" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 

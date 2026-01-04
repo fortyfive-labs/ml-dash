@@ -50,27 +50,48 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
+def exp_path(temp_project):
+    """
+    Helper function to build experiment paths.
+
+    Storage structure is: root / project / prefix
+    where prefix = folder_1/folder_2/.../exp_name
+
+    Usage:
+        exp_path("project", "experiment-name") -> temp_project / "project" / "experiment-name"
+    """
+    def _build_path(project: str, prefix: str):
+        # Split prefix into parts and join them
+        prefix_parts = prefix.strip('/').split('/')
+        return temp_project / project / Path(*prefix_parts)
+
+    return _build_path
+
+
+@pytest.fixture
 def local_experiment(temp_project):
     """
     Create a test experiment in local mode.
 
     Returns a function that creates experiments with default config but allows overrides.
     Uses the new API: Experiment(project=..., prefix=...) where name is extracted from prefix.
+
+    When folder is provided, it becomes part of the local_path (root directory),
+    resulting in structure: local_path/folder/project/name
     """
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
         defaults = {
             "local_path": str(temp_project),
         }
         defaults.update(kwargs)
-        # Convert old-style 'folder' to 'prefix' if present
+        # Convert old-style 'folder' to modify local_path
         if 'folder' in defaults:
-            # Combine folder and name to create prefix
-            folder = defaults.pop('folder')
-            prefix = f"{folder.strip('/')}/{name}" if folder else name
-            defaults['prefix'] = prefix
-        else:
-            # Use name as prefix (experiment name is extracted from last segment)
-            defaults.setdefault('prefix', name)
+            # folder becomes part of local_path, so structure is: local_path/folder/project/name
+            folder = defaults.pop('folder').strip('/')
+            if folder:
+                defaults['local_path'] = str(temp_project / folder)
+        # Use name as prefix (experiment name is extracted from last segment)
+        defaults.setdefault('prefix', name)
         return Experiment(project=project, **defaults)
 
     return _create_experiment

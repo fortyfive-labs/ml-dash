@@ -13,7 +13,7 @@ class TestBasicMetrics:
             for i in range(5):
                 experiment.metrics("loss").append(value=1.0 / (i + 1), epoch=i)
 
-        metric_file = temp_project / "test" / "metric-test" / "metrics" / "loss" / "data.jsonl"
+        metric_file = temp_project /  "test" / "metric-test" / "metrics" / "loss" / "data.jsonl"
         assert metric_file.exists()
 
         with open(metric_file) as f:
@@ -38,7 +38,7 @@ class TestBasicMetrics:
                 experiment.metrics("val_loss").append(value=0.6 - epoch * 0.1, epoch=epoch)
                 experiment.metrics("accuracy").append(value=0.7 + epoch * 0.05, epoch=epoch)
 
-        metrics_dir = temp_project / "test" / "multi-metric" / "metrics"
+        metrics_dir = temp_project /  "test" / "multi-metric" / "metrics"
         assert (metrics_dir / "train_loss" / "data.jsonl").exists()
         assert (metrics_dir / "val_loss" / "data.jsonl").exists()
         assert (metrics_dir / "accuracy" / "data.jsonl").exists()
@@ -61,7 +61,7 @@ class TestBatchAppend:
             result = experiment.metrics("loss").append_batch(sample_data["metric_data"])
             assert result["count"] == 5
 
-        metric_file = temp_project / "test" / "batch-metric" / "metrics" / "loss" / "data.jsonl"
+        metric_file = temp_project /  "test" / "batch-metric" / "metrics" / "loss" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -84,7 +84,7 @@ class TestBatchAppend:
             result = experiment.metrics("metric").append_batch(batch_data)
             assert result["count"] == 1000
 
-        metric_file = temp_project / "test" / "large-batch" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "large-batch" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -106,7 +106,7 @@ class TestFlexibleSchema:
                 learning_rate=0.001
             )
 
-        metric_file = temp_project / "test" / "multi-field" / "metrics" / "all_metrics" / "data.jsonl"
+        metric_file = temp_project /  "test" / "multi-field" / "metrics" / "all_metrics" / "data.jsonl"
         with open(metric_file) as f:
             data_point = json.loads(f.readline())
 
@@ -129,7 +129,7 @@ class TestFlexibleSchema:
             experiment.metrics("flexible").append(field_a=3, field_c=4)
             experiment.metrics("flexible").append(field_a=5, field_b=6, field_c=7)
 
-        metric_file = temp_project / "test" / "varying-schema" / "metrics" / "flexible" / "data.jsonl"
+        metric_file = temp_project /  "test" / "varying-schema" / "metrics" / "flexible" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -148,7 +148,7 @@ class TestMetricMetadata:
             for i in range(15):
                 experiment.metrics("metric").append(value=i * 0.1, step=i)
 
-        metadata_file = temp_project / "test" / "metric-meta" / "metrics" / "metric" / "metadata.json"
+        metadata_file = temp_project /  "test" / "metric-meta" / "metrics" / "metric" / "metadata.json"
         assert metadata_file.exists()
 
         with open(metadata_file) as f:
@@ -261,7 +261,7 @@ class TestMetricIndexing:
             for i in range(10):
                 experiment.metrics("metric").append(value=i * 10)
 
-        metric_file = temp_project / "test" / "metric-index" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "metric-index" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -277,7 +277,7 @@ class TestMetricIndexing:
             experiment.metrics("metric").append_batch(batch1)
             experiment.metrics("metric").append_batch(batch2)
 
-        metric_file = temp_project / "test" / "batch-index" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "batch-index" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -294,7 +294,7 @@ class TestMetricEdgeCases:
         with local_experiment(name="no-metrics", project="test").run as experiment:
             experiment.log("No metrics created")
 
-        metrics_dir = temp_project / "test" / "no-metrics" / "metrics"
+        metrics_dir = temp_project /  "test" / "no-metrics" / "metrics"
         assert metrics_dir.exists()
         subdirs = [d for d in metrics_dir.iterdir() if d.is_dir()]
         assert len(subdirs) == 0
@@ -305,7 +305,7 @@ class TestMetricEdgeCases:
             experiment.metrics("metric").append(value=None, step=0, status="pending")
             experiment.metrics("metric").append(value=0.5, step=1, status="complete")
 
-        metric_file = temp_project / "test" / "null-metric" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "null-metric" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -319,7 +319,7 @@ class TestMetricEdgeCases:
             experiment.metrics("metric-2").append(value=2.0)
             experiment.metrics("metric.3").append(value=3.0)
 
-        metrics_dir = temp_project / "test" / "special-metric" / "metrics"
+        metrics_dir = temp_project /  "test" / "special-metric" / "metrics"
         # Check that metrics were created (names may be sanitized)
         assert metrics_dir.exists()
 
@@ -329,7 +329,7 @@ class TestMetricEdgeCases:
             for i in range(1000):
                 experiment.metrics("metric").append(value=i * 0.001, step=i)
 
-        metric_file = temp_project / "test" / "frequent-metric" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "frequent-metric" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
@@ -351,7 +351,7 @@ class TestMetricEdgeCases:
                 tiny_float=1.23e-100
             )
 
-        metric_file = temp_project / "test" / "large-values" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "large-values" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_point = json.loads(f.readline())
 
@@ -368,7 +368,7 @@ class TestMetricEdgeCases:
                 }
             )
 
-        metric_file = temp_project / "test" / "nested-metric" / "metrics" / "metric" / "data.jsonl"
+        metric_file = temp_project /  "test" / "nested-metric" / "metrics" / "metric" / "data.jsonl"
         with open(metric_file) as f:
             data_point = json.loads(f.readline())
 
@@ -382,7 +382,7 @@ class TestMetricEdgeCases:
             experiment.metrics("loss").append(value=0.9, epoch=1)
             experiment.metrics("loss").append(value=0.8, epoch=2)
 
-        metric_file = temp_project / "test" / "collision" / "metrics" / "loss" / "data.jsonl"
+        metric_file = temp_project /  "test" / "collision" / "metrics" / "loss" / "data.jsonl"
         with open(metric_file) as f:
             data_points = [json.loads(line) for line in f]
 
