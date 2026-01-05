@@ -36,7 +36,6 @@ class EXP:
 
     Template variables available:
         {EXP.prefix}    - Experiment prefix = <project>/<folders...>/<exp_name>
-        {EXP.owner}     - Owner/user
         {EXP.id}        - Numeric experiment ID (milliseconds since epoch)
         {EXP.date}      - Date string (YYYYMMDD)
         {EXP.time}      - Time string (HHMMSS)
@@ -61,7 +60,6 @@ class EXP:
     PREFIX: str = ""  # Prefix path with default templates
 
     # Core identifiers
-    owner: str = EnvVar @ "DASH_USER" | "scratch"  # Owner/user
     name: str = "scratch"  # Experiment name (can be a template)
     project: str = EnvVar @ "DASH_PROJECT" | "scratch"  # Project name
 
@@ -159,4 +157,26 @@ class EXP:
         """DateTime string in YYYYMMDD.HHMMSS format."""
         now = datetime.now(timezone.utc)
         return now.strftime('%Y%m%d.%H%M%S')
+
+    @classmethod
+    def _init_run(cls):
+        """Initialize run with unique ID and timestamp."""
+        if cls.id is None:
+            # Generate unique Snowflake ID
+            from .snowflake import generate_id
+            cls.id = generate_id()
+
+        if cls.timestamp is None:
+            # Generate ISO timestamp
+            from datetime import datetime, timezone
+            cls.timestamp = datetime.now(timezone.utc).isoformat()
+
+    @classmethod
+    def _reset(cls):
+        """Reset run state for next experiment."""
+        cls.id = None
+        cls.timestamp = None
+        cls.prefix = None
+        cls.description = None
+        cls._name_template = None
 

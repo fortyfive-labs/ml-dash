@@ -50,64 +50,57 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
-def exp_path(temp_project):
-    """
-    Helper function to build experiment paths.
-
-    Storage structure is: root / project / prefix
-    where prefix = folder_1/folder_2/.../exp_name
-
-    Usage:
-        exp_path("project", "experiment-name") -> temp_project / "project" / "experiment-name"
-    """
-    def _build_path(project: str, prefix: str):
-        # Split prefix into parts and join them
-        prefix_parts = prefix.strip('/').split('/')
-        return temp_project / project / Path(*prefix_parts)
-
-    return _build_path
-
-
-@pytest.fixture
 def local_experiment(temp_project):
     """
     Create a test experiment in local mode.
 
     Returns a function that creates experiments with default config but allows overrides.
-    Uses the new API: Experiment(project=..., prefix=...) where name is extracted from prefix.
-
-    When folder is provided, it becomes part of the local_path (root directory),
-    resulting in structure: local_path/folder/project/name
     """
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
         defaults = {
             "local_path": str(temp_project),
+            "prefix": name,  # prefix is now required, name is extracted from it
+            "project": project,
         }
         defaults.update(kwargs)
-        # Convert old-style 'folder' to modify local_path
-        if 'folder' in defaults:
-            # folder becomes part of local_path, so structure is: local_path/folder/project/name
-            folder = defaults.pop('folder').strip('/')
-            if folder:
-                defaults['local_path'] = str(temp_project / folder)
-        # Use name as prefix (experiment name is extracted from last segment)
-        defaults.setdefault('prefix', name)
-        return Experiment(project=project, **defaults)
+        return Experiment(**defaults)
 
     return _create_experiment
 
 
 @pytest.fixture
-def remote_experiment():
+def mock_remote_token(monkeypatch):
+    """
+    Mock token storage to return TEST_API_KEY for remote tests.
+
+    This allows RemoteClient to auto-load the test token without
+    explicitly passing api_key parameter.
+    """
+    from unittest.mock import MagicMock
+
+    # Create mock token storage
+    mock_storage = MagicMock()
+    mock_storage.load.return_value = TEST_API_KEY
+
+    # Mock get_token_storage to return our mock
+    def mock_get_token_storage():
+        return mock_storage
+
+    monkeypatch.setattr("ml_dash.client.get_token_storage", mock_get_token_storage)
+
+    return mock_storage
+
+
+@pytest.fixture
+def remote_experiment(mock_remote_token):
     """
     Create a test experiment in remote mode.
 
     Returns a function that creates remote experiments with localhost:3000.
     Use the @pytest.mark.remote marker for tests that require a running server.
-    Uses a pre-generated test JWT token for authentication.
+    Uses a pre-generated test JWT token for authentication (auto-loaded via mock).
 
     Generates unique experiment names using timestamps to avoid collisions between test runs.
-    Uses the new API: Experiment(project=..., prefix=...) where name is extracted from prefix.
     """
     import time
 
@@ -119,17 +112,11 @@ def remote_experiment():
 
         defaults = {
             "remote": REMOTE_SERVER_URL,
-            "api_key": TEST_API_KEY,
+            "prefix": unique_name,  # prefix is now required, name is extracted from it
+            "project": project,
         }
         defaults.update(kwargs)
-        # Convert old-style 'folder' to 'prefix' if present
-        if 'folder' in defaults:
-            folder = defaults.pop('folder')
-            prefix = f"{folder.strip('/')}/{unique_name}" if folder else unique_name
-            defaults['prefix'] = prefix
-        else:
-            defaults.setdefault('prefix', unique_name)
-        return Experiment(project=project, **defaults)
+        return Experiment(**defaults)
 
     return _create_experiment
 

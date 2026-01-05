@@ -609,10 +609,12 @@ class ExperimentUploader:
 
             exp_data = validation_result.valid_data
 
-            # Store prefix path in metadata (not as folderId which expects Snowflake ID)
-            custom_metadata = exp_data.get("metadata") or {}
-            if exp_data.get("prefix"):
-                custom_metadata["prefix"] = exp_data["prefix"]
+            # Construct full prefix from exp_info (folder path + experiment name)
+            # This matches how download saves it
+            if exp_info.prefix:
+                full_prefix = f"{exp_info.prefix}/{exp_info.experiment}"
+            else:
+                full_prefix = exp_info.experiment
 
             response = self.remote.create_or_update_experiment(
                 project=exp_info.project,
@@ -620,9 +622,9 @@ class ExperimentUploader:
                 description=exp_data.get("description"),
                 tags=exp_data.get("tags"),
                 bindrs=exp_data.get("bindrs"),
-                prefix=None,  # Don't send prefix path as folderId (expects Snowflake ID)
+                prefix=full_prefix,  # Send full prefix (folder + name)
                 write_protected=exp_data.get("write_protected", False),
-                metadata=custom_metadata if custom_metadata else None,
+                metadata=exp_data.get("metadata"),
             )
 
             # Extract experiment ID from nested response
