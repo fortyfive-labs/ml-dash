@@ -437,7 +437,7 @@ class LocalStorage:
         # Create file metadata
         file_metadata = {
             "id": file_id,
-            "experimentId": f"{project}/{experiment}",  # Local mode doesn't have real experiment ID
+            "experimentId": f"{project}/{prefix}",  # Local mode doesn't have real experiment ID
             "path": path,
             "filename": filename,
             "description": description,
@@ -495,24 +495,26 @@ class LocalStorage:
 
     def list_files(
         self,
+        owner: str,
         project: str,
-        experiment: str,
-        prefix: Optional[str] = None,
+        prefix: str,
+        path_prefix: Optional[str] = None,
         tags: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         List files from local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
-            prefix: Optional prefix filter
+            prefix: Experiment prefix (folder_1/folder_2/.../exp_name)
+            path_prefix: Optional file path prefix filter
             tags: Optional tags filter
 
         Returns:
             List of file metadata dicts (only non-deleted files)
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         metadata_file = experiment_dir / "files" / ".files_metadata.json"
 
         if not metadata_file.exists():
@@ -529,9 +531,9 @@ class LocalStorage:
         # Filter out deleted files
         files = [f for f in files if f.get("deletedAt") is None]
 
-        # Apply prefix filter
-        if prefix:
-            files = [f for f in files if f["path"].startswith(prefix)]
+        # Apply path prefix filter
+        if path_prefix:
+            files = [f for f in files if f["path"].startswith(path_prefix)]
 
         # Apply tags filter
         if tags:
@@ -541,8 +543,9 @@ class LocalStorage:
 
     def read_file(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         file_id: str,
         dest_path: Optional[str] = None
     ) -> str:
@@ -550,8 +553,9 @@ class LocalStorage:
         Read/copy file from local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix
             file_id: File ID
             dest_path: Optional destination path (defaults to original filename)
 
@@ -565,7 +569,7 @@ class LocalStorage:
         import shutil
         from .files import verify_checksum
 
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
@@ -612,16 +616,18 @@ class LocalStorage:
 
     def delete_file(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         file_id: str
     ) -> Dict[str, Any]:
         """
         Delete file from local storage (soft delete in metadata).
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix
             file_id: File ID
 
         Returns:
@@ -630,7 +636,7 @@ class LocalStorage:
         Raises:
             FileNotFoundError: If file not found
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
@@ -669,8 +675,9 @@ class LocalStorage:
 
     def update_file_metadata(
         self,
+        owner: str,
         project: str,
-        experiment: str,
+        prefix: str,
         file_id: str,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
@@ -680,8 +687,9 @@ class LocalStorage:
         Update file metadata in local storage.
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
+            prefix: Experiment prefix
             file_id: File ID
             description: Optional description
             tags: Optional tags
@@ -693,7 +701,7 @@ class LocalStorage:
         Raises:
             FileNotFoundError: If file not found
         """
-        experiment_dir = self._get_experiment_dir(project, experiment)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 

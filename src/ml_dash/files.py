@@ -43,6 +43,13 @@ class FileBuilder:
         # Delete files
         dxp.files("some.text").delete()
 
+        # Check if file exists
+        if dxp.files("config.json").exists():
+            config = dxp.files("config.json").read_text()
+
+        # Read file content as text
+        config_yaml = dxp.files("configs/view.yaml").read_text()
+
     Specific Save Methods:
         experiment.files.save_text("content", to="view.yaml")
         experiment.files.save_json(dict(hey="yo"), to="config.json")
@@ -1054,6 +1061,110 @@ class FileBuilder:
                 metadata=self._metadata
             )
         finally:
+            try:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+    def exists(self) -> bool:
+        """
+        Check if a file exists at the specified path.
+
+        Returns:
+            True if file exists, False otherwise
+
+        Raises:
+            RuntimeError: If experiment is not open
+            ValueError: If no file path specified
+
+        Examples:
+            # Check if file exists
+            if dxp.files("models/checkpoint.pt").exists():
+                print("File exists!")
+
+            # Check before downloading
+            if not dxp.files("config.json").exists():
+                raise FileNotFoundError("Config file missing")
+        """
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+
+        if not self._path:
+            raise ValueError("No file path specified. Use: experiment.files('path/to/file').exists()")
+
+        # Try to find the file
+        try:
+            files = self._experiment._list_files(prefix=None, tags=None)
+            search_path = self._path.lstrip('/')
+
+            for f in files:
+                filename = f.get('filename', '')
+                prefix = f.get('path', '/').lstrip('/')
+                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
+                full_path = full_path.lstrip('/')
+
+                # Check if this file matches (by full path or just filename)
+                if full_path == search_path or filename == search_path:
+                    # Make sure it's not deleted
+                    if f.get('deletedAt') is None:
+                        return True
+
+            return False
+        except Exception:
+            return False
+
+    def read_text(self, encoding: str = 'utf-8') -> str:
+        """
+        Download file and read its content as text.
+
+        Args:
+            encoding: Text encoding to use (default: 'utf-8')
+
+        Returns:
+            File content as string
+
+        Raises:
+            RuntimeError: If experiment is not open
+            ValueError: If file not found or no path specified
+            UnicodeDecodeError: If file cannot be decoded with specified encoding
+
+        Examples:
+            # Read configuration file
+            config_yaml = dxp.files("configs/view.yaml").read_text()
+
+            # Read log file
+            logs = dxp.files("logs/training.log").read_text()
+
+            # Read with different encoding
+            content = dxp.files("data.txt").read_text(encoding='latin-1')
+        """
+        import tempfile
+        import os
+
+        if not self._experiment._is_open:
+            raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
+
+        if not self._path:
+            raise ValueError("No file path specified. Use: experiment.files('path/to/file').read_text()")
+
+        # Create temporary file for download
+        temp_dir = tempfile.mkdtemp()
+        temp_filename = Path(self._path).name
+        temp_path = os.path.join(temp_dir, temp_filename)
+
+        try:
+            # Download the file
+            downloaded_path = self.download(to=temp_path)
+
+            # Read content as text
+            with open(downloaded_path, 'r', encoding=encoding) as f:
+                content = f.read()
+
+            return content
+        finally:
+            # Clean up temporary file
             try:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
