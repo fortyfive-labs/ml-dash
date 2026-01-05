@@ -133,6 +133,9 @@ class LocalStorage:
         (experiment_dir / "metrics").mkdir(exist_ok=True)
         (experiment_dir / "files").mkdir(exist_ok=True)
 
+        # Extract experiment name from last segment of prefix
+        name = prefix_clean.split('/')[-1]
+
         # Write experiment metadata
         experiment_metadata = {
             "name": name,

@@ -93,11 +93,12 @@ class RemoteClient:
 
         Args:
             project: Project name
-            name: Experiment name
+            name: Experiment name (last segment of prefix)
             description: Optional description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            prefix: Optional folder path (prefix for organization)
+            prefix: Full prefix path including name (e.g., "experiments/resnet/baseline-v1").
+                   The folder path is extracted by removing the last segment (name).
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
 
@@ -118,7 +119,15 @@ class RemoteClient:
         if bindrs is not None:
             payload["bindrs"] = bindrs
         if prefix is not None:
-            payload["prefix"] = prefix
+            # Extract folder path from prefix (remove last segment which is the name)
+            # Example: "experiments/resnet/baseline-v1" -> "experiments/resnet"
+            prefix_clean = prefix.strip('/')
+            parts = prefix_clean.split('/')
+            if len(parts) > 1:
+                # Remove last segment (name) to get folder path
+                folder_path = '/'.join(parts[:-1])
+                payload["folder"] = '/' + folder_path
+            # If only one segment (no folders), don't set folder (root level)
         if write_protected:
             payload["writeProtected"] = write_protected
         if metadata is not None:

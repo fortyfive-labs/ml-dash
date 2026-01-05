@@ -18,29 +18,29 @@ Usage:
     from ml_dash import Experiment
 
     with Experiment(
-        name="my-experiment",
         project="my-project",
+        prefix="experiments/my-experiment",
         local_path=".ml-dash"
     ) as experiment:
         experiment.log("Training started")
         experiment.params.set(lr=0.001)
         experiment.metrics("loss").append(step=0, value=0.5)
 
-    # Remote mode - explicit configuration
+    # Default: Remote mode (defaults to https://api.dash.ml)
     with Experiment(
-        name="my-experiment",
         project="my-project",
-        remote="https://api.dash.ml",
-        api_key="your-jwt-token"
+        prefix="experiments/my-experiment"
     ) as experiment:
         experiment.log("Training started")
+        experiment.params.set(lr=0.001)
+        experiment.metrics("loss").append(step=0, value=0.5)
 
     # Decorator style
     from ml_dash import ml_dash_experiment
 
     @ml_dash_experiment(
-        name="my-experiment",
-        project="my-project"
+        project="my-project",
+        prefix="experiments/my-experiment"
     )
     def train_model(experiment):
         experiment.log("Training started")

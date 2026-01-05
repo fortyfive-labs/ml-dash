@@ -79,12 +79,17 @@ Experiment(
     user_name="your-username"
 )
 
-# Option 2: With API key
+# Option 2: Default remote mode (defaults to https://api.dash.ml)
 Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
+    project="my-project"
+)
+
+# Option 3: Custom remote server
+Experiment(
+    prefix="my-experiment",
     project="my-project",
-    remote="https://api.dash.ml",
-    api_key="your-jwt-token"
+    remote="https://custom-server.com"
 )
 ```
 

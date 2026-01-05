@@ -59,21 +59,46 @@ def local_experiment(temp_project):
     def _create_experiment(name="test-experiment", project="test-project", **kwargs):
         defaults = {
             "local_path": str(temp_project),
+            "prefix": name,  # prefix is now required, name is extracted from it
+            "project": project,
         }
         defaults.update(kwargs)
-        return Experiment(name, project=project, **defaults)
+        return Experiment(**defaults)
 
     return _create_experiment
 
 
 @pytest.fixture
-def remote_experiment():
+def mock_remote_token(monkeypatch):
+    """
+    Mock token storage to return TEST_API_KEY for remote tests.
+
+    This allows RemoteClient to auto-load the test token without
+    explicitly passing api_key parameter.
+    """
+    from unittest.mock import MagicMock
+
+    # Create mock token storage
+    mock_storage = MagicMock()
+    mock_storage.load.return_value = TEST_API_KEY
+
+    # Mock get_token_storage to return our mock
+    def mock_get_token_storage():
+        return mock_storage
+
+    monkeypatch.setattr("ml_dash.client.get_token_storage", mock_get_token_storage)
+
+    return mock_storage
+
+
+@pytest.fixture
+def remote_experiment(mock_remote_token):
     """
     Create a test experiment in remote mode.
 
     Returns a function that creates remote experiments with localhost:3000.
     Use the @pytest.mark.remote marker for tests that require a running server.
-    Uses a pre-generated test JWT token for authentication.
+    Uses a pre-generated test JWT token for authentication (auto-loaded via mock).
 
     Generates unique experiment names using timestamps to avoid collisions between test runs.
     """
@@ -87,10 +112,11 @@ def remote_experiment():
 
         defaults = {
             "remote": REMOTE_SERVER_URL,
-            "api_key": TEST_API_KEY,
+            "prefix": unique_name,  # prefix is now required, name is extracted from it
+            "project": project,
         }
         defaults.update(kwargs)
-        return Experiment(unique_name, project=project, **defaults)
+        return Experiment(**defaults)
 
     return _create_experiment
 

@@ -161,17 +161,16 @@ def train_with_direct_instantiation():
 # =============================================================================
 
 @ml_dash_experiment(
-    name="remote-decorator-example",
+    prefix="remote-decorator-example",
     project="usage-styles",
     remote="https://api.dash.ml",
-    api_key="your-api-key",  # Get from: ml-dash login
     description="Decorator with remote mode",
     tags=["remote", "decorator"]
 )
 def train_remote_decorator(experiment):
     """
     All three styles work with remote mode!
-    Just change the parameters from local_path to remote + api_key
+    Token is auto-loaded from ~/.ml-dash/token.enc (run 'ml-dash login' first)
     """
     print("\n☁️  Remote Mode with Decorator")
     print("=" * 50)
@@ -191,10 +190,9 @@ def train_remote_context_manager():
     print("=" * 50)
 
     with Experiment(
-        name="remote-context-example",
+        prefix="remote-context-example",
         project="usage-styles",
         remote="https://api.dash.ml",
-        api_key="your-api-key",  # Get from: ml-dash login
         description="Context manager with remote mode",
         tags=["remote", "context-manager"]
     ).run as experiment:
@@ -245,8 +243,8 @@ if __name__ == "__main__":
 
     🌐 Remote Mode:
        Uncomment the remote examples to test with a live server!
-       Just change: local_path="./path"
-                → remote="https://...", api_key="..." (get from: ml-dash login)
+       Just change: local_path="./path" → remote="https://..."
+       (Token auto-loaded from ~/.ml-dash/token.enc, run 'ml-dash login' first)
     """)
 
     # Uncomment to test remote mode (requires server running):

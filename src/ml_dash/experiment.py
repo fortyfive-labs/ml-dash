@@ -170,19 +170,24 @@ class Experiment:
 
     Usage examples:
 
-    # Remote mode
+    # Default: Remote mode with production server (https://api.dash.ml)
     experiment = Experiment(
-        name="my-experiment",
         project="my-project",
-        remote="https://api.dash.ml",
-        api_key="your-jwt-token"
+        prefix="experiments/my-experiment"
     )
 
-    # Local mode
+    # Local mode only
     experiment = Experiment(
-        name="my-experiment",
         project="my-project",
+        prefix="experiments/my-experiment",
         local_path=".ml-dash"
+    )
+
+    # Custom remote server
+    experiment = Experiment(
+        project="my-project",
+        prefix="experiments/my-experiment",
+        remote="https://custom-server.com"
     )
 
     # Context manager
@@ -190,7 +195,7 @@ class Experiment:
         exp.log(...)
 
     # Decorator
-    @ml_dash_experiment(name="exp", project="ws", remote="...")
+    @ml_dash_experiment(project="ws", prefix="experiments/exp", remote="...")
     def train():
         ...
     """
@@ -200,14 +205,12 @@ class Experiment:
         project: Optional[str] = None,
         prefix: Optional[str] = None,
         *,
-        owner: Optional[str] = None,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         # Mode configuration
         remote: Optional[str] = None,
-        api_key: Optional[str] = None,
         local_path: Optional[str] = None,
         # Internal parameters
         _write_protected: bool = False,
@@ -216,22 +219,25 @@ class Experiment:
         Initialize an ML-Dash experiment.
 
         Args:
-            owner: Owner/user (defaults to DASH_USER env var)
-            project: Project name (defaults to DASH_PROJECT env var)
+            project: Project name (defaults to DASH_PROJECT env var or "scratch")
             prefix: Experiment prefix path like "folder_1/folder_2/.../exp_name" (defaults to DASH_PREFIX env var)
             description: Optional experiment description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
             metadata: Optional metadata dict
-            remote: Remote API URL (e.g., "https://api.dash.ml")
-            api_key: JWT token for authentication (auto-loaded from storage if not provided)
-            local_path: Local storage root path (for local mode)
+            remote: Remote API URL (defaults to "https://api.dash.ml"). Token auto-loaded from ~/.ml-dash/token.enc
+            local_path: Local storage root path. If specified without remote, uses local-only mode.
             _write_protected: Internal parameter - if True, experiment becomes immutable after creation
+
+        Mode Selection:
+            - No parameters: Remote mode with "https://api.dash.ml" (default)
+            - local_path only: Local-only mode
+            - remote only: Remote mode with custom URL
+            - Both: Hybrid mode (local + remote)
         """
         import os
 
         # Resolve defaults from environment variables
-        self.owner = owner or os.getenv('DASH_USER', 'scratch')
         self.project = project or os.getenv('DASH_PROJECT', 'scratch')
         self._folder_path = prefix or os.getenv('DASH_PREFIX')
 
@@ -252,17 +258,17 @@ class Experiment:
         EXP.project = project
         EXP.description = description
 
-        # Determine operation mode
-        if remote and local_path:
+        # Determine operation mode and apply defaults
+        if not remote and not local_path:
+            # Default to remote mode with production server
+            remote = "https://api.dash.ml"
+            self.mode = OperationMode.REMOTE
+        elif remote and local_path:
             self.mode = OperationMode.HYBRID
         elif remote:
             self.mode = OperationMode.REMOTE
-        elif local_path:
+        else:  # local_path only
             self.mode = OperationMode.LOCAL
-        else:
-            raise ValueError(
-                "Must specify either 'remote' (with api_key) or 'local_path'"
-            )
 
         # Initialize backend
         self._client: Optional[RemoteClient] = None
@@ -273,8 +279,8 @@ class Experiment:
         self._metrics_manager: Optional['MetricsManager'] = None  # Cached metrics manager
 
         if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
-            # api_key can be None - RemoteClient will auto-load from storage
-            self._client = RemoteClient(base_url=remote, api_key=api_key)
+            # RemoteClient will auto-load token from ~/.ml-dash/token.enc
+            self._client = RemoteClient(base_url=remote)
 
         if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
             if not local_path:
@@ -374,8 +380,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: create experiment directory structure
+            # For local storage, owner is needed for directory structure
+            import getpass
+            # Use current system user as owner
+            owner = getpass.getuser()
             self._storage.create_experiment(
-                owner=self.owner,
+                owner=owner,
                 project=self.project,
                 prefix=self._folder_path,
                 description=self.description,
@@ -1237,19 +1247,23 @@ class Experiment:
 
 
 def ml_dash_experiment(
-    name: str,
     project: str,
+    prefix: str,
     **kwargs
 ) -> Callable:
     """
     Decorator for wrapping functions with an ML-Dash experiment.
 
+    Args:
+        project: Project name
+        prefix: Experiment prefix path (e.g., "experiments/my-experiment")
+        **kwargs: Additional arguments passed to Experiment constructor
+
     Usage:
         @ml_dash_experiment(
-            name="my-experiment",
             project="my-project",
-            remote="https://api.dash.ml",
-            api_key="your-token"
+            prefix="experiments/my-experiment",
+            remote="https://api.dash.ml"
         )
         def train_model():
             # Function code here
@@ -1261,7 +1275,7 @@ def ml_dash_experiment(
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **func_kwargs):
-            with Experiment(name=name, project=project, **kwargs).run as experiment:
+            with Experiment(project=project, prefix=prefix, **kwargs).run as experiment:
                 # Inject experiment into function kwargs
                 func_kwargs['experiment'] = experiment
                 return func(*args, **func_kwargs)
