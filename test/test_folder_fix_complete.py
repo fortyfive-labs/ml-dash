@@ -1,11 +1,9 @@
 """
-Test that all operations (parameters, logs, files, metrics) respect the folder field.
+Test that all operations (parameters, logs, files, metrics) respect the prefix field.
 
-This test verifies the fix for the folder path inconsistency bug where:
-- experiment.json was created at: .ml-dash/{folder}/{project}/{experiment}/
-- But parameters, logs, files, metrics were created at: .ml-dash/{project}/{experiment}/
-
-After the fix, ALL data should be at: .ml-dash/{folder}/{project}/{experiment}/
+This test verifies the storage path structure:
+- All data is stored at: root / owner / project / prefix
+- Default owner is "scratch"
 """
 import tempfile
 import json
@@ -15,23 +13,21 @@ from ml_dash import Experiment
 
 
 def test_all_operations_use_folder_field():
-    """Test that parameters, logs, files, and metrics all respect folder field."""
+    """Test that parameters, logs, files, and metrics all respect prefix field."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create experiment with folder template
+        # Create experiment with prefix
         exp = Experiment(
-            name="test_exp",
             project="test_project",
-            prefix="/iclr_2024/{EXP.name}",
+            prefix="iclr_2024/test_exp",
             local_path=tmpdir
         )
 
         with exp.run:
-            # Expected base path - template should be resolved in storage
-            # The {EXP.name} gets replaced with experiment name
-            expected_base = Path(tmpdir) / "iclr_2024" / "{EXP.name}" / "test_project" / "test_exp"
+            # Expected base path: root / owner / project / prefix
+            expected_base = Path(tmpdir) /  "test_project" / "iclr_2024" / "test_exp"
 
             # 1. Test parameters
-            exp.params.log(batch_size=128, lr=0.001)
+            exp.params.set(batch_size=128, lr=0.001)
             params_file = expected_base / "parameters.json"
             assert params_file.exists(), f"parameters.json not at {params_file}"
 
@@ -40,7 +36,7 @@ def test_all_operations_use_folder_field():
             assert params_data["data"]["batch_size"] == 128
 
             # 2. Test logs
-            exp.log().info("Test log message", epoch=1)
+            exp.log("Test log message", epoch=1)
             logs_file = expected_base / "logs" / "logs.jsonl"
             assert logs_file.exists(), f"logs.jsonl not at {logs_file}"
 
@@ -53,7 +49,7 @@ def test_all_operations_use_folder_field():
             # 3. Test files
             test_file = Path(tmpdir) / "test_upload.txt"
             test_file.write_text("test content")
-            exp.files("models").upload(str(test_file))
+            exp.files(dir="models").upload(str(test_file))
 
             files_dir = expected_base / "files" / "models"
             assert files_dir.exists(), f"files directory not at {files_dir}"
@@ -65,12 +61,11 @@ def test_all_operations_use_folder_field():
             with open(metadata_file) as f:
                 files_meta = json.load(f)
             assert len(files_meta["files"]) == 1
-            assert files_meta["files"][0]["path"] == "/models"
 
-            # 4. Test metrics - use correct API: metrics.append()
-            exp.metrics.append(loss=0.5, accuracy=0.95, step=1)
+            # 4. Test metrics - use correct API: metrics("name").append()
+            exp.metrics("train").append(loss=0.5, accuracy=0.95, step=1)
 
-            metrics_dir = expected_base / "metrics" / "None"
+            metrics_dir = expected_base / "metrics" / "train"
             assert metrics_dir.exists(), f"metrics directory not at {metrics_dir}"
 
             metric_data_file = metrics_dir / "data.jsonl"
@@ -89,28 +84,27 @@ def test_all_operations_use_folder_field():
             with open(experiment_file) as f:
                 exp_data = json.load(f)
             assert exp_data["name"] == "test_exp"
-            assert exp_data["folder"] == "/iclr_2024/{EXP.name}"
 
         print(f"✓ All operations correctly saved to: {expected_base}")
 
 
 def test_folder_consistency_with_static_path():
-    """Test folder consistency with a static (non-template) path."""
+    """Test folder consistency with a static path."""
     with tempfile.TemporaryDirectory() as tmpdir:
         exp = Experiment(
-            name="static_exp",
             project="proj",
-            prefix="/custom/path",
+            prefix="custom/path/static_exp",
             local_path=tmpdir
         )
 
         with exp.run:
-            expected_base = Path(tmpdir) / "custom" / "path" / "proj" / "static_exp"
+            # Expected: root / owner / project / prefix
+            expected_base = Path(tmpdir) /  "proj" / "custom" / "path" / "static_exp"
 
             # Add all types of data
-            exp.params.log(test_param=123)
-            exp.log().info("Test log")
-            exp.metrics.append(value=1.0)
+            exp.params.set(test_param=123)
+            exp.log("Test log")
+            exp.metrics("train").append(value=1.0)
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")
@@ -119,7 +113,7 @@ def test_folder_consistency_with_static_path():
             # Verify all in same location
             assert (expected_base / "parameters.json").exists()
             assert (expected_base / "logs" / "logs.jsonl").exists()
-            assert (expected_base / "metrics" / "None" / "data.jsonl").exists()
+            assert (expected_base / "metrics" / "train" / "data.jsonl").exists()
             assert (expected_base / "files" / ".files_metadata.json").exists()
             assert (expected_base / "experiment.json").exists()
 
@@ -127,34 +121,34 @@ def test_folder_consistency_with_static_path():
 
 
 def test_no_folder_field_still_works():
-    """Test backward compatibility when folder field is not set."""
+    """Test when prefix is just experiment name (minimal path)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         exp = Experiment(
-            name="no_folder_exp",
             project="proj",
+            prefix="no_folder_exp",
             local_path=tmpdir
         )
 
         with exp.run:
-            # Should use default path: root_path/project/experiment
-            expected_base = Path(tmpdir) / "proj" / "no_folder_exp"
+            # Should use path: root / owner / project / prefix
+            expected_base = Path(tmpdir) /  "proj" / "no_folder_exp"
 
-            exp.params.log(test=1)
-            exp.log().info("Test")
-            exp.metrics.append(val=2.0)
+            exp.params.set(test=1)
+            exp.log("Test")
+            exp.metrics("train").append(val=2.0)
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")
             exp.files().upload(str(test_file))
 
-            # All should be in the default location
+            # All should be in the expected location
             assert (expected_base / "parameters.json").exists()
             assert (expected_base / "logs" / "logs.jsonl").exists()
-            assert (expected_base / "metrics" / "None" / "data.jsonl").exists()
+            assert (expected_base / "metrics" / "train" / "data.jsonl").exists()
             assert (expected_base / "files" / ".files_metadata.json").exists()
             assert (expected_base / "experiment.json").exists()
 
-        print(f"✓ No folder field works (backward compatible): {expected_base}")
+        print(f"✓ Simple prefix works: {expected_base}")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import shutil
 @pytest.fixture
 def experiment():
     """Create a local experiment for testing."""
-    exp = Experiment("test_exp", project="test_project", local_path=".ml-dash-test")
+    exp = Experiment(project="test_project", prefix="test_exp", local_path=".ml-dash-test")
     exp.run.start()
     yield exp
     exp.run.complete()

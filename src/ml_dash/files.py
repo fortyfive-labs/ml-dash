@@ -160,6 +160,65 @@ class FileBuilder:
             to=to
         )
 
+    def save(
+        self,
+        content: Any = None,
+        *,
+        to: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Unified save method that handles different content types.
+
+        Args:
+            content: Content to save - can be:
+                - str (file path): Uploads existing file
+                - bytes: Saves as binary blob (requires 'to' parameter)
+                - dict/list: Saves as JSON (requires 'to' parameter)
+                - None: Uses file_path from constructor (backwards compatibility)
+            to: Target filename (required for bytes/dict/list, optional for file paths)
+            description: Optional description
+            tags: Optional list of tags
+            metadata: Optional metadata dict
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+        """
+        # Override builder metadata if provided
+        if description is not None:
+            self._description = description
+        if tags is not None:
+            self._tags = tags
+        if metadata is not None:
+            self._metadata = metadata
+
+        # Backwards compatibility: use file_path from constructor if no content provided
+        if content is None:
+            if self._file_path:
+                content = self._file_path
+            else:
+                raise ValueError("No content provided and no file_path set in constructor")
+
+        # Check if content is a file path
+        if isinstance(content, str) and Path(content).exists():
+            return self.upload(content, to=to)
+
+        # Check if content is bytes
+        if isinstance(content, bytes):
+            if not to:
+                raise ValueError("'to' parameter is required when saving bytes")
+            return self.save_blob(content, to=to)
+
+        # Check if content is dict or list (save as JSON)
+        if isinstance(content, (dict, list)):
+            if not to:
+                raise ValueError("'to' parameter is required when saving dict/list")
+            return self.save_json(content, to=to)
+
+        raise ValueError(f"Unsupported content type: {type(content)}. Expected str (file path), bytes, dict, or list.")
+
     def _save_file(
         self,
         fpath: str,
@@ -220,6 +279,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         try:
             with open(temp_path, 'wb') as f:
                 f.write(data)
@@ -253,6 +314,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         try:
             with open(temp_path, 'w') as f:
                 json.dump(content, f, indent=2)
@@ -286,6 +349,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         try:
             torch.save(model, temp_path)
             return self._save_file(
@@ -319,6 +384,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         try:
             fig.savefig(temp_path, **kwargs)
             plt.close(fig)
@@ -352,6 +419,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         try:
             with open(temp_path, 'wb') as f:
                 pickle.dump(content, f)
@@ -660,9 +729,17 @@ class FileBuilder:
         """
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
+        # Extract path component from 'to' if present (e.g., "configs/settings.json")
+        import os
+        to_dirname = os.path.dirname(to)
+        to_filename = os.path.basename(to)
+        if to_dirname:
+            # Merge the path component into prefix
+            prefix = prefix.rstrip('/') + '/' + to_dirname.lstrip('/')
+
         return self._save_json(
             content=content,
-            filename=to,
+            filename=to_filename,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -686,9 +763,16 @@ class FileBuilder:
         """
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
+        # Extract path component from 'to' if present
+        import os
+        to_dirname = os.path.dirname(to)
+        to_filename = os.path.basename(to)
+        if to_dirname:
+            prefix = prefix.rstrip('/') + '/' + to_dirname.lstrip('/')
+
         return self._save_bytes(
             data=content.encode('utf-8'),
-            filename=to,
+            filename=to_filename,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -711,9 +795,16 @@ class FileBuilder:
         """
         prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
 
+        # Extract path component from 'to' if present
+        import os
+        to_dirname = os.path.dirname(to)
+        to_filename = os.path.basename(to)
+        if to_dirname:
+            prefix = prefix.rstrip('/') + '/' + to_dirname.lstrip('/')
+
         return self._save_bytes(
             data=data,
-            filename=to,
+            filename=to_filename,
             prefix=prefix,
             description=self._description,
             tags=self._tags,
@@ -873,6 +964,8 @@ class FileBuilder:
 
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, to)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
 
         try:
             frames_ubyte = img_as_ubyte(frame_stack)

@@ -19,14 +19,14 @@ class TestVideoBasics:
 
         with local_experiment(name="video-test", project="test").run as experiment:
             frames = [im(100 + i, 80) for i in range(20)]
-            result = experiment.files(prefix="/videos").save_video(frames, "test_video.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="test_video.mp4")
 
             assert result['filename'] == 'test_video.mp4'
             assert result['sizeBytes'] > 0
             assert 'checksum' in result
 
         # Verify file was saved
-        files_dir = temp_project / "test" / "video-test" / "files"
+        files_dir = temp_project /  "test" / "video-test" / "files"
         assert files_dir.exists()
         saved_videos = list(files_dir.glob("**/test_video.mp4"))
         assert len(saved_videos) == 1
@@ -44,7 +44,7 @@ class TestVideoBasics:
 
         with remote_experiment(name="video-test-remote", project="test").run as experiment:
             frames = [im(100 + i, 80) for i in range(20)]
-            result = experiment.files(prefix="/videos").save_video(frames, "test_video.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="test_video.mp4")
 
             assert result['filename'] == 'test_video.mp4'
             assert result['sizeBytes'] > 0
@@ -53,7 +53,7 @@ class TestVideoBasics:
         """Test grayscale frame video in local mode."""
         with local_experiment(name="video-grayscale", project="test").run as experiment:
             frames = [np.random.rand(100, 100) for _ in range(10)]
-            result = experiment.files(prefix="/videos").save_video(frames, "grayscale.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="grayscale.mp4")
 
             assert result['filename'] == 'grayscale.mp4'
             assert result['sizeBytes'] > 0
@@ -63,7 +63,7 @@ class TestVideoBasics:
         """Test grayscale frame video in remote mode."""
         with remote_experiment(name="video-grayscale-remote", project="test").run as experiment:
             frames = [np.random.rand(100, 100) for _ in range(10)]
-            result = experiment.files(prefix="/videos").save_video(frames, "grayscale.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="grayscale.mp4")
 
             assert result['filename'] == 'grayscale.mp4'
 
@@ -75,7 +75,7 @@ class TestVideoFormats:
         """Test RGB frame video."""
         with local_experiment(name="video-rgb", project="test").run as experiment:
             frames = [np.random.rand(100, 100, 3) for _ in range(10)]
-            result = experiment.files(prefix="/videos").save_video(frames, "rgb.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="rgb.mp4")
 
             assert result['filename'] == 'rgb.mp4'
             assert result['sizeBytes'] > 0
@@ -84,7 +84,7 @@ class TestVideoFormats:
         """Test GIF format."""
         with local_experiment(name="video-gif", project="test").run as experiment:
             frames = [np.random.rand(50, 50) for _ in range(5)]
-            result = experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+            result = experiment.files(prefix="/videos").save_video(frames, to="animation.gif")
 
             assert result['filename'] == 'animation.gif'
             assert result['sizeBytes'] > 0
@@ -94,7 +94,7 @@ class TestVideoFormats:
         """Test GIF format in remote mode."""
         with remote_experiment(name="video-gif-remote", project="test").run as experiment:
             frames = [np.random.rand(50, 50) for _ in range(5)]
-            result = experiment.files(prefix="/videos").save_video(frames, "animation.gif")
+            result = experiment.files(prefix="/videos").save_video(frames, to="animation.gif")
 
             assert result['filename'] == 'animation.gif'
 
@@ -102,7 +102,7 @@ class TestVideoFormats:
         """Test stacked numpy array input."""
         with local_experiment(name="video-stacked", project="test").run as experiment:
             frames = np.random.rand(10, 100, 100)
-            result = experiment.files(prefix="/videos").save_video(frames, "stacked.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="stacked.mp4")
 
             assert result['filename'] == 'stacked.mp4'
             assert result['sizeBytes'] > 0
@@ -115,7 +115,7 @@ class TestVideoParameters:
         """Test custom FPS parameter."""
         with local_experiment(name="video-fps", project="test").run as experiment:
             frames = [np.random.rand(100, 100) for _ in range(10)]
-            result = experiment.files(prefix="/videos").save_video(frames, "fps30.mp4", fps=30)
+            result = experiment.files(prefix="/videos").save_video(frames, to="fps30.mp4", fps=30)
 
             assert result['filename'] == 'fps30.mp4'
             assert result['sizeBytes'] > 0
@@ -125,7 +125,7 @@ class TestVideoParameters:
         """Test custom FPS in remote mode."""
         with remote_experiment(name="video-fps-remote", project="test").run as experiment:
             frames = [np.random.rand(100, 100) for _ in range(10)]
-            result = experiment.files(prefix="/videos").save_video(frames, "fps30.mp4", fps=30)
+            result = experiment.files(prefix="/videos").save_video(frames, to="fps30.mp4", fps=30)
 
             assert result['filename'] == 'fps30.mp4'
 
@@ -134,7 +134,7 @@ class TestVideoParameters:
         with local_experiment(name="video-kwargs", project="test").run as experiment:
             frames = [np.random.rand(100, 100, 3) for _ in range(10)]
             result = experiment.files(prefix="/videos").save_video(
-                frames, "quality.mp4", fps=30, quality=8
+                frames, to="quality.mp4", fps=30, quality=8
             )
 
             assert result['filename'] == 'quality.mp4'
@@ -148,13 +148,13 @@ class TestVideoEdgeCases:
         """Test error handling for empty frame list."""
         with local_experiment(name="video-error", project="test").run as experiment:
             with pytest.raises(ValueError, match="frame_stack is empty"):
-                experiment.files(prefix="/videos").save_video([], "empty.mp4")
+                experiment.files(prefix="/videos").save_video([], to="empty.mp4")
 
     def test_save_video_float32_frames_local(self, local_experiment):
         """Test float32 frames are converted correctly."""
         with local_experiment(name="video-float32", project="test").run as experiment:
             frames = [np.random.rand(100, 100).astype(np.float32) for _ in range(5)]
-            result = experiment.files(prefix="/videos").save_video(frames, "float32.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="float32.mp4")
 
             assert result['filename'] == 'float32.mp4'
             assert result['sizeBytes'] > 0
@@ -163,7 +163,7 @@ class TestVideoEdgeCases:
         """Test uint8 frames are handled correctly."""
         with local_experiment(name="video-uint8", project="test").run as experiment:
             frames = [np.random.randint(0, 256, (100, 100), dtype=np.uint8) for _ in range(5)]
-            result = experiment.files(prefix="/videos").save_video(frames, "uint8.mp4")
+            result = experiment.files(prefix="/videos").save_video(frames, to="uint8.mp4")
 
             assert result['filename'] == 'uint8.mp4'
             assert result['sizeBytes'] > 0

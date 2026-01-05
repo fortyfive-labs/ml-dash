@@ -14,7 +14,7 @@ class TestOptionalMetricName:
             experiment.metrics.append(value=0.3, step=3)
 
         # Should create a "None" metric
-        metric_file = temp_project / "test" / "no-name-metric" / "metrics" / "None" / "data.jsonl"
+        metric_file = temp_project /  "test" / "no-name-metric" / "metrics" / "None" / "data.jsonl"
         assert metric_file.exists()
 
         with open(metric_file) as f:
@@ -31,7 +31,7 @@ class TestOptionalMetricName:
             experiment.metrics.append(name="loss", value=0.5, step=1)
             experiment.metrics.append(name="loss", value=0.4, step=2)
 
-        metric_file = temp_project / "test" / "explicit-name" / "metrics" / "loss" / "data.jsonl"
+        metric_file = temp_project /  "test" / "explicit-name" / "metrics" / "loss" / "data.jsonl"
         assert metric_file.exists()
 
         with open(metric_file) as f:
@@ -50,7 +50,7 @@ class TestOptionalMetricName:
             result = experiment.metrics.append_batch(data_points=data_points)
             assert result["count"] == 3
 
-        metric_file = temp_project / "test" / "batch-no-name" / "metrics" / "None" / "data.jsonl"
+        metric_file = temp_project /  "test" / "batch-no-name" / "metrics" / "None" / "data.jsonl"
         assert metric_file.exists()
 
         with open(metric_file) as f:
@@ -71,8 +71,8 @@ class TestOptionalMetricName:
             experiment.metrics.append(value=0.9, step=1)
 
         # Check both metrics exist
-        none_file = temp_project / "test" / "mixed" / "metrics" / "None" / "data.jsonl"
-        loss_file = temp_project / "test" / "mixed" / "metrics" / "loss" / "data.jsonl"
+        none_file = temp_project /  "test" / "mixed" / "metrics" / "None" / "data.jsonl"
+        loss_file = temp_project /  "test" / "mixed" / "metrics" / "loss" / "data.jsonl"
 
         assert none_file.exists()
         assert loss_file.exists()
