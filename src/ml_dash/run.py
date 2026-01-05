@@ -12,9 +12,9 @@ Usage:
     EXP.project = "my-project"
 
     # Use in templates (use dot notation for unique paths)
-    folder = "/experiments/{EXP.name}.{EXP.id}".format(RUN=RUN)
+    prefix = "/experiments/{EXP.name}.{EXP.id}".format(EXP=EXP)
 
-    # With dxp singleton (RUN is auto-populated)
+    # With dxp singleton (EXP is auto-populated)
     from ml_dash import dxp
     with dxp.run:
         # EXP.name, EXP.project, EXP.id, EXP.timestamp are set
@@ -23,21 +23,20 @@ Usage:
 
 import time
 from datetime import datetime, timezone
-from params_proto import proto
+from params_proto import proto, EnvVar
 
 
 @proto.prefix
 class EXP:
     """
-    Global run configuration.
+    Global experiment configuration.
 
-    This class is the single source of truth for run metadata.
+    This class is the single source of truth for experiment metadata.
     Configure it before starting an experiment, or let dxp auto-configure.
 
     Template variables available:
-        {EXP.name}      - Experiment name
-        {EXP.project}   - Project name
-        {EXP.id}        - Numeric run ID (milliseconds since epoch)
+        {EXP.prefix}    - Experiment prefix = <project>/<folders...>/<exp_name>
+        {EXP.id}        - Numeric experiment ID (milliseconds since epoch)
         {EXP.date}      - Date string (YYYYMMDD)
         {EXP.time}      - Time string (HHMMSS)
         {EXP.datetime}  - DateTime string (YYYYMMDD.HHMMSS)
@@ -45,81 +44,47 @@ class EXP:
 
     Example:
         EXP.name = "exp.{EXP.date}"  # -> "exp.20251219"
-        dxp.run.folder = "{EXP.project}/{EXP.name}.{EXP.id}"
+        dxp.run.prefix = "{EXP.project}/{EXP.name}.{EXP.id}"
     """
-    # Core identifiers
-    name: str = "untitled"  # Run/experiment name (can be a template)
-    project: str = "scratch"  # Project name
+    #
+    PREFIX: str = ""  # Prefix path with default templates
 
-    # Auto-generated identifiers (populated at run.start())
-    id: int = None  # Unique run ID (numeric, milliseconds since epoch)
+    # Core identifiers
+    name: str = "scratch"  # Experiment name (can be a template)
+    project: str = EnvVar @ "DASH_PROJECT" | "scratch"  # Project name
+
+    # Auto-generated identifiers
+    id: int = None  # Unique experiment ID (numeric, milliseconds since epoch)
     timestamp: str = None  # ISO timestamp string
 
-    # Optional configuration
-    folder: str = None  # Folder path with optional templates
-    description: str = None  # Run description
+    prefix: str = None  # Prefix path with optional templates
+    description: str = None  # Experiment description
 
     # Internal: stores the original name template
     _name_template: str = None
 
-    @classmethod
-    def _generate_id(cls) -> int:
-        """Generate a unique numeric run ID (milliseconds since epoch)."""
-        return int(time.time() * 1000)
+    def __post_init__(self):
+        pass
 
     @classmethod
-    @property
-    def date(cls) -> str:
-        """Current date as YYYYMMDD."""
-        return datetime.now(timezone.utc).strftime("%Y%m%d")
-
-    @classmethod
-    @property
-    def time(cls) -> str:
-        """Current time as HHMMSS."""
-        return datetime.now(timezone.utc).strftime("%H%M%S")
-
-    @classmethod
-    @property
-    def datetime(cls) -> str:
-        """Current datetime as YYYYMMDD.HHMMSS."""
-        return datetime.now(timezone.utc).strftime("%Y%m%d.%H%M%S")
-
-    @classmethod
-    def _init_run(cls) -> None:
-        """Initialize run ID and timestamp if not already set."""
+    def _init_run(cls):
+        """Initialize run with unique ID and timestamp."""
         if cls.id is None:
-            cls.id = cls._generate_id()
+            # Generate unique Snowflake ID
+            from .snowflake import generate_id
+            cls.id = generate_id()
+
+        if cls.timestamp is None:
+            # Generate ISO timestamp
+            from datetime import datetime, timezone
             cls.timestamp = datetime.now(timezone.utc).isoformat()
 
-        # Expand name template if set
-        if cls._name_template:
-            cls.name = cls._name_template.format(RUN=cls)
-
     @classmethod
-    def _format(cls, template: str) -> str:
-        """
-        Format a template string with RUN values.
-
-        Args:
-            template: String with {EXP.attr} placeholders
-
-        Returns:
-            Formatted string with placeholders replaced
-
-        Example:
-            EXP._format("/experiments/{EXP.name}.{EXP.id}")
-            # -> "/experiments/my-exp.1734567890123"
-        """
-        return template.format(RUN=cls)
-
-    @classmethod
-    def _reset(cls) -> None:
-        """Reset RUN to defaults (for testing or new runs)."""
-        cls.name = "untitled"
-        cls._name_template = None
-        cls.project = "scratch"
+    def _reset(cls):
+        """Reset run state for next experiment."""
         cls.id = None
         cls.timestamp = None
-        cls.folder = None
+        cls.prefix = None
         cls.description = None
+        cls._name_template = None
+

@@ -49,16 +49,16 @@ class TestFluentFileSave:
             assert result["filename"] == "array.json"
 
     def test_files_save_direct(self, local_experiment, sample_files):
-        """Test experiment.files.save() direct method."""
+        """Test experiment.folder.save() direct method."""
         with local_experiment(name="fluent-direct-save", project="test").run as exp:
-            result = exp.files.save(sample_files["model"])
+            result = exp.folder.save(sample_files["model"])
 
             assert result["filename"] == "model.txt"
 
     def test_files_save_with_path(self, local_experiment):
-        """Test experiment.files.save() with to parameter including path."""
+        """Test experiment.folder.save() with to parameter including path."""
         with local_experiment(name="fluent-direct-save-path", project="test").run as exp:
-            result = exp.files.save({"key": "value"}, to="configs/settings.json")
+            result = exp.folder.save({"key": "value"}, to="configs/settings.json")
 
             assert result["filename"] == "settings.json"
             assert result["path"] == "/configs"
@@ -81,16 +81,16 @@ class TestFluentSaveText:
             assert Path(downloaded).read_text() == content
 
     def test_save_text_direct(self, local_experiment):
-        """Test experiment.files.save_text() direct method."""
+        """Test experiment.folder.save_text() direct method."""
         with local_experiment(name="save-text-direct", project="test").run as exp:
-            result = exp.files.save_text("content", to="file.txt")
+            result = exp.folder.save_text("content", to="file.txt")
 
             assert result["filename"] == "file.txt"
 
     def test_save_text_with_path(self, local_experiment):
         """Test save_text with path including prefix."""
         with local_experiment(name="save-text-path", project="test").run as exp:
-            result = exp.files.save_text("yaml: content", to="configs/view.yaml")
+            result = exp.folder.save_text("yaml: content", to="configs/view.yaml")
 
             assert result["filename"] == "view.yaml"
             assert result["path"] == "/configs"
@@ -113,9 +113,9 @@ class TestFluentSaveJson:
             assert content == data
 
     def test_save_json_direct(self, local_experiment):
-        """Test experiment.files.save_json() direct method."""
+        """Test experiment.folder.save_json() direct method."""
         with local_experiment(name="save-json-direct", project="test").run as exp:
-            result = exp.files.save_json({"key": "value"}, to="data.json")
+            result = exp.folder.save_json({"key": "value"}, to="data.json")
 
             assert result["filename"] == "data.json"
 
@@ -137,9 +137,9 @@ class TestFluentSaveBlob:
             assert Path(downloaded).read_bytes() == data
 
     def test_save_blob_direct(self, local_experiment):
-        """Test experiment.files.save_blob() direct method."""
+        """Test experiment.folder.save_blob() direct method."""
         with local_experiment(name="save-blob-direct", project="test").run as exp:
-            result = exp.files.save_blob(b"data", to="file.bin")
+            result = exp.folder.save_blob(b"data", to="file.bin")
 
             assert result["filename"] == "file.bin"
 
@@ -189,12 +189,12 @@ class TestFluentList:
             assert len(txt_files) == 1
 
     def test_list_direct_with_pattern(self, local_experiment, sample_files):
-        """Test experiment.files.list() with pattern."""
+        """Test experiment.folder.list() with pattern."""
         with local_experiment(name="list-direct", project="test").run as exp:
             exp.files("models").save(sample_files["model"])
             exp.files("configs").save(sample_files["config"])
 
-            files = exp.files.list("*.txt")
+            files = exp.folder.list("*.txt")
             assert len(files) == 1
 
 
@@ -227,23 +227,23 @@ class TestFluentDownload:
             assert Path(downloaded[0]).exists()
 
     def test_download_direct_single(self, local_experiment, sample_files, tmp_path):
-        """Test experiment.files.download() for single file."""
+        """Test experiment.folder.download() for single file."""
         with local_experiment(name="download-direct", project="test").run as exp:
             exp.files("models").save(sample_files["model"])
 
-            downloaded = exp.files.download("model.txt", to=str(tmp_path / "out.txt"))
+            downloaded = exp.folder.download("model.txt", to=str(tmp_path / "out.txt"))
 
             assert Path(downloaded).exists()
 
     def test_download_direct_with_pattern(self, local_experiment, sample_files, tmp_path):
-        """Test experiment.files.download() with glob pattern."""
+        """Test experiment.folder.download() with glob pattern."""
         with local_experiment(name="download-direct-glob", project="test").run as exp:
             exp.files("images").save(sample_files["model"])
             exp.files("images").save(sample_files["config"])
 
             # Download using path/pattern syntax
             dest_dir = tmp_path / "local_images"
-            downloaded = exp.files.download("images/*.txt", to=str(dest_dir))
+            downloaded = exp.folder.download("images/*.txt", to=str(dest_dir))
 
             assert isinstance(downloaded, list)
             assert len(downloaded) == 1
@@ -279,21 +279,21 @@ class TestFluentDelete:
             assert len(results) == 1
 
     def test_delete_direct(self, local_experiment, sample_files):
-        """Test experiment.files.delete() direct method."""
+        """Test experiment.folder.delete() direct method."""
         with local_experiment(name="delete-direct", project="test").run as exp:
             exp.files("models").save(sample_files["model"])
 
-            result = exp.files.delete("model.txt")
+            result = exp.folder.delete("model.txt")
 
             assert "deletedAt" in result or "id" in result
 
     def test_delete_with_path_pattern(self, local_experiment, sample_files):
-        """Test experiment.files.delete() with path/pattern."""
+        """Test experiment.folder.delete() with path/pattern."""
         with local_experiment(name="delete-direct-glob", project="test").run as exp:
             exp.files("images").save(sample_files["model"])
             exp.files("images").save(sample_files["config"])
 
-            results = exp.files.delete("images/*.txt")
+            results = exp.folder.delete("images/*.txt")
 
             assert isinstance(results, list)
 

@@ -87,49 +87,54 @@ class LocalStorage:
 
     def create_experiment(
         self,
+        owner: str,
         project: str,
-        name: str,
+        prefix: str,
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
-        folder: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Path:
         """
-        Create a experiment directory structure.
+        Create an experiment directory structure.
+
+        Structure: root / owner / project / prefix
+        where prefix = folder_1/folder_2/.../exp_name
 
         Args:
+            owner: Owner/user
             project: Project name
-            name: Experiment name
+            prefix: Experiment prefix (folder_1/folder_2/.../exp_name)
             description: Optional description
             tags: Optional tags
             bindrs: Optional bindrs
-            folder: Optional folder path (used for organization)
             metadata: Optional metadata
 
         Returns:
             Path to experiment directory
         """
-        # Determine base path - include folder in hierarchy if specified
-        if folder is not None:
-            # Strip leading / to make it relative, then use as base path
-            folder_path = folder.lstrip('/')
-            base_path = self.root_path / folder_path
-        else:
-            base_path = self.root_path
+        # Normalize prefix path
+        prefix_clean = prefix.rstrip('/')
+        prefix_path = prefix_clean.lstrip('/')
 
-        # Create project directory
-        project_dir = base_path / project
+        # Create full directory structure: owner / project / prefix
+        owner_dir = self.root_path / owner
+        owner_dir.mkdir(parents=True, exist_ok=True)
+
+        project_dir = owner_dir / project
         project_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create experiment directory
-        experiment_dir = project_dir / name
+        # Create experiment directory (prefix may have subdirectories)
+        experiment_dir = project_dir / prefix_path
         experiment_dir.mkdir(parents=True, exist_ok=True)
 
         # Create subdirectories
         (experiment_dir / "logs").mkdir(exist_ok=True)
         (experiment_dir / "metrics").mkdir(exist_ok=True)
         (experiment_dir / "files").mkdir(exist_ok=True)
+
+        # Extract experiment name from last segment of prefix
+        name = prefix_clean.split('/')[-1]
 
         # Write experiment metadata
         experiment_metadata = {
@@ -138,7 +143,7 @@ class LocalStorage:
             "description": description,
             "tags": tags or [],
             "bindrs": bindrs or [],
-            "folder": folder,
+            "prefix": prefix,
             "metadata": metadata,
             "created_at": datetime.utcnow().isoformat() + "Z",
             "write_protected": False,
@@ -171,8 +176,8 @@ class LocalStorage:
                     existing["tags"] = tags
                 if bindrs is not None:
                     existing["bindrs"] = bindrs
-                if folder is not None:
-                    existing["folder"] = folder
+                if prefix is not None:
+                    existing["prefix"] = prefix
                 if metadata is not None:
                     existing["metadata"] = metadata
                 existing["updated_at"] = datetime.utcnow().isoformat() + "Z"
@@ -189,7 +194,7 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        folder: Optional[str] = None,
+        prefix: Optional[str] = None,
         message: str = "",
         level: str = "info",
         timestamp: str = "",
@@ -201,13 +206,13 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
-            folder: Optional folder path
+            prefix: Optional folder path (prefix for organization)
             message: Log message
             level: Log level
             timestamp: ISO timestamp string
             metadata: Optional metadata
         """
-        experiment_dir = self._get_experiment_dir(project, experiment, folder)
+        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
         logs_dir = experiment_dir / "logs"
         logs_file = logs_dir / "logs.jsonl"
         seq_file = logs_dir / ".log_sequence"
@@ -271,7 +276,7 @@ class LocalStorage:
         self,
         project: str,
         experiment: str,
-        folder: Optional[str] = None,
+        prefix: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -287,12 +292,12 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
-            folder: Optional folder path
+            prefix: Optional folder path (prefix for organization)
             data: Flattened parameter dict with dot notation (already flattened)
         """
         if data is None:
             data = {}
-        experiment_dir = self._get_experiment_dir(project, experiment, folder)
+        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
         params_file = experiment_dir / "parameters.json"
 
         # File-based lock for concurrent parameter writes (prevents data loss and version conflicts)
@@ -370,11 +375,11 @@ class LocalStorage:
 
     def write_file(
         self,
+        owner: str,
         project: str,
-        experiment: str,
-        folder: Optional[str] = None,
-        file_path: str = "",
-        prefix: str = "",
+        prefix: str,
+        file_path: str,
+        path: str = "",
         filename: str = "",
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
@@ -386,15 +391,14 @@ class LocalStorage:
         """
         Write file to local storage.
 
-        Copies file to: files/<prefix>/<file_id>/<filename>
-        Updates .files_metadata.json with file metadata
+        Stores at: root / owner / project / prefix / files / path / file_id / filename
 
         Args:
+            owner: Owner/user
             project: Project name
-            experiment: Experiment name
-            folder: Optional folder path
-            file_path: Source file path
-            prefix: Logical path prefix
+            prefix: Experiment prefix (folder_1/folder_2/.../exp_name)
+            file_path: Source file path (where to copy from)
+            path: Subdirectory within experiment/files for organizing files
             filename: Original filename
             description: Optional description
             tags: Optional tags
@@ -409,21 +413,21 @@ class LocalStorage:
         import shutil
         from .files import generate_snowflake_id
 
-        experiment_dir = self._get_experiment_dir(project, experiment, folder)
+        experiment_dir = self._get_experiment_dir(owner, project, prefix)
         files_dir = experiment_dir / "files"
         metadata_file = files_dir / ".files_metadata.json"
 
         # Generate Snowflake ID for file
         file_id = generate_snowflake_id()
 
-        # Normalize prefix (remove leading slashes to avoid absolute paths)
-        normalized_prefix = prefix.lstrip("/") if prefix else ""
+        # Normalize path (remove leading slashes to avoid absolute paths)
+        normalized_path = path.lstrip("/") if path else ""
 
-        # Create prefix directory, then file directory
-        prefix_dir = files_dir / normalized_prefix if normalized_prefix else files_dir
-        prefix_dir.mkdir(parents=True, exist_ok=True)
+        # Create storage subdirectory, then file directory
+        storage_dir = files_dir / normalized_path if normalized_path else files_dir
+        storage_dir.mkdir(parents=True, exist_ok=True)
 
-        file_dir = prefix_dir / file_id
+        file_dir = storage_dir / file_id
         file_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy file
@@ -434,7 +438,7 @@ class LocalStorage:
         file_metadata = {
             "id": file_id,
             "experimentId": f"{project}/{experiment}",  # Local mode doesn't have real experiment ID
-            "path": prefix,
+            "path": path,
             "filename": filename,
             "description": description,
             "tags": tags or [],
@@ -459,10 +463,10 @@ class LocalStorage:
                 except (json.JSONDecodeError, IOError):
                     files_metadata = {"files": []}
 
-            # Check if file with same prefix+filename exists (overwrite behavior)
+            # Check if file with same path+filename exists (overwrite behavior)
             existing_index = None
             for i, existing_file in enumerate(files_metadata["files"]):
-                if (existing_file["path"] == prefix and
+                if (existing_file["path"] == path and
                     existing_file["filename"] == filename and
                     existing_file["deletedAt"] is None):
                     existing_index = i
@@ -733,58 +737,21 @@ class LocalStorage:
 
         return updated_file
 
-    def _get_experiment_dir(self, project: str, experiment: str, folder: Optional[str] = None) -> Path:
+    def _get_experiment_dir(self, owner: str, project: str, prefix: str) -> Path:
         """
         Get experiment directory path.
 
-        If folder is not provided, tries to read it from experiment.json metadata.
-        Falls back to root_path/project/experiment if not found.
+        Structure: root / owner / project / prefix
+        where prefix = folder_1/folder_2/.../exp_name
         """
-        # If folder explicitly provided, use it
-        if folder is not None:
-            folder_path = folder.lstrip('/')
-            return self.root_path / folder_path / project / experiment
-
-        # Try to read folder from experiment metadata
-        # Check common locations where experiment might exist
-        possible_paths = []
-
-        # First, try without folder (most common case)
-        default_path = self.root_path / project / experiment
-        possible_paths.append(default_path)
-
-        # Then scan for experiment.json in subdirectories (for folder-based experiments)
-        try:
-            for item in self.root_path.rglob(f"*/{project}/{experiment}/experiment.json"):
-                exp_dir = item.parent
-                if exp_dir not in [p for p in possible_paths]:
-                    possible_paths.insert(0, exp_dir)  # Prioritize found paths
-        except:
-            pass
-
-        # Check each possible path for experiment.json with folder metadata
-        for path in possible_paths:
-            exp_json = path / "experiment.json"
-            if exp_json.exists():
-                try:
-                    with open(exp_json, 'r') as f:
-                        metadata = json.load(f)
-                        if metadata.get('folder'):
-                            folder_path = metadata['folder'].lstrip('/')
-                            return self.root_path / folder_path / project / experiment
-                except:
-                    pass
-                # Found experiment.json, use this path even if no folder metadata
-                return path
-
-        # Fallback to default path
-        return default_path
+        prefix_path = prefix.lstrip('/')
+        return self.root_path / owner / project / prefix_path
 
     def append_to_metric(
         self,
         project: str,
         experiment: str,
-        folder: Optional[str] = None,
+        prefix: Optional[str] = None,
         metric_name: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
@@ -802,7 +769,7 @@ class LocalStorage:
         Args:
             project: Project name
             experiment: Experiment name
-            folder: Optional folder path
+            prefix: Optional folder path (prefix for organization)
             metric_name: Metric name (None for unnamed metrics)
             data: Data point (flexible schema)
             description: Optional metric description
@@ -814,7 +781,7 @@ class LocalStorage:
         """
         if data is None:
             data = {}
-        experiment_dir = self._get_experiment_dir(project, experiment, folder)
+        experiment_dir = self._get_experiment_dir(project, experiment, prefix)
         metrics_dir = experiment_dir / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
 

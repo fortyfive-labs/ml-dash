@@ -84,7 +84,7 @@ class RemoteClient:
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
         bindrs: Optional[List[str]] = None,
-        folder: Optional[str] = None,
+        prefix: Optional[str] = None,
         write_protected: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -93,16 +93,17 @@ class RemoteClient:
 
         Args:
             project: Project name
-            name: Experiment name
+            name: Experiment name (last segment of prefix)
             description: Optional description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            folder: Optional folder path
+            prefix: Full prefix path including name (e.g., "experiments/resnet/baseline-v1").
+                   The folder path is extracted by removing the last segment (name).
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
 
         Returns:
-            Response dict with experiment, project, folder, and namespace data
+            Response dict with experiment, project, prefix, and namespace data
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -117,8 +118,16 @@ class RemoteClient:
             payload["tags"] = tags
         if bindrs is not None:
             payload["bindrs"] = bindrs
-        if folder is not None:
-            payload["folder"] = folder
+        if prefix is not None:
+            # Extract folder path from prefix (remove last segment which is the name)
+            # Example: "experiments/resnet/baseline-v1" -> "experiments/resnet"
+            prefix_clean = prefix.strip('/')
+            parts = prefix_clean.split('/')
+            if len(parts) > 1:
+                # Remove last segment (name) to get folder path
+                folder_path = '/'.join(parts[:-1])
+                payload["folder"] = '/' + folder_path
+            # If only one segment (no folders), don't set folder (root level)
         if write_protected:
             payload["writeProtected"] = write_protected
         if metadata is not None:

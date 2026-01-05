@@ -55,7 +55,7 @@ Experiment(
 | `description` | `str` | `None` | Human-readable description of the experiment |
 | `tags` | `List[str]` | `None` | Tags for categorization and search |
 | `bindrs` | `List[str]` | `None` | Binders for advanced organization |
-| `folder` | `str` | `None` | Logical folder path (e.g., "/experiments/baseline") |
+| `prefix` | `str` | `None` | Logical folder path for organization (e.g., "experiments/baseline") |
 | `metadata` | `Dict[str, Any]` | `None` | Additional structured metadata |
 
 #### Mode Configuration
@@ -79,12 +79,17 @@ Experiment(
     user_name="your-username"
 )
 
-# Option 2: With API key
+# Option 2: Default remote mode (defaults to https://api.dash.ml)
 Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
+    project="my-project"
+)
+
+# Option 3: Custom remote server
+Experiment(
+    prefix="my-experiment",
     project="my-project",
-    remote="https://api.dash.ml",
-    api_key="your-jwt-token"
+    remote="https://custom-server.com"
 )
 ```
 
