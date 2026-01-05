@@ -5,6 +5,7 @@ This test verifies the storage path structure:
 - All data is stored at: root / owner / project / prefix
 - Default owner is "scratch"
 """
+import getpass
 import tempfile
 import json
 from pathlib import Path
@@ -24,7 +25,8 @@ def test_all_operations_use_folder_field():
 
         with exp.run:
             # Expected base path: root / owner / project / prefix
-            expected_base = Path(tmpdir) /  "test_project" / "iclr_2024" / "test_exp"
+            owner = getpass.getuser()
+            expected_base = Path(tmpdir) / owner / "test_project" / "iclr_2024" / "test_exp"
 
             # 1. Test parameters
             exp.params.set(batch_size=128, lr=0.001)
@@ -99,7 +101,8 @@ def test_folder_consistency_with_static_path():
 
         with exp.run:
             # Expected: root / owner / project / prefix
-            expected_base = Path(tmpdir) /  "proj" / "custom" / "path" / "static_exp"
+            owner = getpass.getuser()
+            expected_base = Path(tmpdir) / owner / "proj" / "custom" / "path" / "static_exp"
 
             # Add all types of data
             exp.params.set(test_param=123)
@@ -131,7 +134,8 @@ def test_no_folder_field_still_works():
 
         with exp.run:
             # Should use path: root / owner / project / prefix
-            expected_base = Path(tmpdir) /  "proj" / "no_folder_exp"
+            owner = getpass.getuser()
+            expected_base = Path(tmpdir) / owner / "proj" / "no_folder_exp"
 
             exp.params.set(test=1)
             exp.log("Test")

@@ -1,5 +1,6 @@
 """Comprehensive tests for save_video() functionality in both local and remote modes."""
 import numpy as np
+import getpass
 import pytest
 from pathlib import Path
 
@@ -26,7 +27,7 @@ class TestVideoBasics:
             assert 'checksum' in result
 
         # Verify file was saved
-        files_dir = temp_project /  "test" / "video-test" / "files"
+        files_dir = temp_project / getpass.getuser() / "test" / "video-test" / "files"
         assert files_dir.exists()
         saved_videos = list(files_dir.glob("**/test_video.mp4"))
         assert len(saved_videos) == 1

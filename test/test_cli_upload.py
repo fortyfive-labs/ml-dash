@@ -1,5 +1,6 @@
 """Tests for CLI upload command."""
 import pytest
+import getpass
 import json
 import tempfile
 from pathlib import Path
@@ -142,7 +143,7 @@ class TestExperimentValidator:
     def test_validate_missing_metadata(self, temp_project):
         """Test validating experiment with missing metadata."""
         # Create experiment directory without experiment.json
-        exp_dir = temp_project / "proj1" / "exp1"
+        exp_dir = temp_project / getpass.getuser() / "proj1" / "exp1"
         exp_dir.mkdir(parents=True)
 
         from ml_dash.cli_commands.upload import ExperimentInfo
@@ -160,7 +161,7 @@ class TestExperimentValidator:
 
     def test_validate_invalid_json(self, temp_project):
         """Test validating experiment with invalid JSON."""
-        exp_dir = temp_project / "proj1" / "exp1"
+        exp_dir = temp_project / getpass.getuser() / "proj1" / "exp1"
         exp_dir.mkdir(parents=True)
 
         # Write invalid JSON
@@ -187,8 +188,10 @@ class TestExperimentValidator:
             e.log("Test")
 
         # Add invalid log line
+        import getpass
+        owner = getpass.getuser()
         local_path = Path(exp._storage.root_path)
-        logs_dir = local_path / "proj1" / "exp1" / "logs"
+        logs_dir = local_path / owner / "proj1" / "exp1" / "logs"
         logs_file = logs_dir / "logs.jsonl"
 
         # Append invalid JSON line
@@ -210,8 +213,10 @@ class TestExperimentValidator:
             e.log("Test")
 
         # Add invalid log line
+        import getpass
+        owner = getpass.getuser()
         local_path = Path(exp._storage.root_path)
-        logs_dir = local_path / "proj1" / "exp1" / "logs"
+        logs_dir = local_path / owner / "proj1" / "exp1" / "logs"
         logs_file = logs_dir / "logs.jsonl"
 
         with open(logs_file, "a") as f:

@@ -612,9 +612,11 @@ class Experiment:
 
         if self._storage:
             # Local mode: write to file immediately
+            import getpass
+            owner = getpass.getuser()
             self._storage.write_log(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 message=log_entry["message"],
                 level=log_entry["level"],
@@ -981,9 +983,11 @@ class Experiment:
 
         if self._storage:
             # Local mode: write to file
+            import getpass
+            owner = getpass.getuser()
             self._storage.write_parameters(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 data=flattened_params
             )
@@ -1007,9 +1011,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: read from file
+            import getpass
+            owner = getpass.getuser()
             params = self._storage.read_parameters(
+                owner=owner,
                 project=self.project,
-                experiment=self.name
+                prefix=self._folder_path
             )
 
         return params
@@ -1097,9 +1104,11 @@ class Experiment:
 
         if self._storage:
             # Local mode: append to local storage
+            import getpass
+            owner = getpass.getuser()
             result = self._storage.append_to_metric(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
                 prefix=self._folder_path,
                 metric_name=name,
                 data=data,
@@ -1146,9 +1155,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: append batch to local storage
+            import getpass
+            owner = getpass.getuser()
             result = self._storage.append_batch_to_metric(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name,
                 data_points=data_points,
                 description=description,
@@ -1188,9 +1200,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: read from local storage
+            import getpass
+            owner = getpass.getuser()
             result = self._storage.read_metric_data(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name,
                 start_index=start_index,
                 limit=limit
@@ -1219,9 +1234,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: get stats from local storage
+            import getpass
+            owner = getpass.getuser()
             result = self._storage.get_metric_stats(
+                owner=owner,
                 project=self.project,
-                experiment=self.name,
+                prefix=self._folder_path,
                 metric_name=name
             )
 
@@ -1242,9 +1260,12 @@ class Experiment:
 
         if self._storage:
             # Local mode: list from local storage
+            import getpass
+            owner = getpass.getuser()
             result = self._storage.list_metrics(
+                owner=owner,
                 project=self.project,
-                experiment=self.name
+                prefix=self._folder_path
             )
 
         return result or []

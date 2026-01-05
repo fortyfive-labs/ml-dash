@@ -1,5 +1,6 @@
 """Comprehensive integration tests for complete workflows in both local and remote modes."""
 import json
+import getpass
 import random
 import pytest
 from pathlib import Path
@@ -11,11 +12,10 @@ class TestCompleteWorkflows:
     def test_complete_ml_workflow_local(self, local_experiment, temp_project, sample_files):
         """Test complete ML experiment workflow in local mode."""
         with local_experiment(
-            name="ml-experiment",
+            prefix="experiments/2024/ml-experiment",
             project="experiments",
             description="Complete ML training experiment",
-            tags=["ml", "training", "test"],
-            folder="/experiments/2024"
+            tags=["ml", "training", "test"]
         ).run as experiment:
             # 1. Set hyperparameters
             experiment.params.set(
@@ -64,8 +64,9 @@ class TestCompleteWorkflows:
             experiment.log("Experiment completed successfully", level="info")
 
         # Verify everything was created
-        # When folder is set, files go to: root_path / folder / project / experiment
-        experiment_dir = temp_project / "experiments" / "2024" / "experiments" / "ml-experiment"
+        # Storage structure: root_path / owner / project / prefix
+        owner = getpass.getuser()
+        experiment_dir = temp_project / owner / "experiments" / "experiments" / "2024" / "ml-experiment"
         assert (experiment_dir / "experiment.json").exists()
         assert (experiment_dir / "parameters.json").exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
@@ -136,7 +137,7 @@ class TestHyperparameterSearch:
                     experiment.log(f"Grid search run complete: acc={final_acc:.4f}")
 
         # Verify all experiments were created
-        project_dir = temp_project / "hyperparam-search"
+        project_dir = temp_project / getpass.getuser() / "hyperparam-search"
         experiments = [d for d in project_dir.iterdir() if d.is_dir()]
         assert len(experiments) == 9  # 3 LRs × 3 batch sizes
 
@@ -202,7 +203,7 @@ class TestIterativeExperimentation:
                 experiment.log(f"{exp['name']} experiment complete", level="info")
 
         # Verify progression
-        project_dir = temp_project / "iterative"
+        project_dir = temp_project / getpass.getuser() / "iterative"
         assert (project_dir / "exp-baseline").exists()
         assert (project_dir / "exp-deeper").exists()
         assert (project_dir / "exp-lower-lr").exists()
@@ -216,10 +217,9 @@ class TestMultiExperimentPipeline:
         """Test complete ML pipeline with multiple stages."""
         # Stage 1: Data preprocessing
         with local_experiment(
-            name="01-preprocessing",
+            prefix="pipeline/stage-1/01-preprocessing",
             project="pipeline",
-            tags=["pipeline", "preprocessing"],
-            folder="/pipeline/stage-1"
+            tags=["pipeline", "preprocessing"]
         ).run as experiment:
             experiment.log("Starting data preprocessing", level="info")
             experiment.params.set(
@@ -233,10 +233,9 @@ class TestMultiExperimentPipeline:
 
         # Stage 2: Training
         with local_experiment(
-            name="02-training",
+            prefix="pipeline/stage-2/02-training",
             project="pipeline",
-            tags=["pipeline", "training"],
-            folder="/pipeline/stage-2"
+            tags=["pipeline", "training"]
         ).run as experiment:
             experiment.log("Starting model training", level="info")
             experiment.params.set(
@@ -252,10 +251,9 @@ class TestMultiExperimentPipeline:
 
         # Stage 3: Evaluation
         with local_experiment(
-            name="03-evaluation",
+            prefix="pipeline/stage-3/03-evaluation",
             project="pipeline",
-            tags=["pipeline", "evaluation"],
-            folder="/pipeline/stage-3"
+            tags=["pipeline", "evaluation"]
         ).run as experiment:
             experiment.log("Starting model evaluation", level="info")
             experiment.params.set(test_set="test.csv")
@@ -264,10 +262,11 @@ class TestMultiExperimentPipeline:
             experiment.log("Evaluation complete", level="info")
 
         # Verify all stages
-        # When folder is set, files go to: root_path / folder / project / experiment
-        assert (temp_project / "pipeline" / "stage-1" / "pipeline" / "01-preprocessing").exists()
-        assert (temp_project / "pipeline" / "stage-2" / "pipeline" / "02-training").exists()
-        assert (temp_project / "pipeline" / "stage-3" / "pipeline" / "03-evaluation").exists()
+        # Storage structure: root_path / owner / project / prefix
+        owner = getpass.getuser()
+        assert (temp_project / owner / "pipeline" / "pipeline" / "stage-1" / "01-preprocessing").exists()
+        assert (temp_project / owner / "pipeline" / "pipeline" / "stage-2" / "02-training").exists()
+        assert (temp_project / owner / "pipeline" / "pipeline" / "stage-3" / "03-evaluation").exists()
 
     @pytest.mark.remote
     def test_pipeline_remote(self, remote_experiment, sample_files):
@@ -335,7 +334,7 @@ class TestDebuggingWorkflow:
             experiment.log("Debug experiment complete", level="info")
 
         # Verify comprehensive logs
-        logs_file = temp_project / "debugging" / "debug-training" / "logs" / "logs.jsonl"
+        logs_file = temp_project / getpass.getuser() / "debugging" / "debug-training" / "logs" / "logs.jsonl"
         with open(logs_file) as f:
             logs = [json.loads(line) for line in f]
 
@@ -348,11 +347,10 @@ class TestAllFeaturesCombined:
     def test_kitchen_sink_local(self, local_experiment, temp_project, sample_files):
         """Test experiment using every available feature."""
         with local_experiment(
-            name="kitchen-sink",
+            prefix="tests/comprehensive/kitchen-sink",
             project="full-test",
             description="Test of all features combined",
-            tags=["test", "comprehensive", "all-features"],
-            folder="/tests/comprehensive"
+            tags=["test", "comprehensive", "all-features"]
         ).run as experiment:
             # Parameters (simple and nested)
             experiment.params.set(
@@ -401,8 +399,9 @@ class TestAllFeaturesCombined:
             experiment.log("Comprehensive test complete", level="info")
 
         # Verify everything exists
-        # When folder is set, files go to: root_path / folder / project / experiment
-        experiment_dir = temp_project / "tests" / "comprehensive" / "full-test" / "kitchen-sink"
+        # Storage structure: root_path / owner / project / prefix
+        owner = getpass.getuser()
+        experiment_dir = temp_project / owner / "full-test" / "tests" / "comprehensive" / "kitchen-sink"
         assert (experiment_dir / "experiment.json").exists()
         assert (experiment_dir / "parameters.json").exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
@@ -475,7 +474,7 @@ class TestRealWorldScenarios:
             experiment.log("Recovery successful")
 
         # Verify both attempts are recorded
-        experiment_dir = temp_project / "recovery" / "recovery-test"
+        experiment_dir = temp_project / getpass.getuser() / "recovery" / "recovery-test"
         assert experiment_dir.exists()
 
     def test_comparison_experiments_local(self, local_experiment, temp_project):
@@ -498,7 +497,7 @@ class TestRealWorldScenarios:
                 experiment.log(f"{model_name} training complete", metadata={"final_acc": final_acc})
 
         # Verify all comparison runs
-        project_dir = temp_project / "comparisons"
+        project_dir = temp_project / getpass.getuser() / "comparisons"
         assert len([d for d in project_dir.iterdir() if d.is_dir()]) == 3
 
     @pytest.mark.slow

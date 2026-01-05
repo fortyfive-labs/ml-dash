@@ -1,5 +1,6 @@
 """Comprehensive tests for Experiment operations in both local and remote modes."""
 import json
+import getpass
 import pytest
 from pathlib import Path
 
@@ -17,7 +18,7 @@ class TestExperimentCreation:
 
         assert not experiment._is_open
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "test-ws" / "test-ctx"
+        experiment_dir = temp_project / getpass.getuser() / "test-ws" / "test-ctx"
         assert experiment_dir.exists()
         assert (experiment_dir / "experiment.json").exists()
 
@@ -49,7 +50,7 @@ class TestExperimentCreation:
 
         # Verify data was saved
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "test-ws" / "manual-test"
+        experiment_dir = temp_project / getpass.getuser() / "test-ws" / "manual-test"
         assert experiment_dir.exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
 
@@ -81,7 +82,7 @@ class TestExperimentCreation:
 
         # Verify metadata
         # New structure: root / owner / project / prefix
-        experiment_file = temp_project /  "meta-ws" / "experiments" / "meta" / "meta-experiment" / "experiment.json"
+        experiment_file = temp_project / getpass.getuser() / "meta-ws" / "experiments" / "meta" / "meta-experiment" / "experiment.json"
         assert experiment_file.exists()
 
         with open(experiment_file) as f:
@@ -95,13 +96,12 @@ class TestExperimentCreation:
 
     @pytest.mark.remote
     def test_experiment_with_metadata_remote(self, remote_experiment):
-        """Test experiment with description, tags, and folder in remote mode."""
+        """Test experiment with description, tags, and prefix in remote mode."""
         with remote_experiment(
-            name="meta-experiment-remote",
+            prefix="experiments/remote/meta-experiment-remote",
             project="meta-ws-remote",
             description="Remote test experiment with metadata",
             tags=["test", "metadata", "remote"],
-            folder="/experiments/remote",
         ).run as experiment:
             experiment.log("Remote experiment with metadata")
             # In remote mode, metadata is sent to server
@@ -146,7 +146,7 @@ class TestMultipleExperiments:
 
         # Verify all experiments exist
         # New structure: root / owner / project / prefix
-        project_dir = temp_project /  "shared-ws"
+        project_dir = temp_project / getpass.getuser() / "shared-ws"
         assert (project_dir / "experiment-1").exists()
         assert (project_dir / "experiment-2").exists()
         assert (project_dir / "experiment-3").exists()
@@ -175,9 +175,9 @@ class TestMultipleExperiments:
 
         # Verify all projects and experiments exist
         # New structure: root / owner / project / prefix
-        assert (temp_project /  "project-1" / "experiment-a").exists()
-        assert (temp_project /  "project-2" / "experiment-b").exists()
-        assert (temp_project /  "project-3" / "experiment-c").exists()
+        assert (temp_project / getpass.getuser() / "project-1" / "experiment-a").exists()
+        assert (temp_project / getpass.getuser() / "project-2" / "experiment-b").exists()
+        assert (temp_project / getpass.getuser() / "project-3" / "experiment-c").exists()
 
     def test_experiments_local(self, local_experiment):
         """Test experiments sequentially."""
@@ -209,7 +209,7 @@ class TestExperimentErrorHandling:
 
         # Data should still be saved
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "error-ws" / "error-test"
+        experiment_dir = temp_project / getpass.getuser() / "error-ws" / "error-test"
         assert experiment_dir.exists()
         assert (experiment_dir / "logs" / "logs.jsonl").exists()
         assert (experiment_dir / "parameters.json").exists()
@@ -245,7 +245,7 @@ class TestExperimentErrorHandling:
 
         # Experiment should have all logs
         # New structure: root / owner / project / prefix
-        logs_file = temp_project /  "error-ws" / "multi-error" / "logs" / "logs.jsonl"
+        logs_file = temp_project / getpass.getuser() / "error-ws" / "multi-error" / "logs" / "logs.jsonl"
         assert logs_file.exists()
 
         with open(logs_file) as f:
@@ -271,7 +271,7 @@ class TestExperimentReuse:
 
         # Verify both operations are recorded
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "reuse-ws" / "reuse-experiment"
+        experiment_dir = temp_project / getpass.getuser() / "reuse-ws" / "reuse-experiment"
         logs_file = experiment_dir / "logs" / "logs.jsonl"
 
         with open(logs_file) as f:
@@ -303,7 +303,7 @@ class TestExperimentEdgeCases:
 
         # Experiment directory should still be created
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "empty-ws" / "empty-experiment"
+        experiment_dir = temp_project / getpass.getuser() / "empty-ws" / "empty-experiment"
         assert experiment_dir.exists()
 
     def test_experiment_with_special_characters_local(self, local_experiment, temp_project):
@@ -312,7 +312,7 @@ class TestExperimentEdgeCases:
             experiment.log("Experiment with special chars in name")
 
         # New structure: root / owner / project / prefix
-        experiment_dir = temp_project /  "special-ws" / "test-experiment_v1.0"
+        experiment_dir = temp_project / getpass.getuser() / "special-ws" / "test-experiment_v1.0"
         assert experiment_dir.exists()
 
     def test_experiment_with_long_name_local(self, local_experiment):
@@ -331,7 +331,7 @@ class TestExperimentEdgeCases:
             experiment.log("Deeply nested experiment")
 
         # New structure: root / owner / project / prefix
-        experiment_file = temp_project /  "nested-ws" / "a" / "b" / "c" / "d" / "e" / "f" / "g" / "h" / "nested-experiment" / "experiment.json"
+        experiment_file = temp_project / getpass.getuser() / "nested-ws" / "a" / "b" / "c" / "d" / "e" / "f" / "g" / "h" / "nested-experiment" / "experiment.json"
         with open(experiment_file) as f:
             metadata = json.load(f)
             assert metadata["prefix"] == "a/b/c/d/e/f/g/h/nested-experiment"
@@ -347,7 +347,7 @@ class TestExperimentEdgeCases:
             experiment.log("Experiment with many tags")
 
         # New structure: root / owner / project / prefix
-        experiment_file = temp_project /  "tags-ws" / "many-tags" / "experiment.json"
+        experiment_file = temp_project / getpass.getuser() / "tags-ws" / "many-tags" / "experiment.json"
         with open(experiment_file) as f:
             metadata = json.load(f)
             assert len(metadata["tags"]) == 50

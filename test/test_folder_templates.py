@@ -39,11 +39,11 @@ def test_template_with_run_id():
 
         # Should include both name and numeric id
         assert exp.run.prefix.startswith("iclr_2024/my-experiment.")
-        # EXP.id is a 13-digit millisecond timestamp
+        # EXP.id is an 18-digit Snowflake ID
         parts = exp.run.prefix.split(".")
         assert len(parts) == 2
         assert parts[1].isdigit()
-        assert len(parts[1]) == 13  # milliseconds since epoch
+        assert len(parts[1]) == 18  # Snowflake ID (64-bit distributed ID)
 
         with exp.run:
             assert EXP.id is not None

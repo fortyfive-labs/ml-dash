@@ -1,5 +1,6 @@
 """Comprehensive tests for file operations in both local and remote modes."""
 import json
+import getpass
 import pytest
 import hashlib
 from pathlib import Path
@@ -21,7 +22,7 @@ class TestBasicFileOperations:
             assert result["sizeBytes"] > 0
             assert "checksum" in result
 
-        files_dir = temp_project / "test" / "file-test" / "files"
+        files_dir = temp_project / getpass.getuser() / "test" / "file-test" / "files"
         assert files_dir.exists()
         saved_files = list(files_dir.glob("*/*/model.txt"))
         assert len(saved_files) == 1
@@ -47,7 +48,7 @@ class TestBasicFileOperations:
             experiment.files("results").upload(
                 sample_files["results"])
 
-        files_dir = temp_project / "test" / "multi-file" / "files"
+        files_dir = temp_project / getpass.getuser() / "test" / "multi-file" / "files"
         file_dirs = [d for d in files_dir.iterdir() if d.is_dir()]
         assert len(file_dirs) == 3
 
@@ -77,7 +78,7 @@ class TestFileMetadata:
             assert "uploadedAt" in result
             assert result["tags"] == ["results", "metrics"]
 
-        metadata_file = temp_project / "test" / "file-meta" / "files" / ".files_metadata.json"
+        metadata_file = temp_project / getpass.getuser() / "test" / "file-meta" / "files" / ".files_metadata.json"
         assert metadata_file.exists()
 
         with open(metadata_file) as f:
@@ -233,7 +234,7 @@ class TestFileTypes:
             experiment.files("text").upload(
                 sample_files["model"])
 
-        files_dir = temp_project / "test" / "text-file" / "files"
+        files_dir = temp_project / getpass.getuser() / "test" / "text-file" / "files"
         saved_files = list(files_dir.glob("*/*/model.txt"))
         assert len(saved_files) == 1
 

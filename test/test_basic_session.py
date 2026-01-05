@@ -1,4 +1,5 @@
 """Tests for basic experiment operations."""
+import getpass
 import json
 from pathlib import Path
 import pytest
@@ -12,7 +13,6 @@ def test_experiment_creation_with_context_manager(local_experiment, temp_project
 
     # Verify experiment directory was created
     # Local storage uses owner/project/prefix structure
-    import getpass
     owner = getpass.getuser()
     experiment_dir = temp_project / owner / "tutorials" / "hello-ml-dash"
     assert experiment_dir.exists()
@@ -31,7 +31,6 @@ def test_experiment_with_metadata(local_experiment, temp_project):
 
     # Verify metadata was saved
     # Files go to: root_path / owner / project / prefix
-    import getpass
     owner = getpass.getuser()
     experiment_dir = temp_project / owner / "computer-vision" / "experiments" / "mnist" / "mnist-baseline"
     experiment_file = experiment_dir / "experiment.json"
@@ -66,7 +65,8 @@ def test_experiment_manual_open_close(local_experiment, temp_project):
     assert not experiment._is_open
 
     # Verify data was saved
-    experiment_dir = temp_project / "test" / "manual-experiment"
+    owner = getpass.getuser()
+    experiment_dir = temp_project / owner / "test" / "manual-experiment"
     assert experiment_dir.exists()
 
 
@@ -91,7 +91,6 @@ def test_experiments_same_project(local_experiment, temp_project):
         experiment.log("Experiment 2")
 
     # Verify both experiments exist
-    import getpass
     owner = getpass.getuser()
     project_dir = temp_project / owner / "shared"
     assert (project_dir / "experiment-1").exists()
@@ -116,7 +115,6 @@ def test_experiment_error_handling(local_experiment, temp_project):
         pass
 
     # Experiment directory should be created even if error occurs
-    import getpass
     owner = getpass.getuser()
     experiment_dir = temp_project / owner / "test" / "error-test"
     assert experiment_dir.exists(), "Experiment directory should exist even after error"

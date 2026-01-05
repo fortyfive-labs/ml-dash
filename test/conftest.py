@@ -21,17 +21,18 @@ def _generate_test_api_key():
     """Generate a test JWT token for testing using OIDC standard claims."""
     import jwt
 
-    # Use OIDC standard claims matching vuer-auth token format
+    # Use real user from database (Tom Tao)
+    # This user exists in the ml-dash server database with a namespace
     payload = {
-        "sub": "test-user-id-12345",
-        "email": "test@example.com",
-        "name": "Test User",
-        "username": TEST_USERNAME,
-        "given_name": "Test",
-        "family_name": "User",
+        "sub": "4bhvoR725vyRx2lla91uUnNIWAYWKYWR",
+        "email": "tom.tao@57blocks.com",
+        "name": "Tom Tao",
+        "username": "tom_tao_34833x",
+        "given_name": "Tom",
+        "family_name": "Tao",
     }
 
-    # Test secret key (matches server test configuration)
+    # Server JWT secret (from ml-dash-server/.env)
     secret = "your-secret-key-change-this-in-production"
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -86,7 +87,7 @@ def mock_remote_token(monkeypatch):
     def mock_get_token_storage():
         return mock_storage
 
-    monkeypatch.setattr("ml_dash.client.get_token_storage", mock_get_token_storage)
+    monkeypatch.setattr("ml_dash.auth.token_storage.get_token_storage", mock_get_token_storage)
 
     return mock_storage
 
