@@ -268,8 +268,8 @@ Experiment(
     name="baseline",
     project="my-project",
     folder="/experiments/2024",
-    local_prefix=".ml-dash",
-        local_path=".ml-dash"
+    local_prefix=".dash",
+        local_path=".dash"
 )
 ```
 

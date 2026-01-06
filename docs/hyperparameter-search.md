@@ -29,8 +29,8 @@ def train_with_config(lr, batch_size, experiment):
         # Simulate: larger batch_size = slightly worse performance
         accuracy = min(0.95, 0.5 + epoch * 0.05 * (32 / batch_size))
 
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
-        experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, accuracy=accuracy)
+        experiment.metrics.log(epoch=epoch).flush()
 
         final_accuracy = accuracy
 
@@ -53,8 +53,8 @@ def hyperparameter_search():
             project="hyperparameter-search",
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-        local_path=".ml-dash"
-        .run as experiment:
+            local_path=".dash"
+        ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
                 learning_rate=lr,
@@ -145,7 +145,7 @@ for i in range(20):
     bs = random.choice([16, 32, 64, 128])
 
     with Experiment(name=f"random-{i}", project="random-search",
-        local_path=".ml-dash".run as experiment:
+            local_path=".dash").run as experiment:
         experiment.params.set(learning_rate=lr, batch_size=bs)
         # Train and metric...
 ```
@@ -157,7 +157,7 @@ for trial in range(100):
     params = optimizer.suggest()
 
     with Experiment(name=f"trial-{trial}", project="bayes-opt",
-        local_path=".ml-dash".run as experiment:
+            local_path=".dash").run as experiment:
         experiment.params.set(**params)
         accuracy = train_and_evaluate(params, experiment)
 

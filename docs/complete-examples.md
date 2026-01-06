@@ -19,7 +19,7 @@ def train_simple_model():
         project="tutorials",
         description="Simple training example",
         tags=["tutorial", "simple"],
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -38,10 +38,12 @@ def train_simple_model():
             val_loss = 1.2 / (epoch + 1) + random.uniform(-0.05, 0.05)
             accuracy = min(0.95, 0.5 + epoch * 0.05)
 
-            # Metric metrics
-            experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-            experiment.metrics("val_loss").append(value=val_loss, epoch=epoch)
-            experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
+            # Log metrics
+            experiment.metrics.log(
+                epoch=epoch,
+                train=dict(loss=train_loss, accuracy=accuracy),
+                eval=dict(loss=val_loss, accuracy=accuracy)
+            )
 
             # Log progress
             experiment.log(
@@ -119,7 +121,7 @@ def train_mnist():
         project="computer-vision",
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as experiment:
         # Metric configuration
         experiment.params.set({
@@ -186,11 +188,12 @@ def train_mnist():
             avg_val_loss = val_loss / len(test_loader)
             val_accuracy = correct / total
 
-            # Metric metrics
-            experiment.metrics("train_loss").append(value=avg_train_loss, epoch=epoch)
-            experiment.metrics("train_accuracy").append(value=train_accuracy, epoch=epoch)
-            experiment.metrics("val_loss").append(value=avg_val_loss, epoch=epoch)
-            experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
+            # Log metrics
+            experiment.metrics.log(
+                epoch=epoch,
+                train=dict(loss=avg_train_loss, accuracy=train_accuracy),
+                eval=dict(loss=avg_val_loss, accuracy=val_accuracy)
+            )
 
             # Log progress
             experiment.log(
@@ -251,8 +254,10 @@ def train_with_config(lr, batch_size, experiment):
         # Larger batch size = slightly worse performance
         accuracy = min(0.95, 0.5 + epoch * 0.05 * (32 / batch_size))
 
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
-        experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics.log(
+            epoch=epoch,
+            train=dict(loss=loss, accuracy=accuracy)
+        )
 
     return accuracy
 
@@ -272,7 +277,7 @@ def hyperparameter_search():
             project="hyperparameter-search",
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-            local_path=".ml-dash"
+            local_path=".dash"
         ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
@@ -343,7 +348,7 @@ def compare_architectures():
             project="architecture-comparison",
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
-            local_path=".ml-dash"
+            local_path=".dash"
         ).run as experiment:
             # Configuration
             experiment.params.set(
@@ -390,7 +395,7 @@ def train_with_debug():
         project="debugging",
         description="Training with debug logging",
         tags=["debug"],
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as experiment:
         experiment.params.set(
             learning_rate=0.001,

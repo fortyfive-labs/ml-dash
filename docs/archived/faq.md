@@ -45,7 +45,7 @@ Experiment(
 from ml_dash import migrate
 
 migrate.local_to_remote(
-    local_prefix=".ml-dash",
+    local_prefix=".dash",
     remote_url="http://localhost:3000",
     api_key="your-key"
 )
@@ -62,7 +62,7 @@ Not yet! **Hybrid mode** is planned for v0.3:
 Experiment(
     name="my-experiment",
     project="my-project",
-    local_prefix=".ml-dash",  # Local backup
+    local_prefix=".dash",  # Local backup
     remote="http://localhost:3000",  # Syncs to remote
     user_name="your-name"
 )
@@ -108,8 +108,8 @@ ML-Dash experiments are designed for **resilience**:
 ```python
 # First run - crashes at epoch 5
 try:
-    with Experiment(name="training", project="test", local_prefix=".ml-dash",
-        local_path=".ml-dash") as experiment:
+    with Experiment(name="training", project="test", local_prefix=".dash",
+        local_path=".dash") as experiment:
         for epoch in range(10):
             experiment.metric("loss").append(value=loss, epoch=epoch)
             # Crashes here at epoch 5
@@ -117,8 +117,8 @@ except Exception:
     pass
 
 # Second run - continue from crash
-with Experiment(name="training", project="test", local_prefix=".ml-dash",
-        local_path=".ml-dash") as experiment:
+with Experiment(name="training", project="test", local_prefix=".dash",
+        local_path=".dash") as experiment:
     # Continue from epoch 6
     for epoch in range(6, 10):
         experiment.metric("loss").append(value=loss, epoch=epoch)
@@ -458,7 +458,7 @@ httpx.HTTPStatusError: Client error '401 Unauthorized'
 
 3. **Check permissions** (local mode):
    ```bash
-   ls -la .ml-dash/
+   ls -la .dash/
    # Should be writable by your user
    ```
 
@@ -613,7 +613,7 @@ Indices are auto-managed. If you see issues:
 3. **Check for concurrent access** (local mode):
    ```bash
    # Multiple processes writing to same experiment?
-   lsof +D .ml-dash/project/experiment/
+   lsof +D .dash/project/experiment/
    ```
 
 ---
@@ -652,7 +652,7 @@ ModuleNotFoundError: No module named 'ml-dash'
 ## Still Having Issues?
 
 1. **Check the logs**:
-   - Local: `ls -la .ml-dash/project/experiment/`
+   - Local: `ls -la .dash/project/experiment/`
    - Remote: `docker-compose logs ml-dash-server`
 
 2. **Enable debug logging**:

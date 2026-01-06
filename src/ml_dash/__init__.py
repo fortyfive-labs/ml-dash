@@ -20,7 +20,7 @@ Usage:
     with Experiment(
         project="my-project",
         prefix="experiments/my-experiment",
-        local_path=".ml-dash"
+        local_path=".dash"
     ) as experiment:
         experiment.log("Training started")
         experiment.params.set(lr=0.001)
@@ -46,28 +46,28 @@ Usage:
         experiment.log("Training started")
 """
 
-from .experiment import Experiment, ml_dash_experiment, OperationMode, RunManager
+from .auto_start import dxp
 from .client import RemoteClient
-from .storage import LocalStorage
-from .log import LogLevel, LogBuilder
+from .experiment import Experiment, OperationMode, RunManager, ml_dash_experiment
+from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
 from .run import EXP
-from .auto_start import dxp
+from .storage import LocalStorage
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "Experiment",
-    "ml_dash_experiment",
-    "OperationMode",
-    "RunManager",
-    "RemoteClient",
-    "LocalStorage",
-    "LogLevel",
-    "LogBuilder",
-    "ParametersBuilder",
-    "EXP",
-    "dxp",
+  "Experiment",
+  "ml_dash_experiment",
+  "OperationMode",
+  "RunManager",
+  "RemoteClient",
+  "LocalStorage",
+  "LogLevel",
+  "LogBuilder",
+  "ParametersBuilder",
+  "EXP",
+  "dxp",
 ]
 
 # Hidden for now - rdxp (remote auto-start singleton)

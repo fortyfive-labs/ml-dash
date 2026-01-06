@@ -75,7 +75,7 @@ ml-dash list --remote https://api.dash.ml --api-key your-jwt-token
 
 ### Configuration File
 
-Store your credentials in `~/.ml-dash/config.json` to avoid passing them every time:
+Store your credentials in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {

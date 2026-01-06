@@ -102,7 +102,7 @@ For CI/CD or when you have an explicit API key:
 ml-dash upload --api-key your-jwt-token
 ```
 
-Or store it in `~/.ml-dash/config.json`:
+Or store it in `~/.dash/config.json`:
 
 ```json
 {
@@ -200,7 +200,7 @@ ml-dash upload --resume
 ml-dash download ./data --resume
 ```
 
-State is automatically saved to `.ml-dash-upload-state.json` or `.ml-dash-download-state.json`.
+State is automatically saved to `.dash-upload-state.json` or `.dash-download-state.json`.
 
 ## Command Reference
 
@@ -273,7 +273,7 @@ export ML_DASH_API_KEY="your-jwt-token"
 ml-dash upload
 
 # Or use config file
-echo '{"api_key": "your-jwt-token"}' > ~/.ml-dash/config.json
+echo '{"api_key": "your-jwt-token"}' > ~/.dash/config.json
 ```
 
 ### 3. Use Dry-Run Before Large Operations
@@ -375,7 +375,7 @@ For slow transfers:
 
 If resume doesn't work:
 
-1. Check that the state file exists (`.ml-dash-upload-state.json` or `.ml-dash-download-state.json`)
+1. Check that the state file exists (`.dash-upload-state.json` or `.dash-download-state.json`)
 2. Ensure you're running from the same directory
 3. Use `--state-file` to specify a custom state file path
 

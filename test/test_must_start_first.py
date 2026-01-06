@@ -34,7 +34,7 @@ def test_metrics_requires_start(local_dxp):
     if dxp._is_open:
         dxp.run.complete()
     try:
-        dxp.metrics("loss").append(step=0, value=0.5)
+        dxp.metrics("train").log(step=0, value=0.5)
         assert False, "Should have raised RuntimeError"
     except RuntimeError as e:
         assert (
@@ -60,7 +60,7 @@ def test_apis_work_after_start(local_dxp):
     with dxp.run:
         dxp.params.set(lr=0.001)
         dxp.log("Test log")
-        dxp.metrics("loss").append(step=0, value=0.5)
+        dxp.metrics("train").log(step=0, value=0.5)
         dxp.files().list()
 
 

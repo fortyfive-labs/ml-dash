@@ -12,7 +12,7 @@ Experiments are the foundation of ML-Dash. Each experiment represents a single e
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
     # Experiment automatically closed on exit
@@ -47,7 +47,7 @@ result = train_model()
 from ml_dash import Experiment
 
 experiment = Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash")
+        local_path=".dash")
 experiment.run.start()
 
 try:
@@ -67,7 +67,7 @@ finally:
 with Experiment(
     name="my-experiment",
     project="project",
-    local_path=".ml-dash"
+    local_path=".dash"
 ).run as experiment:
     experiment.log("Using local storage")
 ```
@@ -96,7 +96,7 @@ Add description, tags, bindrs, and folders for organization:
 with Experiment(
     name="resnet50-imagenet",
     project="computer-vision",
-    local_path=".ml-dash",
+    local_path=".dash",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
     bindrs=["gpu-cluster", "team-a"],
@@ -172,13 +172,13 @@ Experiments use **upsert behavior** - reopen by using the same name:
 
 # First run
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.log("Starting epoch 1")
     experiment.metrics("loss").append(value=0.5, epoch=1)
 
 # Later - continues same experiment
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.log("Resuming from checkpoint")
     experiment.metrics("loss").append(value=0.3, epoch=2)
 ```
@@ -191,7 +191,7 @@ Once a experiment is open, you can use all ML-Dash features:
 :linenos:
 
 with Experiment(name="demo", project="test",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     # Logging
     experiment.log("Training started", level="info")
 

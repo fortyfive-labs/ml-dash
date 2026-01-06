@@ -254,11 +254,11 @@ def sample_data():
             }
         },
         "metric_data": [
-            {"value": 0.5, "epoch": 0, "step": 0},
-            {"value": 0.4, "epoch": 1, "step": 100},
-            {"value": 0.3, "epoch": 2, "step": 200},
-            {"value": 0.25, "epoch": 3, "step": 300},
-            {"value": 0.2, "epoch": 4, "step": 400},
+            {"loss": 0.5, "epoch": 0, "step": 0},
+            {"loss": 0.4, "epoch": 1, "step": 100},
+            {"loss": 0.3, "epoch": 2, "step": 200},
+            {"loss": 0.25, "epoch": 3, "step": 300},
+            {"loss": 0.2, "epoch": 4, "step": 400},
         ],
         "multi_metric_data": [
             {"epoch": 0, "train_loss": 0.5, "val_loss": 0.6, "accuracy": 0.7},

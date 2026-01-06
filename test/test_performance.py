@@ -11,37 +11,29 @@ class TestMetricPerformance:
     def test_million_metrics_local(self, local_experiment, temp_project):
         """Test creating and storing one million metric data points."""
         total_metrics = 1_000_000
-        batch_size = 10_000  # Process in batches for efficiency
 
         print(f"\nStarting test to create {total_metrics:,} metrics...")
         start_time = time.time()
 
         with local_experiment(name="million-metrics", project="perf-test").run as experiment:
+            metric = experiment.metrics("train")
             # Track progress
-            for batch_num in range(total_metrics // batch_size):
-                # Create batch of data points
-                data_points: List[Dict[str, Any]] = []
-                for i in range(batch_size):
-                    step = batch_num * batch_size + i
-                    data_points.append({
-                        "step": step,
-                        "value": 1.0 / (step + 1),  # Decreasing value simulating loss
-                        "epoch": step // 1000,
-                    })
+            for step in range(total_metrics):
+                metric.log(
+                    step=step,
+                    loss=1.0 / (step + 1),  # Decreasing value simulating loss
+                    epoch=step // 1000,
+                )
 
-                # Append batch
-                result = experiment.metrics("performance_test").append_batch(data_points)
-
-                # Progress update every 10 batches
-                if (batch_num + 1) % 10 == 0:
+                # Progress update every 100k
+                if (step + 1) % 100_000 == 0:
                     elapsed = time.time() - start_time
-                    processed = (batch_num + 1) * batch_size
-                    rate = processed / elapsed
-                    print(f"  Progress: {processed:,}/{total_metrics:,} ({processed/total_metrics*100:.1f}%) - "
-                          f"{rate:.0f} metrics/sec - ETA: {(total_metrics-processed)/rate:.1f}s")
+                    rate = (step + 1) / elapsed
+                    print(f"  Progress: {step+1:,}/{total_metrics:,} ({(step+1)/total_metrics*100:.1f}%) - "
+                          f"{rate:.0f} metrics/sec - ETA: {(total_metrics-step-1)/rate:.1f}s")
 
             # Verify the metrics were created (before context closes)
-            stats = experiment.metrics("performance_test").stats()
+            stats = experiment.metrics("train").stats()
 
         # Calculate statistics
         end_time = time.time()
@@ -62,29 +54,23 @@ class TestMetricPerformance:
     def test_million_metrics_remote(self, remote_experiment):
         """Test creating one million metrics on remote server."""
         total_metrics = 1_080_000
-        batch_size = 10_000
 
         print(f"\nStarting remote test to create {total_metrics:,} metrics...")
         start_time = time.time()
 
         with remote_experiment(name="million-metrics-remote", project="perf-test").run as experiment:
-            for batch_num in range(total_metrics // batch_size):
-                data_points: List[Dict[str, Any]] = []
-                for i in range(batch_size):
-                    step = batch_num * batch_size + i
-                    data_points.append({
-                        "step": step,
-                        "value": 1.0 / (step + 1),
-                        "epoch": step // 1000,
-                    })
+            metric = experiment.metrics("train")
+            for step in range(total_metrics):
+                metric.log(
+                    step=step,
+                    loss=1.0 / (step + 1),
+                    epoch=step // 1000,
+                )
 
-                experiment.metrics("performance_test_remote").append_batch(data_points)
-
-                if (batch_num + 1) % 10 == 0:
+                if (step + 1) % 100_000 == 0:
                     elapsed = time.time() - start_time
-                    processed = (batch_num + 1) * batch_size
-                    rate = processed / elapsed
-                    print(f"  Progress: {processed:,}/{total_metrics:,} ({processed/total_metrics*100:.1f}%) - "
+                    rate = (step + 1) / elapsed
+                    print(f"  Progress: {step+1:,}/{total_metrics:,} ({(step+1)/total_metrics*100:.1f}%) - "
                           f"{rate:.0f} metrics/sec")
 
         end_time = time.time()
@@ -97,17 +83,17 @@ class TestMetricPerformance:
 
     @pytest.mark.slow
     def test_hundred_thousand_metrics_individual(self, local_experiment, temp_project):
-        """Test creating 100k metrics individually (slower but tests single append)."""
+        """Test creating 100k metrics individually."""
         total_metrics = 100_000
 
         print(f"\nStarting test to create {total_metrics:,} metrics individually...")
         start_time = time.time()
 
         with local_experiment(name="hundred-k-individual", project="perf-test").run as experiment:
-            metric = experiment.metrics("individual_test")
+            metric = experiment.metrics("train")
 
             for i in range(total_metrics):
-                metric.append(step=i, value=1.0 / (i + 1), epoch=i // 1000)
+                metric.log(step=i, loss=1.0 / (i + 1), epoch=i // 1000)
 
                 # Progress update every 10k
                 if (i + 1) % 10_000 == 0:
@@ -117,7 +103,7 @@ class TestMetricPerformance:
                           f"{rate:.0f} metrics/sec")
 
             # Verify (before context closes)
-            stats = experiment.metrics("individual_test").stats()
+            stats = experiment.metrics("train").stats()
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -135,7 +121,6 @@ class TestMetricPerformance:
         num_metrics = 10
         points_per_metric = 100_000
         total_points = num_metrics * points_per_metric
-        batch_size = 5_000
 
         print(f"\nStarting test with {num_metrics} concurrent metric streams, "
               f"{points_per_metric:,} points each ({total_points:,} total)...")
@@ -144,17 +129,13 @@ class TestMetricPerformance:
         with local_experiment(name="concurrent-metrics", project="perf-test").run as experiment:
             for metric_idx in range(num_metrics):
                 metric_name = f"metric_{metric_idx}"
+                metric = experiment.metrics(metric_name)
 
-                for batch_num in range(points_per_metric // batch_size):
-                    data_points: List[Dict[str, Any]] = []
-                    for i in range(batch_size):
-                        step = batch_num * batch_size + i
-                        data_points.append({
-                            "step": step,
-                            "value": (metric_idx + 1) * 0.1 / (step + 1),
-                        })
-
-                    experiment.metrics(metric_name).append_batch(data_points)
+                for step in range(points_per_metric):
+                    metric.log(
+                        step=step,
+                        loss=(metric_idx + 1) * 0.1 / (step + 1),
+                    )
 
                 # Progress after each metric
                 elapsed = time.time() - start_time
@@ -173,37 +154,27 @@ class TestMetricPerformance:
 
     @pytest.mark.slow
     def test_large_batch_sizes(self, local_experiment, temp_project):
-        """Test different batch sizes for optimal performance."""
-        batch_sizes = [100, 1_000, 5_000, 10_000, 50_000]
+        """Test performance with high-frequency logging."""
         points_per_test = 100_000
 
-        print(f"\nTesting batch performance with {points_per_test:,} points per batch size...")
+        print(f"\nTesting logging performance with {points_per_test:,} points...")
 
-        results = {}
-        for batch_size in batch_sizes:
-            with local_experiment(
-                name=f"batch-{batch_size}",
-                project="perf-test"
-            ).run as experiment:
-                start_time = time.time()
+        with local_experiment(
+            name="logging-perf",
+            project="perf-test"
+        ).run as experiment:
+            start_time = time.time()
+            metric = experiment.metrics("train")
 
-                num_batches = points_per_test // batch_size
-                for batch_num in range(num_batches):
-                    data_points: List[Dict[str, Any]] = [
-                        {"step": batch_num * batch_size + i, "value": i * 0.001}
-                        for i in range(batch_size)
-                    ]
-                    experiment.metrics("batch_test").append_batch(data_points)
+            for step in range(points_per_test):
+                metric.log(step=step, loss=step * 0.001)
 
-                elapsed = time.time() - start_time
-                rate = points_per_test / elapsed
-                results[batch_size] = {"time": elapsed, "rate": rate}
+            elapsed = time.time() - start_time
+            rate = points_per_test / elapsed
 
-                print(f"  Batch size {batch_size:>6,}: {elapsed:6.2f}s, {rate:8.0f} pts/sec")
+            print(f"  Logged {points_per_test:,} points: {elapsed:6.2f}s, {rate:8.0f} pts/sec")
 
-        # Find optimal batch size
-        optimal = max(results.items(), key=lambda x: x[1]["rate"])
-        print(f"\n✓ Optimal batch size: {optimal[0]:,} ({optimal[1]['rate']:.0f} pts/sec)")
+        print(f"\n✓ Completed logging performance test")
 
 
 class TestMetricReadPerformance:
@@ -211,27 +182,23 @@ class TestMetricReadPerformance:
 
     @pytest.mark.slow
     def test_read_million_metrics(self, local_experiment, temp_project):
-        """Test reading from a million-point metric dataset."""
+        """Test reading from a large metric dataset."""
         total_metrics = 50_000  # Create smaller dataset for read test
-        batch_size = 10_000
 
         print(f"\nCreating {total_metrics:,} metrics for read performance test...")
 
         with local_experiment(name="read-perf", project="perf-test").run as experiment:
             # Create data
-            for batch_num in range(total_metrics // batch_size):
-                data_points = [
-                    {"step": batch_num * batch_size + i, "value": i * 0.001}
-                    for i in range(batch_size)
-                ]
-                experiment.metrics("read_test").append_batch(data_points)
+            metric = experiment.metrics("train")
+            for step in range(total_metrics):
+                metric.log(step=step, loss=step * 0.001)
 
             # Test reading different ranges
             print("\nTesting read performance...")
 
             # Read first 1000
             start = time.time()
-            result = experiment.metrics("read_test").read(start_index=0, limit=1000)
+            result = experiment.metrics("train").read(start_index=0, limit=1000)
             elapsed = time.time() - start
             print(f"  Read first 1,000 points: {elapsed*1000:.2f}ms")
             assert len(result["data"]) == 1000
@@ -239,14 +206,14 @@ class TestMetricReadPerformance:
             # Read middle 1000
             start = time.time()
             middle_index = total_metrics // 2
-            result = experiment.metrics("read_test").read(start_index=middle_index, limit=1000)
+            result = experiment.metrics("train").read(start_index=middle_index, limit=1000)
             elapsed = time.time() - start
             print(f"  Read middle 1,000 points: {elapsed*1000:.2f}ms")
             assert len(result["data"]) == 1000
 
             # Read last 1000
             start = time.time()
-            result = experiment.metrics("read_test").read(
+            result = experiment.metrics("train").read(
                 start_index=total_metrics - 1000, limit=1000
             )
             elapsed = time.time() - start
@@ -255,14 +222,14 @@ class TestMetricReadPerformance:
 
             # Read large range (10k)
             start = time.time()
-            result = experiment.metrics("read_test").read(start_index=0, limit=10000)
+            result = experiment.metrics("train").read(start_index=0, limit=10000)
             elapsed = time.time() - start
             print(f"  Read 10,000 points: {elapsed*1000:.2f}ms")
             assert len(result["data"]) == 10000
 
             # Get stats
             start = time.time()
-            stats = experiment.metrics("read_test").stats()
+            stats = experiment.metrics("train").stats()
             elapsed = time.time() - start
             print(f"  Get stats: {elapsed*1000:.2f}ms")
 

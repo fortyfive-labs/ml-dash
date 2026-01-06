@@ -31,10 +31,10 @@ PYTHONPATH=./src python docs/examples/06_complete_training.py
 
 ## What Gets Created
 
-All examples create data in `tutorial_data/.ml-dash/tutorials/` directory:
+All examples create data in `tutorial_data/.dash/tutorials/` directory:
 
 ```
-tutorial_data/.ml-dash/tutorials/
+tutorial_data/.dash/tutorials/
 ├── hello-ml-dash/
 │   ├── logs.jsonl
 │   └── parameters.json
@@ -59,16 +59,16 @@ After running examples, explore the generated data:
 
 ```bash
 # View logs
-cat tutorial_data/.ml-dash/tutorials/hello-ml-dash/logs.jsonl
+cat tutorial_data/.dash/tutorials/hello-ml-dash/logs.jsonl
 
 # View parameters
-cat tutorial_data/.ml-dash/tutorials/parameters-demo/parameters.json
+cat tutorial_data/.dash/tutorials/parameters-demo/parameters.json
 
 # View metric data
-cat tutorial_data/.ml-dash/tutorials/metrics-demo/metrics/train_loss/data.jsonl
+cat tutorial_data/.dash/tutorials/metrics-demo/metrics/train_loss/data.jsonl
 
 # List all experiments
-ls tutorial_data/.ml-dash/tutorials/
+ls tutorial_data/.dash/tutorials/
 ```
 
 ## Clean Up

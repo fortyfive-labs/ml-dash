@@ -29,7 +29,7 @@ keywords:
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
     # Automatically closed on exit
@@ -54,7 +54,7 @@ result = train_model()
 from ml_dash import Experiment
 
 experiment = Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash")
+        local_path=".dash")
 experiment.run.start()
 
 try:
@@ -70,7 +70,7 @@ finally:
 with Experiment(
     name="my-experiment",
     project="project",
-    local_path=".ml-dash"  # Storage directory
+    local_path=".dash"  # Storage directory
 ).run as experiment:
     experiment.log("Using local storage")
 ```
@@ -93,7 +93,7 @@ with Experiment(
 with Experiment(
     name="resnet50-imagenet",
     project="computer-vision",
-    local_path=".ml-dash",
+    local_path=".dash",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
     bindrs=["gpu-cluster", "team-a"],
@@ -144,11 +144,11 @@ Experiments use upsert behavior - reopen by using the same name:
 ```python
 # First run
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.metrics("loss").append(value=0.5, epoch=1)
 
 # Later - continues same experiment
 with Experiment(name="long-training", project="ml",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.metrics("loss").append(value=0.3, epoch=2)
 ```

@@ -26,7 +26,7 @@ def train_simple_model():
         project="tutorials",
         description="Basic training loop example",
         tags=["tutorial", "simple"],
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -46,10 +46,12 @@ def train_simple_model():
             val_loss = 1.2 / (epoch + 1) + random.uniform(-0.05, 0.05)
             accuracy = min(0.95, 0.5 + epoch * 0.05)
 
-            # Metric metrics
-            experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-            experiment.metrics("val_loss").append(value=val_loss, epoch=epoch)
-            experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
+            # Log metrics
+            experiment.metrics.log(
+                epoch=epoch,
+                train=dict(loss=train_loss, accuracy=accuracy),
+                eval=dict(loss=val_loss, accuracy=accuracy)
+            )
 
             # Log progress
             experiment.log(
@@ -116,7 +118,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(name="...", project="...", local_path=".ml-dash").run as experiment:
+with Experiment(name="...", project="...", local_path=".dash").run as experiment:
     # Your code here
 ```
 
