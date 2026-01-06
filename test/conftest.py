@@ -70,6 +70,46 @@ def local_experiment(temp_project):
 
 
 @pytest.fixture
+def local_dxp():
+    """
+    Configure dxp singleton for local testing.
+
+    Uses a temp directory context and restores original state after test.
+    """
+    from ml_dash import dxp
+    from ml_dash.storage import LocalStorage
+
+    # Save original state
+    original_storage = dxp._storage
+    original_client = dxp._client
+
+    if dxp._is_open:
+        dxp.run.complete()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dxp._storage = LocalStorage(root_path=tmpdir)
+        dxp._client = None
+        yield dxp
+        if dxp._is_open:
+            dxp.run.complete()
+        dxp._storage = original_storage
+        dxp._client = original_client
+
+
+@pytest.fixture
+def tmp_wd(tmp_path):
+    """
+    Change CWD to tmp_path for test isolation.
+
+    Useful for tests where operations default to CWD (e.g., downloads without dest path).
+    """
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    yield tmp_path
+    os.chdir(original_cwd)
+
+
+@pytest.fixture
 def mock_remote_token(monkeypatch):
     """
     Mock token storage to return TEST_API_KEY for remote tests.
