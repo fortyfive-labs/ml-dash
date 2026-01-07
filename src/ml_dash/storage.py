@@ -517,7 +517,7 @@ class LocalStorage:
         List of file metadata dicts (only non-deleted files)
     """
     experiment_dir = self._get_experiment_dir(owner, project, prefix)
-    metadata_file = experiment_dir / "files" / ".files_metadata.json"
+    metadata_file = experiment_dir / "files/.files_metadata.json"
 
     if not metadata_file.exists():
       return []

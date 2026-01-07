@@ -1,393 +1,492 @@
 """Comprehensive tests for metric (time-series) functionality in both local and remote modes."""
-import json
+
 import getpass
+import json
+
 import pytest
-from pathlib import Path
 
 
 class TestBasicMetrics:
-    """Tests for basic metric operations."""
+  """Tests for basic metric operations."""
 
-    def test_single_metric_append_local(self, local_experiment, temp_project):
-        """Test appending single data points to a metric."""
-        with local_experiment(name="metric-test", project="test").run as experiment:
-            for i in range(5):
-                experiment.metrics("train").log(loss=1.0 / (i + 1), epoch=i)
+  def test_single_metric_append_local(self, local_experiment, tmp_proj):
+    """Test appending single data points to a metric."""
+    with local_experiment(name="metric-test", project="test").run as experiment:
+      for i in range(5):
+        experiment.metrics("train").log(loss=1.0 / (i + 1), epoch=i)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "metric-test" / "metrics" / "train" / "data.jsonl"
-        assert metric_file.exists()
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "metric-test"
+      / "metrics"
+      / "train"
+      / "data.jsonl"
+    )
+    assert metric_file.exists()
 
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 5
-        assert data_points[0]["data"]["loss"] == 1.0
-        assert data_points[0]["data"]["epoch"] == 0
+    assert len(data_points) == 5
+    assert data_points[0]["data"]["loss"] == 1.0
+    assert data_points[0]["data"]["epoch"] == 0
 
-    @pytest.mark.remote
-    def test_single_metric_append_remote(self, remote_experiment):
-        """Test appending data points in remote mode."""
-        with remote_experiment(name="metric-test-remote", project="test").run as experiment:
-            for i in range(10):
-                experiment.metrics("train").log(loss=0.5 - i * 0.05, epoch=i)
+  @pytest.mark.remote
+  def test_single_metric_append_remote(self, remote_experiment):
+    """Test appending data points in remote mode."""
+    with remote_experiment(name="metric-test-remote", project="test").run as experiment:
+      for i in range(10):
+        experiment.metrics("train").log(loss=0.5 - i * 0.05, epoch=i)
 
-    def test_multiple_metrics_local(self, local_experiment, temp_project):
-        """Test metricing multiple different metrics."""
-        with local_experiment(name="multi-metric", project="test").run as experiment:
-            for epoch in range(5):
-                experiment.metrics("train").log(loss=0.5 - epoch * 0.1, epoch=epoch)
-                experiment.metrics("eval").log(loss=0.6 - epoch * 0.1, epoch=epoch)
-                experiment.metrics("eval").log(loss=0.7 + epoch * 0.05, epoch=epoch)
+  def test_multiple_metrics_local(self, local_experiment, tmp_proj):
+    """Test metricing multiple different metrics."""
+    with local_experiment(name="multi-metric", project="test").run as experiment:
+      for epoch in range(5):
+        experiment.metrics("train").log(loss=0.5 - epoch * 0.1, epoch=epoch)
+        experiment.metrics("eval").log(loss=0.6 - epoch * 0.1, epoch=epoch)
+        experiment.metrics("eval").log(loss=0.7 + epoch * 0.05, epoch=epoch)
 
-        metrics_dir = temp_project / getpass.getuser() / "test" / "multi-metric" / "metrics"
-        assert (metrics_dir / "train" / "data.jsonl").exists()
-        assert (metrics_dir / "eval" / "data.jsonl").exists()
-        assert (metrics_dir / "eval" / "data.jsonl").exists()
+    metrics_dir = tmp_proj / getpass.getuser() / "test/multi-metric/metrics"
+    assert (metrics_dir / "train/data.jsonl").exists()
+    assert (metrics_dir / "eval/data.jsonl").exists()
+    assert (metrics_dir / "eval/data.jsonl").exists()
 
-    @pytest.mark.remote
-    def test_multiple_metrics_remote(self, remote_experiment):
-        """Test metricing multiple metrics in remote mode."""
-        with remote_experiment(name="multi-metric-remote", project="test").run as experiment:
-            for epoch in range(3):
-                experiment.metrics("train").log(loss=0.4 - epoch * 0.1, epoch=epoch)
-                experiment.metrics("eval").log(loss=0.5 - epoch * 0.1, epoch=epoch)
+  @pytest.mark.remote
+  def test_multiple_metrics_remote(self, remote_experiment):
+    """Test metricing multiple metrics in remote mode."""
+    with remote_experiment(
+      name="multi-metric-remote", project="test"
+    ).run as experiment:
+      for epoch in range(3):
+        experiment.metrics("train").log(loss=0.4 - epoch * 0.1, epoch=epoch)
+        experiment.metrics("eval").log(loss=0.5 - epoch * 0.1, epoch=epoch)
 
 
 class TestMultipleLogCalls:
-    """Tests for logging multiple metric data points."""
+  """Tests for logging multiple metric data points."""
 
-    def test_multiple_log_calls_local(self, local_experiment, temp_project, sample_data):
-        """Test logging multiple data points via individual log calls."""
-        with local_experiment(name="multi-metric", project="test").run as experiment:
-            for point in sample_data["metric_data"]:
-                experiment.metrics("train").log(**point)
+  def test_multiple_log_calls_local(self, local_experiment, tmp_proj, sample_data):
+    """Test logging multiple data points via individual log calls."""
+    with local_experiment(name="multi-metric", project="test").run as experiment:
+      for point in sample_data["metric_data"]:
+        experiment.metrics("train").log(**point)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "multi-metric" / "metrics" / "train" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "multi-metric"
+      / "metrics"
+      / "train"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 5
-        assert data_points[0]["data"]["loss"] == 0.5
-        assert data_points[4]["data"]["loss"] == 0.2
+    assert len(data_points) == 5
+    assert data_points[0]["data"]["loss"] == 0.5
+    assert data_points[4]["data"]["loss"] == 0.2
 
-    @pytest.mark.remote
-    def test_multiple_log_calls_remote(self, remote_experiment, sample_data):
-        """Test logging multiple data points in remote mode."""
-        with remote_experiment(name="multi-metric-remote", project="test").run as experiment:
-            for point in sample_data["metric_data"]:
-                experiment.metrics("metrics").log(**point)
+  @pytest.mark.remote
+  def test_multiple_log_calls_remote(self, remote_experiment, sample_data):
+    """Test logging multiple data points in remote mode."""
+    with remote_experiment(
+      name="multi-metric-remote", project="test"
+    ).run as experiment:
+      for point in sample_data["metric_data"]:
+        experiment.metrics("metrics").log(**point)
 
-    def test_many_log_calls_local(self, local_experiment, temp_project):
-        """Test logging many data points."""
-        with local_experiment(name="many-logs", project="test").run as experiment:
-            for i in range(1000):
-                experiment.metrics("metric").log(loss=i * 0.01, step=i)
+  def test_many_log_calls_local(self, local_experiment, tmp_proj):
+    """Test logging many data points."""
+    with local_experiment(name="many-logs", project="test").run as experiment:
+      for i in range(1000):
+        experiment.metrics("metric").log(loss=i * 0.01, step=i)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "many-logs" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "many-logs"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 1000
+    assert len(data_points) == 1000
 
 
 class TestFlexibleSchema:
-    """Tests for flexible metric schema with multiple fields."""
+  """Tests for flexible metric schema with multiple fields."""
 
-    def test_multi_field_metricing_local(self, local_experiment, temp_project):
-        """Test metrics with multiple fields per data point."""
-        with local_experiment(name="multi-field", project="test").run as experiment:
-            experiment.metrics("all_metrics").log(
-                epoch=5,
-                train_loss=0.3,
-                val_loss=0.35,
-                train_acc=0.85,
-                val_acc=0.82,
-                learning_rate=0.001
-            )
+  def test_multi_field_metricing_local(self, local_experiment, tmp_proj):
+    """Test metrics with multiple fields per data point."""
+    with local_experiment(name="multi-field", project="test").run as experiment:
+      experiment.metrics("all_metrics").log(
+        epoch=5,
+        train_loss=0.3,
+        val_loss=0.35,
+        train_acc=0.85,
+        val_acc=0.82,
+        learning_rate=0.001,
+      )
 
-        metric_file = temp_project / getpass.getuser() / "test" / "multi-field" / "metrics" / "all_metrics" / "data.jsonl"
-        with open(metric_file) as f:
-            data_point = json.loads(f.readline())
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "multi-field"
+      / "metrics"
+      / "all_metrics"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_point = json.loads(f.readline())
 
-        assert data_point["data"]["epoch"] == 5
-        assert data_point["data"]["train_loss"] == 0.3
-        assert data_point["data"]["val_loss"] == 0.35
-        assert data_point["data"]["train_acc"] == 0.85
+    assert data_point["data"]["epoch"] == 5
+    assert data_point["data"]["train_loss"] == 0.3
+    assert data_point["data"]["val_loss"] == 0.35
+    assert data_point["data"]["train_acc"] == 0.85
 
-    @pytest.mark.remote
-    def test_multi_field_metricing_remote(self, remote_experiment, sample_data):
-        """Test multi-field metricing in remote mode."""
-        with remote_experiment(name="multi-field-remote", project="test").run as experiment:
-            for data in sample_data["multi_metric_data"]:
-                experiment.metrics("combined").log(**data)
+  @pytest.mark.remote
+  def test_multi_field_metricing_remote(self, remote_experiment, sample_data):
+    """Test multi-field metricing in remote mode."""
+    with remote_experiment(name="multi-field-remote", project="test").run as experiment:
+      for data in sample_data["multi_metric_data"]:
+        experiment.metrics("combined").log(**data)
 
-    def test_varying_schemas_local(self, local_experiment, temp_project):
-        """Test that schema can vary between data points."""
-        with local_experiment(name="varying-schema", project="test").run as experiment:
-            experiment.metrics("flexible").log(field_a=1, field_b=2)
-            experiment.metrics("flexible").log(field_a=3, field_c=4)
-            experiment.metrics("flexible").log(field_a=5, field_b=6, field_c=7)
+  def test_varying_schemas_local(self, local_experiment, tmp_proj):
+    """Test that schema can vary between data points."""
+    with local_experiment(name="varying-schema", project="test").run as experiment:
+      experiment.metrics("flexible").log(field_a=1, field_b=2)
+      experiment.metrics("flexible").log(field_a=3, field_c=4)
+      experiment.metrics("flexible").log(field_a=5, field_b=6, field_c=7)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "varying-schema" / "metrics" / "flexible" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj / getpass.getuser() / "test/varying-schema/metrics/flexible/data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 3
-        assert "field_b" in data_points[0]["data"]
-        assert "field_c" in data_points[1]["data"]
-        assert "field_c" in data_points[2]["data"]
+    assert len(data_points) == 3
+    assert "field_b" in data_points[0]["data"]
+    assert "field_c" in data_points[1]["data"]
+    assert "field_c" in data_points[2]["data"]
 
 
 class TestMetricMetadata:
-    """Tests for metric metadata."""
+  """Tests for metric metadata."""
 
-    def test_metric_metadata_creation_local(self, local_experiment, temp_project):
-        """Test that metric metadata is created."""
-        with local_experiment(name="metric-meta", project="test").run as experiment:
-            for i in range(15):
-                experiment.metrics("metric").log(loss=i * 0.1, step=i)
+  def test_metric_metadata_creation_local(self, local_experiment, tmp_proj):
+    """Test that metric metadata is created."""
+    with local_experiment(name="metric-meta", project="test").run as experiment:
+      for i in range(15):
+        experiment.metrics("metric").log(loss=i * 0.1, step=i)
 
-        metadata_file = temp_project / getpass.getuser() / "test" / "metric-meta" / "metrics" / "metric" / "metadata.json"
-        assert metadata_file.exists()
+    metadata_file = (
+      tmp_proj / getpass.getuser() / "test/metric-meta/metrics/metric/metadata.json"
+    )
 
-        with open(metadata_file) as f:
-            metadata = json.load(f)
+    assert metadata_file.exists()
 
-        assert metadata["name"] == "metric"
-        assert metadata["totalDataPoints"] == 15
+    with open(metadata_file) as f:
+      metadata = json.load(f)
 
-    def test_metric_stats_local(self, local_experiment):
-        """Test getting metric statistics."""
-        with local_experiment(name="metric-stats", project="test").run as experiment:
-            for i in range(20):
-                experiment.metrics("eval").log(loss=0.5 + i * 0.02, step=i)
+    assert metadata["name"] == "metric"
+    assert metadata["totalDataPoints"] == 15
 
-            stats = experiment.metrics("eval").stats()
+  def test_metric_stats_local(self, local_experiment):
+    """Test getting metric statistics."""
+    with local_experiment(name="metric-stats", project="test").run as experiment:
+      for i in range(20):
+        experiment.metrics("eval").log(loss=0.5 + i * 0.02, step=i)
 
-        assert stats["name"] == "eval"
-        assert int(stats["totalDataPoints"]) == 20
+      stats = experiment.metrics("eval").stats()
 
-    @pytest.mark.remote
-    def test_metric_stats_remote(self, remote_experiment):
-        """Test getting metric stats in remote mode."""
-        with remote_experiment(name="metric-stats-remote", project="test").run as experiment:
-            for i in range(10):
-                experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
+    assert stats["name"] == "eval"
+    assert int(stats["totalDataPoints"]) == 20
 
-            stats = experiment.metrics("train").stats()
-            assert stats["name"] == "loss"
+  @pytest.mark.remote
+  def test_metric_stats_remote(self, remote_experiment):
+    """Test getting metric stats in remote mode."""
+    with remote_experiment(
+      name="metric-stats-remote", project="test"
+    ).run as experiment:
+      for i in range(10):
+        experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
+
+      stats = experiment.metrics("train").stats()
+      assert stats["name"] == "train"
 
 
 class TestMetricRead:
-    """Tests for reading metric data."""
+  """Tests for reading metric data."""
 
-    def test_read_metric_data_local(self, local_experiment):
-        """Test reading metric data."""
-        with local_experiment(name="metric-read", project="test").run as experiment:
-            # Write data
-            for i in range(20):
-                experiment.metrics("metric").log(loss=i * 0.1, step=i)
+  def test_read_metric_data_local(self, local_experiment):
+    """Test reading metric data."""
+    with local_experiment(name="metric-read", project="test").run as experiment:
+      # Write data
+      for i in range(20):
+        experiment.metrics("metric").log(loss=i * 0.1, step=i)
 
-            # Read data
-            result = experiment.metrics("metric").read(start_index=0, limit=10)
+      # Read data
+      result = experiment.metrics("metric").read(start_index=0, limit=10)
 
-        assert result["total"] >= 10
-        assert len(result["data"]) == 10
-        assert result["data"][0]["data"]["step"] == 0
+    assert result["total"] >= 10
+    assert len(result["data"]) == 10
+    assert result["data"][0]["data"]["step"] == 0
 
-    def test_read_with_pagination_local(self, local_experiment):
-        """Test reading metric data with pagination."""
-        with local_experiment(name="metric-page", project="test").run as experiment:
-            # Write 100 data points
-            for i in range(100):
-                experiment.metrics("metric").log(loss=i, step=i)
+  def test_read_with_pagination_local(self, local_experiment):
+    """Test reading metric data with pagination."""
+    with local_experiment(name="metric-page", project="test").run as experiment:
+      # Write 100 data points
+      for i in range(100):
+        experiment.metrics("metric").log(loss=i, step=i)
 
-            # Read first page
-            page1 = experiment.metrics("metric").read(start_index=0, limit=25)
-            assert len(page1["data"]) == 25
+      # Read first page
+      page1 = experiment.metrics("metric").read(start_index=0, limit=25)
+      assert len(page1["data"]) == 25
 
-            # Read second page
-            page2 = experiment.metrics("metric").read(start_index=25, limit=25)
-            assert len(page2["data"]) == 25
-            assert page2["data"][0]["data"]["step"] == 25
+      # Read second page
+      page2 = experiment.metrics("metric").read(start_index=25, limit=25)
+      assert len(page2["data"]) == 25
+      assert page2["data"][0]["data"]["step"] == 25
 
-    @pytest.mark.remote
-    def test_read_metric_data_remote(self, remote_experiment):
-        """Test reading metric data in remote mode."""
-        with remote_experiment(name="metric-read-remote", project="test").run as experiment:
-            for i in range(15):
-                experiment.metrics("metric").log(loss=i * 0.05, step=i)
+  @pytest.mark.remote
+  def test_read_metric_data_remote(self, remote_experiment):
+    """Test reading metric data in remote mode."""
+    with remote_experiment(name="metric-read-remote", project="test").run as experiment:
+      for i in range(15):
+        experiment.metrics("metric").log(loss=i * 0.05, step=i)
 
-            result = experiment.metrics("metric").read(start_index=0, limit=5)
-            assert len(result["data"]) <= 15
+      result = experiment.metrics("metric").read(start_index=0, limit=5)
+      assert len(result["data"]) <= 15
 
 
 class TestListMetrics:
-    """Tests for listing all metrics."""
+  """Tests for listing all metrics."""
 
-    def test_list_all_metrics_local(self, local_experiment):
-        """Test listing all metrics in a experiment."""
-        with local_experiment(name="metric-list", project="test").run as experiment:
-            experiment.metrics("train").log(loss=0.5, step=0)
-            experiment.metrics("eval").log(loss=0.8, step=0)
-            experiment.metrics("train").log(lr=0.001, step=0)
+  def test_list_all_metrics_local(self, local_experiment):
+    """Test listing all metrics in a experiment."""
+    with local_experiment(name="metric-list", project="test").run as experiment:
+      experiment.metrics("train").log(loss=0.5, step=0)
+      experiment.metrics("eval").log(loss=0.8, step=0)
+      experiment.metrics("train").log(lr=0.001, step=0)
 
-            metrics = experiment.metrics("train").list_all()
+      metrics = experiment.metrics("train").list_all()
 
-        assert len(metrics) == 2
-        metric_names = [t["name"] for t in metrics]
-        assert "train" in metric_names
-        assert "eval" in metric_names
+    assert len(metrics) == 2
+    metric_names = [t["name"] for t in metrics]
+    assert "train" in metric_names
+    assert "eval" in metric_names
 
-    @pytest.mark.remote
-    def test_list_all_metrics_remote(self, remote_experiment):
-        """Test listing metrics in remote mode."""
-        with remote_experiment(name="metric-list-remote", project="test").run as experiment:
-            experiment.metrics("metric1").log(loss=1.0, step=0)
-            experiment.metrics("metric2").log(loss=2.0, step=0)
+  @pytest.mark.remote
+  def test_list_all_metrics_remote(self, remote_experiment):
+    """Test listing metrics in remote mode."""
+    with remote_experiment(name="metric-list-remote", project="test").run as experiment:
+      experiment.metrics("metric1").log(loss=1.0, step=0)
+      experiment.metrics("metric2").log(loss=2.0, step=0)
 
-            metrics = experiment.metrics("metric1").list_all()
-            assert len(metrics) >= 2
+      metrics = experiment.metrics("metric1").list_all()
+      assert len(metrics) >= 2
 
 
 class TestMetricIndexing:
-    """Tests for metric data indexing."""
+  """Tests for metric data indexing."""
 
-    def test_metric_sequential_indices_local(self, local_experiment, temp_project):
-        """Test that metric data points have sequential indices."""
-        with local_experiment(name="metric-index", project="test").run as experiment:
-            for i in range(10):
-                experiment.metrics("metric").log(loss=i * 10)
+  def test_metric_sequential_indices_local(self, local_experiment, tmp_proj):
+    """Test that metric data points have sequential indices."""
+    with local_experiment(name="metric-index", project="test").run as experiment:
+      for i in range(10):
+        experiment.metrics("metric").log(loss=i * 10)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "metric-index" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "metric-index"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        for i, point in enumerate(data_points):
-            assert point["index"] == i
+    for i, point in enumerate(data_points):
+      assert point["index"] == i
 
-    def test_metric_indices_with_multiple_logs_local(self, local_experiment, temp_project):
-        """Test indices with multiple log calls."""
-        with local_experiment(name="multi-index", project="test").run as experiment:
-            for i in range(5):
-                experiment.metrics("metric").log(loss=i)
-            for i in range(5, 10):
-                experiment.metrics("metric").log(loss=i)
+  def test_metric_indices_with_multiple_logs_local(self, local_experiment, tmp_proj):
+    """Test indices with multiple log calls."""
+    with local_experiment(name="multi-index", project="test").run as experiment:
+      for i in range(5):
+        experiment.metrics("metric").log(loss=i)
+      for i in range(5, 10):
+        experiment.metrics("metric").log(loss=i)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "multi-index" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "multi-index"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 10
-        for i, point in enumerate(data_points):
-            assert point["index"] == i
+    assert len(data_points) == 10
+    for i, point in enumerate(data_points):
+      assert point["index"] == i
 
 
 class TestMetricEdgeCases:
-    """Tests for edge cases in metric operations."""
+  """Tests for edge cases in metric operations."""
 
-    def test_empty_metric_local(self, local_experiment, temp_project):
-        """Test experiment with no metrics."""
-        with local_experiment(name="no-metrics", project="test").run as experiment:
-            experiment.log("No metrics created")
+  def test_empty_metric_local(self, local_experiment, tmp_proj):
+    """Test experiment with no metrics."""
+    with local_experiment(name="no-metrics", project="test").run as experiment:
+      experiment.log("No metrics created")
 
-        metrics_dir = temp_project / getpass.getuser() / "test" / "no-metrics" / "metrics"
-        assert metrics_dir.exists()
-        subdirs = [d for d in metrics_dir.iterdir() if d.is_dir()]
-        assert len(subdirs) == 0
+    metrics_dir = tmp_proj / getpass.getuser() / "test/no-metrics/metrics"
+    assert metrics_dir.exists()
+    subdirs = [d for d in metrics_dir.iterdir() if d.is_dir()]
+    assert len(subdirs) == 0
 
-    def test_metric_with_null_values_local(self, local_experiment, temp_project):
-        """Test metricing data with null values."""
-        with local_experiment(name="null-metric", project="test").run as experiment:
-            experiment.metrics("metric").log(loss=None, step=0, status="pending")
-            experiment.metrics("metric").log(loss=0.5, step=1, status="complete")
+  def test_metric_with_null_values_local(self, local_experiment, tmp_proj):
+    """Test metricing data with null values."""
+    with local_experiment(name="null-metric", project="test").run as experiment:
+      experiment.metrics("metric").log(loss=None, step=0, status="pending")
+      experiment.metrics("metric").log(loss=0.5, step=1, status="complete")
 
-        metric_file = temp_project / getpass.getuser() / "test" / "null-metric" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "null-metric"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert data_points[0]["data"]["loss"] is None
-        assert data_points[1]["data"]["loss"] == 0.5
+    assert data_points[0]["data"]["loss"] is None
+    assert data_points[1]["data"]["loss"] == 0.5
 
-    def test_metric_with_special_characters_local(self, local_experiment, temp_project):
-        """Test metric names with special characters."""
-        with local_experiment(name="special-metric", project="test").run as experiment:
-            experiment.metrics("metric_1").log(loss=1.0)
-            experiment.metrics("metric-2").log(loss=2.0)
-            experiment.metrics("metric.3").log(loss=3.0)
+  def test_metric_with_special_characters_local(self, local_experiment, tmp_proj):
+    """Test metric names with special characters."""
+    with local_experiment(name="special-metric", project="test").run as experiment:
+      experiment.metrics("metric_1").log(loss=1.0)
+      experiment.metrics("metric-2").log(loss=2.0)
+      experiment.metrics("metric.3").log(loss=3.0)
 
-        metrics_dir = temp_project / getpass.getuser() / "test" / "special-metric" / "metrics"
-        # Check that metrics were created (names may be sanitized)
-        assert metrics_dir.exists()
+    metrics_dir = tmp_proj / getpass.getuser() / "test/special-metric/metrics"
+    # Check that metrics were created (names may be sanitized)
+    assert metrics_dir.exists()
 
-    def test_very_frequent_metricing_local(self, local_experiment, temp_project):
-        """Test rapid, frequent metricing."""
-        with local_experiment(name="frequent-metric", project="test").run as experiment:
-            for i in range(1000):
-                experiment.metrics("metric").log(loss=i * 0.001, step=i)
+  def test_very_frequent_metricing_local(self, local_experiment, tmp_proj):
+    """Test rapid, frequent metricing."""
+    with local_experiment(name="frequent-metric", project="test").run as experiment:
+      for i in range(1000):
+        experiment.metrics("metric").log(loss=i * 0.001, step=i)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "frequent-metric" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "frequent-metric"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 1000
+    assert len(data_points) == 1000
 
-    @pytest.mark.remote
-    def test_frequent_metricing_remote(self, remote_experiment):
-        """Test rapid metricing in remote mode."""
-        with remote_experiment(name="frequent-metric-remote", project="test").run as experiment:
-            for i in range(100):
-                experiment.metrics("metric").log(loss=i * 0.01, step=i)
+  @pytest.mark.remote
+  def test_frequent_metricing_remote(self, remote_experiment):
+    """Test rapid metricing in remote mode."""
+    with remote_experiment(
+      name="frequent-metric-remote", project="test"
+    ).run as experiment:
+      for i in range(100):
+        experiment.metrics("metric").log(loss=i * 0.01, step=i)
 
-    def test_metric_with_large_values_local(self, local_experiment, temp_project):
-        """Test metricing with very large numeric values."""
-        with local_experiment(name="large-values", project="test").run as experiment:
-            experiment.metrics("metric").log(
-                huge_int=999999999999999,
-                huge_float=1.23e100,
-                tiny_float=1.23e-100
-            )
+  def test_metric_with_large_values_local(self, local_experiment, tmp_proj):
+    """Test metricing with very large numeric values."""
+    with local_experiment(name="large-values", project="test").run as experiment:
+      experiment.metrics("metric").log(
+        huge_int=999999999999999, huge_float=1.23e100, tiny_float=1.23e-100
+      )
 
-        metric_file = temp_project / getpass.getuser() / "test" / "large-values" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_point = json.loads(f.readline())
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "large-values"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_point = json.loads(f.readline())
 
-        assert data_point["data"]["huge_int"] == 999999999999999
+    assert data_point["data"]["huge_int"] == 999999999999999
 
-    def test_metric_with_nested_data_local(self, local_experiment, temp_project):
-        """Test metricing with nested data structures."""
-        with local_experiment(name="nested-metric", project="test").run as experiment:
-            experiment.metrics("metric").log(
-                epoch=1,
-                metrics={
-                    "train": {"loss": 0.5, "acc": 0.8},
-                    "val": {"loss": 0.6, "acc": 0.75}
-                }
-            )
+  def test_metric_with_nested_data_local(self, local_experiment, tmp_proj):
+    """Test metricing with nested data structures."""
+    with local_experiment(name="nested-metric", project="test").run as experiment:
+      experiment.metrics("metric").log(
+        epoch=1,
+        metrics={"train": {"loss": 0.5, "acc": 0.8}, "val": {"loss": 0.6, "acc": 0.75}},
+      )
 
-        metric_file = temp_project / getpass.getuser() / "test" / "nested-metric" / "metrics" / "metric" / "data.jsonl"
-        with open(metric_file) as f:
-            data_point = json.loads(f.readline())
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "nested-metric"
+      / "metrics"
+      / "metric"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_point = json.loads(f.readline())
 
-        assert data_point["data"]["epoch"] == 1
-        assert isinstance(data_point["data"]["metrics"], dict)
+    assert data_point["data"]["epoch"] == 1
+    assert isinstance(data_point["data"]["metrics"], dict)
 
-    def test_metric_name_collision_local(self, local_experiment, temp_project):
-        """Test multiple appends to same metric name."""
-        with local_experiment(name="collision", project="test").run as experiment:
-            experiment.metrics("train").log(loss=1.0, epoch=0)
-            experiment.metrics("train").log(loss=0.9, epoch=1)
-            experiment.metrics("train").log(loss=0.8, epoch=2)
+  def test_metric_name_collision_local(self, local_experiment, tmp_proj):
+    """Test multiple appends to same metric name."""
+    with local_experiment(name="collision", project="test").run as experiment:
+      experiment.metrics("train").log(loss=1.0, epoch=0)
+      experiment.metrics("train").log(loss=0.9, epoch=1)
+      experiment.metrics("train").log(loss=0.8, epoch=2)
 
-        metric_file = temp_project / getpass.getuser() / "test" / "collision" / "metrics" / "train" / "data.jsonl"
-        with open(metric_file) as f:
-            data_points = [json.loads(line) for line in f]
+    metric_file = (
+      tmp_proj
+      / getpass.getuser()
+      / "test"
+      / "collision"
+      / "metrics"
+      / "train"
+      / "data.jsonl"
+    )
+    with open(metric_file) as f:
+      data_points = [json.loads(line) for line in f]
 
-        assert len(data_points) == 3
-        assert data_points[0]["data"]["loss"] == 1.0
-        assert data_points[2]["data"]["loss"] == 0.8
+    assert len(data_points) == 3
+    assert data_points[0]["data"]["loss"] == 1.0
+    assert data_points[2]["data"]["loss"] == 0.8
+
 
 if __name__ == "__main__":
-    """Run all tests with pytest."""
-    import sys
-    sys.exit(pytest.main([__file__, "-v"]))
+  """Run all tests with pytest."""
+  import sys
+
+  sys.exit(pytest.main([__file__, "-v"]))

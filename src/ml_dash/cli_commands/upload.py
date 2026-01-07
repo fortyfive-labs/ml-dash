@@ -293,7 +293,7 @@ def discover_experiments(
     exp_info.has_params = params_file.exists()
 
     # Check for logs
-    logs_file = exp_dir / "logs" / "logs.jsonl"
+    logs_file = exp_dir / "logs/logs.jsonl"
     exp_info.has_logs = logs_file.exists()
 
     # Check for metrics
@@ -437,7 +437,7 @@ class ExperimentValidator:
     if not exp_info.has_logs:
       return
 
-    logs_file = exp_info.path / "logs" / "logs.jsonl"
+    logs_file = exp_info.path / "logs/logs.jsonl"
     invalid_lines = []
 
     try:
@@ -713,7 +713,7 @@ class ExperimentUploader:
     if self.verbose:
       console.print("  [dim]Uploading logs...[/dim]")
 
-    logs_file = exp_info.path / "logs" / "logs.jsonl"
+    logs_file = exp_info.path / "logs/logs.jsonl"
     logs_batch = []
     total_uploaded = 0
     skipped = 0

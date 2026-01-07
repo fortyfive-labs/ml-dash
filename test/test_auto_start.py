@@ -60,8 +60,8 @@ def test_dxp_logging():
   # Verify logs exist in .dash directory
   # New structure: root / owner / project / prefix
   owner = getpass.getuser()
-  experiment_dir = Path(".dash") / owner / "scratch" / "dxp"
-  logs_file = experiment_dir / "logs" / "logs.jsonl"
+  experiment_dir = Path(".dash") / owner / "scratch/dxp"
+  logs_file = experiment_dir / "logs/logs.jsonl"
 
   assert logs_file.exists()
 
@@ -96,7 +96,7 @@ def test_dxp_parameters():
   # Verify parameters file exists
   # New structure: root / owner / project / prefix
   owner = getpass.getuser()
-  experiment_dir = Path(".dash") / owner / "scratch" / "dxp"
+  experiment_dir = Path(".dash") / owner / "scratch/dxp"
   params_file = experiment_dir / "parameters.json"
   assert params_file.exists()
 
@@ -119,15 +119,15 @@ def test_dxp_metrics():
   # Verify metrics exist (stored as metrics/<name>/data.jsonl)
   # New structure: root / owner / project / prefix
   owner = getpass.getuser()
-  experiment_dir = Path(".dash") / owner / "scratch" / "dxp"
+  experiment_dir = Path(".dash") / owner / "scratch/dxp"
   metrics_dir = experiment_dir / "metrics"
 
   assert metrics_dir.exists()
-  assert (metrics_dir / "train" / "data.jsonl").exists()
-  assert (metrics_dir / "eval" / "data.jsonl").exists()
+  assert (metrics_dir / "train/data.jsonl").exists()
+  assert (metrics_dir / "eval/data.jsonl").exists()
 
   # Read train metrics
-  with open(metrics_dir / "train" / "data.jsonl", "r") as f:
+  with open(metrics_dir / "train/data.jsonl", "r") as f:
     lines = [json.loads(line) for line in f]
 
   assert len(lines) == 2
@@ -155,8 +155,8 @@ def test_dxp_files(tmp_path):
   # Verify file exists in experiment (files are stored as files/<prefix>/<file_id>/<filename>)
   # New structure: root / owner / project / prefix
   owner = getpass.getuser()
-  experiment_dir = Path(".dash") / owner / "scratch" / "dxp"
-  uploaded_file = experiment_dir / "files" / "tests" / file_id / "test.txt"
+  experiment_dir = Path(".dash") / owner / "scratch/dxp"
+  uploaded_file = experiment_dir / "files/tests" / file_id / "test.txt"
   assert uploaded_file.exists()
   assert uploaded_file.read_text() == "Test content"
 
@@ -193,7 +193,7 @@ def test_dxp_works_like_normal_experiment():
   # Verify data was saved
   # New structure: root / owner / project / prefix
   owner = getpass.getuser()
-  experiment_dir = Path(".dash") / owner / "scratch" / "dxp"
+  experiment_dir = Path(".dash") / owner / "scratch/dxp"
   assert experiment_dir.exists()
   assert (experiment_dir / "experiment.json").exists()
 
