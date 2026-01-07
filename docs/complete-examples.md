@@ -332,7 +332,7 @@ def train_model(architecture, experiment):
 
     for epoch in range(epochs):
         acc = min(base_lr, 0.5 + epoch * (base_lr - 0.5) / epochs + random.uniform(-0.02, 0.02))
-        experiment.metrics("accuracy").append(value=acc, epoch=epoch)
+        experiment.metrics("train").log(accuracy=acc, epoch=epoch)
 
     return acc
 
@@ -429,7 +429,7 @@ def train_with_debug():
                     metadata={"gradient_norm": 15.5, "max_norm": 10.0}
                 )
 
-            experiment.metrics("loss").append(value=loss, epoch=epoch)
+            experiment.metrics("train").log(loss=loss, epoch=epoch)
 
             experiment.log(
                 f"Epoch {epoch + 1} complete",

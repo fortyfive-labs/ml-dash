@@ -129,7 +129,7 @@ experiment.params.set(learning_rate=0.001, batch_size=32)
 
 **Metric metrics in the loop** - Every epoch:
 ```python
-experiment.metrics("loss").append(value=loss, epoch=epoch)
+experiment.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
 **Log important events** - Progress and completion:

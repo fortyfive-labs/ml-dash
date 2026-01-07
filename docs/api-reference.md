@@ -279,73 +279,62 @@ exp.log().warning("GPU memory low", memory_available="1GB")
 
 Track time-series metrics like loss, accuracy, etc.
 
-The `metrics` property supports two usage patterns:
-1. **Named**: Specify metric name upfront: `exp.metrics("loss").append(...)`
-2. **Unnamed**: Specify name in the call: `exp.metrics.append(name="loss", ...)`
+### Basic Usage
 
-### Usage Pattern 1: Named Metrics
-
-Specify the metric name when accessing metrics:
+Log train and eval metrics together:
 
 ```python
-# Simple metric
-metric = exp.metrics("train_loss")
-
-# Metric with metadata
-metric = exp.metrics(
-    "train_loss",
-    description="Training loss over time",
-    tags=["training", "loss"],
-    metadata={"optimizer": "adam"}
-)
-
-# Append single data point
-exp.metrics("train_loss").append(value=0.5, epoch=1, step=100)
-
-# Append with multiple fields
-exp.metrics("metrics").append(
-    loss=0.5,
-    accuracy=0.85,
-    epoch=1,
-    step=100
+# Log all metrics for an epoch in one call
+exp.metrics.log(
+    epoch=epoch,
+    train=dict(loss=train_loss, accuracy=train_acc),
+    eval=dict(loss=val_loss, accuracy=val_acc)
 )
 ```
 
-### Usage Pattern 2: Unnamed Metrics
+### Prefix-Based Logging
 
-Specify the metric name in the method call:
+Log metrics using namespace prefixes:
 
 ```python
-# Append with name in call
-exp.metrics.append(name="train_loss", value=0.5, step=100)
+# Log train metrics with prefix
+exp.metrics("train").log(loss=0.5, accuracy=0.85)
 
-# Append with multiple fields
-exp.metrics.append(
-    name="metrics",
-    loss=0.5,
-    accuracy=0.85,
-    step=100
-)
+# Log eval metrics with prefix
+exp.metrics("eval").log(loss=0.6, accuracy=0.82)
 
-# Batch append
-exp.metrics.append_batch(
-    name="train_loss",
-    data_points=[
-        {"value": 0.5, "step": 100},
-        {"value": 0.4, "step": 200}
-    ]
-)
+# Set context and flush
+exp.metrics.log(epoch=epoch).flush()
 ```
 
-### Batch Operations
+### Buffer API
+
+For high-frequency logging (per-batch), use the buffer API:
 
 ```python
-# Append batch of data points
-exp.metrics("train_loss").append_batch([
-    {"value": 0.5, "epoch": 1, "step": 100},
-    {"value": 0.4, "epoch": 2, "step": 200},
-    {"value": 0.3, "epoch": 3, "step": 300}
-])
+for batch in dataloader:
+    loss = train_step(batch)
+    acc = compute_accuracy(batch)
+
+    # Buffer per-batch values (not written to disk yet)
+    exp.metrics("train").buffer(loss=loss, accuracy=acc)
+
+# At end of epoch, compute and log summary statistics
+exp.metrics.buffer.log_summary()  # default: mean
+exp.metrics.log(epoch=epoch).flush()
+```
+
+### Multiple Aggregations
+
+```python
+# Default (just mean)
+exp.metrics.buffer.log_summary()
+
+# Multiple aggregations
+exp.metrics.buffer.log_summary("mean", "std", "min", "max", "count")
+
+# Percentiles
+exp.metrics.buffer.log_summary("p50", "p90", "p95", "p99")
 ```
 
 ### Reading Metrics
@@ -375,11 +364,14 @@ stats = exp.metrics("train_loss").stats()
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `metric(name, ...)` | See above | `MetricBuilder` | Create/get metric builder |
-| `append(**data)` | Flexible data fields | `dict` | Append single data point |
-| `append_batch(data_points)` | List of dicts | `dict` | Append multiple data points |
-| `read(start_index, limit)` | int, int | `dict` | Read data points |
-| `stats()` | - | `dict` | Get metric statistics |
+| `metrics(prefix)` | `str` | `MetricBuilder` | Create/get metric builder with prefix |
+| `metrics.log(**data)` | Flexible data fields | `MetricBuilder` | Log metric data point |
+| `metrics("prefix").log(**data)` | Flexible data fields | `MetricBuilder` | Log with prefix |
+| `metrics("prefix").buffer(**data)` | Flexible data fields | `None` | Buffer values for summary |
+| `metrics.buffer.log_summary(*aggs)` | aggregation names | `None` | Log summary statistics |
+| `metrics.flush()` | - | `None` | Flush pending metrics |
+| `metrics("prefix").read(start_index, limit)` | int, int | `dict` | Read data points |
+| `metrics("prefix").stats()` | - | `dict` | Get metric statistics |
 
 ---
 
@@ -597,8 +589,8 @@ dxp.log("Starting quick experiment")
 dxp.params.set(lr=0.001, batch_size=32)
 
 # Log metrics
-dxp.metrics("loss").append(step=0, value=0.5)
-dxp.metrics("loss").append(step=1, value=0.4)
+dxp.metrics("train").log(loss=0.5, step=0)
+dxp.metrics("train").log(loss=0.4, step=1)
 
 # Upload files
 dxp.files("models").save("model.pt")
@@ -624,7 +616,7 @@ dxp.params.set(
 # Log training progress
 for epoch in range(10):
     loss = train_epoch()
-    dxp.metrics("loss").append(step=epoch, value=loss)
+    dxp.metrics("train").log(loss=loss, epoch=epoch)
     dxp.log(f"Epoch {epoch} completed", loss=loss)
 
 # Save results
@@ -650,7 +642,7 @@ model = train_model()
 dxp.files("models").save_torch(model, to="model.pt")
 
 # Log final metrics
-dxp.metrics("accuracy").append(value=0.95, step=10)
+dxp.metrics("train").log(accuracy=0.95, step=10)
 dxp.log("Training completed")
 
 # No cleanup needed - automatically handled!
@@ -754,8 +746,7 @@ for epoch in range(10):
     loss = train_epoch(model)
     acc = evaluate(model)
 
-    dxp.metrics("loss").append(step=epoch, value=loss)
-    dxp.metrics("accuracy").append(step=epoch, value=acc)
+    dxp.metrics("train").log(loss=loss, accuracy=acc, epoch=epoch)
     dxp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
 
 # Save results
@@ -870,7 +861,7 @@ for lr, bs in itertools.product(learning_rates, batch_sizes):
         # Train with these hyperparameters
         final_acc = train(lr=lr, batch_size=bs)
 
-        exp.metrics("final_accuracy").append(value=final_acc, step=1)
+        exp.metrics("train").log(accuracy=final_acc, step=1)
         exp.log(f"Search completed: lr={lr}, bs={bs}, acc={final_acc}")
 ```
 
@@ -900,7 +891,7 @@ def train_model(experiment):
     # Training loop
     for epoch in range(50):
         loss = 1.0 / (epoch + 1)  # Simulated loss
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, epoch=epoch)
         experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     # Save model
@@ -941,7 +932,7 @@ with Experiment(
     exp.log("Running on remote server", level="info")
 
     # Metrics stored in MongoDB
-    exp.metrics("training_loss").append(value=0.5, step=100)
+    exp.metrics("train").log(loss=0.5, step=100)
 
     # Files stored in S3
     exp.files("models").save_json(
@@ -1022,13 +1013,14 @@ exp.log("message", level="info")         # With level
 exp.log("msg", epoch=1, loss=0.5)        # With metadata
 exp.log().info("message")                # Fluent style
 
-# Metrics (two patterns)
-exp.metrics("loss").append(value=0.5, step=1)      # Named
-exp.metrics.append(name="loss", value=0.5, step=1)  # Unnamed
-exp.metrics("loss").append_batch([...])
-exp.metrics.append_batch(name="loss", data_points=[...])
-data = exp.metrics("loss").read(0, 100)
-stats = exp.metrics("loss").stats()
+# Metrics
+exp.metrics("train").log(loss=0.5, step=1)          # Log with prefix
+exp.metrics.log(epoch=1, train=dict(loss=0.5))      # Log with groups
+exp.metrics("train").buffer(loss=0.5)               # Buffer for summary
+exp.metrics.buffer.log_summary("mean", "std")       # Log summaries
+exp.metrics.flush()                                 # Flush pending
+data = exp.metrics("train").read(0, 100)            # Read data
+stats = exp.metrics("train").stats()                # Get stats
 
 # Files
 exp.files("models").save("model.pt")
@@ -1043,7 +1035,7 @@ from ml_dash.auto_start import dxp
 
 dxp.log("Already started!")              # Ready to use immediately
 dxp.params.set(lr=0.001)                 # Set parameters
-dxp.metrics("loss").append(value=0.5)    # Log metrics
+dxp.metrics("train").log(loss=0.5)       # Log metrics
 dxp.files("models").save("model.pt")     # Upload files
 # Auto-completed on Python exit
 ```

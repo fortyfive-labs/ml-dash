@@ -42,7 +42,7 @@ with dxp.run:
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        dxp.metrics("loss").append(value=loss, epoch=epoch)
+        dxp.metrics("train").log(loss=loss, epoch=epoch)
 
     dxp.log().info("Training completed")
 ```
@@ -74,7 +74,7 @@ with Experiment(name="my-first-experiment", project="tutorial",
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, epoch=epoch)
 
     experiment.log().info("Training completed")
 ```
@@ -94,7 +94,8 @@ After running the code above, your data is organized like this:
         ├── parameters/
         │   └── parameters.json  # your hyperparameters
         └── metrics/
-            └── loss.jsonl       # your metrics
+            └── train/
+                └── data.jsonl   # your metrics
 ```
 
 ## Common Patterns

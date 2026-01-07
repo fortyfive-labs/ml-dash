@@ -32,7 +32,7 @@ def train_model(experiment):
 
     for epoch in range(10):
         loss = train_epoch()
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, epoch=epoch)
 
     return "Training complete!"
 
@@ -174,13 +174,13 @@ Experiments use **upsert behavior** - reopen by using the same name:
 with Experiment(name="long-training", project="ml",
         local_path=".dash").run as experiment:
     experiment.log("Starting epoch 1")
-    experiment.metrics("loss").append(value=0.5, epoch=1)
+    experiment.metrics("train").log(loss=0.5, epoch=1)
 
 # Later - continues same experiment
 with Experiment(name="long-training", project="ml",
         local_path=".dash").run as experiment:
     experiment.log("Resuming from checkpoint")
-    experiment.metrics("loss").append(value=0.3, epoch=2)
+    experiment.metrics("train").log(loss=0.3, epoch=2)
 ```
 
 ## Available Operations
@@ -199,7 +199,7 @@ with Experiment(name="demo", project="test",
     experiment.params.set(lr=0.001, batch_size=32)
 
     # Metrics tracking
-    experiment.metrics("loss").append(value=0.5, epoch=1)
+    experiment.metrics("train").log(loss=0.5, epoch=1)
 
     # File uploads
     experiment.files("models").save("model.pth")
@@ -217,7 +217,7 @@ with Experiment(name="demo", project="test",
         │   └── logs.jsonl
         ├── parameters.json
         ├── metrics/
-        │   └── loss/
+        │   └── train/
         │       └── data.jsonl
         └── files/
             └── models/
