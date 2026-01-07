@@ -11,7 +11,6 @@ Uses the global EXP ParamsProto object for clean template expansion.
 from ml_dash import Experiment, EXP, dxp
 from ml_dash.storage import LocalStorage
 import tempfile
-import shutil
 from pathlib import Path
 
 
@@ -69,20 +68,8 @@ def test_template_with_run_project():
     print("✓ Template with {EXP.project} and {EXP.name} works")
 
 
-def test_template_with_dxp():
+def test_template_with_dxp(local_dxp):
     """Test template with dxp singleton."""
-    ml_dash_dir = Path(".ml-dash-test-templates")
-
-    # Clean up first
-    if dxp._is_open:
-        dxp.run.complete()
-    if ml_dash_dir.exists():
-        shutil.rmtree(ml_dash_dir)
-
-    # Configure dxp for local mode testing
-    dxp._storage = LocalStorage(root_path=ml_dash_dir)
-    dxp._client = None
-
     # Reset EXP.id for fresh timestamp
     EXP.id = None
     EXP.timestamp = None
@@ -95,10 +82,6 @@ def test_template_with_dxp():
     with dxp.run:
         assert dxp._folder_path == "iclr_2024/dxp"
         assert EXP.name == "dxp"
-
-    # Clean up
-    if ml_dash_dir.exists():
-        shutil.rmtree(ml_dash_dir)
 
     print("✓ Template with dxp and {EXP.name} works")
 
@@ -153,63 +136,58 @@ def demo_folder_templates():
     print("Prefix Templates Demo - {EXP.attr} Format")
     print("="*60)
 
-    ml_dash_dir = Path(".ml-dash-test-templates-demo")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ml_dash_dir = Path(tmpdir) / "ml-dash-test-templates-demo"
 
-    # Clean up first
-    if dxp._is_open:
-        dxp.run.complete()
-    if ml_dash_dir.exists():
-        shutil.rmtree(ml_dash_dir)
+        # Clean up first
+        if dxp._is_open:
+            dxp.run.complete()
 
-    # Configure dxp for local mode testing
-    dxp._storage = LocalStorage(root_path=ml_dash_dir)
-    dxp._client = None
+        # Configure dxp for local mode testing
+        dxp._storage = LocalStorage(root_path=ml_dash_dir)
+        dxp._client = None
 
-    # Reset EXP for clean demo
-    EXP._reset()
+        # Reset EXP for clean demo
+        EXP._reset()
 
-    # Example 1: Using {EXP.name}
-    print("\n1. Template with {EXP.name}:")
-    dxp.run.prefix = "iclr_2024/{EXP.name}"
-    print(f"   Template: 'iclr_2024/{{EXP.name}}'")
-    print(f"   Expanded: '{dxp.run.prefix}'")
+        # Example 1: Using {EXP.name}
+        print("\n1. Template with {EXP.name}:")
+        dxp.run.prefix = "iclr_2024/{EXP.name}"
+        print(f"   Template: 'iclr_2024/{{EXP.name}}'")
+        print(f"   Expanded: '{dxp.run.prefix}'")
 
-    with dxp.run:
-        print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with dxp.run:
+            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
 
-    # Example 2: Using EXP.id for unique folders (dot notation)
-    EXP._reset()
-    print("\n2. Template with {EXP.name}.{EXP.id}:")
-    dxp.run.prefix = "runs/{EXP.name}.{EXP.id}"
-    print(f"   Template: 'runs/{{EXP.name}}.{{EXP.id}}'")
-    print(f"   Expanded: '{dxp.run.prefix}'")
+        # Example 2: Using EXP.id for unique folders (dot notation)
+        EXP._reset()
+        print("\n2. Template with {EXP.name}.{EXP.id}:")
+        dxp.run.prefix = "runs/{EXP.name}.{EXP.id}"
+        print(f"   Template: 'runs/{{EXP.name}}.{{EXP.id}}'")
+        print(f"   Expanded: '{dxp.run.prefix}'")
 
-    with dxp.run:
-        print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with dxp.run:
+            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
 
-    # Example 3: Using date/time templates
-    EXP._reset()
-    print("\n3. Template with {EXP.date}:")
-    dxp.run.prefix = "{EXP.project}/{EXP.name}.{EXP.date}"
-    print(f"   Template: '{{EXP.project}}/{{EXP.name}}.{{EXP.date}}'")
-    print(f"   Expanded: '{dxp.run.prefix}'")
+        # Example 3: Using date/time templates
+        EXP._reset()
+        print("\n3. Template with {EXP.date}:")
+        dxp.run.prefix = "{EXP.project}/{EXP.name}.{EXP.date}"
+        print(f"   Template: '{{EXP.project}}/{{EXP.name}}.{{EXP.date}}'")
+        print(f"   Expanded: '{dxp.run.prefix}'")
 
-    with dxp.run:
-        print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with dxp.run:
+            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
 
-    print("\n" + "="*60)
-    print("EXP attributes:")
-    print(f"  • EXP.name = '{EXP.name}' (experiment name)")
-    print(f"  • EXP.project = '{EXP.project}' (project name)")
-    print(f"  • EXP.id = {EXP.id} (numeric run ID)")
-    print(f"  • EXP.date = '{EXP.date}' (YYYYMMDD)")
-    print(f"  • EXP.datetime = '{EXP.datetime}' (YYYYMMDD.HHMMSS)")
-    print(f"  • EXP.timestamp = '{EXP.timestamp}' (ISO)")
-    print("="*60 + "\n")
-
-    # Clean up
-    if ml_dash_dir.exists():
-        shutil.rmtree(ml_dash_dir)
+        print("\n" + "="*60)
+        print("EXP attributes:")
+        print(f"  • EXP.name = '{EXP.name}' (experiment name)")
+        print(f"  • EXP.project = '{EXP.project}' (project name)")
+        print(f"  • EXP.id = {EXP.id} (numeric run ID)")
+        print(f"  • EXP.date = '{EXP.date}' (YYYYMMDD)")
+        print(f"  • EXP.datetime = '{EXP.datetime}' (YYYYMMDD.HHMMSS)")
+        print(f"  • EXP.timestamp = '{EXP.timestamp}' (ISO)")
+        print("="*60 + "\n")
 
 
 if __name__ == "__main__":

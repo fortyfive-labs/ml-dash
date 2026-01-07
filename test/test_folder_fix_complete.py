@@ -64,8 +64,8 @@ def test_all_operations_use_folder_field():
                 files_meta = json.load(f)
             assert len(files_meta["files"]) == 1
 
-            # 4. Test metrics - use correct API: metrics("name").append()
-            exp.metrics("train").append(loss=0.5, accuracy=0.95, step=1)
+            # 4. Test metrics - use correct API: metrics("name").log()
+            exp.metrics("train").log(loss=0.5, accuracy=0.95, step=1)
 
             metrics_dir = expected_base / "metrics" / "train"
             assert metrics_dir.exists(), f"metrics directory not at {metrics_dir}"
@@ -107,7 +107,7 @@ def test_folder_consistency_with_static_path():
             # Add all types of data
             exp.params.set(test_param=123)
             exp.log("Test log")
-            exp.metrics("train").append(value=1.0)
+            exp.metrics("train").log(loss=1.0)
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")
@@ -139,7 +139,7 @@ def test_no_folder_field_still_works():
 
             exp.params.set(test=1)
             exp.log("Test")
-            exp.metrics("train").append(val=2.0)
+            exp.metrics("train").log(val=2.0)
 
             test_file = Path(tmpdir) / "test.txt"
             test_file.write_text("test")

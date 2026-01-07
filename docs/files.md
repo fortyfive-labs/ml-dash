@@ -12,7 +12,7 @@ The folder API uses a fluent interface that supports multiple styles:
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Upload file from disk
     dxp.files("checkpoints").upload("./model.pt")
@@ -54,7 +54,7 @@ with Experiment(name="my-experiment", project="project",
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Upload a file to a prefix
     result = dxp.files("models").upload("./model.pth")
@@ -72,7 +72,7 @@ Save Python objects directly without creating intermediate files:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Save dict/list as JSON
     config = {"model": "resnet50", "lr": 0.001}
@@ -96,7 +96,7 @@ You can also use the direct method style without specifying a prefix:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Upload file directly
     dxp.files.upload("./model.pt", to="models/model.pt")
@@ -115,7 +115,7 @@ Use paths to organize files logically:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Models
     dxp.files("models").upload("model.pth")
@@ -139,7 +139,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # List all files
     files = dxp.files().list()
@@ -157,7 +157,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # List files in specific prefix
     model_files = dxp.files("/models").list()
@@ -170,7 +170,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # List files matching pattern
     png_files = dxp.files("images").list("*.png")
@@ -186,7 +186,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Download by filename/path
     dxp.files("model.pt").download()  # Downloads to current directory
@@ -202,7 +202,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Download all PNG files from images prefix
     paths = dxp.files("images").download("*.png", to="./local_images")
@@ -219,7 +219,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Upload a file first
     upload_result = dxp.files("models").upload("./model.pth")
@@ -238,7 +238,7 @@ Downloads automatically verify checksums to ensure file integrity:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Upload
     upload_result = dxp.files("models").upload("./model.pth")
@@ -258,7 +258,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Delete by filename/path
     result = dxp.files("some.text").delete()
@@ -273,7 +273,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Delete all PNG files from images prefix
     results = dxp.files("images").delete("*.png")
@@ -292,7 +292,7 @@ Add description, tags, and custom metadata:
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     result = dxp.files("models").save_torch(
         model,
@@ -315,7 +315,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Save text content
     yaml_content = """
@@ -335,7 +335,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     config = {"model": "resnet50", "lr": 0.001}
 
@@ -352,7 +352,7 @@ with Experiment(name="my-experiment", project="project",
 :linenos:
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     binary_data = b"\x00\x01\x02\x03"
 
@@ -374,7 +374,7 @@ import torch
 from ml_dash import Experiment
 
 with Experiment(name="resnet-training", project="cv",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     dxp.params.set(model="resnet50", epochs=100)
     dxp.log("Starting training")
@@ -385,9 +385,17 @@ with Experiment(name="resnet-training", project="cv",
         train_loss = train_one_epoch(model, train_loader)
         val_loss, val_accuracy = validate(model, val_loader)
 
-        # Log metrics
-        dxp.metrics("train_loss").append(value=train_loss, epoch=epoch)
-        dxp.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
+        # Log metrics (single call with nested dict)
+        dxp.metrics.log(
+            epoch=epoch,
+            train=dict(loss=train_loss, accuracy=val_accuracy),
+            eval=dict(loss=val_loss, accuracy=val_accuracy)
+        )
+
+        # Alternative: prefix-based logging
+        # dxp.metrics("train").log(loss=train_loss, accuracy=val_accuracy)
+        # dxp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
+        # dxp.metrics.log(epoch=epoch).flush()
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
@@ -427,7 +435,7 @@ import numpy as np
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Generate plot
     losses = [0.5, 0.4, 0.3, 0.25, 0.2]
@@ -455,7 +463,7 @@ with Experiment(name="my-experiment", project="project",
 
 ## Saving Videos
 
-Upload video frame stacks using the `save_video()` method:
+Upload video frame stacks using the `save_video()` method. This is useful for saving training visualizations, agent rollouts, or any sequence of images.
 
 ```{code-block} python
 :linenos:
@@ -464,7 +472,7 @@ import numpy as np
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as dxp:
+        local_path=".dash").run as dxp:
 
     # Generate frame stack
     frames = [np.random.rand(200, 200) for _ in range(20)]
@@ -478,6 +486,49 @@ with Experiment(name="my-experiment", project="project",
     # Save as GIF
     dxp.files("videos").save_video(frames, to="animation.gif")
 ```
+
+### Practical Example: Agent Rollout
+
+Record an agent's trajectory or any animated visualization:
+
+```{code-block} python
+:linenos:
+
+import numpy as np
+from ml_dash import Experiment
+
+def render_frame(x, y):
+    """Render a frame with a marker at position (x, y)."""
+    canvas = np.zeros((200, 200))
+    # Draw a 10x10 square at position
+    canvas[max(0, x-5):x+5, max(0, y-5):y+5] = 1.0
+    return canvas
+
+with Experiment(name="agent-rollout", project="rl",
+        local_path=".dash").run as dxp:
+
+    # Simulate agent moving across the canvas
+    frames = [render_frame(100 + i, 80) for i in range(20)]
+
+    result = dxp.files("videos").save_video(frames, to="rollout.mp4")
+    print(f"Saved: {result['filename']} ({result['sizeBytes']} bytes)")
+```
+
+### Video Encoding Options
+
+Control video quality and encoding with additional parameters:
+
+```{code-block} python
+:linenos:
+
+# High quality MP4
+dxp.files("videos").save_video(frames, to="high_quality.mp4", fps=30, quality=8)
+
+# Lower quality for smaller file size
+dxp.files("videos").save_video(frames, to="compressed.mp4", fps=30, quality=5)
+```
+
+Additional keyword arguments are passed to imageio's writer (e.g., `quality`, `codec`, `bitrate`).
 
 ### Frame Format Support
 
@@ -502,7 +553,9 @@ dxp.files("videos").save_video(frames, to="stacked.mp4")
 **Frame value ranges:**
 - Float values (0.0 to 1.0) - automatically scaled to 0-255
 - Uint8 values (0 to 255) - used directly
-- Other formats - automatically converted
+- Float32 values - automatically converted
+
+**Note:** An empty frame list raises `ValueError: frame_stack is empty`.
 
 ## Storage Format
 

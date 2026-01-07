@@ -65,7 +65,7 @@ Experiment(
 Experiment(
     name="my-experiment",
     project="my-project",
-    local_path=".ml-dash"  # Required for local mode
+    local_path=".dash"  # Required for local mode
 )
 ```
 
@@ -104,7 +104,7 @@ Experiments are managed through the `run` property, which returns a `RunManager`
 Automatically starts and completes/fails the experiment:
 
 ```python
-with Experiment(name="exp", project="proj", local_path=".ml-dash").run as exp:
+with Experiment(name="exp", project="proj", local_path=".dash").run as exp:
     exp.log("Training started")
     exp.params.set(lr=0.001)
     # Experiment automatically completes on successful exit
@@ -116,7 +116,7 @@ with Experiment(name="exp", project="proj", local_path=".ml-dash").run as exp:
 Perfect for wrapping training functions:
 
 ```python
-exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+exp = Experiment(name="exp", project="proj", local_path=".dash")
 
 @exp.run
 def train_model(experiment):
@@ -132,7 +132,7 @@ result = train_model()
 Explicit start/complete for fine-grained control:
 
 ```python
-exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+exp = Experiment(name="exp", project="proj", local_path=".dash")
 
 exp.run.start()
 try:
@@ -574,7 +574,7 @@ The `ml_dash.auto_start` module provides a pre-configured, auto-started experime
 ### Overview
 
 The `dxp` singleton is:
-- **Pre-configured**: Name is "dxp", project is "scratch", storage is local (`.ml-dash`)
+- **Pre-configured**: Name is "dxp", project is "scratch", storage is local (`.dash`)
 - **Auto-started**: Ready to use immediately on import - no need to call `.run.start()`
 - **Auto-cleanup**: Automatically completed on Python exit via `atexit` handler
 - **Fully-featured**: Works exactly like a normal `Experiment` instance
@@ -664,8 +664,8 @@ The `dxp` singleton has a fixed configuration:
 |----------|-------|------------|
 | Name | `"dxp"` | No (read-only) |
 | Project | `"scratch"` | No (read-only) |
-| Storage Mode | Local (`.ml-dash`) | No (fixed at initialization) |
-| Local Path | `".ml-dash"` | No (fixed at initialization) |
+| Storage Mode | Local (`.dash`) | No (fixed at initialization) |
+| Local Path | `".dash"` | No (fixed at initialization) |
 | Parameters | Empty (initially) | Yes (during lifecycle) |
 | Tags | Empty (initially) | No |
 | Description | None | No |
@@ -713,7 +713,7 @@ dxp.run.fail()
 | Configuration | User-defined | Fixed (dxp/scratch/local) |
 | Lifecycle | Manual or context manager | Auto-started, auto-completed |
 | Use Case | Production experiments | Quick prototyping, notebooks |
-| Storage | Local or remote | Local only (`.ml-dash`) |
+| Storage | Local or remote | Local only (`.dash`) |
 | Reusable | Create multiple instances | Single global instance |
 
 ### Best Practices
@@ -780,7 +780,7 @@ with Experiment(
     project="image-classification",
     description="ResNet50 on CIFAR-10",
     tags=["resnet", "cifar10", "baseline"],
-    local_path=".ml-dash"
+    local_path=".dash"
 ).run as exp:
 
     # 1. Set hyperparameters
@@ -815,10 +815,9 @@ with Experiment(
         val_loss, val_acc = validate()  # Your validation code
 
         # Log metrics
-        exp.metrics("train_loss").append(value=train_loss, epoch=epoch)
-        exp.metrics("train_acc").append(value=train_acc, epoch=epoch)
-        exp.metrics("val_loss").append(value=val_loss, epoch=epoch)
-        exp.metrics("val_acc").append(value=val_acc, epoch=epoch)
+        exp.metrics("train").log(loss=train_loss, accuracy=train_acc)
+        exp.metrics("eval").log(loss=val_loss, accuracy=val_acc)
+        exp.metrics.log(epoch=epoch).flush()
 
         # Log progress
         if epoch % 10 == 0:
@@ -859,7 +858,7 @@ for lr, bs in itertools.product(learning_rates, batch_sizes):
         name=f"search-lr{lr}-bs{bs}",
         project="hyperparam-search",
         tags=["search", "grid"],
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as exp:
 
         exp.params.set(
@@ -884,7 +883,7 @@ from ml_dash import Experiment
 exp = Experiment(
     name="training-run",
     project="my-project",
-    local_path=".ml-dash"
+    local_path=".dash"
 )
 
 @exp.run
@@ -964,7 +963,7 @@ try:
     with Experiment(
         name="my-experiment",
         project="test",
-        local_path=".ml-dash"
+        local_path=".dash"
     ).run as exp:
         exp.log("Starting work")
         exp.params.set(test_param="value")
@@ -1003,7 +1002,7 @@ The experiment status will be set to `FAILED` automatically, and all logs, param
 from ml_dash import Experiment
 
 # Create experiment
-exp = Experiment(name="exp", project="proj", local_path=".ml-dash")
+exp = Experiment(name="exp", project="proj", local_path=".dash")
 
 # Lifecycle
 with exp.run as exp:                    # Context manager

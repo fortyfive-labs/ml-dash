@@ -37,8 +37,9 @@ def train_model(architecture, experiment):
 
         loss = (1 - progress) * 2.0 + random.uniform(-0.1, 0.1)
 
-        experiment.metrics("accuracy").append(value=accuracy, epoch=epoch)
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics.log(epoch=epoch)
+        experiment.metrics("train").log(accuracy=accuracy, loss=loss)
+        experiment.metrics.flush()
 
     return accuracy
 
@@ -55,7 +56,7 @@ def compare_architectures():
             project="architecture-comparison",
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
-        local_path=".ml-dash"
+        local_path=".dash"
         .run as experiment:
             # Same configuration for fair comparison
             experiment.params.set(
@@ -186,15 +187,17 @@ def train_and_evaluate(model, train_loader, val_loader, experiment):
         accuracy = correct / total
 
         # Metric metrics
-        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metrics("val_accuracy").append(value=accuracy, epoch=epoch)
+        experiment.metrics.log(epoch=epoch)
+        experiment.metrics("train").log(loss=train_loss, accuracy=accuracy)
+        experiment.metrics("eval").log(loss=train_loss, accuracy=accuracy)
+        experiment.metrics.flush()
 
     return accuracy
 
 # Compare architectures
 for arch in ["cnn", "resnet", "vit"]:
     with Experiment(name=f"comparison-{arch}", project="arch-comp",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
         experiment.params.set(architecture=arch, dataset="cifar10")
 
         model = create_model(arch)

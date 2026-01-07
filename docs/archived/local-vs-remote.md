@@ -4,7 +4,7 @@ ML-Dash operates in two modes: **Local** (filesystem) and **Remote** (API + Clou
 
 ## Local Mode
 
-Local mode stores all data on your local filesystem in a `.ml-dash/` directory.
+Local mode stores all data on your local filesystem in a `.dash/` directory.
 
 ### When to Use Local Mode
 
@@ -23,7 +23,7 @@ with Experiment(
     name="my-experiment",
     project="my-project",
     local_prefix="./experiments"  # Required for local mode,
-        local_path=".ml-dash"
+        local_path=".dash"
 ) as experiment:
     experiment.log("Running in local mode")
     experiment.parameters().set(batch_size=32)
@@ -34,7 +34,7 @@ with Experiment(
 ### Local Storage Structure
 
 ```
-./experiments/.ml-dash/
+./experiments/.dash/
 └── my-project/
     └── my-experiment/
         ├── logs.jsonl              # Log entries (JSONL format)
@@ -52,7 +52,7 @@ with Experiment(
 
 - **Fast**: No network latency
 - **Simple**: No server setup required
-- **Portable**: Copy `.ml-dash/` directory to move experiments
+- **Portable**: Copy `.dash/` directory to move experiments
 - **No costs**: No cloud storage fees
 
 ### Disadvantages of Local Mode
@@ -155,7 +155,7 @@ You can't directly convert between modes, but you can export/import data.
 ### Export from Local
 
 ```python
-# Local data is in .ml-dash/ directory
+# Local data is in .dash/ directory
 # Copy the entire directory to back up or share
 ```
 
@@ -164,7 +164,7 @@ You can't directly convert between modes, but you can export/import data.
 ```python
 # Development (local)
 with Experiment(name="experiment", project="dev", local_prefix="./data",
-        local_path=".ml-dash") as experiment:
+        local_path=".dash") as experiment:
     # Develop your code...
     pass
 
@@ -183,7 +183,7 @@ Set default mode using environment variables:
 export DREAMLAKE_LOCAL_PATH="./experiments"
 
 # Remote mode
-export DREAMLAKE_API_URL="https://api.ml-dash.ai"
+export DREAMLAKE_API_URL="https://api.dash.ai"
 export DREAMLAKE_API_KEY="your-api-key"
 ```
 
@@ -218,7 +218,7 @@ is_production = os.getenv("ENVIRONMENT") == "production"
 if is_production:
     # Remote mode for production
     experiment_config = {
-        "remote": "https://api.ml-dash.ai",
+        "remote": "https://api.dash.ai",
         "api_key": os.getenv("DREAMLAKE_API_KEY")
     }
 else:
@@ -228,7 +228,7 @@ else:
     }
 
 with Experiment(name="experiment", project="ml", **experiment_config,
-        local_path=".ml-dash") as experiment:
+        local_path=".dash") as experiment:
     experiment.log("Starting training")
     # Your training code...
 ```
@@ -237,7 +237,7 @@ with Experiment(name="experiment", project="ml", **experiment_config,
 
 1. **Development**: Start with local mode for fast iteration
 2. **Production**: Use remote mode for team collaboration
-3. **Backup**: Regularly back up `.ml-dash/` in local mode
+3. **Backup**: Regularly back up `.dash/` in local mode
 4. **Environment vars**: Use environment variables for configuration
 5. **Testing**: Test both modes before deploying
 

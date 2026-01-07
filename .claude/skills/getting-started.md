@@ -57,7 +57,7 @@ with dxp.run:
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="tutorial",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     experiment.log().info("Training started")
     experiment.params.set(learning_rate=0.001, batch_size=32)
 
@@ -66,7 +66,7 @@ with Experiment(name="my-experiment", project="tutorial",
         experiment.metrics("loss").append(value=loss, epoch=epoch)
 ```
 
-Data stored in `.ml-dash/tutorial/my-experiment/`.
+Data stored in `.dash/tutorial/my-experiment/`.
 
 ## Pre-configured Singleton (dxp)
 
@@ -82,7 +82,7 @@ dxp.files.save_torch(model, "model.pt")
 ## Data Storage Structure
 
 ```
-.ml-dash/
+.dash/
 └── project/
     └── experiment/
         ├── logs/logs.jsonl

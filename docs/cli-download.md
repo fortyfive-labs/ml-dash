@@ -83,7 +83,7 @@ ml-dash download ./data --remote https://api.dash.ml --api-key your-jwt-token
 
 ### Configuration File
 
-Store your credentials in `~/.ml-dash/config.json` to avoid passing them every time:
+Store your credentials in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {
@@ -102,7 +102,7 @@ ml-dash download ./data
 
 ### Positional Arguments
 
-- `path` - Local storage directory to download to (default: `./.ml-dash`)
+- `path` - Local storage directory to download to (default: `./.dash`)
 
 ### Remote Configuration
 
@@ -128,7 +128,7 @@ ml-dash download ./data
 - `--dry-run` - Preview without downloading
 - `--overwrite` - Overwrite existing experiments (default: skip existing)
 - `--resume` - Resume interrupted download
-- `--state-file STATE_FILE` - State file path for resume (default: `.ml-dash-download-state.json`)
+- `--state-file STATE_FILE` - State file path for resume (default: `.dash-download-state.json`)
 
 ### Performance Options
 
@@ -244,7 +244,7 @@ ml-dash download ./data --remote https://api.dash.ml --username tom --resume
 ml-dash download ./data --remote https://api.dash.ml --username tom --resume
 ```
 
-The download state is saved to `.ml-dash-download-state.json` and includes:
+The download state is saved to `.dash-download-state.json` and includes:
 - Which experiments have been downloaded
 - Which metrics/files within each experiment are complete
 - Progress tracking for resuming exactly where you left off
@@ -481,7 +481,7 @@ Use `--resume` to continue from checkpoint:
 ml-dash download ./data --resume --verbose
 ```
 
-State file (`.ml-dash-download-state.json`) tracks:
+State file (`.dash-download-state.json`) tracks:
 - Completed experiments
 - Completed metrics within each experiment
 - Completed files
@@ -505,7 +505,7 @@ State file (`.ml-dash-download-state.json`) tracks:
    ml-dash download --api-key "eyJhbGc..."
    ```
 
-3. **Check config file** (`~/.ml-dash/config.json`):
+3. **Check config file** (`~/.dash/config.json`):
    ```json
    {
      "remote_url": "https://api.dash.ml",
@@ -696,13 +696,13 @@ After downloading, verify data integrity:
 
 ```bash
 # Check experiment structure
-tree .ml-dash/my-project/my-experiment
+tree .dash/my-project/my-experiment
 
 # Validate JSONL files
-cat .ml-dash/my-project/my-experiment/metrics/loss/data.jsonl | jq '.'
+cat .dash/my-project/my-experiment/metrics/loss/data.jsonl | jq '.'
 
 # Check file count
-find .ml-dash -type f | wc -l
+find .dash -type f | wc -l
 ```
 
 ## Next Steps

@@ -12,7 +12,7 @@ with Experiment(
     name="experiment-name",
     project="project-name",
     local_prefix="./data",
-        local_path=".ml-dash"
+        local_path=".dash"
 ) as experiment:
     # Your code here
     pass
@@ -139,7 +139,7 @@ with Experiment(
     name="mnist-training",
     project="computer-vision",
     local_prefix="./experiments",
-        local_path=".ml-dash"
+        local_path=".dash"
 ) as experiment:
     # Configuration
     experiment.parameters().set(
@@ -236,7 +236,7 @@ with Experiment(...) as experiment:
 ### Local Mode
 
 ```
-.ml-dash/
+.dash/
 └── project-name/
     └── experiment-name/
         ├── logs.jsonl              # Log entries
@@ -259,16 +259,16 @@ with Experiment(...) as experiment:
 
 ```bash
 # View logs
-cat .ml-dash/project/experiment/logs.jsonl
+cat .dash/project/experiment/logs.jsonl
 
 # View parameters
-cat .ml-dash/project/experiment/parameters.json
+cat .dash/project/experiment/parameters.json
 
 # View metric data
-cat .ml-dash/project/experiment/metrics/train_loss/data.jsonl
+cat .dash/project/experiment/metrics/train_loss/data.jsonl
 
 # List files
-ls .ml-dash/project/experiment/files/
+ls .dash/project/experiment/files/
 ```
 
 ## See Also

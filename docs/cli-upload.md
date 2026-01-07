@@ -15,7 +15,7 @@ The `ml-dash upload` command allows you to upload experiment data that was logge
 
 ### Basic Upload
 
-Upload all experiments from the default local storage directory (`./.ml-dash`):
+Upload all experiments from the default local storage directory (`./.dash`):
 
 ```bash
 ml-dash upload --remote https://api.dash.ml --username your-username
@@ -73,7 +73,7 @@ ml-dash upload --remote https://api.dash.ml --api-key your-jwt-token
 
 ### Configuration File
 
-Store your credentials in `~/.ml-dash/config.json` to avoid passing them every time:
+Store your credentials in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {
@@ -92,7 +92,7 @@ ml-dash upload
 
 ### Positional Arguments
 
-- `path` - Local storage directory to upload from (default: `./.ml-dash`)
+- `path` - Local storage directory to upload from (default: `./.dash`)
 
 ### Remote Configuration
 
@@ -122,7 +122,7 @@ ml-dash upload
 ### Resume Functionality
 
 - `--resume` - Resume previous interrupted upload
-- `--state-file PATH` - Path to state file (default: `.ml-dash-upload-state.json`)
+- `--state-file PATH` - Path to state file (default: `.dash-upload-state.json`)
 
 ## Usage Examples
 
@@ -137,7 +137,7 @@ ml-dash upload \
 
 **Output:**
 ```
-Scanning local storage: /path/to/.ml-dash
+Scanning local storage: /path/to/.dash
 Found 3 experiment(s)
 
 Validating experiments...
@@ -215,7 +215,7 @@ ml-dash upload --resume --verbose
 ### Example 5: Upload from Custom Directory
 
 ```bash
-ml-dash upload /path/to/custom/.ml-dash \
+ml-dash upload /path/to/custom/.dash \
   --remote https://api.dash.ml \
   --username john-doe
 ```
@@ -355,7 +355,7 @@ Interrupted uploads can be resumed without re-uploading completed experiments.
 
 ### How Resume Works
 
-1. During upload, state is saved to `.ml-dash-upload-state.json` after each experiment
+1. During upload, state is saved to `.dash-upload-state.json` after each experiment
 2. State includes: completed experiments, failed experiments, timestamp
 3. Use `--resume` to continue from where you left off
 
@@ -366,7 +366,7 @@ Interrupted uploads can be resumed without re-uploading completed experiments.
 ml-dash upload --remote https://api.dash.ml --username john-doe
 # ...uploads 3 experiments successfully...
 # ...network error on experiment 4...
-# State saved to .ml-dash-upload-state.json. Use --resume to retry failed uploads.
+# State saved to .dash-upload-state.json. Use --resume to retry failed uploads.
 ```
 
 **Resume:**
@@ -395,7 +395,7 @@ The state file is a JSON file:
 
 ```json
 {
-  "local_path": "/path/to/.ml-dash",
+  "local_path": "/path/to/.dash",
   "remote_url": "https://api.dash.ml",
   "completed_experiments": [
     "project1/exp1",
@@ -423,7 +423,7 @@ from ml_dash import Experiment
 with Experiment(
     name="resnet-training",
     project="image-classification",
-    local_path="./.ml-dash"
+    local_path=".dash"
 ).run as exp:
     exp.params.set(
         model="resnet50",
@@ -432,9 +432,11 @@ with Experiment(
     )
 
     for epoch in range(10):
-        # Training loop...
-        exp.metrics("loss").append(value=loss, epoch=epoch)
-        exp.metrics("accuracy").append(value=acc, epoch=epoch)
+        # Simulated training
+        loss = 1.0 / (epoch + 1)
+        acc = 0.5 + epoch * 0.05
+        exp.metrics("train").log(loss=loss, accuracy=acc)
+        exp.metrics.log(epoch=epoch).flush()
 ```
 
 ```bash
@@ -529,7 +531,7 @@ jobs:
 ml-dash upload --username your-username --remote https://api.dash.ml
 ```
 
-Or create a config file at `~/.ml-dash/config.json`:
+Or create a config file at `~/.dash/config.json`:
 ```json
 {
   "remote_url": "https://api.dash.ml",
@@ -570,9 +572,9 @@ Or create a config file at `~/.ml-dash/config.json`:
 **Error:** `No experiments found in local storage`
 
 **Solutions:**
-- Verify the path: `ls ./.ml-dash`
-- Check if experiments exist: `ls ./.ml-dash/*/*/experiment.json`
-- Specify correct path: `ml-dash upload /path/to/.ml-dash`
+- Verify the path: `ls ./.dash`
+- Check if experiments exist: `ls ./.dash/*/*/experiment.json`
+- Specify correct path: `ml-dash upload /path/to/.dash`
 - Ensure experiments were created in local mode
 
 ### Slow Uploads
@@ -611,7 +613,7 @@ The CLI automatically saves progress and skips already-uploaded experiments.
 **Error:** `State file local path doesn't match`
 
 **Solution:** The state file is for a different local directory. Either:
-- Start fresh (delete `.ml-dash-upload-state.json`)
+- Start fresh (delete `.dash-upload-state.json`)
 - Use the correct local directory
 - Specify a different state file: `--state-file my-state.json`
 
@@ -626,7 +628,7 @@ from ml_dash.cli_commands.upload import discover_experiments, ExperimentValidato
 from pathlib import Path
 
 # Discover experiments
-experiments = discover_experiments(Path("./.ml-dash"))
+experiments = discover_experiments(Path("./.dash"))
 
 # Validate
 validator = ExperimentValidator(strict=True)
@@ -647,7 +649,7 @@ from ml_dash.cli_commands.upload import cmd_upload
 import argparse
 
 args = argparse.Namespace(
-    path="./.ml-dash",
+    path="./.dash",
     remote="https://api.dash.ml",
     api_key=None,
     user_name="john-doe",
@@ -662,7 +664,7 @@ args = argparse.Namespace(
     skip_files=False,
     skip_params=False,
     resume=False,
-    state_file=".ml-dash-upload-state.json",
+    state_file=".dash-upload-state.json",
 )
 
 exit_code = cmd_upload(args)
@@ -698,7 +700,7 @@ ml-dash upload --dry-run --verbose
 Avoid passing credentials on command line:
 
 ```json
-// ~/.ml-dash/config.json
+// ~/.dash/config.json
 {
   "remote_url": "https://api.dash.ml",
   "api_key": "your-token"

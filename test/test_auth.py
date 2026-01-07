@@ -258,15 +258,15 @@ class TestDeviceFlow:
     mock_response.json.return_value = {
       "device_code": "test-device-code",
       "user_code": "ABC-123",
-      "verification_uri": "https://auth.ml-dash.com/device",
-      "verification_uri_complete": "https://auth.ml-dash.com/device?code=ABC-123",
+      "verification_uri": "https://auth.dash.com/device",
+      "verification_uri_complete": "https://auth.dash.com/device?code=ABC-123",
       "expires_in": 600,
       "interval": 5,
     }
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
 
     result = client.start_device_flow()
@@ -295,7 +295,7 @@ class TestDeviceFlow:
     mock_post.side_effect = [response1, response2, response3]
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
     client._device_code = "test-device-code"
     client._interval = 1  # Short interval for testing
@@ -313,7 +313,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
     client._device_code = "test-device-code"
     client._interval = 1
@@ -329,7 +329,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
     client._device_code = "test-device-code"
     client._interval = 1
@@ -346,7 +346,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
     client._device_code = "test-device-code"
     client._interval = 1
@@ -364,7 +364,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
 
     ml_dash_token = client.exchange_token("vuer-auth-token")
@@ -388,7 +388,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
 
     with pytest.raises(exceptions.TokenExchangeError):
@@ -397,11 +397,11 @@ class TestDeviceFlow:
   def test_device_flow_client_initialization(self):
     """Test DeviceFlowClient initialization."""
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com/"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com/"
     )
 
     # Should strip trailing slash
-    assert client.ml_dash_server_url == "https://api.ml-dash.com"
+    assert client.ml_dash_server_url == "https://api.dash.com"
     assert client.device_secret == "test-secret"
 
   @patch("ml_dash.auth.device_flow.httpx.post")
@@ -412,7 +412,7 @@ class TestDeviceFlow:
     mock_post.return_value = mock_response
 
     client = device_flow.DeviceFlowClient(
-      device_secret="test-secret", ml_dash_server_url="https://api.ml-dash.com"
+      device_secret="test-secret", ml_dash_server_url="https://api.dash.com"
     )
     client._device_code = "test-device-code"
     client._interval = 0.1

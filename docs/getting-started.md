@@ -58,9 +58,9 @@ Local mode stores everything on your filesystem - perfect for offline work:
 
 from ml_dash import Experiment
 
-# Create a experiment (stores data in .ml-dash/ directory)
+# Create a experiment (stores data in .dash/ directory)
 with Experiment(name="my-first-experiment", project="tutorial",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     # Log messages
     experiment.log().info("Training started")
 
@@ -79,14 +79,14 @@ with Experiment(name="my-first-experiment", project="tutorial",
     experiment.log().info("Training completed")
 ```
 
-That's it! Your experiment data is now saved in `.ml-dash/tutorial/my-first-experiment/`.
+That's it! Your experiment data is now saved in `.dash/tutorial/my-first-experiment/`.
 
 ### Where is My Data?
 
 After running the code above, your data is organized like this:
 
 ```
-.ml-dash/
+.dash/
 └── tutorial/                    # project
     └── my-first-experiment/     # experiment
         ├── logs/
@@ -107,7 +107,7 @@ After running the code above, your data is organized like this:
 from ml_dash import Experiment
 
 with Experiment(name="train-model", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     # Set hyperparameters
     experiment.params.set(
         model="resnet50",
@@ -121,9 +121,12 @@ with Experiment(name="train-model", project="project",
         train_loss = 0.5  # your actual loss
         val_acc = 0.9     # your actual accuracy
 
-        # Metric metrics
-        experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metrics("val_accuracy").append(value=val_acc, epoch=epoch)
+        # Log metrics
+        experiment.metrics.log(
+            epoch=epoch,
+            train=dict(loss=train_loss, accuracy=val_acc),
+            eval=dict(loss=train_loss, accuracy=val_acc)
+        )
 
         # Log important events
         if epoch % 10 == 0:
@@ -138,7 +141,7 @@ with Experiment(name="train-model", project="project",
 from ml_dash import Experiment
 
 with Experiment(name="my-experiment", project="project",
-        local_path=".ml-dash").run as experiment:
+        local_path=".dash").run as experiment:
     # Train your model...
     # model.save("model.pth")
 

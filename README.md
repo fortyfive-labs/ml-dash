@@ -86,7 +86,7 @@ with Experiment(
 from ml_dash import Experiment
 
 with Experiment(
-  project="my-project", prefix="my-experiment", local_path=".ml-dash"
+  project="my-project", prefix="my-experiment", local_path=".dash"
 ).run as experiment:
   experiment.log().info("Running locally")
 

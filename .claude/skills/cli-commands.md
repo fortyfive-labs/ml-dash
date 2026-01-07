@@ -56,7 +56,7 @@ ml-dash upload
 # Or command line
 ml-dash upload --api-key your-jwt-token
 
-# Or config file ~/.ml-dash/config.json
+# Or config file ~/.dash/config.json
 {"remote_url": "https://api.dash.ml", "api_key": "your-jwt-token"}
 ```
 
@@ -67,7 +67,7 @@ ml-dash upload --api-key your-jwt-token
 Upload local experiments to remote server.
 
 ```bash
-# Upload all from default .ml-dash directory
+# Upload all from default .dash directory
 ml-dash upload
 
 # Upload from specific directory
@@ -221,5 +221,5 @@ ml-dash logout && ml-dash login
 
 ### Resume Not Working
 Check state files exist:
-- `.ml-dash-upload-state.json`
-- `.ml-dash-download-state.json`
+- `.dash-upload-state.json`
+- `.dash-download-state.json`

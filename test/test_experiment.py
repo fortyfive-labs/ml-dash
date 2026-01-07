@@ -202,7 +202,7 @@ class TestExperimentErrorHandling:
             with local_experiment(name="error-test", project="error-ws").run as experiment:
                 experiment.log("Starting work")
                 experiment.params.set(param="value")
-                experiment.metrics("metric").append(value=0.5, step=0)
+                experiment.metrics("metric").log(loss=0.5, step=0)
                 raise ValueError("Simulated error")
         except ValueError:
             pass

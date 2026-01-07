@@ -42,10 +42,9 @@ exp.run.start("You can log any message here, to mark the start of the run")
 exp.params.set(learning_rate=0.001, batch_size=32)
 
 # log metrics
-exp.metrics.append(loss=0.001, accuracy=0.5)
-
-# and you can namespace the metrics by calling the metrics writer.
-exp.metrics("eval").append(loss=0.001, accuracy=0.5)
+exp.metrics("train").log(loss=0.001, accuracy=0.5)
+exp.metrics("eval").log(loss=0.001, accuracy=0.5)
+exp.metrics.log(epoch=1).flush()
 
 # You can upload files with a prefix
 exp.files("checkpoints").save(fname="model.pth")
@@ -98,12 +97,14 @@ def train(lr=0.001, batch_size=32, n_steps=10):
         loss = (lambda: 0.001)()
         accuracy = (lambda: 0.5)()
 
-        # Logging metrics
-        dxp.metrics.append(loss=loss, accuracy=accuracy, step=step)
+        # Logging metrics with step context
+        dxp.metrics("train").log(loss=loss, accuracy=accuracy)
+        dxp.metrics.log(step=step).flush()
 
-    # then you can log the evaluation metrics.
+    # then you can log the evaluation metrics
     eval_loss, eval_accuracy = 0.001, 0.02
-    dxp.metrics("eval").append(loss=eval_loss, accuracy=eval_accuracy, step=step)
+    dxp.metrics("eval").log(loss=eval_loss, accuracy=eval_accuracy)
+    dxp.metrics.log(step=step).flush()
 
     # this allows you to upload the file.
     dxp.file.save_torch(net, "model_last.pt")

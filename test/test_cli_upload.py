@@ -99,15 +99,15 @@ class TestExperimentDiscovery:
         """Test discovering experiments with metrics."""
         exp = local_experiment(name="exp1", project="proj1")
         with exp.run as e:
-            e.metrics("loss").append(value=0.5)
-            e.metrics("accuracy").append(value=0.85)
+            e.metrics("train").log(loss=0.5)
+            e.metrics("eval").log(loss=0.85)
 
         local_path = Path(exp._storage.root_path)
         experiments = discover_experiments(local_path)
 
         assert len(experiments) == 1
-        assert "loss" in experiments[0].metric_names
-        assert "accuracy" in experiments[0].metric_names
+        assert "train" in experiments[0].metric_names
+        assert "eval" in experiments[0].metric_names
 
     def test_discover_empty_directory(self, temp_project):
         """Test discovering experiments in empty directory."""
@@ -309,7 +309,7 @@ class TestUploadIntegration:
         with exp.run as e:
             e.log("Test log message")
             e.params.set(**{"lr": 0.001, "batch_size": 32})
-            e.metrics("loss").append(value=0.5)
+            e.metrics("train").log(loss=0.5)
 
         local_path = Path(exp._storage.root_path)
 
@@ -408,7 +408,7 @@ class TestUploadIntegration:
         with exp.run as e:
             e.log("Test message")
             e.params.set(**{"lr": 0.001})
-            e.metrics("loss").append(value=0.5)
+            e.metrics("train").log(loss=0.5)
 
         local_path = Path(exp._storage.root_path)
 

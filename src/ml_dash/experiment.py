@@ -7,1312 +7,1302 @@ Supports three usage styles:
 3. Direct instantiation: exp = Experiment(...)
 """
 
-from typing import Optional, Dict, Any, List, Callable
-from enum import Enum
 import functools
-from pathlib import Path
 from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 from .client import RemoteClient
-from .storage import LocalStorage
-from .log import LogLevel, LogBuilder
+from .files import BindrsBuilder, FilesAccessor
+from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
-from .files import FilesAccessor, BindrsBuilder
 from .run import EXP
+from .storage import LocalStorage
 
 
 class OperationMode(Enum):
-    """Operation mode for the experiment."""
-    LOCAL = "local"
-    REMOTE = "remote"
-    HYBRID = "hybrid"  # Future: sync local to remote
+  """Operation mode for the experiment."""
+
+  LOCAL = "local"
+  REMOTE = "remote"
+  HYBRID = "hybrid"  # Future: sync local to remote
 
 
 class RunManager:
+  """
+  Lifecycle manager for experiments.
+
+  Supports three usage patterns:
+  1. Method calls: experiment.run.start(), experiment.run.complete()
+  2. Context manager: with Experiment(...).run as exp:
+  3. Decorator: @exp.run or @Experiment(...).run
+  """
+
+  def __init__(self, experiment: "Experiment"):
     """
-    Lifecycle manager for experiments.
+    Initialize RunManager.
 
-    Supports three usage patterns:
-    1. Method calls: experiment.run.start(), experiment.run.complete()
-    2. Context manager: with Experiment(...).run as exp:
-    3. Decorator: @exp.run or @Experiment(...).run
+    Args:
+        experiment: Parent Experiment instance
+    """
+    self._experiment = experiment
+
+  def start(self) -> "Experiment":
+    """
+    Start the experiment (sets status to RUNNING).
+
+    Returns:
+        The experiment instance for chaining
+    """
+    return self._experiment._open()
+
+  def complete(self) -> None:
+    """Mark experiment as completed (status: COMPLETED)."""
+    self._experiment._close(status="COMPLETED")
+
+  def fail(self) -> None:
+    """Mark experiment as failed (status: FAILED)."""
+    self._experiment._close(status="FAILED")
+
+  def cancel(self) -> None:
+    """Mark experiment as cancelled (status: CANCELLED)."""
+    self._experiment._close(status="CANCELLED")
+
+  @property
+  def prefix(self) -> Optional[str]:
+    """
+    Get the current folder prefix for this experiment.
+
+    Returns:
+        Current folder prefix path or None
+
+    Example:
+        current_prefix = exp.run.prefix
+    """
+    return self._experiment._folder_path
+
+  @prefix.setter
+  def prefix(self, value: Optional[str]) -> None:
+    """
+    Set the folder prefix for this experiment before initialization.
+
+    This can ONLY be set before the experiment is started (initialized).
+    Once the experiment is opened, the prefix cannot be changed.
+
+    Supports template variables:
+    - {EXP.name} - Experiment name
+    - {EXP.project} - Project name
+
+    Args:
+        value: Folder prefix path with optional template variables
+               (e.g., "experiments/{EXP.name}" or None)
+
+    Raises:
+        RuntimeError: If experiment is already initialized/open
+
+    Examples:
+        from ml_dash import dxp
+
+        # Static folder
+        dxp.run.prefix = "experiments/vision/resnet"
+
+        # Template with experiment name
+        dxp.run.prefix = "iclr_2024/{EXP.name}"
+
+        # Template with multiple variables
+        dxp.run.prefix = "{EXP.project}/experiments/{EXP.name}"
+
+        # Now start the experiment
+        with dxp.run:
+            dxp.params.set(lr=0.001)
+    """
+    if self._experiment._is_open:
+      raise RuntimeError(
+        "Cannot change prefix after experiment is initialized. "
+        "Set prefix before calling start() or entering 'with' block."
+      )
+
+    if value:
+      # Sync RUN with this experiment's values
+      EXP.name = self._experiment.name
+      EXP.project = self._experiment.project
+      EXP.description = self._experiment.description
+      # Generate id/timestamp if not already set
+      if EXP.id is None:
+        EXP._init_run()
+      # Format with RUN - no-op if no placeholders
+      value = value.format(EXP=EXP)
+
+    # Update the folder on the experiment
+    self._experiment._folder_path = value
+
+  def __enter__(self) -> "Experiment":
+    """Context manager entry - starts the experiment."""
+    return self.start()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    """Context manager exit - completes or fails the experiment."""
+    if exc_type is not None:
+      self.fail()
+    else:
+      self.complete()
+    return False
+
+  def __call__(self, func: Callable) -> Callable:
+    """
+    Decorator support for wrapping functions with experiment lifecycle.
+
+    Usage:
+        @exp.run
+        def train(exp):
+            exp.log("Training...")
     """
 
-    def __init__(self, experiment: "Experiment"):
-        """
-        Initialize RunManager.
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+      with self as exp:
+        return func(exp, *args, **kwargs)
 
-        Args:
-            experiment: Parent Experiment instance
-        """
-        self._experiment = experiment
-
-    def start(self) -> "Experiment":
-        """
-        Start the experiment (sets status to RUNNING).
-
-        Returns:
-            The experiment instance for chaining
-        """
-        return self._experiment._open()
-
-    def complete(self) -> None:
-        """Mark experiment as completed (status: COMPLETED)."""
-        self._experiment._close(status="COMPLETED")
-
-    def fail(self) -> None:
-        """Mark experiment as failed (status: FAILED)."""
-        self._experiment._close(status="FAILED")
-
-    def cancel(self) -> None:
-        """Mark experiment as cancelled (status: CANCELLED)."""
-        self._experiment._close(status="CANCELLED")
-
-    @property
-    def prefix(self) -> Optional[str]:
-        """
-        Get the current folder prefix for this experiment.
-
-        Returns:
-            Current folder prefix path or None
-
-        Example:
-            current_prefix = exp.run.prefix
-        """
-        return self._experiment._folder_path
-
-    @prefix.setter
-    def prefix(self, value: Optional[str]) -> None:
-        """
-        Set the folder prefix for this experiment before initialization.
-
-        This can ONLY be set before the experiment is started (initialized).
-        Once the experiment is opened, the prefix cannot be changed.
-
-        Supports template variables:
-        - {EXP.name} - Experiment name
-        - {EXP.project} - Project name
-
-        Args:
-            value: Folder prefix path with optional template variables
-                   (e.g., "experiments/{EXP.name}" or None)
-
-        Raises:
-            RuntimeError: If experiment is already initialized/open
-
-        Examples:
-            from ml_dash import dxp
-
-            # Static folder
-            dxp.run.prefix = "experiments/vision/resnet"
-
-            # Template with experiment name
-            dxp.run.prefix = "iclr_2024/{EXP.name}"
-
-            # Template with multiple variables
-            dxp.run.prefix = "{EXP.project}/experiments/{EXP.name}"
-
-            # Now start the experiment
-            with dxp.run:
-                dxp.params.set(lr=0.001)
-        """
-        if self._experiment._is_open:
-            raise RuntimeError(
-                "Cannot change prefix after experiment is initialized. "
-                "Set prefix before calling start() or entering 'with' block."
-            )
-
-        if value:
-            # Sync RUN with this experiment's values
-            EXP.name = self._experiment.name
-            EXP.project = self._experiment.project
-            EXP.description = self._experiment.description
-            # Generate id/timestamp if not already set
-            if EXP.id is None:
-                EXP._init_run()
-            # Format with RUN - no-op if no placeholders
-            value = value.format(EXP=EXP)
-
-        # Update the folder on the experiment
-        self._experiment._folder_path = value
-
-    def __enter__(self) -> "Experiment":
-        """Context manager entry - starts the experiment."""
-        return self.start()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - completes or fails the experiment."""
-        if exc_type is not None:
-            self.fail()
-        else:
-            self.complete()
-        return False
-
-    def __call__(self, func: Callable) -> Callable:
-        """
-        Decorator support for wrapping functions with experiment lifecycle.
-
-        Usage:
-            @exp.run
-            def train(exp):
-                exp.log("Training...")
-        """
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            with self as exp:
-                return func(exp, *args, **kwargs)
-        return wrapper
+    return wrapper
 
 
 class Experiment:
+  """
+  ML-Dash experiment for metricing experiments.
+
+  Usage examples:
+
+  # Default: Remote mode with production server (https://api.dash.ml)
+  experiment = Experiment(
+      project="my-project",
+      prefix="experiments/my-experiment"
+  )
+
+  # Local mode only
+  experiment = Experiment(
+      project="my-project",
+      prefix="experiments/my-experiment",
+      local_path=".dash"
+  )
+
+  # Custom remote server
+  experiment = Experiment(
+      project="my-project",
+      prefix="experiments/my-experiment",
+      remote="https://custom-server.com"
+  )
+
+  # Context manager
+  with Experiment(...) as exp:
+      exp.log(...)
+
+  # Decorator
+  @ml_dash_experiment(project="ws", prefix="experiments/exp", remote="...")
+  def train():
+      ...
+  """
+
+  def __init__(
+    self,
+    project: Optional[str] = None,
+    prefix: Optional[str] = None,
+    *,
+    description: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    bindrs: Optional[List[str]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    # Mode configuration
+    remote: Optional[str] = None,
+    local_path: Optional[str] = None,
+    # Internal parameters
+    _write_protected: bool = False,
+  ):
     """
-    ML-Dash experiment for metricing experiments.
-
-    Usage examples:
-
-    # Default: Remote mode with production server (https://api.dash.ml)
-    experiment = Experiment(
-        project="my-project",
-        prefix="experiments/my-experiment"
-    )
-
-    # Local mode only
-    experiment = Experiment(
-        project="my-project",
-        prefix="experiments/my-experiment",
-        local_path=".ml-dash"
-    )
-
-    # Custom remote server
-    experiment = Experiment(
-        project="my-project",
-        prefix="experiments/my-experiment",
-        remote="https://custom-server.com"
-    )
-
-    # Context manager
-    with Experiment(...) as exp:
-        exp.log(...)
-
-    # Decorator
-    @ml_dash_experiment(project="ws", prefix="experiments/exp", remote="...")
-    def train():
-        ...
-    """
-
-    def __init__(
-        self,
-        project: Optional[str] = None,
-        prefix: Optional[str] = None,
-        *,
-        description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        bindrs: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        # Mode configuration
-        remote: Optional[str] = None,
-        local_path: Optional[str] = None,
-        # Internal parameters
-        _write_protected: bool = False,
-    ):
-        """
-        Initialize an ML-Dash experiment.
-
-        Args:
-            project: Project name (defaults to DASH_PROJECT env var or "scratch")
-            prefix: Experiment prefix path like "folder_1/folder_2/.../exp_name" (defaults to DASH_PREFIX env var)
-            description: Optional experiment description
-            tags: Optional list of tags
-            bindrs: Optional list of bindrs
-            metadata: Optional metadata dict
-            remote: Remote API URL (defaults to "https://api.dash.ml"). Token auto-loaded from ~/.ml-dash/token.enc
-            local_path: Local storage root path. If specified without remote, uses local-only mode.
-            _write_protected: Internal parameter - if True, experiment becomes immutable after creation
-
-        Mode Selection:
-            - No parameters: Remote mode with "https://api.dash.ml" (default)
-            - local_path only: Local-only mode
-            - remote only: Remote mode with custom URL
-            - Both: Hybrid mode (local + remote)
-        """
-        import os
-
-        # Resolve defaults from environment variables
-        self.project = project or os.getenv('DASH_PROJECT', 'scratch')
-        self._folder_path = prefix or os.getenv('DASH_PREFIX')
-
-        # Extract experiment name from last segment of prefix
-        if self._folder_path:
-            self.name = self._folder_path.rstrip('/').split('/')[-1]
-        else:
-            raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
-
-        self.description = description
-        self.tags = tags
-        self._bindrs_list = bindrs
-        self._write_protected = _write_protected
-        self.metadata = metadata
-
-        # Initialize EXP with experiment values
-        EXP.name = self.name
-        EXP.project = project
-        EXP.description = description
-
-        # Determine operation mode and apply defaults
-        if not remote and not local_path:
-            # Default to remote mode with production server
-            remote = "https://api.dash.ml"
-            self.mode = OperationMode.REMOTE
-        elif remote and local_path:
-            self.mode = OperationMode.HYBRID
-        elif remote:
-            self.mode = OperationMode.REMOTE
-        else:  # local_path only
-            self.mode = OperationMode.LOCAL
-
-        # Initialize backend
-        self._client: Optional[RemoteClient] = None
-        self._storage: Optional[LocalStorage] = None
-        self._experiment_id: Optional[str] = None
-        self._experiment_data: Optional[Dict[str, Any]] = None
-        self._is_open = False
-        self._metrics_manager: Optional['MetricsManager'] = None  # Cached metrics manager
-
-        if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
-            # RemoteClient will auto-load token from ~/.ml-dash/token.enc
-            self._client = RemoteClient(base_url=remote)
-
-        if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
-            if not local_path:
-                raise ValueError("local_path is required for local mode")
-            self._storage = LocalStorage(root_path=Path(local_path))
-
-    def _open(self) -> "Experiment":
-        """
-        Internal method to open the experiment (create or update on server/filesystem).
-
-        Returns:
-            self for chaining
-        """
-        if self._is_open:
-            return self
-
-        # Ensure EXP.id is generated when run starts
-        if EXP.id is None:
-            EXP._init_run()
-
-        if self._client:
-            # Remote mode: create/update experiment via API
-            try:
-                response = self._client.create_or_update_experiment(
-                    project=self.project,
-                    name=self.name,
-                    description=self.description,
-                    tags=self.tags,
-                    bindrs=self._bindrs_list,
-                    prefix=self._folder_path,
-                    write_protected=self._write_protected,
-                    metadata=self.metadata,
-                )
-                self._experiment_data = response
-                self._experiment_id = response["experiment"]["id"]
-
-                # Display message about viewing data online
-                try:
-                    from rich.console import Console
-                    console = Console()
-                    console.print(
-                        f"[dim]✓ Experiment started: [bold]{self.name}[/bold] (project: {self.project})[/dim]\n"
-                        f"[dim]View your data, statistics, and plots online at:[/dim] "
-                        f"[link=https://dash.ml]https://dash.ml[/link]"
-                    )
-                except ImportError:
-                    # Fallback if rich is not available
-                    print(f"✓ Experiment started: {self.name} (project: {self.project})")
-                    print(f"View your data at: https://dash.ml")
-
-            except Exception as e:
-                # Check if it's an authentication error
-                from .auth.exceptions import AuthenticationError
-                if isinstance(e, AuthenticationError):
-                    try:
-                        from rich.console import Console
-                        from rich.panel import Panel
-                        console = Console()
-
-                        message = (
-                            "[bold red]Authentication Required[/bold red]\n\n"
-                            "You need to authenticate before using remote experiments.\n\n"
-                            "[bold]To authenticate:[/bold]\n"
-                            "  [cyan]ml-dash login[/cyan]\n\n"
-                            "[dim]This will open your browser for secure OAuth2 authentication.\n"
-                            "Your token will be stored securely in your system keychain.[/dim]\n\n"
-                            "[bold]Alternative:[/bold]\n"
-                            "  Use [cyan]local_path[/cyan] instead of [cyan]remote[/cyan] for offline experiments"
-                        )
-
-                        panel = Panel(
-                            message,
-                            title="[bold yellow]⚠ Not Authenticated[/bold yellow]",
-                            border_style="yellow",
-                            expand=False,
-                        )
-                        console.print("\n")
-                        console.print(panel)
-                        console.print("\n")
-                    except ImportError:
-                        # Fallback if rich is not available
-                        print("\n" + "=" * 60)
-                        print("⚠ Authentication Required")
-                        print("=" * 60)
-                        print("\nYou need to authenticate before using remote experiments.\n")
-                        print("To authenticate:")
-                        print("  ml-dash login\n")
-                        print("Alternative:")
-                        print("  Use local_path instead of remote for offline experiments\n")
-                        print("=" * 60 + "\n")
-
-                    import sys
-                    sys.exit(1)
-                else:
-                    # Re-raise other exceptions
-                    raise
-
-        if self._storage:
-            # Local mode: create experiment directory structure
-            # For local storage, owner is needed for directory structure
-            import getpass
-            # Use current system user as owner
-            owner = getpass.getuser()
-            self._storage.create_experiment(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                description=self.description,
-                tags=self.tags,
-                bindrs=self._bindrs_list,
-                metadata=self.metadata,
-            )
-
-        self._is_open = True
-        return self
-
-    def _close(self, status: str = "COMPLETED"):
-        """
-        Internal method to close the experiment and update status.
-
-        Args:
-            status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
-        """
-        if not self._is_open:
-            return
-
-        # Flush any pending writes
-        if self._storage:
-            self._storage.flush()
-
-        # Update experiment status in remote mode
-        if self._client and self._experiment_id:
-            try:
-                self._client.update_experiment_status(
-                    experiment_id=self._experiment_id,
-                    status=status
-                )
-
-                # Display completion message with link to view results
-                status_emoji = {
-                    "COMPLETED": "✓",
-                    "FAILED": "✗",
-                    "CANCELLED": "⊘"
-                }.get(status, "•")
-
-                status_color = {
-                    "COMPLETED": "green",
-                    "FAILED": "red",
-                    "CANCELLED": "yellow"
-                }.get(status, "white")
-
-                try:
-                    from rich.console import Console
-                    console = Console()
-                    console.print(
-                        f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
-                        f"[bold]{self.name}[/bold] (project: {self.project})[/{status_color}]\n"
-                        f"[dim]View results, statistics, and plots online at:[/dim] "
-                        f"[link=https://dash.ml]https://dash.ml[/link]"
-                    )
-                except ImportError:
-                    # Fallback if rich is not available
-                    print(f"{status_emoji} Experiment {status.lower()}: {self.name} (project: {self.project})")
-                    print(f"View results at: https://dash.ml")
-
-            except Exception as e:
-                # Log error but don't fail the close operation
-                print(f"Warning: Failed to update experiment status: {e}")
-
-        self._is_open = False
-
-        # Reset RUN for next experiment
-        EXP._reset()
-
-    @property
-    def run(self) -> RunManager:
-        """
-        Get the RunManager for lifecycle operations.
-
-        Usage:
-            # Method calls
-            experiment.run.start()
-            experiment.run.complete()
-
-            # Context manager
-            with Experiment(...).run as exp:
-                exp.log("Training...")
-
-            # Decorator
-            @experiment.run
-            def train(exp):
-                exp.log("Training...")
-
-        Returns:
-            RunManager instance
-        """
-        return RunManager(self)
-
-    @property
-    def params(self) -> ParametersBuilder:
-        """
-        Get a ParametersBuilder for parameter operations.
-
-        Usage:
-            # Set parameters
-            experiment.params.set(lr=0.001, batch_size=32)
-
-            # Get parameters
-            params = experiment.params.get()
-
-        Returns:
-            ParametersBuilder instance
-
-        Raises:
-            RuntimeError: If experiment is not open
-        """
-        if not self._is_open:
-            raise RuntimeError(
-                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-                "Example:\n"
-                "  with dxp.run:\n"
-                "      dxp.params.set(lr=0.001)"
-            )
-
-        return ParametersBuilder(self)
-
-    def log(
-        self,
-        message: Optional[str] = None,
-        level: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        **extra_metadata
-    ) -> Optional[LogBuilder]:
-        """
-        Create a log entry or return a LogBuilder for fluent API.
-
-        This method supports two styles:
-
-        1. Fluent style (no message provided):
-           Returns a LogBuilder that allows chaining with level methods.
-
-           Examples:
-               experiment.log(metadata={"epoch": 1}).info("Training started")
-               experiment.log().error("Failed", error_code=500)
-
-        2. Traditional style (message provided):
-           Writes the log immediately and returns None.
-
-           Examples:
-               experiment.log("Training started", level="info", epoch=1)
-               experiment.log("Training started")  # Defaults to "info"
-
-        Args:
-            message: Optional log message (for traditional style)
-            level: Optional log level (for traditional style, defaults to "info")
-            metadata: Optional metadata dict
-            **extra_metadata: Additional metadata as keyword arguments
-
-        Returns:
-            LogBuilder if no message provided (fluent mode)
-            None if log was written directly (traditional mode)
-
-        Raises:
-            RuntimeError: If experiment is not open
-            ValueError: If log level is invalid
-        """
-        if not self._is_open:
-            raise RuntimeError(
-                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-                "Example:\n"
-                "  with dxp.run:\n"
-                "      dxp.log().info('Training started')"
-            )
-
-        # Fluent mode: return LogBuilder
-        if message is None:
-            combined_metadata = {**(metadata or {}), **extra_metadata}
-            return LogBuilder(self, combined_metadata if combined_metadata else None)
-
-        # Traditional mode: write immediately
-        level = level or LogLevel.INFO.value  # Default to "info"
-        level = LogLevel.validate(level)  # Validate level
-
-        combined_metadata = {**(metadata or {}), **extra_metadata}
-        self._write_log(
-            message=message,
-            level=level,
-            metadata=combined_metadata if combined_metadata else None,
-            timestamp=None
-        )
-        return None
-
-    def _write_log(
-        self,
-        message: str,
-        level: str,
-        metadata: Optional[Dict[str, Any]],
-        timestamp: Optional[datetime]
-    ) -> None:
-        """
-        Internal method to write a log entry immediately.
-        No buffering - writes directly to storage/remote AND stdout/stderr.
-
-        Args:
-            message: Log message
-            level: Log level (already validated)
-            metadata: Optional metadata dict
-            timestamp: Optional custom timestamp (defaults to now)
-        """
-        log_entry = {
-            "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
-            "level": level,
-            "message": message,
-        }
-
-        if metadata:
-            log_entry["metadata"] = metadata
-
-        # Mirror to stdout/stderr before writing to storage
-        self._print_log(message, level, metadata)
-
-        # Write immediately (no buffering)
-        if self._client:
-            # Remote mode: send to API (wrapped in array for batch API)
-            self._client.create_log_entries(
-                experiment_id=self._experiment_id,
-                logs=[log_entry]  # Single log in array
-            )
-
-        if self._storage:
-            # Local mode: write to file immediately
-            import getpass
-            owner = getpass.getuser()
-            self._storage.write_log(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                message=log_entry["message"],
-                level=log_entry["level"],
-                metadata=log_entry.get("metadata"),
-                timestamp=log_entry["timestamp"]
-            )
-
-    def _print_log(
-        self,
-        message: str,
-        level: str,
-        metadata: Optional[Dict[str, Any]]
-    ) -> None:
-        """
-        Print log to stdout or stderr based on level.
-
-        ERROR and FATAL go to stderr, all others go to stdout.
-
-        Args:
-            message: Log message
-            level: Log level
-            metadata: Optional metadata dict
-        """
-        import sys
-
-        # Format the log message
-        level_upper = level.upper()
-
-        # Build metadata string if present
-        metadata_str = ""
-        if metadata:
-            # Format metadata as key=value pairs
-            pairs = [f"{k}={v}" for k, v in metadata.items()]
-            metadata_str = f" [{', '.join(pairs)}]"
-
-        # Format: [LEVEL] message [key=value, ...]
-        formatted_message = f"[{level_upper}] {message}{metadata_str}"
-
-        # Route to stdout or stderr based on level
-        if level in ("error", "fatal"):
-            print(formatted_message, file=sys.stderr)
-        else:
-            print(formatted_message, file=sys.stdout)
-
-    @property
-    def files(self) -> FilesAccessor:
-        """
-        Get a FilesAccessor for fluent file operations.
-
-        Returns:
-            FilesAccessor instance for chaining
-
-        Raises:
-            RuntimeError: If experiment is not open
-
-        Examples:
-            # Upload file - supports flexible syntax
-            experiment.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
-            experiment.files(prefix="checkpoints").upload("./model.pt")
-            experiment.files().upload("./model.pt", to="models/model.pt")  # root
-
-            # List files
-            files = experiment.files("/some/location").list()
-            files = experiment.files("/models").list()
-
-            # Download file
-            experiment.files("some.text").download()
-            experiment.files("some.text").download(to="./model.pt")
-
-            # Download files via glob pattern
-            file_paths = experiment.files("images").list("*.png")
-            experiment.files("images").download("*.png")
-
-            # This is equivalent to downloading to a directory
-            experiment.files.download("images/*.png", to="local_images")
-
-            # Delete files
-            experiment.files("some.text").delete()
-            experiment.files.delete("some.text")
-
-            # Specific file types
-            dxp.files.save_text("content", to="view.yaml")
-            dxp.files.save_json(dict(hey="yo"), to="config.json")
-            dxp.files.save_blob(b"xxx", to="data.bin")
-        """
-        if not self._is_open:
-            raise RuntimeError(
-                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-                "Example:\n"
-                "  with dxp.run:\n"
-                "      dxp.files('path').upload()"
-            )
-
-        return FilesAccessor(self)
-
-    def bindrs(self, bindr_name: str) -> BindrsBuilder:
-        """
-        Get a BindrsBuilder for working with file collections (bindrs).
-
-        Bindrs are collections of files that can span multiple prefixes.
-
-        Args:
-            bindr_name: Name of the bindr (collection)
-
-        Returns:
-            BindrsBuilder instance for chaining
-
-        Raises:
-            RuntimeError: If experiment is not open
-
-        Examples:
-            # List files in a bindr
-            file_paths = experiment.bindrs("some-bindr").list()
-
-        Note:
-            This is a placeholder for future bindr functionality.
-        """
-        if not self._is_open:
-            raise RuntimeError(
-                "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-                "Example:\n"
-                "  with dxp.run:\n"
-                "      files = dxp.bindrs('my-bindr').list()"
-            )
-
-        return BindrsBuilder(self, bindr_name)
-
-    def _upload_file(
-        self,
-        file_path: str,
-        prefix: str,
-        filename: str,
-        description: Optional[str],
-        tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]],
-        checksum: str,
-        content_type: str,
-        size_bytes: int
-    ) -> Dict[str, Any]:
-        """
-        Internal method to upload a file.
-
-        Args:
-            file_path: Local file path
-            prefix: Logical path prefix
-            filename: Original filename
-            description: Optional description
-            tags: Optional tags
-            metadata: Optional metadata
-            checksum: SHA256 checksum
-            content_type: MIME type
-            size_bytes: File size in bytes
-
-        Returns:
-            File metadata dict
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: upload to API
-            result = self._client.upload_file(
-                experiment_id=self._experiment_id,
-                file_path=file_path,
-                prefix=prefix,
-                filename=filename,
-                description=description,
-                tags=tags,
-                metadata=metadata,
-                checksum=checksum,
-                content_type=content_type,
-                size_bytes=size_bytes
-            )
-
-        if self._storage:
-            # Local mode: copy to local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.write_file(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                file_path=file_path,
-                path=prefix,
-                filename=filename,
-                description=description,
-                tags=tags,
-                metadata=metadata,
-                checksum=checksum,
-                content_type=content_type,
-                size_bytes=size_bytes
-            )
-
-        return result
-
-    def _list_files(
-        self,
-        prefix: Optional[str] = None,
-        tags: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Internal method to list files.
-
-        Args:
-            prefix: Optional prefix filter
-            tags: Optional tags filter
-
-        Returns:
-            List of file metadata dicts
-        """
-        files = []
-
-        if self._client:
-            # Remote mode: fetch from API
-            files = self._client.list_files(
-                experiment_id=self._experiment_id,
-                prefix=prefix,
-                tags=tags
-            )
-
-        if self._storage:
-            # Local mode: read from metadata file
-            import getpass
-            owner = getpass.getuser()
-            files = self._storage.list_files(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                path_prefix=prefix,
-                tags=tags
-            )
-
-        return files
-
-    def _download_file(
-        self,
-        file_id: str,
-        dest_path: Optional[str] = None
-    ) -> str:
-        """
-        Internal method to download a file.
-
-        Args:
-            file_id: File ID
-            dest_path: Optional destination path (defaults to original filename)
-
-        Returns:
-            Path to downloaded file
-        """
-        if self._client:
-            # Remote mode: download from API
-            return self._client.download_file(
-                experiment_id=self._experiment_id,
-                file_id=file_id,
-                dest_path=dest_path
-            )
-
-        if self._storage:
-            # Local mode: copy from local storage
-            import getpass
-            owner = getpass.getuser()
-            return self._storage.read_file(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                file_id=file_id,
-                dest_path=dest_path
-            )
-
-        raise RuntimeError("No client or storage configured")
-
-    def _delete_file(self, file_id: str) -> Dict[str, Any]:
-        """
-        Internal method to delete a file.
-
-        Args:
-            file_id: File ID
-
-        Returns:
-            Dict with id and deletedAt
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: delete via API
-            result = self._client.delete_file(
-                experiment_id=self._experiment_id,
-                file_id=file_id
-            )
-
-        if self._storage:
-            # Local mode: soft delete in metadata
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.delete_file(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                file_id=file_id
-            )
-
-        return result
-
-    def _update_file(
-        self,
-        file_id: str,
-        description: Optional[str],
-        tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Internal method to update file metadata.
-
-        Args:
-            file_id: File ID
-            description: Optional description
-            tags: Optional tags
-            metadata: Optional metadata
-
-        Returns:
-            Updated file metadata dict
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: update via API
-            result = self._client.update_file(
-                experiment_id=self._experiment_id,
-                file_id=file_id,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        if self._storage:
-            # Local mode: update in metadata file
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.update_file_metadata(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                file_id=file_id,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        return result
-
-
-    def _write_params(self, flattened_params: Dict[str, Any]) -> None:
-        """
-        Internal method to write/merge parameters.
-
-        Args:
-            flattened_params: Already-flattened parameter dict with dot notation
-        """
-        if self._client:
-            # Remote mode: send to API
-            self._client.set_parameters(
-                experiment_id=self._experiment_id,
-                data=flattened_params
-            )
-
-        if self._storage:
-            # Local mode: write to file
-            import getpass
-            owner = getpass.getuser()
-            self._storage.write_parameters(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                data=flattened_params
-            )
-
-    def _read_params(self) -> Optional[Dict[str, Any]]:
-        """
-        Internal method to read parameters.
-
-        Returns:
-            Flattened parameters dict, or None if no parameters exist
-        """
-        params = None
-
-        if self._client:
-            # Remote mode: fetch from API
-            try:
-                params = self._client.get_parameters(experiment_id=self._experiment_id)
-            except Exception:
-                # Parameters don't exist yet
-                params = None
-
-        if self._storage:
-            # Local mode: read from file
-            import getpass
-            owner = getpass.getuser()
-            params = self._storage.read_parameters(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path
-            )
-
-        return params
-
-    @property
-    def metrics(self) -> 'MetricsManager':
-        """
-        Get a MetricsManager for metric operations.
-
-        Supports two usage patterns:
-        1. Named: experiment.metrics("loss").append(value=0.5, step=1)
-        2. Unnamed: experiment.metrics.append(name="loss", value=0.5, step=1)
-
-        Returns:
-            MetricsManager instance
-
-        Raises:
-            RuntimeError: If experiment is not open
-
-        Examples:
-            # Named metric
-            experiment.metrics("train_loss").append(value=0.5, step=100)
-
-            # Unnamed (name in append call)
-            experiment.metrics.append(name="train_loss", value=0.5, step=100)
-
-            # Append batch
-            experiment.metrics("metrics").append_batch([
-                {"loss": 0.5, "acc": 0.8, "step": 1},
-                {"loss": 0.4, "acc": 0.85, "step": 2}
-            ])
-
-            # Read data
-            data = experiment.metrics("train_loss").read(start_index=0, limit=100)
-
-            # Get statistics
-            stats = experiment.metrics("train_loss").stats()
-        """
-        from .metric import MetricsManager
-
-        if not self._is_open:
-            raise RuntimeError(
-                "Cannot use metrics on closed experiment. "
-                "Use 'with Experiment(...).run as experiment:' or call experiment.run.start() first."
-            )
-
-        # Cache the MetricsManager instance to preserve MetricBuilder cache across calls
-        if self._metrics_manager is None:
-            self._metrics_manager = MetricsManager(self)
-        return self._metrics_manager
-
-    def _append_to_metric(
-        self,
-        name: Optional[str],
-        data: Dict[str, Any],
-        description: Optional[str],
-        tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Internal method to append a single data point to a metric.
-
-        Args:
-            name: Metric name (can be None for unnamed metrics)
-            data: Data point (flexible schema)
-            description: Optional metric description
-            tags: Optional tags
-            metadata: Optional metadata
-
-        Returns:
-            Dict with metricId, index, bufferedDataPoints, chunkSize
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: append via API
-            result = self._client.append_to_metric(
-                experiment_id=self._experiment_id,
-                metric_name=name,
-                data=data,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        if self._storage:
-            # Local mode: append to local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.append_to_metric(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                metric_name=name,
-                data=data,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        return result
-
-    def _append_batch_to_metric(
-        self,
-        name: Optional[str],
-        data_points: List[Dict[str, Any]],
-        description: Optional[str],
-        tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Internal method to append multiple data points to a metric.
-
-        Args:
-            name: Metric name (can be None for unnamed metrics)
-            data_points: List of data points
-            description: Optional metric description
-            tags: Optional tags
-            metadata: Optional metadata
-
-        Returns:
-            Dict with metricId, startIndex, endIndex, count
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: append batch via API
-            result = self._client.append_batch_to_metric(
-                experiment_id=self._experiment_id,
-                metric_name=name,
-                data_points=data_points,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        if self._storage:
-            # Local mode: append batch to local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.append_batch_to_metric(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                metric_name=name,
-                data_points=data_points,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-
-        return result
-
-    def _read_metric_data(
-        self,
-        name: str,
-        start_index: int,
-        limit: int
-    ) -> Dict[str, Any]:
-        """
-        Internal method to read data points from a metric.
-
-        Args:
-            name: Metric name
-            start_index: Starting index
-            limit: Max points to read
-
-        Returns:
-            Dict with data, startIndex, endIndex, total, hasMore
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: read via API
-            result = self._client.read_metric_data(
-                experiment_id=self._experiment_id,
-                metric_name=name,
-                start_index=start_index,
-                limit=limit
-            )
-
-        if self._storage:
-            # Local mode: read from local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.read_metric_data(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                metric_name=name,
-                start_index=start_index,
-                limit=limit
-            )
-
-        return result
-
-    def _get_metric_stats(self, name: str) -> Dict[str, Any]:
-        """
-        Internal method to get metric statistics.
-
-        Args:
-            name: Metric name
-
-        Returns:
-            Dict with metric stats
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: get stats via API
-            result = self._client.get_metric_stats(
-                experiment_id=self._experiment_id,
-                metric_name=name
-            )
-
-        if self._storage:
-            # Local mode: get stats from local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.get_metric_stats(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path,
-                metric_name=name
-            )
-
-        return result
-
-    def _list_metrics(self) -> List[Dict[str, Any]]:
-        """
-        Internal method to list all metrics in experiment.
-
-        Returns:
-            List of metric summaries
-        """
-        result = None
-
-        if self._client:
-            # Remote mode: list via API
-            result = self._client.list_metrics(experiment_id=self._experiment_id)
-
-        if self._storage:
-            # Local mode: list from local storage
-            import getpass
-            owner = getpass.getuser()
-            result = self._storage.list_metrics(
-                owner=owner,
-                project=self.project,
-                prefix=self._folder_path
-            )
-
-        return result or []
-
-    @property
-    def id(self) -> Optional[str]:
-        """Get the experiment ID (only available after open in remote mode)."""
-        return self._experiment_id
-
-    @property
-    def data(self) -> Optional[Dict[str, Any]]:
-        """Get the full experiment data (only available after open in remote mode)."""
-        return self._experiment_data
-
-
-def ml_dash_experiment(
-    project: str,
-    prefix: str,
-    **kwargs
-) -> Callable:
-    """
-    Decorator for wrapping functions with an ML-Dash experiment.
+    Initialize an ML-Dash experiment.
 
     Args:
-        project: Project name
-        prefix: Experiment prefix path (e.g., "experiments/my-experiment")
-        **kwargs: Additional arguments passed to Experiment constructor
+        project: Project name (defaults to DASH_PROJECT env var or "scratch")
+        prefix: Experiment prefix path like "folder_1/folder_2/.../exp_name" (defaults to DASH_PREFIX env var)
+        description: Optional experiment description
+        tags: Optional list of tags
+        bindrs: Optional list of bindrs
+        metadata: Optional metadata dict
+        remote: Remote API URL (defaults to "https://api.dash.ml"). Token auto-loaded from ~/.dash/token.enc
+        local_path: Local storage root path. If specified without remote, uses local-only mode.
+        _write_protected: Internal parameter - if True, experiment becomes immutable after creation
+
+    Mode Selection:
+        - No parameters: Remote mode with "https://api.dash.ml" (default)
+        - local_path only: Local-only mode
+        - remote only: Remote mode with custom URL
+        - Both: Hybrid mode (local + remote)
+    """
+    import os
+
+    # Resolve defaults from environment variables
+    self.project = project or os.getenv("DASH_PROJECT", "scratch")
+    self._folder_path = prefix or os.getenv("DASH_PREFIX")
+
+    # Extract experiment name from last segment of prefix
+    if self._folder_path:
+      self.name = self._folder_path.rstrip("/").split("/")[-1]
+    else:
+      raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
+
+    self.description = description
+    self.tags = tags
+    self._bindrs_list = bindrs
+    self._write_protected = _write_protected
+    self.metadata = metadata
+
+    # Initialize EXP with experiment values
+    EXP.name = self.name
+    EXP.project = project
+    EXP.description = description
+
+    # Determine operation mode and apply defaults
+    if not remote and not local_path:
+      # Default to remote mode with production server
+      remote = "https://api.dash.ml"
+      self.mode = OperationMode.REMOTE
+    elif remote and local_path:
+      self.mode = OperationMode.HYBRID
+    elif remote:
+      self.mode = OperationMode.REMOTE
+    else:  # local_path only
+      self.mode = OperationMode.LOCAL
+
+    # Initialize backend
+    self._client: Optional[RemoteClient] = None
+    self._storage: Optional[LocalStorage] = None
+    self._experiment_id: Optional[str] = None
+    self._experiment_data: Optional[Dict[str, Any]] = None
+    self._is_open = False
+    self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
+
+    if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
+      # RemoteClient will auto-load token from ~/.dash/token.enc
+      self._client = RemoteClient(base_url=remote)
+
+    if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
+      if not local_path:
+        raise ValueError("local_path is required for local mode")
+      self._storage = LocalStorage(root_path=Path(local_path))
+
+  def _open(self) -> "Experiment":
+    """
+    Internal method to open the experiment (create or update on server/filesystem).
+
+    Returns:
+        self for chaining
+    """
+    if self._is_open:
+      return self
+
+    # Ensure EXP.id is generated when run starts
+    if EXP.id is None:
+      EXP._init_run()
+
+    if self._client:
+      # Remote mode: create/update experiment via API
+      try:
+        response = self._client.create_or_update_experiment(
+          project=self.project,
+          name=self.name,
+          description=self.description,
+          tags=self.tags,
+          bindrs=self._bindrs_list,
+          prefix=self._folder_path,
+          write_protected=self._write_protected,
+          metadata=self.metadata,
+        )
+        self._experiment_data = response
+        self._experiment_id = response["experiment"]["id"]
+
+        # Display message about viewing data online
+        try:
+          from rich.console import Console
+
+          console = Console()
+          console.print(
+            f"[dim]✓ Experiment started: [bold]{self.name}[/bold] (project: {self.project})[/dim]\n"
+            f"[dim]View your data, statistics, and plots online at:[/dim] "
+            f"[link=https://dash.ml]https://dash.ml[/link]"
+          )
+        except ImportError:
+          # Fallback if rich is not available
+          print(f"✓ Experiment started: {self.name} (project: {self.project})")
+          print("View your data at: https://dash.ml")
+
+      except Exception as e:
+        # Check if it's an authentication error
+        from .auth.exceptions import AuthenticationError
+
+        if isinstance(e, AuthenticationError):
+          try:
+            from rich.console import Console
+            from rich.panel import Panel
+
+            console = Console()
+
+            message = (
+              "[bold red]Authentication Required[/bold red]\n\n"
+              "You need to authenticate before using remote experiments.\n\n"
+              "[bold]To authenticate:[/bold]\n"
+              "  [cyan]ml-dash login[/cyan]\n\n"
+              "[dim]This will open your browser for secure OAuth2 authentication.\n"
+              "Your token will be stored securely in your system keychain.[/dim]\n\n"
+              "[bold]Alternative:[/bold]\n"
+              "  Use [cyan]local_path[/cyan] instead of [cyan]remote[/cyan] for offline experiments"
+            )
+
+            panel = Panel(
+              message,
+              title="[bold yellow]⚠ Not Authenticated[/bold yellow]",
+              border_style="yellow",
+              expand=False,
+            )
+            console.print("\n")
+            console.print(panel)
+            console.print("\n")
+          except ImportError:
+            # Fallback if rich is not available
+            print("\n" + "=" * 60)
+            print("⚠ Authentication Required")
+            print("=" * 60)
+            print("\nYou need to authenticate before using remote experiments.\n")
+            print("To authenticate:")
+            print("  ml-dash login\n")
+            print("Alternative:")
+            print("  Use local_path instead of remote for offline experiments\n")
+            print("=" * 60 + "\n")
+
+          import sys
+
+          sys.exit(1)
+        else:
+          # Re-raise other exceptions
+          raise
+
+    if self._storage:
+      # Local mode: create experiment directory structure
+      # For local storage, owner is needed for directory structure
+      import getpass
+
+      # Use current system user as owner
+      owner = getpass.getuser()
+      self._storage.create_experiment(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        description=self.description,
+        tags=self.tags,
+        bindrs=self._bindrs_list,
+        metadata=self.metadata,
+      )
+
+    self._is_open = True
+    return self
+
+  def _close(self, status: str = "COMPLETED"):
+    """
+    Internal method to close the experiment and update status.
+
+    Args:
+        status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
+    """
+    if not self._is_open:
+      return
+
+    # Flush any pending writes
+    if self._storage:
+      self._storage.flush()
+
+    # Update experiment status in remote mode
+    if self._client and self._experiment_id:
+      try:
+        self._client.update_experiment_status(
+          experiment_id=self._experiment_id, status=status
+        )
+
+        # Display completion message with link to view results
+        status_emoji = {"COMPLETED": "✓", "FAILED": "✗", "CANCELLED": "⊘"}.get(
+          status, "•"
+        )
+
+        status_color = {
+          "COMPLETED": "green",
+          "FAILED": "red",
+          "CANCELLED": "yellow",
+        }.get(status, "white")
+
+        try:
+          from rich.console import Console
+
+          console = Console()
+          console.print(
+            f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
+            f"[bold]{self.name}[/bold] (project: {self.project})[/{status_color}]\n"
+            f"[dim]View results, statistics, and plots online at:[/dim] "
+            f"[link=https://dash.ml]https://dash.ml[/link]"
+          )
+        except ImportError:
+          # Fallback if rich is not available
+          print(
+            f"{status_emoji} Experiment {status.lower()}: {self.name} (project: {self.project})"
+          )
+          print("View results at: https://dash.ml")
+
+      except Exception as e:
+        # Log error but don't fail the close operation
+        print(f"Warning: Failed to update experiment status: {e}")
+
+    self._is_open = False
+
+    # Reset RUN for next experiment
+    EXP._reset()
+
+  @property
+  def run(self) -> RunManager:
+    """
+    Get the RunManager for lifecycle operations.
 
     Usage:
-        @ml_dash_experiment(
-            project="my-project",
-            prefix="experiments/my-experiment",
-            remote="https://api.dash.ml"
-        )
-        def train_model():
-            # Function code here
-            pass
+        # Method calls
+        experiment.run.start()
+        experiment.run.complete()
 
-    The decorated function will receive an 'experiment' keyword argument
-    with the active Experiment instance.
+        # Context manager
+        with Experiment(...).run as exp:
+            exp.log("Training...")
+
+        # Decorator
+        @experiment.run
+        def train(exp):
+            exp.log("Training...")
+
+    Returns:
+        RunManager instance
     """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **func_kwargs):
-            with Experiment(project=project, prefix=prefix, **kwargs).run as experiment:
-                # Inject experiment into function kwargs
-                func_kwargs['experiment'] = experiment
-                return func(*args, **func_kwargs)
-        return wrapper
-    return decorator
+    return RunManager(self)
+
+  @property
+  def params(self) -> ParametersBuilder:
+    """
+    Get a ParametersBuilder for parameter operations.
+
+    Usage:
+        # Set parameters
+        experiment.params.set(lr=0.001, batch_size=32)
+
+        # Get parameters
+        params = experiment.params.get()
+
+    Returns:
+        ParametersBuilder instance
+
+    Raises:
+        RuntimeError: If experiment is not open
+    """
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      dxp.params.set(lr=0.001)"
+      )
+
+    return ParametersBuilder(self)
+
+  def log(
+    self,
+    message: Optional[str] = None,
+    level: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    **extra_metadata,
+  ) -> Optional[LogBuilder]:
+    """
+    Create a log entry or return a LogBuilder for fluent API.
+
+    This method supports two styles:
+
+    1. Fluent style (no message provided):
+       Returns a LogBuilder that allows chaining with level methods.
+
+       Examples:
+           experiment.log(metadata={"epoch": 1}).info("Training started")
+           experiment.log().error("Failed", error_code=500)
+
+    2. Traditional style (message provided):
+       Writes the log immediately and returns None.
+
+       Examples:
+           experiment.log("Training started", level="info", epoch=1)
+           experiment.log("Training started")  # Defaults to "info"
+
+    Args:
+        message: Optional log message (for traditional style)
+        level: Optional log level (for traditional style, defaults to "info")
+        metadata: Optional metadata dict
+        **extra_metadata: Additional metadata as keyword arguments
+
+    Returns:
+        LogBuilder if no message provided (fluent mode)
+        None if log was written directly (traditional mode)
+
+    Raises:
+        RuntimeError: If experiment is not open
+        ValueError: If log level is invalid
+    """
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      dxp.log().info('Training started')"
+      )
+
+    # Fluent mode: return LogBuilder
+    if message is None:
+      combined_metadata = {**(metadata or {}), **extra_metadata}
+      return LogBuilder(self, combined_metadata if combined_metadata else None)
+
+    # Traditional mode: write immediately
+    level = level or LogLevel.INFO.value  # Default to "info"
+    level = LogLevel.validate(level)  # Validate level
+
+    combined_metadata = {**(metadata or {}), **extra_metadata}
+    self._write_log(
+      message=message,
+      level=level,
+      metadata=combined_metadata if combined_metadata else None,
+      timestamp=None,
+    )
+    return None
+
+  def _write_log(
+    self,
+    message: str,
+    level: str,
+    metadata: Optional[Dict[str, Any]],
+    timestamp: Optional[datetime],
+  ) -> None:
+    """
+    Internal method to write a log entry immediately.
+    No buffering - writes directly to storage/remote AND stdout/stderr.
+
+    Args:
+        message: Log message
+        level: Log level (already validated)
+        metadata: Optional metadata dict
+        timestamp: Optional custom timestamp (defaults to now)
+    """
+    log_entry = {
+      "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
+      "level": level,
+      "message": message,
+    }
+
+    if metadata:
+      log_entry["metadata"] = metadata
+
+    # Mirror to stdout/stderr before writing to storage
+    self._print_log(message, level, metadata)
+
+    # Write immediately (no buffering)
+    if self._client:
+      # Remote mode: send to API (wrapped in array for batch API)
+      self._client.create_log_entries(
+        experiment_id=self._experiment_id,
+        logs=[log_entry],  # Single log in array
+      )
+
+    if self._storage:
+      # Local mode: write to file immediately
+      import getpass
+
+      owner = getpass.getuser()
+      self._storage.write_log(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        message=log_entry["message"],
+        level=log_entry["level"],
+        metadata=log_entry.get("metadata"),
+        timestamp=log_entry["timestamp"],
+      )
+
+  def _print_log(
+    self, message: str, level: str, metadata: Optional[Dict[str, Any]]
+  ) -> None:
+    """
+    Print log to stdout or stderr based on level.
+
+    ERROR and FATAL go to stderr, all others go to stdout.
+
+    Args:
+        message: Log message
+        level: Log level
+        metadata: Optional metadata dict
+    """
+    import sys
+
+    # Format the log message
+    level_upper = level.upper()
+
+    # Build metadata string if present
+    metadata_str = ""
+    if metadata:
+      # Format metadata as key=value pairs
+      pairs = [f"{k}={v}" for k, v in metadata.items()]
+      metadata_str = f" [{', '.join(pairs)}]"
+
+    # Format: [LEVEL] message [key=value, ...]
+    formatted_message = f"[{level_upper}] {message}{metadata_str}"
+
+    # Route to stdout or stderr based on level
+    if level in ("error", "fatal"):
+      print(formatted_message, file=sys.stderr)
+    else:
+      print(formatted_message, file=sys.stdout)
+
+  @property
+  def files(self) -> FilesAccessor:
+    """
+    Get a FilesAccessor for fluent file operations.
+
+    Returns:
+        FilesAccessor instance for chaining
+
+    Raises:
+        RuntimeError: If experiment is not open
+
+    Examples:
+        # Upload file - supports flexible syntax
+        experiment.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
+        experiment.files(prefix="checkpoints").upload("./model.pt")
+        experiment.files().upload("./model.pt", to="models/model.pt")  # root
+
+        # List files
+        files = experiment.files("/some/location").list()
+        files = experiment.files("/models").list()
+
+        # Download file
+        experiment.files("some.text").download()
+        experiment.files("some.text").download(to="./model.pt")
+
+        # Download files via glob pattern
+        file_paths = experiment.files("images").list("*.png")
+        experiment.files("images").download("*.png")
+
+        # This is equivalent to downloading to a directory
+        experiment.files.download("images/*.png", to="local_images")
+
+        # Delete files
+        experiment.files("some.text").delete()
+        experiment.files.delete("some.text")
+
+        # Specific file types
+        dxp.files.save_text("content", to="view.yaml")
+        dxp.files.save_json(dict(hey="yo"), to="config.json")
+        dxp.files.save_blob(b"xxx", to="data.bin")
+    """
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      dxp.files('path').upload()"
+      )
+
+    return FilesAccessor(self)
+
+  def bindrs(self, bindr_name: str) -> BindrsBuilder:
+    """
+    Get a BindrsBuilder for working with file collections (bindrs).
+
+    Bindrs are collections of files that can span multiple prefixes.
+
+    Args:
+        bindr_name: Name of the bindr (collection)
+
+    Returns:
+        BindrsBuilder instance for chaining
+
+    Raises:
+        RuntimeError: If experiment is not open
+
+    Examples:
+        # List files in a bindr
+        file_paths = experiment.bindrs("some-bindr").list()
+
+    Note:
+        This is a placeholder for future bindr functionality.
+    """
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      files = dxp.bindrs('my-bindr').list()"
+      )
+
+    return BindrsBuilder(self, bindr_name)
+
+  def _upload_file(
+    self,
+    file_path: str,
+    prefix: str,
+    filename: str,
+    description: Optional[str],
+    tags: Optional[List[str]],
+    metadata: Optional[Dict[str, Any]],
+    checksum: str,
+    content_type: str,
+    size_bytes: int,
+  ) -> Dict[str, Any]:
+    """
+    Internal method to upload a file.
+
+    Args:
+        file_path: Local file path
+        prefix: Logical path prefix
+        filename: Original filename
+        description: Optional description
+        tags: Optional tags
+        metadata: Optional metadata
+        checksum: SHA256 checksum
+        content_type: MIME type
+        size_bytes: File size in bytes
+
+    Returns:
+        File metadata dict
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: upload to API
+      result = self._client.upload_file(
+        experiment_id=self._experiment_id,
+        file_path=file_path,
+        prefix=prefix,
+        filename=filename,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+        checksum=checksum,
+        content_type=content_type,
+        size_bytes=size_bytes,
+      )
+
+    if self._storage:
+      # Local mode: copy to local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.write_file(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        file_path=file_path,
+        path=prefix,
+        filename=filename,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+        checksum=checksum,
+        content_type=content_type,
+        size_bytes=size_bytes,
+      )
+
+    return result
+
+  def _list_files(
+    self, prefix: Optional[str] = None, tags: Optional[List[str]] = None
+  ) -> List[Dict[str, Any]]:
+    """
+    Internal method to list files.
+
+    Args:
+        prefix: Optional prefix filter
+        tags: Optional tags filter
+
+    Returns:
+        List of file metadata dicts
+    """
+    files = []
+
+    if self._client:
+      # Remote mode: fetch from API
+      files = self._client.list_files(
+        experiment_id=self._experiment_id, prefix=prefix, tags=tags
+      )
+
+    if self._storage:
+      # Local mode: read from metadata file
+      import getpass
+
+      owner = getpass.getuser()
+      files = self._storage.list_files(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        path_prefix=prefix,
+        tags=tags,
+      )
+
+    return files
+
+  def _download_file(self, file_id: str, dest_path: Optional[str] = None) -> str:
+    """
+    Internal method to download a file.
+
+    Args:
+        file_id: File ID
+        dest_path: Optional destination path (defaults to original filename)
+
+    Returns:
+        Path to downloaded file
+    """
+    if self._client:
+      # Remote mode: download from API
+      return self._client.download_file(
+        experiment_id=self._experiment_id, file_id=file_id, dest_path=dest_path
+      )
+
+    if self._storage:
+      # Local mode: copy from local storage
+      import getpass
+
+      owner = getpass.getuser()
+      return self._storage.read_file(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        file_id=file_id,
+        dest_path=dest_path,
+      )
+
+    raise RuntimeError("No client or storage configured")
+
+  def _delete_file(self, file_id: str) -> Dict[str, Any]:
+    """
+    Internal method to delete a file.
+
+    Args:
+        file_id: File ID
+
+    Returns:
+        Dict with id and deletedAt
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: delete via API
+      result = self._client.delete_file(
+        experiment_id=self._experiment_id, file_id=file_id
+      )
+
+    if self._storage:
+      # Local mode: soft delete in metadata
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.delete_file(
+        owner=owner, project=self.project, prefix=self._folder_path, file_id=file_id
+      )
+
+    return result
+
+  def _update_file(
+    self,
+    file_id: str,
+    description: Optional[str],
+    tags: Optional[List[str]],
+    metadata: Optional[Dict[str, Any]],
+  ) -> Dict[str, Any]:
+    """
+    Internal method to update file metadata.
+
+    Args:
+        file_id: File ID
+        description: Optional description
+        tags: Optional tags
+        metadata: Optional metadata
+
+    Returns:
+        Updated file metadata dict
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: update via API
+      result = self._client.update_file(
+        experiment_id=self._experiment_id,
+        file_id=file_id,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    if self._storage:
+      # Local mode: update in metadata file
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.update_file_metadata(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        file_id=file_id,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    return result
+
+  def _write_params(self, flattened_params: Dict[str, Any]) -> None:
+    """
+    Internal method to write/merge parameters.
+
+    Args:
+        flattened_params: Already-flattened parameter dict with dot notation
+    """
+    if self._client:
+      # Remote mode: send to API
+      self._client.set_parameters(
+        experiment_id=self._experiment_id, data=flattened_params
+      )
+
+    if self._storage:
+      # Local mode: write to file
+      import getpass
+
+      owner = getpass.getuser()
+      self._storage.write_parameters(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        data=flattened_params,
+      )
+
+  def _read_params(self) -> Optional[Dict[str, Any]]:
+    """
+    Internal method to read parameters.
+
+    Returns:
+        Flattened parameters dict, or None if no parameters exist
+    """
+    params = None
+
+    if self._client:
+      # Remote mode: fetch from API
+      try:
+        params = self._client.get_parameters(experiment_id=self._experiment_id)
+      except Exception:
+        # Parameters don't exist yet
+        params = None
+
+    if self._storage:
+      # Local mode: read from file
+      import getpass
+
+      owner = getpass.getuser()
+      params = self._storage.read_parameters(
+        owner=owner, project=self.project, prefix=self._folder_path
+      )
+
+    return params
+
+  @property
+  def metrics(self) -> "MetricsManager":
+    """
+    Get a MetricsManager for metric operations.
+
+    Supports two usage patterns:
+    1. Named: experiment.metrics("train").log(loss=0.5, accuracy=0.9)
+    2. Unnamed: experiment.metrics.log(epoch=epoch).flush()
+
+    Returns:
+        MetricsManager instance
+
+    Raises:
+        RuntimeError: If experiment is not open
+
+    Examples:
+        # Named metric with multi-field logging
+        experiment.metrics("train").log(loss=0.5, accuracy=0.9)
+        experiment.metrics("eval").log(loss=0.6, accuracy=0.85)
+        experiment.metrics.log(epoch=epoch).flush()
+
+        # Nested dict pattern (single call for all metrics)
+        experiment.metrics.log(
+            epoch=100,
+            train=dict(loss=0.142, accuracy=0.80),
+            eval=dict(loss=0.201, accuracy=0.76)
+        )
+
+        # Read data
+        data = experiment.metrics("train").read(start_index=0, limit=100)
+
+        # Get statistics
+        stats = experiment.metrics("train").stats()
+    """
+    from .metric import MetricsManager
+
+    if not self._is_open:
+      raise RuntimeError(
+        "Cannot use metrics on closed experiment. "
+        "Use 'with Experiment(...).run as experiment:' or call experiment.run.start() first."
+      )
+
+    # Cache the MetricsManager instance to preserve MetricBuilder cache across calls
+    if self._metrics_manager is None:
+      self._metrics_manager = MetricsManager(self)
+    return self._metrics_manager
+
+  def _append_to_metric(
+    self,
+    name: Optional[str],
+    data: Dict[str, Any],
+    description: Optional[str],
+    tags: Optional[List[str]],
+    metadata: Optional[Dict[str, Any]],
+  ) -> Dict[str, Any]:
+    """
+    Internal method to append a single data point to a metric.
+
+    Args:
+        name: Metric name (can be None for unnamed metrics)
+        data: Data point (flexible schema)
+        description: Optional metric description
+        tags: Optional tags
+        metadata: Optional metadata
+
+    Returns:
+        Dict with metricId, index, bufferedDataPoints, chunkSize
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: append via API
+      result = self._client.append_to_metric(
+        experiment_id=self._experiment_id,
+        metric_name=name,
+        data=data,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    if self._storage:
+      # Local mode: append to local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.append_to_metric(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        metric_name=name,
+        data=data,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    return result
+
+  def _append_batch_to_metric(
+    self,
+    name: Optional[str],
+    data_points: List[Dict[str, Any]],
+    description: Optional[str],
+    tags: Optional[List[str]],
+    metadata: Optional[Dict[str, Any]],
+  ) -> Dict[str, Any]:
+    """
+    Internal method to append multiple data points to a metric.
+
+    Args:
+        name: Metric name (can be None for unnamed metrics)
+        data_points: List of data points
+        description: Optional metric description
+        tags: Optional tags
+        metadata: Optional metadata
+
+    Returns:
+        Dict with metricId, startIndex, endIndex, count
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: append batch via API
+      result = self._client.append_batch_to_metric(
+        experiment_id=self._experiment_id,
+        metric_name=name,
+        data_points=data_points,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    if self._storage:
+      # Local mode: append batch to local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.append_batch_to_metric(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        metric_name=name,
+        data_points=data_points,
+        description=description,
+        tags=tags,
+        metadata=metadata,
+      )
+
+    return result
+
+  def _read_metric_data(
+    self, name: str, start_index: int, limit: int
+  ) -> Dict[str, Any]:
+    """
+    Internal method to read data points from a metric.
+
+    Args:
+        name: Metric name
+        start_index: Starting index
+        limit: Max points to read
+
+    Returns:
+        Dict with data, startIndex, endIndex, total, hasMore
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: read via API
+      result = self._client.read_metric_data(
+        experiment_id=self._experiment_id,
+        metric_name=name,
+        start_index=start_index,
+        limit=limit,
+      )
+
+    if self._storage:
+      # Local mode: read from local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.read_metric_data(
+        owner=owner,
+        project=self.project,
+        prefix=self._folder_path,
+        metric_name=name,
+        start_index=start_index,
+        limit=limit,
+      )
+
+    return result
+
+  def _get_metric_stats(self, name: str) -> Dict[str, Any]:
+    """
+    Internal method to get metric statistics.
+
+    Args:
+        name: Metric name
+
+    Returns:
+        Dict with metric stats
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: get stats via API
+      result = self._client.get_metric_stats(
+        experiment_id=self._experiment_id, metric_name=name
+      )
+
+    if self._storage:
+      # Local mode: get stats from local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.get_metric_stats(
+        owner=owner, project=self.project, prefix=self._folder_path, metric_name=name
+      )
+
+    return result
+
+  def _list_metrics(self) -> List[Dict[str, Any]]:
+    """
+    Internal method to list all metrics in experiment.
+
+    Returns:
+        List of metric summaries
+    """
+    result = None
+
+    if self._client:
+      # Remote mode: list via API
+      result = self._client.list_metrics(experiment_id=self._experiment_id)
+
+    if self._storage:
+      # Local mode: list from local storage
+      import getpass
+
+      owner = getpass.getuser()
+      result = self._storage.list_metrics(
+        owner=owner, project=self.project, prefix=self._folder_path
+      )
+
+    return result or []
+
+  @property
+  def id(self) -> Optional[str]:
+    """Get the experiment ID (only available after open in remote mode)."""
+    return self._experiment_id
+
+  @property
+  def data(self) -> Optional[Dict[str, Any]]:
+    """Get the full experiment data (only available after open in remote mode)."""
+    return self._experiment_data
+
+
+def ml_dash_experiment(project: str, prefix: str, **kwargs) -> Callable:
+  """
+  Decorator for wrapping functions with an ML-Dash experiment.
+
+  Args:
+      project: Project name
+      prefix: Experiment prefix path (e.g., "experiments/my-experiment")
+      **kwargs: Additional arguments passed to Experiment constructor
+
+  Usage:
+      @ml_dash_experiment(
+          project="my-project",
+          prefix="experiments/my-experiment",
+          remote="https://api.dash.ml"
+      )
+      def train_model():
+          # Function code here
+          pass
+
+  The decorated function will receive an 'experiment' keyword argument
+  with the active Experiment instance.
+  """
+
+  def decorator(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args, **func_kwargs):
+      with Experiment(project=project, prefix=prefix, **kwargs).run as experiment:
+        # Inject experiment into function kwargs
+        func_kwargs["experiment"] = experiment
+        return func(*args, **func_kwargs)
+
+    return wrapper
+
+  return decorator

@@ -70,6 +70,46 @@ def local_experiment(temp_project):
 
 
 @pytest.fixture
+def local_dxp():
+    """
+    Configure dxp singleton for local testing.
+
+    Uses a temp directory context and restores original state after test.
+    """
+    from ml_dash import dxp
+    from ml_dash.storage import LocalStorage
+
+    # Save original state
+    original_storage = dxp._storage
+    original_client = dxp._client
+
+    if dxp._is_open:
+        dxp.run.complete()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dxp._storage = LocalStorage(root_path=tmpdir)
+        dxp._client = None
+        yield dxp
+        if dxp._is_open:
+            dxp.run.complete()
+        dxp._storage = original_storage
+        dxp._client = original_client
+
+
+@pytest.fixture
+def tmp_wd(tmp_path):
+    """
+    Change CWD to tmp_path for test isolation.
+
+    Useful for tests where operations default to CWD (e.g., downloads without dest path).
+    """
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    yield tmp_path
+    os.chdir(original_cwd)
+
+
+@pytest.fixture
 def mock_remote_token(monkeypatch):
     """
     Mock token storage to return TEST_API_KEY for remote tests.
@@ -214,11 +254,11 @@ def sample_data():
             }
         },
         "metric_data": [
-            {"value": 0.5, "epoch": 0, "step": 0},
-            {"value": 0.4, "epoch": 1, "step": 100},
-            {"value": 0.3, "epoch": 2, "step": 200},
-            {"value": 0.25, "epoch": 3, "step": 300},
-            {"value": 0.2, "epoch": 4, "step": 400},
+            {"loss": 0.5, "epoch": 0, "step": 0},
+            {"loss": 0.4, "epoch": 1, "step": 100},
+            {"loss": 0.3, "epoch": 2, "step": 200},
+            {"loss": 0.25, "epoch": 3, "step": 300},
+            {"loss": 0.2, "epoch": 4, "step": 400},
         ],
         "multi_metric_data": [
             {"epoch": 0, "train_loss": 0.5, "val_loss": 0.6, "accuracy": 0.7},
