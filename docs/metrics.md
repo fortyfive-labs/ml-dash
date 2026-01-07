@@ -12,7 +12,7 @@ Log train and eval metrics together with a single call:
 from ml_dash import Experiment
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
 
     for epoch in range(10):
         train_loss, train_acc = train_one_epoch(model)
@@ -34,7 +34,7 @@ You can also log metrics using namespace prefixes with explicit context:
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
 
     for epoch in range(10):
         # Log train metrics with prefix
@@ -55,7 +55,7 @@ Define your own metric groups beyond train/eval:
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
 
     # Log with custom groups
     experiment.metrics.log(
@@ -75,7 +75,7 @@ Read metric data by index range:
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     # Log data
     for i in range(100):
         experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
@@ -95,7 +95,7 @@ For high-frequency logging (e.g., per-batch), use the buffer API to accumulate v
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
 
     for epoch in range(10):
         for batch in dataloader:
@@ -163,7 +163,7 @@ The summary cache API is still supported for backward compatibility:
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
 
     for epoch in range(10):
         for batch in dataloader:
@@ -202,7 +202,7 @@ metric.summary_cache.summarize(clear=False)
 :linenos:
 
 with Experiment(prefix="mnist-training", project="cv",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     experiment.params.set(learning_rate=0.001, batch_size=32)
     experiment.log("Starting training")
 
@@ -231,7 +231,7 @@ Combine related metrics:
 :linenos:
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     for epoch in range(10):
         experiment.metrics("train").log(
             epoch=epoch,

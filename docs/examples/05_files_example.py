@@ -41,7 +41,7 @@ def main():
       f.write(f"{i + 1},{1.0 / (i + 1):.4f},{0.5 + i * 0.05:.4f}\n")
 
   with Experiment(
-    prefix="files-demo", project="tutorials", local_path="./tutorial_data"
+    prefix="files-demo", project="tutorials"
   ).run as experiment:
     print("\n1. Uploading model file...")
 

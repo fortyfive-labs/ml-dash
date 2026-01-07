@@ -22,7 +22,7 @@ def main():
   print("=" * 60)
 
   with Experiment(
-    prefix="metrics-demo", project="tutorials", local_path="./tutorial_data"
+    prefix="metrics-demo", project="tutorials"
   ).run as experiment:
     experiment.params.set(epochs=10, learning_rate=0.001)
 

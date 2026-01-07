@@ -52,7 +52,7 @@ def main():
   with Experiment(
     prefix="complete-training-demo",
     project="tutorials",
-    local_path="./tutorial_data",
+    
     description="Complete end-to-end training example",
     tags=["tutorial", "complete", "cifar10", "resnet"],
   ).run as experiment:

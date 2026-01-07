@@ -13,7 +13,7 @@ def main():
     with Experiment(
         prefix="hello-ml-dash",
         project="tutorials",
-        local_path="./tutorial_data",
+        
         description="My first ML-Dash experiment",
         tags=["tutorial", "basic"]
     ).run as experiment:

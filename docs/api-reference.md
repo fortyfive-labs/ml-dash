@@ -65,7 +65,7 @@ Experiment(
 Experiment(
     prefix="my-experiment",
     project="my-project",
-    local_path=".dash"  # Required for local mode
+      # Required for local mode
 )
 ```
 
@@ -104,7 +104,7 @@ Experiments are managed through the `run` property, which returns a `RunManager`
 Automatically starts and completes/fails the experiment:
 
 ```python
-with Experiment(prefix="exp", project="proj", local_path=".dash").run as exp:
+with Experiment(prefix="exp", project="proj").run as exp:
     exp.log("Training started")
     exp.params.set(lr=0.001)
     # Experiment automatically completes on successful exit
@@ -116,7 +116,7 @@ with Experiment(prefix="exp", project="proj", local_path=".dash").run as exp:
 Perfect for wrapping training functions:
 
 ```python
-exp = Experiment(prefix="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj")
 
 @exp.run
 def train_model(experiment):
@@ -132,7 +132,7 @@ result = train_model()
 Explicit start/complete for fine-grained control:
 
 ```python
-exp = Experiment(prefix="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj")
 
 exp.run.start()
 try:
@@ -771,7 +771,7 @@ with Experiment(
     project="image-classification",
     description="ResNet50 on CIFAR-10",
     tags=["resnet", "cifar10", "baseline"],
-    local_path=".dash"
+    
 ).run as exp:
 
     # 1. Set hyperparameters
@@ -849,7 +849,7 @@ for lr, bs in itertools.product(learning_rates, batch_sizes):
         name=f"search-lr{lr}-bs{bs}",
         project="hyperparam-search",
         tags=["search", "grid"],
-        local_path=".dash"
+        
     ).run as exp:
 
         exp.params.set(
@@ -874,7 +874,7 @@ from ml_dash import Experiment
 exp = Experiment(
     prefix="training-run",
     project="my-project",
-    local_path=".dash"
+    
 )
 
 @exp.run
@@ -954,7 +954,7 @@ try:
     with Experiment(
         prefix="my-experiment",
         project="test",
-        local_path=".dash"
+        
     ).run as exp:
         exp.log("Starting work")
         exp.params.set(test_param="value")
@@ -993,7 +993,7 @@ The experiment status will be set to `FAILED` automatically, and all logs, param
 from ml_dash import Experiment
 
 # Create experiment
-exp = Experiment(prefix="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj")
 
 # Lifecycle
 with exp.run as exp:                    # Context manager

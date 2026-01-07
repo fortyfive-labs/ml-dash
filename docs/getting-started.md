@@ -60,7 +60,7 @@ from ml_dash import Experiment
 
 # Create a experiment (stores data in .dash/ directory)
 with Experiment(prefix="my-first-experiment", project="tutorial",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     # Log messages
     experiment.log().info("Training started")
 
@@ -108,7 +108,7 @@ After running the code above, your data is organized like this:
 from ml_dash import Experiment
 
 with Experiment(prefix="train-model", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     # Set hyperparameters
     experiment.params.set(
         model="resnet50",
@@ -142,7 +142,7 @@ with Experiment(prefix="train-model", project="project",
 from ml_dash import Experiment
 
 with Experiment(prefix="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+        ).run as experiment:
     # Train your model...
     # model.save("model.pth")
 

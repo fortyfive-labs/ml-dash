@@ -19,7 +19,7 @@ def train_simple_model():
         project="tutorials",
         description="Simple training example",
         tags=["tutorial", "simple"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -121,7 +121,7 @@ def train_mnist():
         project="computer-vision",
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric configuration
         experiment.params.set({
@@ -277,7 +277,7 @@ def hyperparameter_search():
             project="hyperparameter-search",
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-            local_path=".dash"
+            
         ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
@@ -348,7 +348,7 @@ def compare_architectures():
             project="architecture-comparison",
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
-            local_path=".dash"
+            
         ).run as experiment:
             # Configuration
             experiment.params.set(
@@ -395,7 +395,7 @@ def train_with_debug():
         project="debugging",
         description="Training with debug logging",
         tags=["debug"],
-        local_path=".dash"
+        
     ).run as experiment:
         experiment.params.set(
             learning_rate=0.001,

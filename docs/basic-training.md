@@ -26,7 +26,7 @@ def train_simple_model():
         project="tutorials",
         description="Basic training loop example",
         tags=["tutorial", "simple"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(prefix="...", project="...", local_path=".dash").run as experiment:
+with Experiment(prefix="...", project="...").run as experiment:
     # Your code here
 ```
 

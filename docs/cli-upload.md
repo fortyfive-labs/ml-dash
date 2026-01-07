@@ -423,7 +423,7 @@ from ml_dash import Experiment
 with Experiment(
     prefix="resnet-training",
     project="image-classification",
-    local_path=".dash"
+    
 ).run as exp:
     exp.params.set(
         model="resnet50",
