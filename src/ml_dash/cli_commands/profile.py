@@ -71,19 +71,7 @@ def cmd_profile(args) -> int:
 
   if token:
     info["authenticated"] = True
-
-    # Get user profile from server
-    try:
-      from ml_dash.client import RemoteClient
-
-      client = RemoteClient(base_url=config.remote_url or "https://api.dash.ml")
-      user_profile = client.get_current_user()
-      info["user"] = user_profile
-    except Exception as e:
-      # Fallback to JWT payload if server call fails
-      payload = decode_jwt_payload(token)
-      info["user"] = payload
-      info["server_error"] = str(e)
+    info["user"] = decode_jwt_payload(token)
 
   if args.json:
     console.print_json(json.dumps(info))

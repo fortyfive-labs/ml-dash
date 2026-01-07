@@ -77,20 +77,6 @@ class RemoteClient:
             )
         return self._gql_client
 
-    def get_current_user(self) -> Dict[str, Any]:
-        """
-        Get the current authenticated user's profile.
-
-        Returns:
-            User profile dict with id, username, name, email, etc.
-
-        Raises:
-            httpx.HTTPStatusError: If request fails
-        """
-        response = self._client.get("/me")
-        response.raise_for_status()
-        return response.json()
-
     def create_or_update_experiment(
         self,
         project: str,
