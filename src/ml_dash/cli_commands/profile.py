@@ -1,4 +1,4 @@
-"""Info command for ml-dash CLI - shows current user and configuration."""
+"""Profile command for ml-dash CLI - shows current user and configuration."""
 
 import json
 from base64 import urlsafe_b64decode
@@ -12,11 +12,11 @@ from ml_dash.config import config
 
 
 def add_parser(subparsers):
-  """Add info command parser."""
+  """Add profile command parser."""
   parser = subparsers.add_parser(
-    "info",
-    help="Show current user and configuration",
-    description="Display information about the current authenticated user and configuration.",
+    "profile",
+    help="Show current user profile",
+    description="Display the current authenticated user profile and configuration.",
   )
   parser.add_argument(
     "--json",
@@ -53,7 +53,7 @@ def decode_jwt_payload(token: str) -> dict:
     return {}
 
 
-def cmd_info(args) -> int:
+def cmd_profile(args) -> int:
   """Execute info command."""
   console = Console()
 
@@ -61,24 +61,29 @@ def cmd_info(args) -> int:
   storage = get_token_storage()
   token = storage.load("ml-dash-token")
 
+  import getpass
+
   info = {
     "authenticated": False,
     "remote_url": config.remote_url,
+    "local_user": getpass.getuser(),
   }
 
   if token:
-    payload = decode_jwt_payload(token)
     info["authenticated"] = True
-    info["user"] = {
-      "id": payload.get("sub"),
-      "email": payload.get("email"),
-      "name": payload.get("name"),
-    }
-    # Token expiry
-    if "exp" in payload:
-      from datetime import datetime
-      exp = datetime.fromtimestamp(payload["exp"])
-      info["token_expires"] = exp.isoformat()
+
+    # Get user profile from server
+    try:
+      from ml_dash.client import RemoteClient
+
+      client = RemoteClient(base_url=config.remote_url or "https://api.dash.ml")
+      user_profile = client.get_current_user()
+      info["user"] = user_profile
+    except Exception as e:
+      # Fallback to JWT payload if server call fails
+      payload = decode_jwt_payload(token)
+      info["user"] = payload
+      info["server_error"] = str(e)
 
   if args.json:
     console.print_json(json.dumps(info))
@@ -88,6 +93,7 @@ def cmd_info(args) -> int:
   if not info["authenticated"]:
     console.print(
       Panel(
+        f"[bold cyan]OS Username:[/bold cyan]  {info.get('local_user')}\n\n"
         "[yellow]Not authenticated[/yellow]\n\n"
         "Run [cyan]ml-dash login[/cyan] to authenticate.",
         title="[bold]ML-Dash Info[/bold]",
@@ -101,12 +107,17 @@ def cmd_info(args) -> int:
   table.add_column("Key", style="bold cyan")
   table.add_column("Value")
 
+  # table.add_row("OS Username", info.get("local_user"))
   user = info.get("user", {})
-  table.add_row("User", user.get("name") or user.get("email") or "Unknown")
+  if user.get("username"):
+    table.add_row("Username", user["username"])
+  else:
+    table.add_row("Username", "[red]Unavailable[/red]")
+  if user.get("sub"):
+    table.add_row("User ID", user["sub"])
+  table.add_row("Name", user.get("name") or "Unknown")
   if user.get("email"):
     table.add_row("Email", user["email"])
-  if user.get("id"):
-    table.add_row("User ID", user["id"])
   table.add_row("Remote", info.get("remote_url") or "https://api.dash.ml")
   if info.get("token_expires"):
     table.add_row("Token Expires", info["token_expires"])
