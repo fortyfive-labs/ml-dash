@@ -22,7 +22,7 @@ def train_simple_model():
     """Train a simple model and metric everything with ML-Dash."""
 
     with Experiment(
-        name="simple-training",
+        prefix="simple-training",
         project="tutorials",
         description="Basic training loop example",
         tags=["tutorial", "simple"],
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(name="...", project="...", local_path=".dash").run as experiment:
+with Experiment(prefix="...", project="...", local_path=".dash").run as experiment:
     # Your code here
 ```
 

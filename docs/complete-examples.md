@@ -15,7 +15,7 @@ def train_simple_model():
     """Train a simple model and metric with ML-Dash."""
 
     with Experiment(
-        name="simple-training",
+        prefix="simple-training",
         project="tutorials",
         description="Simple training example",
         tags=["tutorial", "simple"],
@@ -117,7 +117,7 @@ def train_mnist():
 
     # ML-Dash experiment
     with Experiment(
-        name="mnist-pytorch",
+        prefix="mnist-pytorch",
         project="computer-vision",
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
@@ -391,7 +391,7 @@ def train_with_debug():
     """Training with extensive debugging logs."""
 
     with Experiment(
-        name="debug-training",
+        prefix="debug-training",
         project="debugging",
         description="Training with debug logging",
         tags=["debug"],

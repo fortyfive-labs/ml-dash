@@ -50,7 +50,7 @@ def main():
 
   # Create ML-Dash experiment
   with Experiment(
-    name="complete-training-demo",
+    prefix="complete-training-demo",
     project="tutorials",
     local_path="./tutorial_data",
     description="Complete end-to-end training example",

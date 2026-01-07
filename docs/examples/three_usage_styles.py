@@ -15,7 +15,7 @@ from ml_dash import Experiment, ml_dash_experiment
 
 
 @ml_dash_experiment(
-  name="decorator-example",
+  prefix="decorator-example",
   project="usage-styles",
   local_path="./decorator_demo",
   description="Demonstrating decorator style",
@@ -70,7 +70,7 @@ def train_with_context_manager():
   print("=" * 50)
 
   with Experiment(
-    name="context-manager-example",
+    prefix="context-manager-example",
     project="usage-styles",
     local_path="./context_manager_demo",
     description="Demonstrating context manager style",
@@ -114,7 +114,7 @@ def train_with_direct_instantiation():
 
   # Create experiment object
   experiment = Experiment(
-    name="direct-example",
+    prefix="direct-example",
     project="usage-styles",
     local_path="./direct_demo",
     description="Demonstrating direct instantiation style",

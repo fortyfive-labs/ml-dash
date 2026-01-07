@@ -59,7 +59,7 @@ Local mode stores everything on your filesystem - perfect for offline work:
 from ml_dash import Experiment
 
 # Create a experiment (stores data in .dash/ directory)
-with Experiment(name="my-first-experiment", project="tutorial",
+with Experiment(prefix="my-first-experiment", project="tutorial",
         local_path=".dash").run as experiment:
     # Log messages
     experiment.log().info("Training started")
@@ -107,7 +107,7 @@ After running the code above, your data is organized like this:
 
 from ml_dash import Experiment
 
-with Experiment(name="train-model", project="project",
+with Experiment(prefix="train-model", project="project",
         local_path=".dash").run as experiment:
     # Set hyperparameters
     experiment.params.set(
@@ -141,7 +141,7 @@ with Experiment(name="train-model", project="project",
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     # Train your model...
     # model.save("model.pth")
@@ -168,7 +168,7 @@ from ml_dash import Experiment
 # First authenticate: ml-dash login
 
 with Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="team-project",
     remote="https://api.dash.ml"  # token auto-loaded from keychain
 ).run as experiment:

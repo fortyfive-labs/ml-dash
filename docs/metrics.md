@@ -11,7 +11,7 @@ Log train and eval metrics together with a single call:
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
 
     for epoch in range(10):
@@ -33,7 +33,7 @@ You can also log metrics using namespace prefixes with explicit context:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
 
     for epoch in range(10):
@@ -54,7 +54,7 @@ Define your own metric groups beyond train/eval:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
 
     # Log with custom groups
@@ -74,7 +74,7 @@ Read metric data by index range:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     # Log data
     for i in range(100):
@@ -94,7 +94,7 @@ For high-frequency logging (e.g., per-batch), use the buffer API to accumulate v
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
 
     for epoch in range(10):
@@ -162,7 +162,7 @@ The summary cache API is still supported for backward compatibility:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
 
     for epoch in range(10):
@@ -201,7 +201,7 @@ metric.summary_cache.summarize(clear=False)
 ```{code-block} python
 :linenos:
 
-with Experiment(name="mnist-training", project="cv",
+with Experiment(prefix="mnist-training", project="cv",
         local_path=".dash").run as experiment:
     experiment.params.set(learning_rate=0.001, batch_size=32)
     experiment.log("Starting training")
@@ -230,7 +230,7 @@ Combine related metrics:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     for epoch in range(10):
         experiment.metrics("train").log(

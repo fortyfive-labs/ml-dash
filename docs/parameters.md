@@ -9,7 +9,7 @@ Metric hyperparameters, configuration values, and experiment settings. Parameter
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.params.set(
         learning_rate=0.001,
@@ -26,20 +26,19 @@ Use nested dictionaries - they're automatically flattened with dot notation:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as experiment:
-    experiment.params.set(**{
-        "model": {
+with Experiment(prefix="my-experiment", project="project").run as experiment:
+    experiment.params.set(
+        model={
             "architecture": "resnet50",
             "pretrained": True,
             "num_classes": 1000
         },
-        "optimizer": {
+        optimizer={
             "type": "adam",
             "lr": 0.001,
             "weight_decay": 0.0001
         }
-    })
+    )
 
     # Stored as:
     # model.architecture = "resnet50"
@@ -64,8 +63,7 @@ class ModelConfig:
     architecture = "resnet50"
     hidden_size = 768
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="my-experiment", project="project", local_path=".dash").run as experiment:
     # Pass class objects directly
     experiment.params.log(training=TrainingConfig, model=ModelConfig)
 
@@ -86,7 +84,7 @@ Call `parameters().set()` multiple times - values merge and overwrite:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     # Initial parameters
     experiment.params.set(learning_rate=0.001, batch_size=32)
@@ -117,7 +115,7 @@ from ml_dash import Experiment
 with open("config.json", "r") as f:
     config = json.load(f)
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.params.set(**config)
     experiment.log("Configuration loaded")
@@ -136,7 +134,7 @@ parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--batch-size", type=int, default=32)
 args = parser.parse_args()
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.params.set(**vars(args))
 ```
@@ -157,7 +155,7 @@ class TrainingConfig:
 
 config = TrainingConfig()
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.params.set(**asdict(config))
 ```
@@ -174,7 +172,7 @@ class Args:
     batch_size = 64
     learning_rate = 0.001
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     # Pass class directly - automatically extracts attributes
     experiment.params.log(Args=Args)
@@ -185,7 +183,7 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="resnet-imagenet", project="cv",
+with Experiment(prefix="resnet-imagenet", project="cv",
         local_path=".dash").run as experiment:
     experiment.params.set(**{
         "model": {
@@ -215,7 +213,7 @@ Get parameters during or after an experiment:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.params.set(learning_rate=0.001, batch_size=32)
 

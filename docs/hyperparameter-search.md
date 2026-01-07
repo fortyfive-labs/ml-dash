@@ -144,7 +144,7 @@ for i in range(20):
     lr = 10 ** random.uniform(-4, -1)  # 0.0001 to 0.1
     bs = random.choice([16, 32, 64, 128])
 
-    with Experiment(name=f"random-{i}", project="random-search",
+    with Experiment(prefix=f"random-{i}", project="random-search",
             local_path=".dash").run as experiment:
         experiment.params.set(learning_rate=lr, batch_size=bs)
         # Train and metric...
@@ -156,7 +156,7 @@ for trial in range(100):
     # Get next params from Bayesian optimizer
     params = optimizer.suggest()
 
-    with Experiment(name=f"trial-{trial}", project="bayes-opt",
+    with Experiment(prefix=f"trial-{trial}", project="bayes-opt",
             local_path=".dash").run as experiment:
         experiment.params.set(**params)
         accuracy = train_and_evaluate(params, experiment)

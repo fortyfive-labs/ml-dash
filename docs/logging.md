@@ -9,7 +9,7 @@ Metric events, progress, and debugging information throughout your experiments. 
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.log("Training started")
     experiment.log("Model architecture: ResNet-50", level="info")
@@ -24,7 +24,7 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     experiment.log("Detailed debugging info", level="debug")
     experiment.log("Training epoch 1", level="info")
@@ -40,7 +40,7 @@ Add context and metrics to your logs:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     # Log with metrics
     experiment.log(
@@ -72,7 +72,7 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="mnist-training", project="ml",
+with Experiment(prefix="mnist-training", project="ml",
         local_path=".dash").run as experiment:
     experiment.log("Starting training", level="info")
 
@@ -98,7 +98,7 @@ with Experiment(name="mnist-training", project="ml",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
+with Experiment(prefix="my-experiment", project="project",
         local_path=".dash").run as experiment:
     try:
         result = risky_operation()
@@ -120,7 +120,7 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="data-processing", project="etl",
+with Experiment(prefix="data-processing", project="etl",
         local_path=".dash").run as experiment:
     total = 10000
     experiment.log(f"Processing {total} items", level="info")

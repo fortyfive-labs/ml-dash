@@ -63,7 +63,7 @@ Experiment(
 **Local Mode** (filesystem storage):
 ```python
 Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="my-project",
     local_path=".dash"  # Required for local mode
 )
@@ -73,7 +73,7 @@ Experiment(
 ```python
 # Option 1: With username (auto-generates API key)
 Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="my-project",
     remote="https://api.dash.ml",
     user_name="your-username"
@@ -104,7 +104,7 @@ Experiments are managed through the `run` property, which returns a `RunManager`
 Automatically starts and completes/fails the experiment:
 
 ```python
-with Experiment(name="exp", project="proj", local_path=".dash").run as exp:
+with Experiment(prefix="exp", project="proj", local_path=".dash").run as exp:
     exp.log("Training started")
     exp.params.set(lr=0.001)
     # Experiment automatically completes on successful exit
@@ -116,7 +116,7 @@ with Experiment(name="exp", project="proj", local_path=".dash").run as exp:
 Perfect for wrapping training functions:
 
 ```python
-exp = Experiment(name="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj", local_path=".dash")
 
 @exp.run
 def train_model(experiment):
@@ -132,7 +132,7 @@ result = train_model()
 Explicit start/complete for fine-grained control:
 
 ```python
-exp = Experiment(name="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj", local_path=".dash")
 
 exp.run.start()
 try:
@@ -767,7 +767,7 @@ from ml_dash import Experiment
 
 # Create experiment
 with Experiment(
-    name="resnet50-training",
+    prefix="resnet50-training",
     project="image-classification",
     description="ResNet50 on CIFAR-10",
     tags=["resnet", "cifar10", "baseline"],
@@ -872,7 +872,7 @@ from ml_dash import Experiment
 
 # Create experiment instance
 exp = Experiment(
-    name="training-run",
+    prefix="training-run",
     project="my-project",
     local_path=".dash"
 )
@@ -914,7 +914,7 @@ from ml_dash import Experiment
 
 # Connect to shared ML-Dash server
 with Experiment(
-    name="team-experiment",
+    prefix="team-experiment",
     project="shared-project",
     remote="http://ml-dash-server:3000",
     user_name="alice",
@@ -952,7 +952,7 @@ Experiments handle errors gracefully:
 ```python
 try:
     with Experiment(
-        name="my-experiment",
+        prefix="my-experiment",
         project="test",
         local_path=".dash"
     ).run as exp:
@@ -993,7 +993,7 @@ The experiment status will be set to `FAILED` automatically, and all logs, param
 from ml_dash import Experiment
 
 # Create experiment
-exp = Experiment(name="exp", project="proj", local_path=".dash")
+exp = Experiment(prefix="exp", project="proj", local_path=".dash")
 
 # Lifecycle
 with exp.run as exp:                    # Context manager

@@ -196,7 +196,7 @@ def train_and_evaluate(model, train_loader, val_loader, experiment):
 
 # Compare architectures
 for arch in ["cnn", "resnet", "vit"]:
-    with Experiment(name=f"comparison-{arch}", project="arch-comp",
+    with Experiment(prefix=f"comparison-{arch}", project="arch-comp",
         local_path=".dash").run as experiment:
         experiment.params.set(architecture=arch, dataset="cifar10")
 
