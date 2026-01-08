@@ -21,8 +21,9 @@ def main():
   print("Metrics Example - Time-Series Metrics")
   print("=" * 60)
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="metrics-demo", project="tutorials"
+    prefix="demo/tutorials/metrics-demo"
   ).run as experiment:
     experiment.params.set(epochs=10, learning_rate=0.001)
 

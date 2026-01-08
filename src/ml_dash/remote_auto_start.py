@@ -9,18 +9,18 @@ IMPORTANT: Before using rdxp, you must authenticate with the ML-Dash server:
     python -m ml_dash.cli login
 
 Usage:
-    from ml_dash import rdxp
+    from ml_dash.remote_auto_start import rdxp
 
     # Use with statement (recommended)
     with rdxp.run:
-        rdxp.log().info("Hello from rdxp!")
+        rdxp.log("Hello from rdxp!", level="info")
         rdxp.params.set(lr=0.001)
-        rdxp.metrics("loss").append(step=0, value=0.5)
+        rdxp.metrics("train").log(loss=0.5, step=0)
     # Automatically completes on exit from with block
 
     # Or start/complete manually
     rdxp.run.start()
-    rdxp.log().info("Training...")
+    rdxp.log("Training...", level="info")
     rdxp.run.complete()
 
 Configuration:

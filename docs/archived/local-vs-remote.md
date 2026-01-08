@@ -19,24 +19,29 @@ Local mode stores all data on your local filesystem in a `.dash/` directory.
 ```python
 from ml_dash import Experiment
 
-with Experiment(
-    name="my-experiment",
-    project="my-project",
-    local_prefix="./experiments"  # Required for local mode,
-        local_path=".dash"
-) as experiment:
-    experiment.log("Running in local mode")
-    experiment.parameters().set(batch_size=32)
-    experiment.metric("loss").append(value=0.5)
-    experiment.files("model.pth", prefix="/models")
+exp = Experiment(
+    prefix="owner/my-project/my-experiment",
+    local_path=".dash/owner/my-project/my-experiment"
+)
+
+with exp.run:
+    import torch.nn as nn
+
+    net = nn.Sequential(nn.Linear(), ...)
+
+    exp.log("Running in local mode")
+    exp.params.set(batch_size=32)
+    exp.metrics("train").log(loss=0.5)
+    exp.files("models").save(net, "model.pth")
 ```
 
 ### Local Storage Structure
 
 ```
-./experiments/.dash/
-└── my-project/
-    └── my-experiment/
+.dash/
+└── owner/
+    └── my-project/
+        └── my-experiment/
         ├── logs.jsonl              # Log entries (JSONL format)
         ├── parameters.json         # Parameters (JSON)
         ├── metrics/                 # Time-series data
@@ -80,28 +85,30 @@ Remote mode stores data in MongoDB (metadata) and S3 (large files), accessed via
 from ml_dash import Experiment
 
 # With username (simpler for development)
-with Experiment(
-    name="my-experiment",
-    project="my-project",
+exp = Experiment(
+    prefix="owner/my-project/my-experiment",
     remote="https://api.dash.ml",     # API endpoint
     user_name="your-username"            # Authentication
-) as experiment:
-    experiment.log("Running in remote mode")
-    experiment.parameters().set(batch_size=32)
-    experiment.metric("loss").append(value=0.5)
-    experiment.files("model.pth", prefix="/models")
+)
+
+with exp.run:
+    exp.log("Running in remote mode")
+    exp.params.set(batch_size=32)
+    exp.metrics("train").log(loss=0.5)
+    exp.files("model.pth", prefix="/models")
 
 # Or with API key (advanced)
-with Experiment(
-    name="my-experiment",
-    project="my-project",
+exp = Experiment(
+    prefix="owner/my-project/my-experiment",
     remote="https://api.dash.ml",     # API endpoint
     api_key="your-api-key-here"          # Authentication
-) as experiment:
-    experiment.log("Running in remote mode")
-    experiment.parameters().set(batch_size=32)
-    experiment.metric("loss").append(value=0.5)
-    experiment.files("model.pth", prefix="/models")
+)
+
+with exp.run:
+    exp.log("Running in remote mode")
+    exp.params.set(batch_size=32)
+    exp.metrics("train").log(loss=0.5)
+    exp.files("model.pth", prefix="/models")
 ```
 
 ### Remote Storage Architecture
@@ -163,13 +170,16 @@ You can't directly convert between modes, but you can export/import data.
 
 ```python
 # Development (local)
-with Experiment(name="experiment", project="dev", local_prefix="./data",
-        local_path=".dash") as experiment:
+exp = Experiment(prefix="owner/dev/experiment", local_path=".dash/owner/dev/experiment")
+
+with exp.run:
     # Develop your code...
     pass
 
 # Production (remote)
-with Experiment(name="experiment", project="prod", remote="https://api", api_key="key") as experiment:
+exp = Experiment(prefix="owner/prod/experiment", remote="https://api", api_key="key")
+
+with exp.run:
     # Run at scale...
     pass
 ```
@@ -194,13 +204,14 @@ import os
 from ml_dash import Experiment
 
 # Will use environment variables
-with Experiment(
-    name="experiment",
-    project="my-project",
+exp = Experiment(
+    prefix="owner/my-project/experiment",
     local_path=os.getenv("DREAMLAKE_LOCAL_PATH"),
     remote=os.getenv("DREAMLAKE_API_URL"),
     api_key=os.getenv("DREAMLAKE_API_KEY")
-) as experiment:
+)
+
+with exp.run:
     pass
 ```
 
@@ -227,9 +238,10 @@ else:
         "local_path": "./experiments"
     }
 
-with Experiment(name="experiment", project="ml", **experiment_config,
-        local_path=".dash") as experiment:
-    experiment.log("Starting training")
+exp = Experiment(prefix="owner/ml/experiment", **experiment_config)
+
+with exp.run:
+    exp.log("Starting training")
     # Your training code...
 ```
 

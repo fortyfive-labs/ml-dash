@@ -54,16 +54,16 @@ This opens your browser for secure OAuth2 authentication. Your credentials are s
 #### Option A: Use the Pre-configured Singleton (Easiest)
 
 ```python
-from ml_dash import dxp
+from ml_dash.auto_start import dxp
 
 # Start experiment (uploads to https://api.dash.ml by default)
 with dxp.run:
-    dxp.log().info("Training started")
+    dxp.log("Training started", level="info")
     dxp.params.set(learning_rate=0.001, batch_size=32)
 
     for epoch in range(10):
         loss = train_one_epoch()
-        dxp.metrics("loss").append(value=loss, epoch=epoch)
+        dxp.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
 #### Option B: Create Your Own Experiment
@@ -72,11 +72,10 @@ with dxp.run:
 from ml_dash import Experiment
 
 with Experiment(
-  project="my-project",
-  prefix="my-experiment",
+  prefix="alice/my-project/my-experiment",
   remote="https://api.dash.ml",  # token auto-loaded
 ).run as experiment:
-  experiment.log.info("Hello!")
+  experiment.log("Hello!", level="info")
   experiment.params.set(lr=0.001)
 ```
 
@@ -88,7 +87,7 @@ from ml_dash import Experiment
 with Experiment(
   project="my-project", prefix="my-experiment", local_path=".dash"
 ).run as experiment:
-  experiment.log().info("Running locally")
+  experiment.log("Running locally", level="info")
 
 ```
 

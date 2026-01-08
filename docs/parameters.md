@@ -9,9 +9,8 @@ Metric hyperparameters, configuration values, and experiment settings. Parameter
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.params.set(
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(
         learning_rate=0.001,
         batch_size=32,
         optimizer="adam",
@@ -26,8 +25,8 @@ Use nested dictionaries - they're automatically flattened with dot notation:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project").run as experiment:
-    experiment.params.set(
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(
         model={
             "architecture": "resnet50",
             "pretrained": True,
@@ -63,9 +62,9 @@ class ModelConfig:
     architecture = "resnet50"
     hidden_size = 768
 
-with Experiment(prefix="my-experiment", project="project").run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Pass class objects directly
-    experiment.params.log(training=TrainingConfig, model=ModelConfig)
+    exp.params.log(training=TrainingConfig, model=ModelConfig)
 
     # Stored as:
     # training.learning_rate = 0.001
@@ -84,16 +83,15 @@ Call `parameters().set()` multiple times - values merge and overwrite:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Initial parameters
-    experiment.params.set(learning_rate=0.001, batch_size=32)
+    exp.params.set(learning_rate=0.001, batch_size=32)
 
     # Add more
-    experiment.params.set(optimizer="adam", momentum=0.9)
+    exp.params.set(optimizer="adam", momentum=0.9)
 
     # Update existing
-    experiment.params.set(learning_rate=0.0001)
+    exp.params.set(learning_rate=0.0001)
 
     # Final result:
     # learning_rate = 0.0001  (updated)
@@ -115,10 +113,9 @@ from ml_dash import Experiment
 with open("config.json", "r") as f:
     config = json.load(f)
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.params.set(**config)
-    experiment.log("Configuration loaded")
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(**config)
+    exp.log("Configuration loaded")
 ```
 
 **From command line arguments:**
@@ -134,9 +131,8 @@ parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--batch-size", type=int, default=32)
 args = parser.parse_args()
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.params.set(**vars(args))
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(**vars(args))
 ```
 
 **From dataclass:**
@@ -155,9 +151,8 @@ class TrainingConfig:
 
 config = TrainingConfig()
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.params.set(**asdict(config))
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(**asdict(config))
 ```
 
 **From params-proto (or any class):**
@@ -172,10 +167,9 @@ class Args:
     batch_size = 64
     learning_rate = 0.001
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Pass class directly - automatically extracts attributes
-    experiment.params.log(Args=Args)
+    exp.params.log(Args=Args)
 ```
 
 ## Complete Training Configuration
@@ -183,9 +177,8 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="resnet-imagenet", project="cv",
-        ).run as experiment:
-    experiment.params.set(**{
+with Experiment(prefix="alice/cv/resnet-imagenet").run as exp:
+    exp.params.set(**{
         "model": {
             "architecture": "resnet50",
             "pretrained": True,
@@ -213,17 +206,16 @@ Get parameters during or after an experiment:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.params.set(learning_rate=0.001, batch_size=32)
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.params.set(learning_rate=0.001, batch_size=32)
 
     # Retrieve flattened parameters
-    params = experiment.params.get()
+    params = exp.params.get()
     print(params)
     # → {"learning_rate": 0.001, "batch_size": 32}
 
     # Retrieve as nested dictionary
-    params_nested = experiment.params.get(flatten=False)
+    params_nested = exp.params.get(flatten=False)
     print(params_nested)
     # → {"learning_rate": 0.001, "batch_size": 32}
 ```
@@ -253,7 +245,7 @@ Retrieve current parameters:
 **Local mode** - Stored as JSON:
 
 ```bash
-cat ./experiments/project/my-experiment/parameters.json
+cat .dash/alice/project/my-experiment/parameters.json
 ```
 
 ```json

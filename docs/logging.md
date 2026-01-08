@@ -9,12 +9,11 @@ Metric events, progress, and debugging information throughout your experiments. 
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.log("Training started")
-    experiment.log("Model architecture: ResNet-50", level="info")
-    experiment.log("GPU memory low", level="warn")
-    experiment.log("Failed to load checkpoint", level="error")
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.log("Training started")
+    exp.log("Model architecture: ResNet-50", level="info")
+    exp.log("GPU memory low", level="warn")
+    exp.log("Failed to load checkpoint", level="error")
 ```
 
 ## Log Levels
@@ -24,13 +23,12 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.log("Detailed debugging info", level="debug")
-    experiment.log("Training epoch 1", level="info")
-    experiment.log("Learning rate decreased", level="warn")
-    experiment.log("Gradient exploded", level="error")
-    experiment.log("Out of memory - aborting", level="fatal")
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.log("Detailed debugging info", level="debug")
+    exp.log("Training epoch 1", level="info")
+    exp.log("Learning rate decreased", level="warn")
+    exp.log("Gradient exploded", level="error")
+    exp.log("Out of memory - aborting", level="fatal")
 ```
 
 ## Structured Metadata
@@ -40,10 +38,9 @@ Add context and metrics to your logs:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Log with metrics
-    experiment.log(
+    exp.log(
         "Epoch completed",
         level="info",
         metadata={
@@ -55,7 +52,7 @@ with Experiment(prefix="my-experiment", project="project",
     )
 
     # Log with system info
-    experiment.log(
+    exp.log(
         "System status",
         level="info",
         metadata={
@@ -72,15 +69,14 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="mnist-training", project="ml",
-        ).run as experiment:
-    experiment.log("Starting training", level="info")
+with Experiment(prefix="alice/ml/mnist-training").run as exp:
+    exp.log("Starting training", level="info")
 
     for epoch in range(10):
         train_loss = train_one_epoch(model, train_loader)
         val_loss = validate(model, val_loader)
 
-        experiment.log(
+        exp.log(
             f"Epoch {epoch + 1} complete",
             level="info",
             metadata={
@@ -90,7 +86,7 @@ with Experiment(prefix="mnist-training", project="ml",
             }
         )
 
-    experiment.log("Training complete", level="info")
+    exp.log("Training complete", level="info")
 ```
 
 **Error tracking:**
@@ -98,13 +94,12 @@ with Experiment(prefix="mnist-training", project="ml",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     try:
         result = risky_operation()
-        experiment.log("Operation succeeded", level="info")
+        exp.log("Operation succeeded", level="info")
     except Exception as e:
-        experiment.log(
+        exp.log(
             f"Operation failed: {str(e)}",
             level="error",
             metadata={
@@ -120,23 +115,22 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="data-processing", project="etl",
-        ).run as experiment:
+with Experiment(prefix="alice/etl/data-processing").run as exp:
     total = 10000
-    experiment.log(f"Processing {total} items", level="info")
+    exp.log(f"Processing {total} items", level="info")
 
     for i in range(total):
         process_item(i)
 
         if (i + 1) % (total // 10) == 0:
             percent = ((i + 1) / total) * 100
-            experiment.log(
+            exp.log(
                 f"Progress: {percent:.0f}%",
                 level="info",
                 metadata={"processed": i + 1, "total": total}
             )
 
-    experiment.log("Processing complete", level="info")
+    exp.log("Processing complete", level="info")
 ```
 
 ## Storage Format
@@ -144,7 +138,7 @@ with Experiment(prefix="data-processing", project="etl",
 **Local mode** - Logs stored as JSONL (JSON Lines):
 
 ```bash
-cat ./experiments/project/my-experiment/logs/logs.jsonl
+cat .dash/alice/project/my-experiment/logs/logs.jsonl
 ```
 
 Each line is a JSON object:

@@ -35,7 +35,7 @@ def test_metrics_requires_start():
     with tempfile.TemporaryDirectory() as tmpdir:
         exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
         try:
-            exp.metrics("train").log(step=0, value=0.5)
+            exp.metrics("train").log(loss=0.5, step=0)
             assert False, "Should have raised RuntimeError"
         except RuntimeError as e:
             assert (
@@ -63,7 +63,7 @@ def test_apis_work_after_start():
         with exp.run:
             exp.params.set(lr=0.001)
             exp.log("Test log")
-            exp.metrics("train").log(step=0, value=0.5)
+            exp.metrics("train").log(loss=0.5, step=0)
             exp.files().list()
 
 

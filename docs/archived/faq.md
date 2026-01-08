@@ -32,9 +32,8 @@ Currently, you need to manually sync data. We recommend:
 ```python
 # Change from local to remote, re-run your code
 Experiment(
-    name="my-experiment",
-    project="my-project",
-    remote="http://localhost:3000",  # Changed from local_path
+    prefix="owner/my-project/my-experiment",
+    remote="http://localhost:3000",
     user_name="your-name"
 )
 ```
@@ -60,9 +59,8 @@ Not yet! **Hybrid mode** is planned for v0.3:
 ```python
 # Coming soon
 Experiment(
-    name="my-experiment",
-    project="my-project",
-    local_prefix=".dash",  # Local backup
+    prefix="owner/my-project/my-experiment",
+    local_path=".dash",  # Local backup
     remote="http://localhost:3000",  # Syncs to remote
     user_name="your-name"
 )
@@ -108,20 +106,22 @@ ML-Dash experiments are designed for **resilience**:
 ```python
 # First run - crashes at epoch 5
 try:
-    with Experiment(name="training", project="test", local_prefix=".dash",
-        local_path=".dash") as experiment:
+    exp = Experiment(prefix="owner/test/training", local_path=".dash/owner/test/training")
+
+    with exp.run:
         for epoch in range(10):
-            experiment.metric("loss").append(value=loss, epoch=epoch)
+            exp.metrics("train").log(loss=loss, epoch=epoch)
             # Crashes here at epoch 5
 except Exception:
     pass
 
 # Second run - continue from crash
-with Experiment(name="training", project="test", local_prefix=".dash",
-        local_path=".dash") as experiment:
+exp = Experiment(prefix="owner/test/training", local_path=".dash/owner/test/training")
+
+with exp.run:
     # Continue from epoch 6
     for epoch in range(6, 10):
-        experiment.metric("loss").append(value=loss, epoch=epoch)
+        exp.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
 **Result**: You'll have all data from both runs in the same experiment!
@@ -135,9 +135,11 @@ with Experiment(name="training", project="test", local_prefix=".dash",
 ```python
 # Each worker
 rank = dist.get_rank()
-with Experiment(name=f"training-rank-{rank}", project="distributed", ...) as experiment:
-    # Each worker metrics its own metrics
-    experiment.metric("loss").append(value=local_loss, epoch=epoch)
+exp = Experiment(prefix=f"owner/distributed/training-rank-{rank}", ...)
+
+with exp.run:
+    # Each worker logs its own metrics
+    exp.metrics("train").log(loss=local_loss, epoch=epoch)
 ```
 
 **Planned (v0.4)**: First-class distributed training support with:
@@ -181,6 +183,7 @@ results = query.search(
 ```python
 # SDK automatically generates JWT from username
 Experiment(
+    prefix="owner/my-project/my-experiment",
     remote="http://localhost:3000",
     user_name="alice"  # No API key needed!
 )
@@ -198,6 +201,7 @@ The SDK generates a deterministic JWT token using the username and the server's 
 api_key = your_auth_service.login("alice", "password")
 
 Experiment(
+    prefix="owner/my-project/my-experiment",
     remote="https://ml-dash.company.com",
     api_key=api_key
 )
@@ -316,7 +320,7 @@ def _generate_api_key_from_username(user_name: str) -> str:
    ```python
    # Upload to S3 directly, just store reference
    s3_url = upload_to_s3("huge_model.bin")
-   experiment.parameters().set(model_url=s3_url)
+   exp.params.set(model_url=s3_url)
    ```
 
 **Performance Tips**:
@@ -333,13 +337,13 @@ def _generate_api_key_from_username(user_name: str) -> str:
 ❌ **Slow** (individual calls):
 ```python
 for i in range(10000):
-    experiment.metric("metric").append(value=i, step=i)
+    experiment.metrics("train").log(value=i, step=i)
 ```
 
 ✅ **Fast** (batch operation):
 ```python
-batch_data = [{"value": i, "step": i} for i in range(10000)]
-experiment.metric("metric").append_batch(batch_data)
+batch_data = [{"loss": i, "step": i} for i in range(10000)]
+experiment.metrics("train").log_batch(batch_data)
 ```
 
 **Performance gains**:
@@ -355,32 +359,32 @@ experiment.metric("metric").append_batch(batch_data)
 
 ### When should I use batch operations?
 
-**Use `append_batch()` when**:
-- Metricing > 10 data points at once
-- High-frequency metricing (>10/sec)
+**Use `log_batch()` when**:
+- Logging > 10 data points at once
+- High-frequency logging (>10/sec)
 - Post-processing results (already have all data)
 
-**Use individual `append()` when**:
-- Real-time metricing during training
+**Use individual `log()` when**:
+- Real-time logging during training
 - Immediate feedback needed
-- Metricing < 10 data points
+- Logging < 10 data points
 
 **Example**: Training loop
 ```python
-# Batch append for per-batch metrics
+# Batch log for per-batch metrics
 batch_metrics = []
 for batch_idx, batch in enumerate(dataloader):
     loss = train_step(batch)
     batch_metrics.append({"loss": loss, "step": batch_idx})
 
-    # Batch append every 100 steps
+    # Batch log every 100 steps
     if len(batch_metrics) >= 100:
-        experiment.metric("batch_loss").append_batch(batch_metrics)
+        experiment.metrics("train").log_batch(batch_metrics)
         batch_metrics = []
 
-# Append remaining
+# Log remaining
 if batch_metrics:
-    experiment.metric("batch_loss").append_batch(batch_metrics)
+    experiment.metrics("train").log_batch(batch_metrics)
 ```
 
 ---
@@ -403,7 +407,7 @@ httpx.HTTPStatusError: Client error '401 Unauthorized'
 
 1. **Use `user_name` for development**:
    ```python
-   Experiment(remote="http://localhost:3000", user_name="test-user")
+   Experiment(prefix="owner/my-project/my-experiment", remote="http://localhost:3000", user_name="test-user")
    ```
 
 2. **Check JWT secret matches**:
@@ -438,13 +442,15 @@ httpx.HTTPStatusError: Client error '401 Unauthorized'
 1. **Always use context manager**:
    ```python
    # ✅ Good - auto-closes
-   with Experiment(...) as experiment:
-       experiment.log("message")
+   exp = Experiment(...)
+
+   with exp.run:
+       exp.log("message")
 
    # ❌ Bad - might not close
-   experiment = Experiment(...)
-   experiment.log("message")
-   # Forgot to call experiment.close()!
+   exp = Experiment(...)
+   exp.log("message")
+   # Forgot to call exp.close()!
    ```
 
 2. **Manual close**:
@@ -576,14 +582,14 @@ Error uploading file: File not found / Permission denied
 
 ```python
 # ❌ Wrong - not flattened
-experiment.parameters().set(model={"layers": 50})
+exp.params.set(model={"layers": 50})
 
 # ✅ Correct - use ** unpacking
-experiment.parameters().set(**{"model": {"layers": 50}})
+exp.params.set(**{"model": {"layers": 50}})
 
 # ✅ Alternative - use dict variable
 params = {"model": {"layers": 50}}
-experiment.parameters().set(**params)
+exp.params.set(**params)
 ```
 
 ---
@@ -606,14 +612,14 @@ Indices are auto-managed. If you see issues:
    ```python
    from datetime import datetime
 
-   experiment_name = f"training-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-   Experiment(name=experiment_name, ...)
+   experiment_name = f"owner/project/training-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+   Experiment(prefix=experiment_name, ...)
    ```
 
 3. **Check for concurrent access** (local mode):
    ```bash
    # Multiple processes writing to same experiment?
-   lsof +D .dash/project/experiment/
+   lsof +D .dash/owner/project/experiment/
    ```
 
 ---
@@ -652,7 +658,7 @@ ModuleNotFoundError: No module named 'ml-dash'
 ## Still Having Issues?
 
 1. **Check the logs**:
-   - Local: `ls -la .dash/project/experiment/`
+   - Local: `ls -la .dash/owner/project/experiment/`
    - Remote: `docker-compose logs ml-dash-server`
 
 2. **Enable debug logging**:

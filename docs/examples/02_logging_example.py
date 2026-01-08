@@ -21,8 +21,9 @@ def main():
   print("Logging Example")
   print("=" * 60)
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="logging-demo", project="tutorials"
+    prefix="demo/tutorials/logging-demo"
   ).run as experiment:
     # Different log levels //
     experiment.log("Debug information", level="debug")

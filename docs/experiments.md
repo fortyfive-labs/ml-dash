@@ -2,6 +2,19 @@
 
 Experiments are the foundation of ML-Dash. Each experiment represents a single experiment run, containing all your logs, parameters, metrics, and files.
 
+## Prefix Format
+
+The prefix is a universal key that identifies your experiment:
+
+```
+{owner}/{project}/path.../[name]
+```
+
+- **owner**: First segment (e.g., your username)
+- **project**: Second segment (e.g., project name)
+- **path**: Remaining segments form the folder structure
+- **name**: Derived from the last segment
+
 ## Three Usage Styles
 
 **Context Manager** (recommended for most cases):
@@ -11,10 +24,10 @@ Experiments are the foundation of ML-Dash. Each experiment represents a single e
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
-    experiment.log("Training started")
-    experiment.params.set(learning_rate=0.001)
+# Prefix format: owner/project/experiment-name
+with Experiment(prefix="alice/project/my-experiment").run as exp:
+    exp.log("Training started")
+    exp.params.set(learning_rate=0.001)
     # Experiment automatically closed on exit
 ```
 
@@ -25,7 +38,7 @@ with Experiment(prefix="my-experiment", project="project",
 
 from ml_dash import ml_dash_experiment
 
-@ml_dash_experiment(prefix="my-experiment", project="project")
+@ml_dash_experiment(prefix="alice/project/my-experiment")
 def train_model(experiment):
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
@@ -46,15 +59,14 @@ result = train_model()
 
 from ml_dash import Experiment
 
-experiment = Experiment(prefix="my-experiment", project="project",
-        )
-experiment.run.start()
+exp = Experiment(prefix="alice/project/my-experiment")
+exp.run.start()
 
 try:
-    experiment.log("Training started")
-    experiment.params.set(learning_rate=0.001)
+    exp.log("Training started")
+    exp.params.set(learning_rate=0.001)
 finally:
-    experiment.run.complete()
+    exp.run.complete()
 ```
 
 ## Local vs Remote Mode
@@ -65,11 +77,10 @@ finally:
 :linenos:
 
 with Experiment(
-    prefix="my-experiment",
-    project="project",
-    
-).run as experiment:
-    experiment.log("Using local storage")
+    prefix="alice/project/my-experiment",
+    local_path=".dash"
+).run as exp:
+    exp.log("Using local storage")
 ```
 
 **Remote mode** - Team collaboration with server:
@@ -78,38 +89,32 @@ with Experiment(
 :linenos:
 
 with Experiment(
-    prefix="my-experiment",
-    project="project",
-    remote="https://api.dash.ml",
-    user_name="alice"
-).run as experiment:
-    experiment.log("Using remote server")
+    prefix="alice/project/my-experiment",
+    remote="https://api.dash.ml"
+).run as exp:
+    exp.log("Using remote server")
 ```
 
 ## Experiment Metadata
 
-Add description, tags, bindrs, and folders for organization:
+Add description, tags, and bindrs for organization:
 
 ```{code-block} python
 :linenos:
 
 with Experiment(
-    prefix="resnet50-imagenet",
-    project="computer-vision",
-    
+    prefix="alice/computer-vision/resnet50-imagenet",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
-    bindrs=["gpu-cluster", "team-a"],
-    folder="/experiments/2025/resnet"
-).run as experiment:
-    experiment.log("Training started")
+    bindrs=["gpu-cluster", "team-a"]
+).run as exp:
+    exp.log("Training started")
 ```
 
 **Metadata fields:**
 - `description`: Human-readable experiment description
 - `tags`: List of tags for categorization (e.g., ["baseline", "production"])
 - `bindrs`: List of bindrs for resource/team association (e.g., ["gpu-1", "team-ml"])
-- `prefix`: Hierarchical folder path for organization (referred to as "folder" in the directory structure)
 
 ## Experiment Status Lifecycle
 
@@ -126,15 +131,19 @@ Experiments automatically track their status through the lifecycle:
 :linenos:
 
 # Normal completion - status becomes COMPLETED
-with Experiment(prefix="training", project="ml",
-        remote="https://api.dash.ml").run as experiment:
-    experiment.log("Training...")
+with Experiment(
+    prefix="alice/ml/training",
+    remote="https://api.dash.ml"
+).run as exp:
+    exp.log("Training...")
     # Status automatically set to COMPLETED on exit
 
 # Exception handling - status becomes FAILED
-with Experiment(prefix="training", project="ml",
-        remote="https://api.dash.ml").run as experiment:
-    experiment.log("Training...")
+with Experiment(
+    prefix="alice/ml/training",
+    remote="https://api.dash.ml"
+).run as exp:
+    exp.log("Training...")
     raise ValueError("Training failed!")
     # Status automatically set to FAILED on exception
 ```
@@ -146,63 +155,62 @@ with Experiment(prefix="training", project="ml",
 
 from ml_dash import Experiment
 
-experiment = Experiment(prefix="training", project="ml",
-        remote="https://api.dash.ml")
-experiment.run.start()
+exp = Experiment(
+    prefix="alice/ml/training",
+    remote="https://api.dash.ml"
+)
+exp.run.start()
 
 try:
-    experiment.log("Training...")
+    exp.log("Training...")
     # ... training code ...
-    experiment.run.complete()
+    exp.run.complete()
 except KeyboardInterrupt:
-    experiment.run.cancel()
+    exp.run.cancel()
 except Exception as e:
-    experiment.log(f"Error: {e}")
-    experiment.run.fail()
+    exp.log(f"Error: {e}")
+    exp.run.fail()
 ```
 
 **Note:** Status updates only work in remote mode. Local mode doesn't track status.
 
 ## Resuming Experiments
 
-Experiments use **upsert behavior** - reopen by using the same name:
+Experiments use **upsert behavior** - reopen by using the same prefix:
 
 ```{code-block} python
 :linenos:
 
 # First run
-with Experiment(prefix="long-training", project="ml",
-        ).run as experiment:
-    experiment.log("Starting epoch 1")
-    experiment.metrics("train").log(loss=0.5, epoch=1)
+with Experiment(prefix="alice/ml/long-training").run as exp:
+    exp.log("Starting epoch 1")
+    exp.metrics("train").log(loss=0.5, epoch=1)
 
 # Later - continues same experiment
-with Experiment(prefix="long-training", project="ml",
-        ).run as experiment:
-    experiment.log("Resuming from checkpoint")
-    experiment.metrics("train").log(loss=0.3, epoch=2)
+with Experiment(prefix="alice/ml/long-training").run as exp:
+    exp.log("Resuming from checkpoint")
+    exp.metrics("train").log(loss=0.3, epoch=2)
 ```
 
 ## Available Operations
 
-Once a experiment is open, you can use all ML-Dash features:
+Once an experiment is open, you can use all ML-Dash features:
 
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="demo", project="test",
-        ).run as experiment:
+with Experiment(prefix="alice/test/demo").run as exp:
     # Logging
-    experiment.log("Training started", level="info")
+    exp.log("Training started", level="info")
 
     # Parameters
-    experiment.params.set(lr=0.001, batch_size=32)
+    exp.params.set(lr=0.001, batch_size=32)
 
     # Metrics tracking
-    experiment.metrics("train").log(loss=0.5, epoch=1)
+    exp.metrics("train").log(loss=0.5, epoch=1)
 
     # File uploads
-    experiment.files("models").save("model.pth")
+    exp.files("models").save("model.pth")
 ```
 
 ## Storage Structure
@@ -210,19 +218,20 @@ with Experiment(prefix="demo", project="test",
 **Local mode** creates a directory structure:
 
 ```
-./experiments/
-└── project/
-    └── my-experiment/
-        ├── logs/
-        │   └── logs.jsonl
-        ├── parameters.json
-        ├── metrics/
-        │   └── train/
-        │       └── data.jsonl
-        └── files/
-            └── models/
-                └── 7218065541365719/
-                    └── model.pth
+.dash/
+└── alice/                          # owner
+    └── project/                    # project
+        └── my-experiment/          # experiment name
+            ├── logs/
+            │   └── logs.jsonl
+            ├── parameters.json
+            ├── metrics/
+            │   └── train/
+            │       └── data.jsonl
+            └── files/
+                └── models/
+                    └── 7218065541365719/
+                        └── model.pth
 ```
 
 Files are stored under `files/{prefix}/{snowflake_id}/{filename}` where:
@@ -234,4 +243,4 @@ Files are stored under `files/{prefix}/{snowflake_id}/{filename}` where:
 
 ---
 
-**Next:** Learn about [Logging](logging.md) to metric events and progress.
+**Next:** Learn about [Logging](logging.md) to track events and progress.

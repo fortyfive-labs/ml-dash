@@ -40,8 +40,9 @@ def main():
     for i in range(10):
       f.write(f"{i + 1},{1.0 / (i + 1):.4f},{0.5 + i * 0.05:.4f}\n")
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="files-demo", project="tutorials"
+    prefix="demo/tutorials/files-demo"
   ).run as experiment:
     print("\n1. Uploading model file...")
 

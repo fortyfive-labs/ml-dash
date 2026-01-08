@@ -11,37 +11,36 @@ The folder API uses a fluent interface that supports multiple styles:
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload file from disk
-    dxp.files("checkpoints").upload("./model.pt")
-    dxp.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
+    exp.files("checkpoints").upload("./model.pt")
+    exp.files("checkpoints").upload("./model.pt", to="checkpoint.pt")
 
     # Save objects as files
-    dxp.files("models").save_torch(model, to="model.pt")
-    dxp.files("configs").save_json(config, to="config.json")
+    exp.files("models").save_torch(model, to="model.pt")
+    exp.files("configs").save_json(config, to="config.json")
 
     # List files in a location
-    files = dxp.files("/models").list()
+    files = exp.files("/models").list()
 
     # Download a file
-    dxp.files("some.text").download()
-    dxp.files("some.text").download(to="./local_copy.text")
+    exp.files("some.text").download()
+    exp.files("some.text").download(to="./local_copy.text")
 
     # Download using glob patterns
-    file_paths = dxp.files("images").list("*.png")
-    dxp.files("images").download("*.png", to="local_images")
+    file_paths = exp.files("images").list("*.png")
+    exp.files("images").download("*.png", to="local_images")
 
     # Delete files
-    dxp.files("some.text").delete()
-    dxp.file.delete("some.text")
-    dxp.file.delete("images/*.png")
+    exp.files("some.text").delete()
+    exp.file.delete("some.text")
+    exp.file.delete("images/*.png")
 
     # Specific file types
-    dxp.file.save_text("content", to="view.yaml")
-    dxp.file.save_json(dict(hey="yo"), to="config.json")
-    dxp.file.save_blob(b"xxx", to="data.bin")
+    exp.file.save_text("content", to="view.yaml")
+    exp.file.save_json(dict(hey="yo"), to="config.json")
+    exp.file.save_blob(b"xxx", to="data.bin")
 ```
 
 ## Basic Upload
@@ -53,11 +52,10 @@ with Experiment(prefix="my-experiment", project="project",
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload a file to a prefix
-    result = dxp.files("models").upload("./model.pth")
+    result = exp.files("models").upload("./model.pth")
 
     print(f"Uploaded: {result['filename']}")
     print(f"Size: {result['sizeBytes']} bytes")
@@ -71,21 +69,20 @@ Save Python objects directly without creating intermediate files:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Save dict/list as JSON
     config = {"model": "resnet50", "lr": 0.001}
-    dxp.files("configs").save_json(config, to="config.json")
+    exp.files("configs").save_json(config, to="config.json")
 
     # Save bytes directly
-    dxp.files("data").save_blob(b"binary data", to="data.bin")
+    exp.files("data").save_blob(b"binary data", to="data.bin")
 
     # Save PyTorch model
     import torch
     model = torch.nn.Linear(10, 5)
-    dxp.files("checkpoints").save_torch(model, to="checkpoint.pt")
-    dxp.files("checkpoints").save_torch(model.state_dict(), to="weights.pt")
+    exp.files("checkpoints").save_torch(model, to="checkpoint.pt")
+    exp.files("checkpoints").save_torch(model.state_dict(), to="weights.pt")
 ```
 
 ### Direct Method Style
@@ -95,16 +92,15 @@ You can also use the direct method style without specifying a prefix:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload file directly
-    dxp.files.upload("./model.pt", to="models/model.pt")
+    exp.files.upload("./model.pt", to="models/model.pt")
 
     # Save objects directly
-    dxp.files.save_text("yaml content", to="configs/view.yaml")
-    dxp.files.save_json({"key": "value"}, to="data/config.json")
-    dxp.files.save_blob(b"\x00\x01\x02", to="binary/data.bin")
+    exp.files.save_text("yaml content", to="configs/view.yaml")
+    exp.files.save_json({"key": "value"}, to="data/config.json")
+    exp.files.save_blob(b"\x00\x01\x02", to="binary/data.bin")
 ```
 
 ## Organizing Files
@@ -114,21 +110,20 @@ Use paths to organize files logically:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Models
-    dxp.files("models").upload("model.pth")
-    dxp.files("models/checkpoints").upload("best_model.pth")
+    exp.files("models").upload("model.pth")
+    exp.files("models/checkpoints").upload("best_model.pth")
 
     # Visualizations
-    dxp.files("visualizations").upload("loss_curve.png")
+    exp.files("visualizations").upload("loss_curve.png")
 
     # Configuration
-    dxp.files("config").save_json(config, to="config.json")
+    exp.files("config").save_json(config, to="config.json")
 
     # Results
-    dxp.files("results").upload("results.csv")
+    exp.files("results").upload("results.csv")
 ```
 
 ## Listing Files
@@ -138,11 +133,10 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # List all files
-    files = dxp.files().list()
+    files = exp.files().list()
 
     for file_info in files:
         print(f"File: {file_info['filename']}")
@@ -156,12 +150,11 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # List files in specific prefix
-    model_files = dxp.files("/models").list()
-    config_files = dxp.files("/configs").list()
+    model_files = exp.files("/models").list()
+    config_files = exp.files("/configs").list()
 ```
 
 ### List with Glob Pattern
@@ -169,13 +162,12 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # List files matching pattern
-    png_files = dxp.files("images").list("*.png")
-    model_files = dxp.files().list("*.pt")
-    all_configs = dxp.files().list("**/*.json")
+    png_files = exp.files("images").list("*.png")
+    model_files = exp.files().list("*.pt")
+    all_configs = exp.files().list("**/*.json")
 ```
 
 ## Downloading Files
@@ -185,15 +177,14 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Download by filename/path
-    dxp.files("model.pt").download()  # Downloads to current directory
-    dxp.files("model.pt").download(to="./local_model.pt")  # Custom destination
+    exp.files("model.pt").download()  # Downloads to current directory
+    exp.files("model.pt").download(to="./local_model.pt")  # Custom destination
 
     # Download from specific prefix
-    dxp.files("models/best.pt").download(to="./best_model.pt")
+    exp.files("models/best.pt").download(to="./best_model.pt")
 ```
 
 ### Download with Glob Pattern
@@ -201,14 +192,13 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Download all PNG files from images prefix
-    paths = dxp.files("images").download("*.png", to="./local_images")
+    paths = exp.files("images").download("*.png", to="./local_images")
 
     # Direct style with path/pattern
-    paths = dxp.file.download("images/*.png", to="local_images")
+    paths = exp.file.download("images/*.png", to="local_images")
 
     print(f"Downloaded {len(paths)} files")
 ```
@@ -218,15 +208,14 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload a file first
-    upload_result = dxp.files("models").upload("./model.pth")
+    upload_result = exp.files("models").upload("./model.pth")
     file_id = upload_result["id"]
 
     # Download by ID
-    downloaded_path = dxp.files(file_id=file_id).download()
+    downloaded_path = exp.files(file_id=file_id).download()
     print(f"Downloaded to: {downloaded_path}")
 ```
 
@@ -237,16 +226,15 @@ Downloads automatically verify checksums to ensure file integrity:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload
-    upload_result = dxp.files("models").upload("./model.pth")
+    upload_result = exp.files("models").upload("./model.pth")
     original_checksum = upload_result["checksum"]
     print(f"Original checksum: {original_checksum}")
 
     # Download (checksum verified automatically)
-    downloaded = dxp.files("model.pth").download(to="./verified_model.pth")
+    downloaded = exp.files("model.pth").download(to="./verified_model.pth")
     print(f"Download verified and saved to: {downloaded}")
 ```
 
@@ -257,14 +245,13 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Delete by filename/path
-    result = dxp.files("some.text").delete()
+    result = exp.files("some.text").delete()
 
     # Direct style
-    result = dxp.file.delete("some.text")
+    result = exp.file.delete("some.text")
 ```
 
 ### Delete with Glob Pattern
@@ -272,14 +259,13 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Delete all PNG files from images prefix
-    results = dxp.files("images").delete("*.png")
+    results = exp.files("images").delete("*.png")
 
     # Direct style
-    results = dxp.file.delete("images/*.png")
+    results = exp.file.delete("images/*.png")
 
     print(f"Deleted {len(results)} files")
 ```
@@ -291,10 +277,9 @@ Add description, tags, and custom metadata:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
-    result = dxp.files("models").save_torch(
+    result = exp.files("models").save_torch(
         model,
         to="best_model.pth",
         description="Best model from epoch 50",
@@ -314,8 +299,7 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Save text content
     yaml_content = """
@@ -323,10 +307,10 @@ with Experiment(prefix="my-experiment", project="project",
       architecture: resnet50
       pretrained: true
     """
-    dxp.files("configs").save_text(yaml_content, to="model.yaml")
+    exp.files("configs").save_text(yaml_content, to="model.yaml")
 
     # Or using direct style
-    dxp.file.save_text(yaml_content, to="configs/model.yaml")
+    exp.file.save_text(yaml_content, to="configs/model.yaml")
 ```
 
 ### Save JSON
@@ -334,16 +318,15 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     config = {"model": "resnet50", "lr": 0.001}
 
     # Save JSON
-    dxp.files("configs").save_json(config, to="config.json")
+    exp.files("configs").save_json(config, to="config.json")
 
     # Or direct style
-    dxp.file.save_json(config, to="configs/training.json")
+    exp.file.save_json(config, to="configs/training.json")
 ```
 
 ### Save Binary Data
@@ -351,16 +334,15 @@ with Experiment(prefix="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     binary_data = b"\x00\x01\x02\x03"
 
     # Save blob
-    dxp.files("data").save_blob(binary_data, to="weights.bin")
+    exp.files("data").save_blob(binary_data, to="weights.bin")
 
     # Or direct style
-    dxp.folder.save_blob(binary_data, to="data/embeddings.bin")
+    exp.folder.save_blob(binary_data, to="data/embeddings.bin")
 ```
 
 ## Training with Checkpoints
@@ -373,11 +355,10 @@ Save models during training:
 import torch
 from ml_dash import Experiment
 
-with Experiment(prefix="resnet-training", project="cv",
-        ).run as dxp:
+with Experiment(prefix="alice/cv/resnet-training").run as exp:
 
-    dxp.params.set(model="resnet50", epochs=100)
-    dxp.log("Starting training")
+    exp.params.set(model="resnet50", epochs=100)
+    exp.log("Starting training")
 
     best_accuracy = 0.0
 
@@ -386,20 +367,20 @@ with Experiment(prefix="resnet-training", project="cv",
         val_loss, val_accuracy = validate(model, val_loader)
 
         # Log metrics (single call with nested dict)
-        dxp.metrics.log(
+        exp.metrics.log(
             epoch=epoch,
             train=dict(loss=train_loss, accuracy=val_accuracy),
             eval=dict(loss=val_loss, accuracy=val_accuracy)
         )
 
         # Alternative: prefix-based logging
-        # dxp.metrics("train").log(loss=train_loss, accuracy=val_accuracy)
-        # dxp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
-        # dxp.metrics.log(epoch=epoch).flush()
+        # exp.metrics("train").log(loss=train_loss, accuracy=val_accuracy)
+        # exp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
+        # exp.metrics.log(epoch=epoch).flush()
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
-            dxp.files("checkpoints").save_torch(
+            exp.files("checkpoints").save_torch(
                 model.state_dict(),
                 to=f"checkpoint_epoch_{epoch + 1}.pt",
                 tags=["checkpoint"],
@@ -410,7 +391,7 @@ with Experiment(prefix="resnet-training", project="cv",
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy
 
-            dxp.files("models").save_torch(
+            exp.files("models").save_torch(
                 model.state_dict(),
                 to="best_model.pt",
                 description=f"Best model (accuracy: {best_accuracy:.4f})",
@@ -418,9 +399,9 @@ with Experiment(prefix="resnet-training", project="cv",
                 metadata={"epoch": epoch + 1, "accuracy": best_accuracy}
             )
 
-            dxp.log(f"New best model saved (accuracy: {best_accuracy:.4f})")
+            exp.log(f"New best model saved (accuracy: {best_accuracy:.4f})")
 
-    dxp.log("Training complete")
+    exp.log("Training complete")
 ```
 
 ## Saving Visualizations
@@ -434,8 +415,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Generate plot
     losses = [0.5, 0.4, 0.3, 0.25, 0.2]
@@ -445,13 +425,13 @@ with Experiment(prefix="my-experiment", project="project",
     plt.ylabel("Loss")
 
     # Save directly (auto-closes figure)
-    dxp.files("visualizations").save_fig(to="loss_curve.png")
+    exp.files("visualizations").save_fig(to="loss_curve.png")
 
     # Save as PDF with custom DPI
     xs = np.linspace(-5, 5, 100)
     plt.plot(xs, np.cos(xs), label='Cosine')
     plt.legend()
-    dxp.files("visualizations").save_fig(
+    exp.files("visualizations").save_fig(
         to="cosine_function.pdf",
         dpi=150,
         transparent=True,
@@ -471,20 +451,19 @@ Upload video frame stacks using the `save_video()` method. This is useful for sa
 import numpy as np
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as dxp:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Generate frame stack
     frames = [np.random.rand(200, 200) for _ in range(20)]
 
     # Save as MP4 (default 20 FPS)
-    dxp.files("videos").save_video(frames, to="animation.mp4")
+    exp.files("videos").save_video(frames, to="animation.mp4")
 
     # Save with custom FPS
-    dxp.files("videos").save_video(frames, to="animation.mp4", fps=30)
+    exp.files("videos").save_video(frames, to="animation.mp4", fps=30)
 
     # Save as GIF
-    dxp.files("videos").save_video(frames, to="animation.gif")
+    exp.files("videos").save_video(frames, to="animation.gif")
 ```
 
 ### Practical Example: Agent Rollout
@@ -504,13 +483,12 @@ def render_frame(x, y):
     canvas[max(0, x-5):x+5, max(0, y-5):y+5] = 1.0
     return canvas
 
-with Experiment(prefix="agent-rollout", project="rl",
-        ).run as dxp:
+with Experiment(prefix="alice/rl/agent-rollout").run as exp:
 
     # Simulate agent moving across the canvas
     frames = [render_frame(100 + i, 80) for i in range(20)]
 
-    result = dxp.files("videos").save_video(frames, to="rollout.mp4")
+    result = exp.files("videos").save_video(frames, to="rollout.mp4")
     print(f"Saved: {result['filename']} ({result['sizeBytes']} bytes)")
 ```
 
@@ -522,10 +500,10 @@ Control video quality and encoding with additional parameters:
 :linenos:
 
 # High quality MP4
-dxp.files("videos").save_video(frames, to="high_quality.mp4", fps=30, quality=8)
+exp.files("videos").save_video(frames, to="high_quality.mp4", fps=30, quality=8)
 
 # Lower quality for smaller file size
-dxp.files("videos").save_video(frames, to="compressed.mp4", fps=30, quality=5)
+exp.files("videos").save_video(frames, to="compressed.mp4", fps=30, quality=5)
 ```
 
 Additional keyword arguments are passed to imageio's writer (e.g., `quality`, `codec`, `bitrate`).
@@ -539,15 +517,15 @@ Additional keyword arguments are passed to imageio's writer (e.g., `quality`, `c
 
 # Grayscale frames (H×W)
 frames = [np.random.rand(480, 640) for _ in range(30)]
-dxp.files("videos").save_video(frames, to="grayscale.mp4")
+exp.files("videos").save_video(frames, to="grayscale.mp4")
 
 # RGB frames (H×W×3)
 frames = [np.random.rand(480, 640, 3) for _ in range(30)]
-dxp.files("videos").save_video(frames, to="rgb.mp4")
+exp.files("videos").save_video(frames, to="rgb.mp4")
 
 # Stacked array (N×H×W or N×H×W×C)
 frames = np.random.rand(30, 480, 640, 3)
-dxp.files("videos").save_video(frames, to="stacked.mp4")
+exp.files("videos").save_video(frames, to="stacked.mp4")
 ```
 
 **Frame value ranges:**
@@ -562,21 +540,22 @@ dxp.files("videos").save_video(frames, to="stacked.mp4")
 **Local mode** - Files stored with prefix-based organization:
 
 ```
-./experiments/
-└── project/
-    └── my-experiment/
-        └── files/
-            ├── models/
-            │   ├── 7218065541365719/
-            │   │   └── model.pth
-            │   └── 7218065541366823/
-            │       └── best_model.pth
-            ├── visualizations/
-            │   └── 7218065541367921/
-            │       └── loss_curve.png
-            └── config/
-                └── 7218065541368015/
-                    └── config.json
+.dash/
+└── alice/                              # owner
+    └── project/                        # project
+        └── my-experiment/              # experiment name
+            └── files/
+                ├── models/
+                │   ├── 7218065541365719/
+                │   │   └── model.pth
+                │   └── 7218065541366823/
+                │       └── best_model.pth
+                ├── visualizations/
+                │   └── 7218065541367921/
+                │       └── loss_curve.png
+                └── config/
+                    └── 7218065541368015/
+                        └── config.json
 ```
 
 Each file is stored as: `files/{prefix}/{snowflake_id}/{filename}`

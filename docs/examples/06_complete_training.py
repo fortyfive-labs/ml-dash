@@ -49,10 +49,9 @@ def main():
   }
 
   # Create ML-Dash experiment
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="complete-training-demo",
-    project="tutorials",
-    
+    prefix="demo/tutorials/complete-training-demo",
     description="Complete end-to-end training example",
     tags=["tutorial", "complete", "cifar10", "resnet"],
   ).run as experiment:

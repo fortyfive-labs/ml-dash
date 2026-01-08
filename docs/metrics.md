@@ -11,15 +11,14 @@ Log train and eval metrics together with a single call:
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     for epoch in range(10):
         train_loss, train_acc = train_one_epoch(model)
         eval_loss, eval_acc = evaluate(model)
 
         # Log all metrics for this epoch in one call
-        experiment.metrics.log(
+        exp.metrics.log(
             epoch=epoch,
             train=dict(loss=train_loss, accuracy=train_acc),
             eval=dict(loss=eval_loss, accuracy=eval_acc)
@@ -33,18 +32,17 @@ You can also log metrics using namespace prefixes with explicit context:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     for epoch in range(10):
         # Log train metrics with prefix
-        experiment.metrics("train").log(loss=train_loss, accuracy=train_acc)
+        exp.metrics("train").log(loss=train_loss, accuracy=train_acc)
 
         # Log eval metrics with prefix
-        experiment.metrics("eval").log(loss=eval_loss, accuracy=eval_acc)
+        exp.metrics("eval").log(loss=eval_loss, accuracy=eval_acc)
 
         # Set epoch and flush
-        experiment.metrics.log(epoch=epoch).flush()
+        exp.metrics.log(epoch=epoch).flush()
 ```
 
 ## Custom Metric Groups
@@ -54,11 +52,10 @@ Define your own metric groups beyond train/eval:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Log with custom groups
-    experiment.metrics.log(
+    exp.metrics.log(
         step=100,
         train=dict(loss=0.5, accuracy=0.85),
         eval=dict(loss=0.6, accuracy=0.82),
@@ -74,14 +71,13 @@ Read metric data by index range:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Log data
     for i in range(100):
-        experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
+        exp.metrics("train").log(loss=1.0 / (i + 1), step=i)
 
     # Read first 10 points
-    result = experiment.metrics("train").read(start_index=0, limit=10)
+    result = exp.metrics("train").read(start_index=0, limit=10)
 
     for point in result['data']:
         print(f"Index {point['index']}: {point['data']}")
@@ -94,8 +90,7 @@ For high-frequency logging (e.g., per-batch), use the buffer API to accumulate v
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     for epoch in range(10):
         for batch in dataloader:
@@ -103,11 +98,11 @@ with Experiment(prefix="my-experiment", project="project",
             acc = compute_accuracy(batch)
 
             # Buffer per-batch values (not written to disk yet)
-            experiment.metrics("train").buffer(loss=loss, accuracy=acc)
+            exp.metrics("train").buffer(loss=loss, accuracy=acc)
 
         # At end of epoch, compute and log summary statistics
-        experiment.metrics.buffer.log_summary()  # default: mean
-        experiment.metrics.log(epoch=epoch).flush()
+        exp.metrics.buffer.log_summary()  # default: mean
+        exp.metrics.log(epoch=epoch).flush()
 ```
 
 This produces statistics like `loss.mean`, `accuracy.mean` per epoch.
@@ -122,16 +117,16 @@ This produces statistics like `loss.mean`, `accuracy.mean` per epoch.
 
 ```python
 # Default (just mean)
-experiment.metrics.buffer.log_summary()
+exp.metrics.buffer.log_summary()
 
 # Multiple aggregations
-experiment.metrics.buffer.log_summary("mean", "std", "min", "max", "count")
+exp.metrics.buffer.log_summary("mean", "std", "min", "max", "count")
 
 # Percentiles
-experiment.metrics.buffer.log_summary("p50", "p90", "p95", "p99")
+exp.metrics.buffer.log_summary("p50", "p90", "p95", "p99")
 
 # First/last values
-experiment.metrics.buffer.log_summary("first", "last")
+exp.metrics.buffer.log_summary("first", "last")
 ```
 
 Available aggregations: `mean`, `std`, `min`, `max`, `count`, `median`, `sum`, `p50`, `p90`, `p95`, `p99`, `first`, `last`
@@ -148,11 +143,11 @@ for batch in dataloader:
     val_loss = validate_step(batch)
 
     # Buffer to different prefixes
-    experiment.metrics("train").buffer(loss=train_loss)
-    experiment.metrics("eval").buffer(loss=val_loss)
+    exp.metrics("train").buffer(loss=train_loss)
+    exp.metrics("eval").buffer(loss=val_loss)
 
 # Single call logs summaries for ALL prefixes
-experiment.metrics.buffer.log_summary("mean", "std")
+exp.metrics.buffer.log_summary("mean", "std")
 ```
 
 ## Summary Cache (Legacy API)
@@ -162,19 +157,18 @@ The summary cache API is still supported for backward compatibility:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     for epoch in range(10):
         for batch in dataloader:
             loss = train_step(batch)
 
             # Store per-batch values (not written to disk yet)
-            experiment.metrics("train").summary_cache.store(loss=loss)
+            exp.metrics("train").summary_cache.store(loss=loss)
 
         # At end of epoch, summarize and write to disk
-        experiment.metrics("train").summary_cache.set(epoch=epoch)
-        experiment.metrics("train").summary_cache.summarize()
+        exp.metrics("train").summary_cache.set(epoch=epoch)
+        exp.metrics("train").summary_cache.summarize()
 ```
 
 ### Summary Cache Methods
@@ -201,26 +195,25 @@ metric.summary_cache.summarize(clear=False)
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="mnist-training", project="cv",
-        ).run as experiment:
-    experiment.params.set(learning_rate=0.001, batch_size=32)
-    experiment.log("Starting training")
+with Experiment(prefix="alice/cv/mnist-training").run as exp:
+    exp.params.set(learning_rate=0.001, batch_size=32)
+    exp.log("Starting training")
 
     for epoch in range(10):
         train_loss = train_one_epoch(model, train_loader)
         val_loss, val_accuracy = validate(model, val_loader)
 
         # Log metrics
-        experiment.metrics("train").log(loss=train_loss)
-        experiment.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
-        experiment.metrics.log(epoch=epoch + 1).flush()
+        exp.metrics("train").log(loss=train_loss)
+        exp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
+        exp.metrics.log(epoch=epoch + 1).flush()
 
-        experiment.log(
+        exp.log(
             f"Epoch {epoch + 1}/10 complete",
             metadata={"train_loss": train_loss, "val_loss": val_loss}
         )
 
-    experiment.log("Training complete")
+    exp.log("Training complete")
 ```
 
 ## Multiple Metrics in One Call
@@ -230,15 +223,14 @@ Combine related metrics:
 ```{code-block} python
 :linenos:
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     for epoch in range(10):
-        experiment.metrics("train").log(
+        exp.metrics("train").log(
             epoch=epoch,
             loss=0.5 / (epoch + 1),
             accuracy=0.8 + epoch * 0.01
         )
-        experiment.metrics("eval").log(
+        exp.metrics("eval").log(
             epoch=epoch,
             loss=0.6 / (epoch + 1),
             accuracy=0.75 + epoch * 0.01
@@ -250,7 +242,7 @@ with Experiment(prefix="my-experiment", project="project",
 **Local mode** - JSONL files:
 
 ```bash
-cat ./experiments/project/my-experiment/metrics/train/data.jsonl
+cat .dash/alice/project/my-experiment/metrics/train/data.jsonl
 ```
 
 ```json

@@ -191,7 +191,7 @@ def test_dxp_works_like_normal_experiment():
   # Should be able to use all methods
   dxp.log("Test log")
   dxp.params.set(test="value")
-  dxp.metrics("test_metric").log(step=0, value=1.0)
+  dxp.metrics("train").log(loss=1.0, step=0)
 
   # Verify data was saved
   # New structure: root / owner / project / prefix

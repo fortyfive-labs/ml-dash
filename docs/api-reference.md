@@ -25,37 +25,37 @@ The `Experiment` class is the main entry point for ML-Dash. It represents a sing
 
 ```python
 Experiment(
-    name: str,
-    project: str,
+    prefix: Optional[str] = None,
     *,
     description: Optional[str] = None,
     tags: Optional[List[str]] = None,
     bindrs: Optional[List[str]] = None,
-    folder: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
-    remote: Optional[str] = None,
-    api_key: Optional[str] = None,
-    user_name: Optional[str] = None,
-    local_path: Optional[str] = None,
+    remote: Optional[Union[str, bool]] = None,
+    local_path: Optional[str] = ".dash",
 )
 ```
 
-#### Required Parameters
+#### Prefix Format
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `name` | `str` | Unique experiment name within the project |
-| `project` | `str` | Project name to organize experiments |
+The prefix is a universal key that identifies your experiment:
 
-#### Optional Metadata Parameters
+```
+{owner}/{project}/path.../[name]
+```
+
+- **owner**: First segment (e.g., your username)
+- **project**: Second segment (e.g., project name)
+- **path**: Remaining segments form the folder structure
+- **name**: Derived from the last segment
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `prefix` | `str` | `None` | Universal key in format `owner/project/name` |
 | `description` | `str` | `None` | Human-readable description of the experiment |
 | `tags` | `List[str]` | `None` | Tags for categorization and search |
 | `bindrs` | `List[str]` | `None` | Binders for advanced organization |
-| `prefix` | `str` | `None` | Logical folder path for organization (e.g., "experiments/baseline") |
 | `metadata` | `Dict[str, Any]` | `None` | Additional structured metadata |
 
 #### Mode Configuration
@@ -63,32 +63,21 @@ Experiment(
 **Local Mode** (filesystem storage):
 ```python
 Experiment(
-    prefix="my-experiment",
-    project="my-project",
-      # Required for local mode
+    prefix="alice/my-project/my-experiment",
+    local_path=".dash"  # Default
 )
 ```
 
 **Remote Mode** (API + S3 storage):
 ```python
-# Option 1: With username (auto-generates API key)
+# Default remote mode (uses https://api.dash.ml)
 Experiment(
-    prefix="my-experiment",
-    project="my-project",
-    remote="https://api.dash.ml",
-    user_name="your-username"
+    prefix="alice/my-project/my-experiment"
 )
 
-# Option 2: Default remote mode (defaults to https://api.dash.ml)
+# Custom remote server
 Experiment(
-    prefix="my-experiment",
-    project="my-project"
-)
-
-# Option 3: Custom remote server
-Experiment(
-    prefix="my-experiment",
-    project="my-project",
+    prefix="alice/my-project/my-experiment",
     remote="https://custom-server.com"
 )
 ```
@@ -104,7 +93,7 @@ Experiments are managed through the `run` property, which returns a `RunManager`
 Automatically starts and completes/fails the experiment:
 
 ```python
-with Experiment(prefix="exp", project="proj").run as exp:
+with Experiment(prefix="alice/proj/exp").run as exp:
     exp.log("Training started")
     exp.params.set(lr=0.001)
     # Experiment automatically completes on successful exit
@@ -116,7 +105,7 @@ with Experiment(prefix="exp", project="proj").run as exp:
 Perfect for wrapping training functions:
 
 ```python
-exp = Experiment(prefix="exp", project="proj")
+exp = Experiment(prefix="alice/proj/exp")
 
 @exp.run
 def train_model(experiment):
@@ -132,7 +121,7 @@ result = train_model()
 Explicit start/complete for fine-grained control:
 
 ```python
-exp = Experiment(prefix="exp", project="proj")
+exp = Experiment(prefix="alice/proj/exp")
 
 exp.run.start()
 try:
@@ -585,15 +574,15 @@ from ml_dash.auto_start import dxp
 from ml_dash.auto_start import dxp
 
 # Ready to use immediately - already started!
-dxp.log("Starting quick experiment")
-dxp.params.set(lr=0.001, batch_size=32)
+exp.log("Starting quick experiment")
+exp.params.set(lr=0.001, batch_size=32)
 
 # Log metrics
-dxp.metrics("train").log(loss=0.5, step=0)
-dxp.metrics("train").log(loss=0.4, step=1)
+exp.metrics("train").log(loss=0.5, step=0)
+exp.metrics("train").log(loss=0.4, step=1)
 
 # Upload files
-dxp.files("models").save("model.pt")
+exp.files("models").save("model.pt")
 
 # Automatically completed on Python exit
 ```
@@ -606,7 +595,7 @@ Perfect for Jupyter notebooks and interactive Python sessions:
 from ml_dash.auto_start import dxp
 
 # Quick parameter tracking
-dxp.params.set(
+exp.params.set(
     model="resnet50",
     lr=0.001,
     batch_size=32,
@@ -616,11 +605,11 @@ dxp.params.set(
 # Log training progress
 for epoch in range(10):
     loss = train_epoch()
-    dxp.metrics("train").log(loss=loss, epoch=epoch)
-    dxp.log(f"Epoch {epoch} completed", loss=loss)
+    exp.metrics("train").log(loss=loss, epoch=epoch)
+    exp.log(f"Epoch {epoch} completed", loss=loss)
 
 # Save results
-dxp.files("results").save_json(results, to="results.json")
+exp.files("results").save_json(results, to="results.json")
 ```
 
 #### Prototyping Scripts
@@ -632,18 +621,18 @@ from ml_dash.auto_start import dxp
 import torch
 
 # Track experiment
-dxp.params.set(model_name="simple_cnn", dataset="mnist")
-dxp.log("Training started")
+exp.params.set(model_name="simple_cnn", dataset="mnist")
+exp.log("Training started")
 
 # Train model
 model = train_model()
 
 # Save model
-dxp.files("models").save_torch(model, to="model.pt")
+exp.files("models").save_torch(model, to="model.pt")
 
 # Log final metrics
-dxp.metrics("train").log(accuracy=0.95, step=10)
-dxp.log("Training completed")
+exp.metrics("train").log(accuracy=0.95, step=10)
+exp.log("Training completed")
 
 # No cleanup needed - automatically handled!
 ```
@@ -673,8 +662,8 @@ from ml_dash.auto_start import dxp
 assert dxp._is_open  # True
 
 # Use normally
-dxp.log("Working...")
-dxp.params.set(foo="bar")
+exp.log("Working...")
+exp.params.set(foo="bar")
 
 # Automatically completed on Python exit
 # No need to call .run.complete()
@@ -724,14 +713,14 @@ import torch
 import torch.nn as nn
 
 # Setup
-dxp.params.set(
+exp.params.set(
     model="simple_cnn",
     lr=0.001,
     epochs=10,
     batch_size=64
 )
 
-dxp.log("Starting prototype experiment")
+exp.log("Starting prototype experiment")
 
 # Define and train model
 model = nn.Sequential(
@@ -746,12 +735,12 @@ for epoch in range(10):
     loss = train_epoch(model)
     acc = evaluate(model)
 
-    dxp.metrics("train").log(loss=loss, accuracy=acc, epoch=epoch)
-    dxp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
+    exp.metrics("train").log(loss=loss, accuracy=acc, epoch=epoch)
+    exp.log(f"Epoch {epoch}", loss=loss, accuracy=acc)
 
 # Save results
-dxp.files("models").save_torch(model.state_dict(), to="final.pt")
-dxp.log("Experiment completed!")
+exp.files("models").save_torch(model.state_dict(), to="final.pt")
+exp.log("Experiment completed!")
 
 # Automatically saved on exit!
 ```
@@ -767,11 +756,9 @@ from ml_dash import Experiment
 
 # Create experiment
 with Experiment(
-    prefix="resnet50-training",
-    project="image-classification",
+    prefix="alice/image-classification/resnet50-training",
     description="ResNet50 on CIFAR-10",
-    tags=["resnet", "cifar10", "baseline"],
-    
+    tags=["resnet", "cifar10", "baseline"]
 ).run as exp:
 
     # 1. Set hyperparameters
@@ -846,10 +833,8 @@ batch_sizes = [32, 64, 128]
 for lr, bs in itertools.product(learning_rates, batch_sizes):
     # Create experiment for each combination
     with Experiment(
-        name=f"search-lr{lr}-bs{bs}",
-        project="hyperparam-search",
-        tags=["search", "grid"],
-        
+        prefix=f"alice/hyperparam-search/search-lr{lr}-bs{bs}",
+        tags=["search", "grid"]
     ).run as exp:
 
         exp.params.set(
@@ -872,9 +857,7 @@ from ml_dash import Experiment
 
 # Create experiment instance
 exp = Experiment(
-    prefix="training-run",
-    project="my-project",
-    
+    prefix="alice/my-project/training-run"
 )
 
 @exp.run
@@ -914,10 +897,8 @@ from ml_dash import Experiment
 
 # Connect to shared ML-Dash server
 with Experiment(
-    prefix="team-experiment",
-    project="shared-project",
+    prefix="alice/shared-project/team-experiment",
     remote="http://ml-dash-server:3000",
-    user_name="alice",
     description="Collaborative experiment",
     tags=["team", "production"]
 ).run as exp:
@@ -952,9 +933,7 @@ Experiments handle errors gracefully:
 ```python
 try:
     with Experiment(
-        prefix="my-experiment",
-        project="test",
-        
+        prefix="alice/test/my-experiment"
     ).run as exp:
         exp.log("Starting work")
         exp.params.set(test_param="value")
@@ -993,7 +972,7 @@ The experiment status will be set to `FAILED` automatically, and all logs, param
 from ml_dash import Experiment
 
 # Create experiment
-exp = Experiment(prefix="exp", project="proj")
+exp = Experiment(prefix="alice/proj/exp")
 
 # Lifecycle
 with exp.run as exp:                    # Context manager
@@ -1011,7 +990,6 @@ params = exp.params.get(flatten=False)   # Get nested
 exp.log("message")                       # Simple log
 exp.log("message", level="info")         # With level
 exp.log("msg", epoch=1, loss=0.5)        # With metadata
-exp.log().info("message")                # Fluent style
 
 # Metrics
 exp.metrics("train").log(loss=0.5, step=1)          # Log with prefix
@@ -1033,9 +1011,9 @@ exp.files(file_id="123").delete()
 # Auto-Start (dxp) - Quick prototyping
 from ml_dash.auto_start import dxp
 
-dxp.log("Already started!")              # Ready to use immediately
-dxp.params.set(lr=0.001)                 # Set parameters
-dxp.metrics("train").log(loss=0.5)       # Log metrics
-dxp.files("models").save("model.pt")     # Upload files
+exp.log("Already started!")              # Ready to use immediately
+exp.params.set(lr=0.001)                 # Set parameters
+exp.metrics("train").log(loss=0.5)       # Log metrics
+exp.files("models").save("model.pt")     # Upload files
 # Auto-completed on Python exit
 ```

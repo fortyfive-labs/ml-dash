@@ -93,8 +93,8 @@ class LogBuilder:
             **extra_metadata: Additional metadata as keyword arguments
 
         Example:
-            experiment.log().info("Training started")
-            experiment.log().info("Epoch complete", epoch=1, loss=0.5)
+            exp.log("Training started", level="info")
+            exp.log("Epoch complete", level="info", epoch=1, loss=0.5)
         """
         self._write(LogLevel.INFO.value, message, extra_metadata)
 

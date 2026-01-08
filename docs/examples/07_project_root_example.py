@@ -70,9 +70,9 @@ def demo_project_root():
   print("\n4. Creating experiment with auto-detected prefix:")
 
   data_dir = Path(__file__).parent / "tutorial_data"
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    project="demo",
-    prefix=EXP.prefix,  # Uses auto-detected prefix
+    prefix=f"demo/project/{EXP.prefix}",  # Uses auto-detected prefix
     local_path=str(data_dir),
     description="Demo using project_root",
   ).run as exp:
