@@ -8,22 +8,23 @@ Quick reference for common ML-Dash operations.
 from ml_dash import Experiment
 
 # Local mode
-with Experiment(
-    name="experiment-name",
-    project="project-name",
-    local_prefix="./data",
-        local_path=".dash"
-) as experiment:
+exp = Experiment(
+    prefix="owner/project/experiment-name",
+    local_path=".dash"
+)
+
+with exp.run:
     # Your code here
     pass
 
 # Remote mode (with username - auto-generates API key)
-with Experiment(
-    name="experiment-name",
-    project="project-name",
+exp = Experiment(
+    prefix="owner/project/experiment-name",
     remote="https://api.dash.ml",
     user_name="your-username"
-) as experiment:
+)
+
+with exp.run:
     # Your code here
     pass
 ```
@@ -53,13 +54,13 @@ experiment.log(
 
 ```python
 # Set parameters (keyword arguments)
-experiment.parameters().set(
+exp.params.set(
     learning_rate=0.001,
     batch_size=32
 )
 
 # Set parameters (dictionary - supports nested)
-experiment.parameters().set(**{
+exp.params.set(**{
     "model": {
         "architecture": "resnet50",
         "layers": 50
@@ -68,40 +69,40 @@ experiment.parameters().set(**{
 # Stored as: {"model.architecture": "resnet50", "model.layers": 50}
 
 # Update parameters
-experiment.parameters().set(learning_rate=0.0001)
+exp.params.set(learning_rate=0.0001)
 ```
 
 ## Metrics (Time-Series Metrics)
 
 ```python
-# Append single data point
-experiment.metric("train_loss").append(value=0.5, epoch=1)
+# Log single data point
+experiment.metrics("train").log(loss=0.5, epoch=1)
 
 # Flexible schema
-experiment.metric("metrics").append(
+experiment.metrics("train").log(
     loss=0.5,
     accuracy=0.85,
     epoch=1
 )
 
-# Batch append
-experiment.metric("loss").append_batch([
-    {"value": 0.5, "epoch": 1},
-    {"value": 0.4, "epoch": 2},
-    {"value": 0.3, "epoch": 3}
+# Batch log
+experiment.metrics("train").log_batch([
+    {"loss": 0.5, "epoch": 1},
+    {"loss": 0.4, "epoch": 2},
+    {"loss": 0.3, "epoch": 3}
 ])
 
 # Read data
-result = experiment.metric("loss").read(start_index=0, limit=10)
+result = experiment.metrics("train").read(start_index=0, limit=10)
 for point in result['data']:
     print(f"Index {point['index']}: {point['data']}")
 
 # Get statistics
-stats = experiment.metric("loss").stats()
+stats = experiment.metrics("train").stats()
 print(f"Total points: {stats['totalDataPoints']}")
 
 # List all metrics
-metrics = experiment.metric("loss").list_all()
+metrics = experiment.metrics("train").list_all()
 for metric in metrics:
     print(f"{metric['name']}: {metric['totalDataPoints']} points")
 ```
@@ -135,33 +136,33 @@ for file in files:
 ```python
 from ml_dash import Experiment
 
-with Experiment(
-    name="mnist-training",
-    project="computer-vision",
-    local_prefix="./experiments",
-        local_path=".dash"
-) as experiment:
+exp = Experiment(
+    prefix="owner/computer-vision/mnist-training",
+    local_path=".dash/owner/computer-vision/mnist-training"
+)
+
+with exp.run:
     # Configuration
-    experiment.parameters().set(
+    exp.params.set(
         learning_rate=0.001,
         batch_size=64,
         epochs=10
     )
 
-    experiment.log("Training started", level="info")
+    exp.log("Training started", level="info")
 
     # Training loop
     for epoch in range(10):
         # Train
         train_loss, val_loss, accuracy = train_one_epoch()
 
-        # Metric metrics
-        experiment.metric("train_loss").append(value=train_loss, epoch=epoch)
-        experiment.metric("val_loss").append(value=val_loss, epoch=epoch)
-        experiment.metric("accuracy").append(value=accuracy, epoch=epoch)
+        # Log metrics
+        exp.metrics("train").log(loss=train_loss, epoch=epoch)
+        exp.metrics("val").log(loss=val_loss, epoch=epoch)
+        exp.metrics("eval").log(accuracy=accuracy, epoch=epoch)
 
         # Log progress
-        experiment.log(
+        exp.log(
             f"Epoch {epoch + 1}/10 complete",
             metadata={
                 "train_loss": train_loss,
@@ -172,9 +173,9 @@ with Experiment(
 
     # Save model
     save_model("model.pth")
-    experiment.files(file_prefix="model.pth", prefix="models/").save()
+    exp.files(file_prefix="model.pth", prefix="models/").save()
 
-    experiment.log("Training complete!", level="info")
+    exp.log("Training complete!", level="info")
 ```
 
 ## Common Patterns
@@ -182,18 +183,20 @@ with Experiment(
 ### Training with Checkpoints
 
 ```python
-with Experiment(...) as experiment:
+exp = Experiment(...)
+
+with exp.run:
     best_acc = 0
     for epoch in range(epochs):
         train()
         acc = validate()
 
-        experiment.metric("accuracy").append(value=acc, epoch=epoch)
+        exp.metrics("eval").log(accuracy=acc, epoch=epoch)
 
         if acc > best_acc:
             best_acc = acc
             save_checkpoint(f"checkpoint_{epoch}.pth")
-            experiment.files(
+            exp.files(
                 file_path=f"checkpoint_{epoch}.pth",
                 prefix="checkpoints/",
                 tags=["best"]
@@ -205,27 +208,31 @@ with Experiment(...) as experiment:
 ```python
 for lr in [0.1, 0.01, 0.001]:
     for bs in [32, 64, 128]:
-        with Experiment(name=f"search-lr{lr}-bs{bs}", ...) as experiment:
-            experiment.parameters().set(
+        exp = Experiment(prefix=f"owner/project/search-lr{lr}-bs{bs}", ...)
+
+        with exp.run:
+            exp.params.set(
                 learning_rate=lr,
                 batch_size=bs
             )
 
             accuracy = train(lr, bs)
-            experiment.metric("accuracy").append(value=accuracy)
+            exp.metrics("eval").log(accuracy=accuracy)
 ```
 
 ### Progress Logging
 
 ```python
-with Experiment(...) as experiment:
+exp = Experiment(...)
+
+with exp.run:
     total = 1000
     for i in range(total):
         process_item(i)
 
         if i % 100 == 0:
             percent = (i / total) * 100
-            experiment.log(
+            exp.log(
                 f"Progress: {percent}%",
                 metadata={"processed": i, "total": total}
             )
@@ -259,16 +266,16 @@ with Experiment(...) as experiment:
 
 ```bash
 # View logs
-cat .dash/project/experiment/logs.jsonl
+cat .dash/owner/project/experiment/logs.jsonl
 
 # View parameters
-cat .dash/project/experiment/parameters.json
+cat .dash/owner/project/experiment/parameters.json
 
 # View metric data
-cat .dash/project/experiment/metrics/train_loss/data.jsonl
+cat .dash/owner/project/experiment/metrics/train_loss/data.jsonl
 
 # List files
-ls .dash/project/experiment/files/
+ls .dash/owner/project/experiment/files/
 ```
 
 ## See Also

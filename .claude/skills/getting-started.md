@@ -38,17 +38,17 @@ Opens browser for secure OAuth2 authentication. Token stored in system keychain.
 ### 2. Start Tracking
 
 ```python
-from ml_dash import dxp
+from ml_dash.auto_start import dxp
 
 with dxp.run:
-    dxp.log().info("Training started")
+    dxp.log("Training started", level="info")
     dxp.params.set(learning_rate=0.001, batch_size=32)
 
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08
-        dxp.metrics("loss").append(value=loss, epoch=epoch)
+        dxp.metrics("train").log(loss=loss, epoch=epoch)
 
-    dxp.log().info("Training completed")
+    dxp.log("Training completed", level="info")
 ```
 
 ## Quick Start - Local Mode (No Auth)
@@ -56,26 +56,27 @@ with dxp.run:
 ```python
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="tutorial",
-        local_path=".dash").run as experiment:
-    experiment.log().info("Training started")
-    experiment.params.set(learning_rate=0.001, batch_size=32)
+exp = Experiment(prefix="alice/tutorial/my-experiment")
+
+with exp.run:
+    exp.log("Training started", level="info")
+    exp.params.set(learning_rate=0.001, batch_size=32)
 
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        exp.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
-Data stored in `.dash/tutorial/my-experiment/`.
+Data stored in `.dash/alice/tutorial/my-experiment/`.
 
 ## Pre-configured Singleton (dxp)
 
 ```python
-from ml_dash import dxp  # or from ml_dash.auto_start import dxp
+from ml_dash.auto_start import dxp
 
 # Ready to use immediately
 dxp.params.set(learning_rate=0.001)
-dxp.metrics.append(loss=0.5, accuracy=0.9)
+dxp.metrics("train").log(loss=0.5, accuracy=0.9)
 dxp.files.save_torch(model, "model.pt")
 ```
 
@@ -83,9 +84,10 @@ dxp.files.save_torch(model, "model.pt")
 
 ```
 .dash/
-└── project/
-    └── experiment/
-        ├── logs/logs.jsonl
-        ├── parameters/parameters.json
-        └── metrics/loss.jsonl
+└── owner/
+    └── project/
+        └── experiment/
+            ├── logs/logs.jsonl
+            ├── parameters/parameters.json
+            └── metrics/train.jsonl
 ```

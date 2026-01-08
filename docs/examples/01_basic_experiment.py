@@ -9,11 +9,10 @@ def main():
     print("Basic Experiment Example")
     print("=" * 60)
 
-    # Create a experiment in local mode
+    # Create an experiment in local mode
+    # Prefix format: owner/project/experiment-name
     with Experiment(
-        prefix="hello-ml-dash",
-        project="tutorials",
-        
+        prefix="demo/tutorials/hello-ml-dash",
         description="My first ML-Dash experiment",
         tags=["tutorial", "basic"]
     ).run as experiment:

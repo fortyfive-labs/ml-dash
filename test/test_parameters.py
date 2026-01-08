@@ -181,16 +181,16 @@ class TestParameterUpdates:
   def test_multiple_parameter_updates_local(self, local_experiment, tmp_proj):
     """Test multiple parameter update operations."""
     with local_experiment(name="multi-update", project="test").run as experiment:
-      experiment.params.set(step=1, value=0.1)
-      experiment.params.set(step=2, value=0.2)
-      experiment.params.set(step=3, value=0.3)
+      experiment.params.set(lr=0.1, batch_size=32)
+      experiment.params.set(lr=0.01, ent_coef=0.01)
+      experiment.params.set(lr=0.001, ent_coef=0.001)
 
     params_file = tmp_proj / getpass.getuser() / "test/multi-update/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
-    assert params["step"] == 3
-    assert params["value"] == 0.3
+    assert params["lr"] == 0.001
+    assert params["ent_coef"] == 0.001
 
   def test_overwrite_nested_parameter_local(self, local_experiment, tmp_proj):
     """Test overwriting nested parameters."""

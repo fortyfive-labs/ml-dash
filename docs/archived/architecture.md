@@ -72,7 +72,7 @@ experiment.log("Message", level="info", metadata={...})
 
 #### ParametersBuilder
 ```python
-experiment.parameters().set(lr=0.001, batch_size=32)
+exp.params.set(lr=0.001, batch_size=32)
 ```
 - Stores hyperparameters and configuration
 - **Automatic flattening**: Nested dicts converted to dot notation
@@ -82,8 +82,8 @@ experiment.parameters().set(lr=0.001, batch_size=32)
 
 #### MetricBuilder
 ```python
-experiment.metric("loss").append(value=0.5, epoch=0)
-experiment.metric("loss").append_batch([...])
+experiment.metrics("train").log(loss=0.5, epoch=0)
+experiment.metrics("train").log_batch([...])
 ```
 - Time-series metrics metricing
 - Flexible schema (any fields)
@@ -229,10 +229,10 @@ sequenceDiagram
 **Example**:
 ```python
 # Clean, readable API
-experiment.metric("accuracy").append(value=0.95, epoch=10)
+experiment.metrics("eval").log(accuracy=0.95, epoch=10)
 
 # vs procedural approach
-experiment.append_metric("accuracy", {"value": 0.95, "epoch": 10})
+experiment.log_metric("eval", {"accuracy": 0.95, "epoch": 10})
 ```
 
 ### 2. Upsert Behavior
@@ -260,16 +260,12 @@ experiment.append_metric("accuracy", {"value": 0.95, "epoch": 10})
 **Example**:
 ```python
 # This automatically creates:
-# - Namespace (if remote)
+# - Owner namespace (if remote)
 # - Project "my-project"
-# - Folder "/experiments/2024"
 # - Experiment "baseline"
 Experiment(
-    name="baseline",
-    project="my-project",
-    folder="/experiments/2024",
-    local_prefix=".dash",
-        local_path=".dash"
+    prefix="owner/my-project/baseline",
+    local_path=".dash/owner/my-project/baseline"
 )
 ```
 
@@ -351,13 +347,13 @@ class CustomStorage:
 For high-throughput scenarios, use batch operations:
 
 ```python
-# Instead of multiple appends
+# Instead of multiple logs
 for data in dataset:
-    experiment.metric("metric").append(**data)  # ❌ Slow
+    experiment.metrics("train").log(**data)  # ❌ Slow
 
-# Use batch append
-batch_data = [{"value": x, "step": i} for i, x in enumerate(values)]
-experiment.metric("metric").append_batch(batch_data)  # ✅ Fast
+# Use batch log
+batch_data = [{"loss": x, "step": i} for i, x in enumerate(values)]
+experiment.metrics("train").log_batch(batch_data)  # ✅ Fast
 ```
 
 **Performance gains**:
@@ -394,14 +390,14 @@ experiment.metric("metric").append_batch(batch_data)  # ✅ Fast
 **Development Mode**:
 ```python
 # Auto-generates JWT from username
-Experiment(remote="...", user_name="alice")
+Experiment(prefix="owner/my-project/my-experiment", remote="...", user_name="alice")
 # Equivalent to providing a JWT token
 ```
 
 **Production Mode**:
 ```python
 # Use proper API key from authentication service
-Experiment(remote="...", api_key="actual-jwt-token")
+Experiment(prefix="owner/my-project/my-experiment", remote="...", api_key="actual-jwt-token")
 ```
 
 ### Data Security

@@ -17,23 +17,23 @@ Usage:
     with Experiment(
         prefix="ge/my-project/experiments/exp1",
         local_path=".dash"
-    ).run as experiment:
-        experiment.log("Training started")
-        experiment.params.set(lr=0.001)
-        experiment.metrics("loss").append(step=0, value=0.5)
+    ).run as exp:
+        exp.log("Training started")
+        exp.params.set(lr=0.001)
+        exp.metrics("train").log(loss=0.5, step=0)
 
     # Default: Remote mode (defaults to https://api.dash.ml)
-    with Experiment(prefix="ge/my-project/experiments/exp1").run as experiment:
-        experiment.log("Training started")
-        experiment.params.set(lr=0.001)
-        experiment.metrics("loss").append(step=0, value=0.5)
+    with Experiment(prefix="ge/my-project/experiments/exp1").run as exp:
+        exp.log("Training started")
+        exp.params.set(lr=0.001)
+        exp.metrics("train").log(loss=0.5, step=0)
 
     # Decorator style
     from ml_dash import ml_dash_experiment
 
     @ml_dash_experiment(prefix="ge/my-project/experiments/exp1")
-    def train_model(experiment):
-        experiment.log("Training started")
+    def train_model(exp):
+        exp.log("Training started")
 """
 
 from .client import RemoteClient

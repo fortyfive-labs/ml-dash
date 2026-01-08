@@ -19,8 +19,9 @@ def main():
   print("Parameters Example")
   print("=" * 60)
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="parameters-demo", project="tutorials"
+    prefix="demo/tutorials/parameters-demo"
   ).run as experiment:
     # Simple parameters
     experiment.params.set(learning_rate=0.001, batch_size=32, epochs=100)

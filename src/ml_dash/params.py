@@ -17,9 +17,9 @@ class ParametersBuilder:
     Fluent interface for parameter operations.
 
     Usage:
-        experiment.parameters().set(model={"lr": 0.001}, optimizer="adam")
-        params = experiment.parameters().get()
-        params_nested = experiment.parameters().get(flatten=False)
+        exp.params.set(model={"lr": 0.001}, optimizer="adam")
+        params = exp.params.get()
+        params_nested = exp.params.get(flatten=False)
     """
 
     def __init__(self, experiment: 'Experiment'):
@@ -51,16 +51,16 @@ class ParametersBuilder:
 
         Examples:
             # Set nested parameters
-            experiment.parameters().set(
+            exp.params.set(
                 model={"lr": 0.001, "batch_size": 32},
                 optimizer="adam"
             )
 
             # Merge/update specific parameters
-            experiment.parameters().set(model={"lr": 0.0001})  # Only updates model.lr
+            exp.params.set(model={"lr": 0.0001})  # Only updates model.lr
 
             # Set flat parameters with dot notation
-            experiment.parameters().set(**{"model.lr": 0.001, "model.batch_size": 32})
+            exp.params.set(**{"model.lr": 0.001, "model.batch_size": 32})
         """
         if not self._experiment._is_open:
             raise RuntimeError(

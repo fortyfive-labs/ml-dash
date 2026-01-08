@@ -15,9 +15,7 @@ from ml_dash import Experiment, ml_dash_experiment
 
 
 @ml_dash_experiment(
-  prefix="decorator-example",
-  project="usage-styles",
-  
+  prefix="demo/usage-styles/decorator-example",
   description="Demonstrating decorator style",
   tags=["decorator", "demo"],
 )
@@ -69,10 +67,9 @@ def train_with_context_manager():
   print("\n📦 Context Manager Style Example")
   print("=" * 50)
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="context-manager-example",
-    project="usage-styles",
-    
+    prefix="demo/usage-styles/context-manager-example",
     description="Demonstrating context manager style",
     tags=["context-manager", "demo"],
   ).run as experiment:
@@ -113,10 +110,9 @@ def train_with_direct_instantiation():
   print("=" * 50)
 
   # Create experiment object
+  # Prefix format: owner/project/experiment-name
   experiment = Experiment(
-    prefix="direct-example",
-    project="usage-styles",
-    
+    prefix="demo/usage-styles/direct-example",
     description="Demonstrating direct instantiation style",
     tags=["direct", "demo"],
   )
@@ -151,8 +147,7 @@ def train_with_direct_instantiation():
 
 
 @ml_dash_experiment(
-  prefix="remote-decorator-example",
-  project="usage-styles",
+  prefix="demo/usage-styles/remote-decorator-example",
   remote="https://api.dash.ml",
   description="Decorator with remote mode",
   tags=["remote", "decorator"],
@@ -179,9 +174,9 @@ def train_remote_context_manager():
   print("\n☁️  Remote Mode with Context Manager")
   print("=" * 50)
 
+  # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix="remote-context-example",
-    project="usage-styles",
+    prefix="demo/usage-styles/remote-context-example",
     remote="https://api.dash.ml",
     description="Context manager with remote mode",
     tags=["remote", "context-manager"],

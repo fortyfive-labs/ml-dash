@@ -10,7 +10,7 @@ pip install ml-dash==0.6.2rc1
 
 ## Quick Start with Remote Mode
 
-The fastest way to get started is using the pre-configured `dxp` singleton with remote tracking:
+The fastest way to get started is using remote tracking with the ML-Dash server:
 
 ### 1. Authenticate
 
@@ -25,15 +25,16 @@ This opens your browser for secure OAuth2 authentication. Your token is stored s
 ```{code-block} python
 :linenos:
 
-from ml_dash import dxp
+from ml_dash import Experiment
 
 # Start experiment (uploads to https://api.dash.ml by default)
-with dxp.run:
+# Prefix format: owner/project/experiment-name
+with Experiment(prefix="alice/my-project/training-run").run as exp:
     # Log messages
-    dxp.log().info("Training started")
+    exp.log("Training started", level="info")
 
     # Track parameters
-    dxp.params.set(
+    exp.params.set(
         learning_rate=0.001,
         batch_size=32,
         epochs=10
@@ -42,9 +43,9 @@ with dxp.run:
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        dxp.metrics("train").log(loss=loss, epoch=epoch)
+        exp.metrics("train").log(loss=loss, epoch=epoch)
 
-    dxp.log().info("Training completed")
+    exp.log("Training completed", level="info")
 ```
 
 That's it! Your experiment is now tracked on the ML-Dash server.
@@ -58,14 +59,17 @@ Local mode stores everything on your filesystem - perfect for offline work:
 
 from ml_dash import Experiment
 
-# Create a experiment (stores data in .dash/ directory)
-with Experiment(prefix="my-first-experiment", project="tutorial",
-        ).run as experiment:
+# Create an experiment (stores data in .dash/ directory)
+# Prefix format: owner/project/experiment-name
+with Experiment(
+    prefix="alice/tutorial/my-first-experiment",
+    local_path=".dash"
+).run as exp:
     # Log messages
-    experiment.log().info("Training started")
+    exp.log("Training started", level="info")
 
     # Track parameters
-    experiment.params.set(
+    exp.params.set(
         learning_rate=0.001,
         batch_size=32,
         epochs=10
@@ -74,12 +78,12 @@ with Experiment(prefix="my-first-experiment", project="tutorial",
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        experiment.metrics("train").log(loss=loss, epoch=epoch)
+        exp.metrics("train").log(loss=loss, epoch=epoch)
 
-    experiment.log().info("Training completed")
+    exp.log("Training completed", level="info")
 ```
 
-That's it! Your experiment data is now saved in `.dash/tutorial/my-first-experiment/`.
+That's it! Your experiment data is now saved in `.dash/alice/tutorial/my-first-experiment/`.
 
 ### Where is My Data?
 
@@ -87,15 +91,16 @@ After running the code above, your data is organized like this:
 
 ```
 .dash/
-└── tutorial/                    # project
-    └── my-first-experiment/     # experiment
-        ├── logs/
-        │   └── logs.jsonl       # your log messages
-        ├── parameters/
-        │   └── parameters.json  # your hyperparameters
-        └── metrics/
-            └── train/
-                └── data.jsonl   # your metrics
+└── alice/                              # owner
+    └── tutorial/                       # project
+        └── my-first-experiment/        # experiment
+            ├── logs/
+            │   └── logs.jsonl          # your log messages
+            ├── parameters/
+            │   └── parameters.json     # your hyperparameters
+            └── metrics/
+                └── train/
+                    └── data.jsonl      # your metrics
 ```
 
 ## Common Patterns
@@ -107,10 +112,10 @@ After running the code above, your data is organized like this:
 
 from ml_dash import Experiment
 
-with Experiment(prefix="train-model", project="project",
-        ).run as experiment:
+# Prefix format: owner/project/experiment-name
+with Experiment(prefix="alice/project/train-model").run as exp:
     # Set hyperparameters
-    experiment.params.set(
+    exp.params.set(
         model="resnet50",
         optimizer="adam",
         learning_rate=0.001
@@ -123,7 +128,7 @@ with Experiment(prefix="train-model", project="project",
         val_acc = 0.9     # your actual accuracy
 
         # Log metrics
-        experiment.metrics.log(
+        exp.metrics.log(
             epoch=epoch,
             train=dict(loss=train_loss, accuracy=val_acc),
             eval=dict(loss=train_loss, accuracy=val_acc)
@@ -131,7 +136,7 @@ with Experiment(prefix="train-model", project="project",
 
         # Log important events
         if epoch % 10 == 0:
-            experiment.log(f"Checkpoint at epoch {epoch}")
+            exp.log(f"Checkpoint at epoch {epoch}")
 ```
 
 ### Uploading Files
@@ -141,16 +146,15 @@ with Experiment(prefix="train-model", project="project",
 
 from ml_dash import Experiment
 
-with Experiment(prefix="my-experiment", project="project",
-        ).run as experiment:
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     # Train your model...
     # model.save("model.pth")
 
     # Upload the model file
-    experiment.files("models").save("model.pth")
+    exp.files("models").save("model.pth")
 
     # Upload a config file with metadata
-    experiment.files("configs").save(
+    exp.files("configs").save(
         "config.yaml",
         metadata={"version": "1.0"}
     )
@@ -168,13 +172,12 @@ from ml_dash import Experiment
 # First authenticate: ml-dash login
 
 with Experiment(
-    prefix="my-experiment",
-    project="team-project",
+    prefix="alice/team-project/my-experiment",
     remote="https://api.dash.ml"  # token auto-loaded from keychain
-).run as experiment:
+).run as exp:
     # Use exactly the same API as local mode!
-    experiment.log().info("Running on remote server")
-    experiment.params.set(learning_rate=0.001)
+    exp.log("Running on remote server", level="info")
+    exp.params.set(learning_rate=0.001)
 ```
 
 The API is identical across local and remote modes!

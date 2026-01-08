@@ -164,29 +164,3 @@ def train_simple_model():
 
 if __name__ == "__main__":
   train_simple_model()
-
-
-# The current code incorrectly uses metric
-#    names as namespaces. The correct approach is to group related metrics
-#   in namespaces and pass multiple metrics per append call
-
-
-# # Log all metrics (15+ metrics total)
-# experiment.metrics("train_loss").log(value=train_loss, epoch=epoch)
-# experiment.metrics("val_loss").log(value=val_loss, epoch=epoch)
-# experiment.metrics("train_accuracy").log(value=train_accuracy, epoch=epoch)
-# experiment.metrics("val_accuracy").log(value=val_accuracy, epoch=epoch)
-# experiment.metrics("precision").log(value=precision, epoch=epoch)
-# experiment.metrics("recall").log(value=recall, epoch=epoch)
-# experiment.metrics("f1_score").log(value=f1_score, epoch=epoch)
-# experiment.metrics("learning_rate").log(value=current_lr, epoch=epoch)
-# experiment.metrics("gradient_norm").log(value=gradient_norm, epoch=epoch)
-# experiment.metrics("perplexity").log(value=perplexity, epoch=epoch)
-# experiment.metrics("gpu_memory_mb").log(value=gpu_memory_mb, epoch=epoch)
-# experiment.metrics("batch_time_ms").log(value=batch_time_ms, epoch=epoch)
-# experiment.metrics("epoch_time_sec").log(value=epoch_time, epoch=epoch)
-# experiment.metrics("true_positives").log(value=true_positives, epoch=epoch)
-# experiment.metrics("false_positives").log(value=false_positives, epoch=epoch)
-# experiment.metrics("class_0_accuracy").log(value=class_0_acc, epoch=epoch)
-# experiment.metrics("class_1_accuracy").log(value=class_1_acc, epoch=epoch)
-# experiment.metrics("class_2_accuracy").log(value=class_2_acc, epoch=epoch)

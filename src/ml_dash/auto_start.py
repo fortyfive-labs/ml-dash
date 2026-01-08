@@ -9,18 +9,18 @@ Usage:
     # First, authenticate
     # $ ml-dash login
 
-    from ml_dash import dxp
+    from ml_dash.auto_start import dxp
 
     # Use with statement (recommended)
     with dxp.run:
-        dxp.log().info("Hello from dxp!")
+        dxp.log("Hello from dxp!", level="info")
         dxp.params.set(lr=0.001)
-        dxp.metrics("loss").append(step=0, value=0.5)
+        dxp.metrics("train").log(loss=0.5, step=0)
     # Automatically completes on exit from with block
 
     # Or start/complete manually
     dxp.run.start()
-    dxp.log().info("Training...")
+    dxp.log("Training...", level="info")
     dxp.run.complete()
 """
 

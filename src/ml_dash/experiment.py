@@ -3,7 +3,7 @@ Experiment class for ML-Dash SDK.
 
 Supports three usage styles:
 1. Decorator: @ml_dash_experiment(...)
-2. Context manager: with Experiment(...) as exp:
+2. Context manager: with Experiment(...).run as exp:
 3. Direct instantiation: exp = Experiment(...)
 """
 
@@ -589,7 +589,7 @@ class Experiment:
         "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
         "Example:\n"
         "  with dxp.run:\n"
-        "      dxp.log().info('Training started')"
+        "      dxp.log('Training started', level='info')"
       )
 
     # Fluent mode: return LogBuilder
