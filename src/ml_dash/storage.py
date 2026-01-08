@@ -95,13 +95,13 @@ class LocalStorage:
     """
     Create an experiment directory structure.
 
-    Structure: root / owner / project / prefix
-    where prefix = folder_1/folder_2/.../exp_name
+    Structure: root / prefix
+    where prefix = owner/project/folder_1/.../exp_name
 
     Args:
-        owner: Owner/user
-        project: Project name
-        prefix: Experiment prefix (folder_1/folder_2/.../exp_name)
+        owner: Owner/user (extracted from prefix, kept for API compatibility)
+        project: Project name (extracted from prefix, kept for API compatibility)
+        prefix: Full experiment path (owner/project/folder_1/.../exp_name)
         description: Optional description
         tags: Optional tags
         bindrs: Optional bindrs
@@ -114,15 +114,8 @@ class LocalStorage:
     prefix_clean = prefix.rstrip("/")
     prefix_path = prefix_clean.lstrip("/")
 
-    # Create full directory structure: owner / project / prefix
-    owner_dir = self.root_path / owner
-    owner_dir.mkdir(parents=True, exist_ok=True)
-
-    project_dir = owner_dir / project
-    project_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create experiment directory (prefix may have subdirectories)
-    experiment_dir = project_dir / prefix_path
+    # Create experiment directory directly from prefix
+    experiment_dir = self.root_path / prefix_path
     experiment_dir.mkdir(parents=True, exist_ok=True)
 
     # Create subdirectories
@@ -746,11 +739,11 @@ class LocalStorage:
     """
     Get experiment directory path.
 
-    Structure: root / owner / project / prefix
-    where prefix = folder_1/folder_2/.../exp_name
+    Structure: root / prefix
+    where prefix = owner/project/folder_1/.../exp_name
     """
     prefix_path = prefix.lstrip("/")
-    return self.root_path / owner / project / prefix_path
+    return self.root_path / prefix_path
 
   def append_to_metric(
     self,

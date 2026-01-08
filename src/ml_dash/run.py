@@ -1,27 +1,27 @@
 """
-RUN - Global run configuration object for ML-Dash.
+EXP - Global experiment configuration object for ML-Dash.
 
-This module provides a global RUN object that serves as the single source
-of truth for run/experiment metadata. Uses params-proto for configuration.
+This module provides a global EXP object that serves as the single source
+of truth for experiment metadata. Uses params-proto for configuration.
 
 Usage:
-    from ml_dash import RUN
+    from ml_dash import EXP
 
-    # Configure the run
-    EXP.name = "my-experiment"
-    EXP.project = "my-project"
+    # Configure via environment variable
+    # export ML_DASH_PREFIX="ge/myproject/experiments/exp1"
 
-    # Use in templates (use dot notation for unique paths)
-    prefix = "/experiments/{EXP.name}.{EXP.id}".format(EXP=EXP)
+    # Or set directly
+    EXP.PREFIX = "ge/myproject/experiments/exp1"
 
-    # With dxp singleton (EXP is auto-populated)
-    from ml_dash import dxp
-    with dxp.run:
-        # EXP.name, EXP.project, EXP.id, EXP.timestamp are set
-        dxp.log().info(f"Running {EXP.name}")
+    # Use in templates
+    prefix = "{EXP.PREFIX}/{EXP.name}.{EXP.id}".format(EXP=EXP)
+
+    # With Experiment (EXP is auto-populated)
+    from ml_dash import Experiment
+    with Experiment(prefix=EXP.PREFIX).run as exp:
+        exp.log().info(f"Running {EXP.name}")
 """
 
-import time
 from datetime import datetime, timezone
 from params_proto import proto, EnvVar
 
@@ -32,19 +32,25 @@ class EXP:
     Global experiment configuration.
 
     This class is the single source of truth for experiment metadata.
-    Configure it before starting an experiment, or let dxp auto-configure.
+    Configure it before starting an experiment, or let Experiment auto-configure.
+
+    Prefix format: {owner}/{project}/path.../[name]
 
     Template variables available:
-        {EXP.prefix}    - Experiment prefix = <project>/<folders...>/<exp_name>
-        {EXP.id}        - Numeric experiment ID (milliseconds since epoch)
+        {EXP.PREFIX}    - Full experiment prefix from env or direct setting
+        {EXP.name}      - Experiment name (last segment of prefix)
+        {EXP.id}        - Unique experiment ID (snowflake)
         {EXP.date}      - Date string (YYYYMMDD)
         {EXP.time}      - Time string (HHMMSS)
         {EXP.datetime}  - DateTime string (YYYYMMDD.HHMMSS)
         {EXP.timestamp} - ISO timestamp
 
     Example:
-        EXP.name = "exp.{EXP.date}"  # -> "exp.20251219"
-        dxp.run.prefix = "{EXP.project}/{EXP.name}.{EXP.id}"
+        # Set prefix via env var or directly
+        EXP.PREFIX = "ge/myproject/exp1"
+
+        # Or use environment variable
+        # export ML_DASH_PREFIX="ge/myproject/exp1"
 
     Auto-detection from file path:
         # In experiments/__init__.py
@@ -56,26 +62,32 @@ class EXP:
         EXP.__post_init__(entry=__file__)
         # Result: EXP.prefix = "vision/resnet", EXP.name = "resnet"
     """
-    #
-    PREFIX: str = ""  # Prefix path with default templates
+    PREFIX: str = EnvVar @ "ML_DASH_PREFIX" | None
+    """Full experiment path: {owner}/{project}/path.../[name]"""
 
-    # Core identifiers
-    name: str = "scratch"  # Experiment name (can be a template)
-    project: str = EnvVar @ "DASH_PROJECT" | "scratch"  # Project name
+    API_URL: str = EnvVar @ "ML_DASH_API_URL" | "https://api.dash.ml"
+    """Remote API server URL"""
 
-    # Auto-generated identifiers
-    id: int = None  # Unique experiment ID (numeric, milliseconds since epoch)
-    timestamp: str = None  # ISO timestamp string
+    name: str = "scratch"
+    """Experiment name (last segment of prefix)"""
 
-    prefix: str = None  # Prefix path with optional templates
-    description: str = None  # Experiment description
+    description: str = None
+    """Experiment description"""
 
-    # Project root for auto-detection
-    project_root: str = None  # Root directory for experiment hierarchy
-    entry: str = None  # Entry point file/directory path
+    id: int = None
+    """Unique experiment ID (snowflake, auto-generated at run start)"""
 
-    # Internal: stores the original name template
-    _name_template: str = None
+    timestamp: str = None
+    """ISO timestamp (auto-generated at run start)"""
+
+    prefix: str = None
+    """Resolved prefix after template substitution"""
+
+    project_root: str = None
+    """Root directory for experiment hierarchy (for auto-detection)"""
+
+    entry: str = None
+    """Entry point file/directory path"""
 
     def __post_init__(self, entry: str = None):
         """
@@ -120,26 +132,6 @@ class EXP:
                 # entry is not under project_root, keep current values
                 pass
 
-    @classmethod
-    def _init_run(cls):
-        """
-        Initialize run-specific values (id, timestamp, date, time).
-        Called when an experiment starts.
-        """
-        now = datetime.now(timezone.utc)
-        cls.id = int(time.time() * 1000)  # milliseconds since epoch
-        cls.timestamp = now.isoformat()
-
-    @classmethod
-    def _reset(cls):
-        """
-        Reset run-specific values after an experiment closes.
-        Preserves project_root and other configuration.
-        """
-        cls.id = None
-        cls.timestamp = None
-        cls.entry = None
-
     @property
     def date(cls) -> str:
         """Date string in YYYYMMDD format."""
@@ -178,5 +170,4 @@ class EXP:
         cls.timestamp = None
         cls.prefix = None
         cls.description = None
-        cls._name_template = None
 

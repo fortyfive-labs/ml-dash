@@ -74,6 +74,7 @@ class TestExperimentCreation:
 
   def test_experiment_with_metadata_local(self, local_experiment, tmp_proj):
     """Test experiment with description, tags, and prefix in local mode."""
+    owner = getpass.getuser()
     with local_experiment(
       name="meta-experiment",
       project="meta-ws",
@@ -84,10 +85,10 @@ class TestExperimentCreation:
       experiment.log("Experiment with metadata")
 
     # Verify metadata
-    # New structure: root / owner / project / prefix
+    # New structure: root / prefix (where prefix = owner/project/path)
     experiment_file = (
       tmp_proj
-      / getpass.getuser()
+      / owner
       / "meta-ws/experiments/meta/meta-experiment/experiment.json"
     )
     assert experiment_file.exists()
@@ -99,7 +100,8 @@ class TestExperimentCreation:
       assert metadata["description"] == "Test experiment with metadata"
       assert "test" in metadata["tags"]
       assert "metadata" in metadata["tags"]
-      assert metadata["prefix"] == "experiments/meta/meta-experiment"
+      # Prefix is now full path: owner/project/path
+      assert metadata["prefix"] == f"{owner}/meta-ws/experiments/meta/meta-experiment"
 
   @pytest.mark.remote
   def test_experiment_with_metadata_remote(self, remote_experiment):
@@ -352,6 +354,7 @@ class TestExperimentEdgeCases:
 
   def test_deeply_nested_prefix_local(self, local_experiment, tmp_proj):
     """Test experiment with deeply nested prefix structure."""
+    owner = getpass.getuser()
     with local_experiment(
       name="nested-experiment",
       project="nested-ws",
@@ -359,15 +362,16 @@ class TestExperimentEdgeCases:
     ).run as experiment:
       experiment.log("Deeply nested experiment")
 
-    # New structure: root / owner / project / prefix
+    # New structure: root / prefix (where prefix = owner/project/path)
     experiment_file = (
       tmp_proj
-      / getpass.getuser()
+      / owner
       / "nested-ws/a/b/c/d/e/f/g/h/nested-experiment/experiment.json"
     )
     with open(experiment_file) as f:
       metadata = json.load(f)
-      assert metadata["prefix"] == "a/b/c/d/e/f/g/h/nested-experiment"
+      # Prefix is now full path: owner/project/path
+      assert metadata["prefix"] == f"{owner}/nested-ws/a/b/c/d/e/f/g/h/nested-experiment"
 
   def test_experiment_with_many_tags_local(self, local_experiment, tmp_proj):
     """Test experiment with many tags."""

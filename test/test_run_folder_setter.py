@@ -11,7 +11,7 @@ from ml_dash import Experiment
 def test_prefix_setter_before_init():
   """Test that prefix can be set before initialization."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(project="test", prefix="test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
 
     # Should be able to set prefix before initialization
     exp.run.prefix = "experiments/vision"
@@ -28,7 +28,7 @@ def test_prefix_setter_before_init():
 def test_prefix_setter_fails_after_init():
   """Test that prefix cannot be set after initialization."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(project="test", prefix="test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
 
     with exp.run:
       # Try to set prefix after initialization - should fail
@@ -44,51 +44,16 @@ def test_prefix_setter_fails_after_init():
 def test_prefix_getter():
   """Test prefix getter."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(project="test", local_path=tmpdir, prefix="initial/folder")
+    exp = Experiment(prefix="test/project/initial/folder", local_path=tmpdir)
 
     # Getter should work before initialization
-    assert exp.run.prefix == "initial/folder"
+    assert exp.run.prefix == "test/project/initial/folder"
 
     # And after
     with exp.run:
-      assert exp.run.prefix == "initial/folder"
+      assert exp.run.prefix == "test/project/initial/folder"
 
   print("✓ Prefix getter works")
-
-
-def test_dxp_prefix():
-  """Test prefix setter with dxp."""
-  import shutil
-
-  from ml_dash import dxp
-  from ml_dash.storage import LocalStorage
-
-  ml_dash_dir = Path(".dash-test-prefix")
-
-  # Clean up first
-  if dxp._is_open:
-    dxp.run.complete()
-  if ml_dash_dir.exists():
-    shutil.rmtree(ml_dash_dir)
-
-  # Configure dxp for local mode testing
-  dxp._storage = LocalStorage(root_path=ml_dash_dir)
-  dxp._client = None
-
-  # Set prefix before starting
-  dxp.run.prefix = "my-experiments/vision"
-  assert dxp.run.prefix == "my-experiments/vision"
-
-  # Start and use
-  with dxp.run:
-    assert dxp._folder_path == "my-experiments/vision"
-    dxp.params.set(test="prefix_test")
-
-  # Clean up
-  if ml_dash_dir.exists():
-    shutil.rmtree(ml_dash_dir)
-
-  print("✓ dxp prefix setter works")
 
 
 if __name__ == "__main__":
@@ -97,5 +62,4 @@ if __name__ == "__main__":
   test_prefix_setter_before_init()
   test_prefix_setter_fails_after_init()
   test_prefix_getter()
-  test_dxp_prefix()
   print("\n✅ All tests passed!")

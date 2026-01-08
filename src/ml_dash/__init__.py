@@ -3,34 +3,27 @@ ML-Dash Python SDK
 
 A simple and flexible SDK for ML experiment metricing and data storage.
 
+Prefix format: {owner}/{project}/path.../[name]
+  - owner: First segment (e.g., your username)
+  - project: Second segment (e.g., project name)
+  - path: Remaining segments form the folder structure
+  - name: Derived from last segment (may be a seed/id)
+
 Usage:
 
-    # Quickest - dxp (pre-configured remote singleton)
-    # Requires: ml-dash login
-    from ml_dash import dxp
-
-    with dxp.run:
-        dxp.params.set(lr=0.001)
-        dxp.log().info("Training started")
-    # Auto-completes on exit from with block
-
-    # Local mode - explicit configuration
     from ml_dash import Experiment
 
+    # Local mode - explicit configuration
     with Experiment(
-        project="my-project",
-        prefix="experiments/my-experiment",
+        prefix="ge/my-project/experiments/exp1",
         local_path=".dash"
-    ) as experiment:
+    ).run as experiment:
         experiment.log("Training started")
         experiment.params.set(lr=0.001)
         experiment.metrics("loss").append(step=0, value=0.5)
 
     # Default: Remote mode (defaults to https://api.dash.ml)
-    with Experiment(
-        project="my-project",
-        prefix="experiments/my-experiment"
-    ) as experiment:
+    with Experiment(prefix="ge/my-project/experiments/exp1").run as experiment:
         experiment.log("Training started")
         experiment.params.set(lr=0.001)
         experiment.metrics("loss").append(step=0, value=0.5)
@@ -38,15 +31,11 @@ Usage:
     # Decorator style
     from ml_dash import ml_dash_experiment
 
-    @ml_dash_experiment(
-        project="my-project",
-        prefix="experiments/my-experiment"
-    )
+    @ml_dash_experiment(prefix="ge/my-project/experiments/exp1")
     def train_model(experiment):
         experiment.log("Training started")
 """
 
-from .auto_start import dxp
 from .client import RemoteClient
 from .experiment import Experiment, OperationMode, RunManager, ml_dash_experiment
 from .log import LogBuilder, LogLevel
@@ -67,21 +56,4 @@ __all__ = [
   "LogBuilder",
   "ParametersBuilder",
   "EXP",
-  "dxp",
 ]
-
-# Hidden for now - rdxp (remote auto-start singleton)
-# Will be exposed in a future release
-#
-# # Lazy-load rdxp to avoid auto-connecting to server on package import
-# _rdxp = None
-#
-# def __getattr__(name):
-#     """Lazy-load rdxp only when accessed."""
-#     if name == "rdxp":
-#         global _rdxp
-#         if _rdxp is None:
-#             from .remote_auto_start import rdxp as _loaded_rdxp
-#             _rdxp = _loaded_rdxp
-#         return _rdxp
-#     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

@@ -2,7 +2,8 @@
 Test params.log() with class objects (for params_proto support).
 """
 
-from ml_dash import dxp
+import tempfile
+from ml_dash import Experiment
 
 
 def test_params_with_class_object():
@@ -13,15 +14,17 @@ def test_params_with_class_object():
         lr = 0.001
         epochs = 10
 
-    with dxp.run:
-        # Should automatically extract class attributes
-        dxp.params.log(Args=Args)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        with exp.run:
+            # Should automatically extract class attributes
+            exp.params.log(Args=Args)
 
-        params = dxp.params.get()
+            params = exp.params.get()
 
-        assert params["Args.batch_size"] == 64
-        assert params["Args.lr"] == 0.001
-        assert params["Args.epochs"] == 10
+            assert params["Args.batch_size"] == 64
+            assert params["Args.lr"] == 0.001
+            assert params["Args.epochs"] == 10
 
     print("✓ params.log(Args=Args) works with class objects")
 
@@ -37,18 +40,20 @@ def test_params_with_nested_config():
         lr = 0.001
         beta1 = 0.9
 
-    with dxp.run:
-        dxp.params.log(
-            model=ModelConfig,
-            optimizer=OptimizerConfig
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        with exp.run:
+            exp.params.log(
+                model=ModelConfig,
+                optimizer=OptimizerConfig
+            )
 
-        params = dxp.params.get()
+            params = exp.params.get()
 
-        assert params["model.hidden_size"] == 128
-        assert params["model.num_layers"] == 3
-        assert params["optimizer.lr"] == 0.001
-        assert params["optimizer.beta1"] == 0.9
+            assert params["model.hidden_size"] == 128
+            assert params["model.num_layers"] == 3
+            assert params["optimizer.lr"] == 0.001
+            assert params["optimizer.beta1"] == 0.9
 
     print("✓ Nested config classes work")
 
@@ -60,18 +65,20 @@ def test_params_mixed_class_and_dict():
         batch_size = 64
         lr = 0.001
 
-    with dxp.run:
-        dxp.params.log(
-            Args=Args,
-            runtime={"gpu": "cuda:0", "workers": 4}
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        with exp.run:
+            exp.params.log(
+                Args=Args,
+                runtime={"gpu": "cuda:0", "workers": 4}
+            )
 
-        params = dxp.params.get()
+            params = exp.params.get()
 
-        assert params["Args.batch_size"] == 64
-        assert params["Args.lr"] == 0.001
-        assert params["runtime.gpu"] == "cuda:0"
-        assert params["runtime.workers"] == 4
+            assert params["Args.batch_size"] == 64
+            assert params["Args.lr"] == 0.001
+            assert params["runtime.gpu"] == "cuda:0"
+            assert params["runtime.workers"] == 4
 
     print("✓ Mixed class and dict params work")
 
@@ -84,14 +91,16 @@ def test_params_skips_private_attributes():
         _private = "should be skipped"
         __magic__ = "should be skipped"
 
-    with dxp.run:
-        dxp.params.log(Args=Args)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        with exp.run:
+            exp.params.log(Args=Args)
 
-        params = dxp.params.get()
+            params = exp.params.get()
 
-        assert params["Args.batch_size"] == 64
-        assert "Args._private" not in params
-        assert "Args.__magic__" not in params
+            assert params["Args.batch_size"] == 64
+            assert "Args._private" not in params
+            assert "Args.__magic__" not in params
 
     print("✓ Private attributes are correctly skipped")
 
@@ -115,30 +124,33 @@ def demo_params_class_objects():
         num_layers = 12
         num_heads = 12
 
-    print("\n1. Single config class:")
-    with dxp.run:
-        dxp.params.log(Args=TrainingConfig)
-        params = dxp.params.get()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        print("\n1. Single config class:")
+        exp1 = Experiment(prefix="demo/project/exp", local_path=tmpdir)
+        with exp1.run:
+            exp1.params.log(Args=TrainingConfig)
+            params = exp1.params.get()
 
-        for key in sorted(params.keys()):
-            if key.startswith("Args."):
-                print(f"   {key} = {params[key]}")
+            for key in sorted(params.keys()):
+                if key.startswith("Args."):
+                    print(f"   {key} = {params[key]}")
 
-    print("\n2. Multiple config classes:")
-    with dxp.run:
-        dxp.params.log(
-            training=TrainingConfig,
-            model=ModelConfig
-        )
-        params = dxp.params.get()
+        print("\n2. Multiple config classes:")
+        exp2 = Experiment(prefix="demo/project/exp2", local_path=tmpdir)
+        with exp2.run:
+            exp2.params.log(
+                training=TrainingConfig,
+                model=ModelConfig
+            )
+            params = exp2.params.get()
 
-        print("   Training config:")
-        for key in sorted(k for k in params.keys() if k.startswith("training.")):
-            print(f"     {key} = {params[key]}")
+            print("   Training config:")
+            for key in sorted(k for k in params.keys() if k.startswith("training.")):
+                print(f"     {key} = {params[key]}")
 
-        print("   Model config:")
-        for key in sorted(k for k in params.keys() if k.startswith("model.")):
-            print(f"     {key} = {params[key]}")
+            print("   Model config:")
+            for key in sorted(k for k in params.keys() if k.startswith("model.")):
+                print(f"     {key} = {params[key]}")
 
     print("\n" + "="*60)
     print("Benefits:")

@@ -22,8 +22,10 @@ def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
 
 def test_experiment_with_metadata(local_experiment, tmp_proj):
   """Test experiment creation with description, tags, and prefix."""
+  owner = getpass.getuser()
+
   with local_experiment(
-    name="experiments/mnist/mnist-baseline",  # Full prefix
+    name="mnist-baseline",
     project="computer-vision",
     description="Baseline CNN for MNIST classification",
     tags=["mnist", "cnn", "baseline"],
@@ -31,9 +33,8 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
     experiment.log("Experiment created with metadata")
 
   # Verify metadata was saved
-  # Files go to: root_path / owner / project / prefix
-  owner = getpass.getuser()
-  experiment_dir = tmp_proj / owner / "computer-vision/experiments/mnist/mnist-baseline"
+  # Files go to: root_path / prefix (where prefix = owner/project/name)
+  experiment_dir = tmp_proj / owner / "computer-vision/mnist-baseline"
   experiment_file = experiment_dir / "experiment.json"
 
   assert experiment_file.exists()
@@ -44,7 +45,8 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
     assert metadata["description"] == "Baseline CNN for MNIST classification"
     assert "mnist" in metadata["tags"]
     assert "cnn" in metadata["tags"]
-    assert metadata["prefix"] == "experiments/mnist/mnist-baseline"
+    # Prefix is now the full path: owner/project/name
+    assert metadata["prefix"] == f"{owner}/computer-vision/mnist-baseline"
 
 
 def test_experiment_manual_open_close(local_experiment, tmp_proj):

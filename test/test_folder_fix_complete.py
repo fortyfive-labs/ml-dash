@@ -2,11 +2,10 @@
 Test that all operations (parameters, logs, files, metrics) respect the prefix field.
 
 This test verifies the storage path structure:
-- All data is stored at: root / owner / project / prefix
-- Default owner is "scratch"
+- All data is stored at: root / prefix
+- Prefix format: owner/project/path.../name
 """
 
-import getpass
 import json
 import tempfile
 from pathlib import Path
@@ -17,15 +16,14 @@ from ml_dash import Experiment
 def test_all_operations_use_folder_field():
   """Test that parameters, logs, files, and metrics all respect prefix field."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    # Create experiment with prefix
+    # Create experiment with prefix (new format: owner/project/path/name)
     exp = Experiment(
-      project="test_project", prefix="iclr_2024/test_exp", local_path=tmpdir
+      prefix="test-user/test_project/iclr_2024/test_exp", local_path=tmpdir
     )
 
     with exp.run:
-      # Expected base path: root / owner / project / prefix
-      owner = getpass.getuser()
-      expected_base = Path(tmpdir) / owner / "test_project/iclr_2024/test_exp"
+      # Expected base path: root / prefix
+      expected_base = Path(tmpdir) / "test-user/test_project/iclr_2024/test_exp"
 
       # 1. Test parameters
       exp.params.set(batch_size=128, lr=0.001)
@@ -92,12 +90,11 @@ def test_all_operations_use_folder_field():
 def test_folder_consistency_with_static_path():
   """Test folder consistency with a static path."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(project="proj", prefix="custom/path/static_exp", local_path=tmpdir)
+    exp = Experiment(prefix="test-user/proj/custom/path/static_exp", local_path=tmpdir)
 
     with exp.run:
-      # Expected: root / owner / project / prefix
-      owner = getpass.getuser()
-      expected_base = Path(tmpdir) / owner / "proj/custom/path/static_exp"
+      # Expected: root / prefix
+      expected_base = Path(tmpdir) / "test-user/proj/custom/path/static_exp"
 
       # Add all types of data
       exp.params.set(test_param=123)
@@ -119,14 +116,13 @@ def test_folder_consistency_with_static_path():
 
 
 def test_no_folder_field_still_works():
-  """Test when prefix is just experiment name (minimal path)."""
+  """Test when prefix is just owner/project/name (minimal path)."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(project="proj", prefix="no_folder_exp", local_path=tmpdir)
+    exp = Experiment(prefix="test-user/proj/no_folder_exp", local_path=tmpdir)
 
     with exp.run:
-      # Should use path: root / owner / project / prefix
-      owner = getpass.getuser()
-      expected_base = Path(tmpdir) / owner / "proj/no_folder_exp"
+      # Should use path: root / prefix
+      expected_base = Path(tmpdir) / "test-user/proj/no_folder_exp"
 
       exp.params.set(test=1)
       exp.log("Test")
