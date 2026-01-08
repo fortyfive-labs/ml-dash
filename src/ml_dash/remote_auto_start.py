@@ -30,25 +30,28 @@ Configuration:
 """
 
 import atexit
-from .experiment import Experiment
 
 # Create pre-configured singleton experiment for remote mode
 # Uses remote API server - token auto-loaded from storage
-rdxp = Experiment(
-    name="rdxp",
-    project="scratch",
-    remote="https://api.dash.ml"
-)
+# Prefix format: {owner}/{project}/path...
+import getpass
+
+from .experiment import Experiment
+
+_owner = getpass.getuser()
+rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", remote="https://api.dash.ml")
+
 
 # Register cleanup handler to complete experiment on Python exit (if still open)
 def _cleanup():
-    """Complete the rdxp experiment on exit if still open."""
-    if rdxp._is_open:
-        try:
-            rdxp.run.complete()
-        except Exception:
-            # Silently ignore errors during cleanup
-            pass
+  """Complete the rdxp experiment on exit if still open."""
+  if rdxp._is_open:
+    try:
+      rdxp.run.complete()
+    except Exception:
+      # Silently ignore errors during cleanup
+      pass
+
 
 atexit.register(_cleanup)
 

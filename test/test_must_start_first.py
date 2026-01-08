@@ -3,65 +3,68 @@ Test that APIs require experiment to be started first.
 """
 
 import pytest
+import tempfile
 
-from ml_dash import dxp
+from ml_dash import Experiment
 
 
-def test_params_requires_start(local_dxp):
+def test_params_requires_start():
     """Test that params.set() requires experiment to be started."""
-    if dxp._is_open:
-        dxp.run.complete()
-    try:
-        dxp.params.set(lr=0.001)
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError as e:
-        assert "not started" in str(e).lower() or "not open" in str(e).lower()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        try:
+            exp.params.set(lr=0.001)
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "not started" in str(e).lower() or "not open" in str(e).lower()
 
 
-def test_log_requires_start(local_dxp):
+def test_log_requires_start():
     """Test that log() requires experiment to be started."""
-    if dxp._is_open:
-        dxp.run.complete()
-    try:
-        dxp.log("test")
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError as e:
-        assert "not started" in str(e).lower() or "not open" in str(e).lower()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        try:
+            exp.log("test")
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "not started" in str(e).lower() or "not open" in str(e).lower()
 
 
-def test_metrics_requires_start(local_dxp):
+def test_metrics_requires_start():
     """Test that metrics() requires experiment to be started."""
-    if dxp._is_open:
-        dxp.run.complete()
-    try:
-        dxp.metrics("train").log(step=0, value=0.5)
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError as e:
-        assert (
-            "not started" in str(e).lower()
-            or "not open" in str(e).lower()
-            or "closed" in str(e).lower()
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        try:
+            exp.metrics("train").log(step=0, value=0.5)
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert (
+                "not started" in str(e).lower()
+                or "not open" in str(e).lower()
+                or "closed" in str(e).lower()
+            )
 
 
-def test_files_requires_start(local_dxp):
+def test_files_requires_start():
     """Test that files() requires experiment to be started."""
-    if dxp._is_open:
-        dxp.run.complete()
-    try:
-        dxp.files().list()
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError as e:
-        assert "not started" in str(e).lower() or "not open" in str(e).lower()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        try:
+            exp.files().list()
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "not started" in str(e).lower() or "not open" in str(e).lower()
 
 
-def test_apis_work_after_start(local_dxp):
+def test_apis_work_after_start():
     """Test that all APIs work after start."""
-    with dxp.run:
-        dxp.params.set(lr=0.001)
-        dxp.log("Test log")
-        dxp.metrics("train").log(step=0, value=0.5)
-        dxp.files().list()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        with exp.run:
+            exp.params.set(lr=0.001)
+            exp.log("Test log")
+            exp.metrics("train").log(step=0, value=0.5)
+            exp.files().list()
 
 
 if __name__ == "__main__":

@@ -58,45 +58,45 @@ def local_experiment(tmp_proj):
   Create a test experiment in local mode.
 
   Returns a function that creates experiments with default config but allows overrides.
-  """
+  Prefix format: {owner}/{project}/path.../[name]
 
-  def _create_experiment(name="test-experiment", project="test-project", **kwargs):
+  For backward compatibility, accepts old parameters:
+  - name: becomes the last segment of prefix (or full path if contains /)
+  - project: becomes the second segment of prefix
+  - prefix: if provided with project, appends to owner/project/
+
+  When using old parameters, the owner defaults to getpass.getuser() to match
+  the expected test paths.
+  """
+  import getpass
+  DEFAULT_PREFIX = "test-user/test-project/test-experiment"
+
+  def _create_experiment(prefix=DEFAULT_PREFIX, **kwargs):
+    # Handle backward compatibility for old parameters
+    name = kwargs.pop("name", None)
+    project = kwargs.pop("project", None)
+
+    if name or project:
+      # Build prefix from old-style parameters
+      # Use current username as owner for backward compatibility with test assertions
+      owner = getpass.getuser()
+      proj = project if project else "test-project"
+      exp_name = name if name else "test-experiment"
+
+      # If caller passed an explicit prefix (not default), use it as a path under owner/project
+      if prefix != DEFAULT_PREFIX:
+        prefix = f"{owner}/{proj}/{prefix}"
+      else:
+        prefix = f"{owner}/{proj}/{exp_name}"
+
     defaults = {
       "local_path": str(tmp_proj),
-      "prefix": name,  # prefix is now required, name is extracted from it
-      "project": project,
+      "prefix": prefix,
     }
     defaults.update(kwargs)
     return Experiment(**defaults)
 
   return _create_experiment
-
-
-@pytest.fixture
-def local_dxp():
-  """
-  Configure dxp singleton for local testing.
-
-  Uses a temp directory context and restores original state after test.
-  """
-  from ml_dash import dxp
-  from ml_dash.storage import LocalStorage
-
-  # Save original state
-  original_storage = dxp._storage
-  original_client = dxp._client
-
-  if dxp._is_open:
-    dxp.run.complete()
-
-  with tempfile.TemporaryDirectory() as tmpdir:
-    dxp._storage = LocalStorage(root_path=tmpdir)
-    dxp._client = None
-    yield dxp
-    if dxp._is_open:
-      dxp.run.complete()
-    dxp._storage = original_storage
-    dxp._client = original_client
 
 
 @pytest.fixture
@@ -147,19 +147,40 @@ def remote_experiment(mock_remote_token):
   Uses a pre-generated test JWT token for authentication (auto-loaded via mock).
 
   Generates unique experiment names using timestamps to avoid collisions between test runs.
+  Prefix format: {owner}/{project}/path.../[name]
+
+  For backward compatibility, accepts old parameters:
+  - name: becomes the last segment of prefix
+  - project: becomes the second segment of prefix
   """
   import time
 
-  def _create_experiment(name="test-experiment", project="test-project", **kwargs):
-    # Add timestamp suffix to experiment name to make it unique
-    # This prevents collisions from previous test runs
+  def _create_experiment(prefix="test-user/test-project/test-experiment", **kwargs):
+    # Handle backward compatibility for old parameters
+    name = kwargs.pop("name", None)
+    project = kwargs.pop("project", None)
+
+    if name or project:
+      # Build prefix from old-style parameters
+      parts = prefix.strip("/").split("/")
+      owner = parts[0] if len(parts) > 0 else "test-user"
+      proj = project if project else (parts[1] if len(parts) > 1 else "test-project")
+      exp_name = name if name else (parts[-1] if len(parts) > 2 else "test-experiment")
+      prefix = f"{owner}/{proj}/{exp_name}"
+
+    # Add timestamp suffix to make it unique
     timestamp_suffix = str(int(time.time() * 1000000))  # microsecond precision
-    unique_name = f"{name}-{timestamp_suffix}"
+
+    # Parse prefix and add timestamp to the name part
+    parts = prefix.rstrip("/").split("/")
+    if len(parts) >= 2:
+      parts[-1] = f"{parts[-1]}-{timestamp_suffix}"
+    unique_prefix = "/".join(parts)
 
     defaults = {
       "remote": REMOTE_SERVER_URL,
-      "prefix": unique_name,  # prefix is now required, name is extracted from it
-      "project": project,
+      "prefix": unique_prefix,
+      "local_path": None,  # Remote only
     }
     defaults.update(kwargs)
     return Experiment(**defaults)

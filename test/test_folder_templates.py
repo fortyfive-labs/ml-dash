@@ -2,13 +2,13 @@
 Test prefix template syntax support with {EXP.attr} format.
 
 Uses the global EXP ParamsProto object for clean template expansion.
-- {EXP.name}: Experiment name (no timestamp - just the name)
-- {EXP.project}: Project name
-- {EXP.id}: Unique run ID (timestamp-based)
-- {EXP.timestamp}: Same as id
+- {EXP.name}: Experiment name (last segment of prefix)
+- {EXP.id}: Unique run ID (snowflake)
+- {EXP.date}: Date string (YYYYMMDD)
+- {EXP.datetime}: DateTime string (YYYYMMDD.HHMMSS)
 """
 
-from ml_dash import Experiment, EXP, dxp
+from ml_dash import Experiment, EXP
 from ml_dash.storage import LocalStorage
 import tempfile
 from pathlib import Path
@@ -17,10 +17,10 @@ from pathlib import Path
 def test_template_with_run_name():
     """Test template with {EXP.name} variable."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="test", prefix="my-experiment", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/my-experiment", local_path=tmpdir)
         exp.run.prefix = "iclr_2024/{EXP.name}"
 
-        # EXP.name is just the experiment name (no timestamp)
+        # EXP.name is the last segment of the original prefix
         assert exp.run.prefix == "iclr_2024/my-experiment"
 
         with exp.run:
@@ -33,7 +33,7 @@ def test_template_with_run_name():
 def test_template_with_run_id():
     """Test template with {EXP.id} for unique folders."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="test", prefix="my-experiment", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/my-experiment", local_path=tmpdir)
         exp.run.prefix = "iclr_2024/{EXP.name}.{EXP.id}"
 
         # Should include both name and numeric id
@@ -51,52 +51,17 @@ def test_template_with_run_id():
     print("✓ Template with {EXP.name}.{EXP.id} works")
 
 
-def test_template_with_run_project():
-    """Test template with {EXP.project} variable."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="vision", prefix="exp1", local_path=tmpdir)
-        exp.run.prefix = "{EXP.project}/experiments/{EXP.name}"
-
-        # Verify template was expanded
-        assert exp.run.prefix == "vision/experiments/exp1"
-
-        with exp.run:
-            assert exp._folder_path == "vision/experiments/exp1"
-            assert EXP.project == "vision"
-            assert EXP.name == "exp1"
-
-    print("✓ Template with {EXP.project} and {EXP.name} works")
-
-
-def test_template_with_dxp(local_dxp):
-    """Test template with dxp singleton."""
-    # Reset EXP.id for fresh timestamp
-    EXP.id = None
-    EXP.timestamp = None
-
-    dxp.run.prefix = "iclr_2024/{EXP.name}"
-
-    # Should be formatted with dxp's name
-    assert dxp.run.prefix == "iclr_2024/dxp"
-
-    with dxp.run:
-        assert dxp._folder_path == "iclr_2024/dxp"
-        assert EXP.name == "dxp"
-
-    print("✓ Template with dxp and {EXP.name} works")
-
-
 def test_template_with_multiple_vars():
     """Test template with multiple variables."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="vision", prefix="resnet50", local_path=tmpdir)
-        exp.run.prefix = "experiments/{EXP.project}/models/{EXP.name}/runs"
+        exp = Experiment(prefix="vision/models/resnet50", local_path=tmpdir)
+        exp.run.prefix = "experiments/{EXP.name}/runs"
 
-        # Verify both project and name are present
-        assert exp.run.prefix == "experiments/vision/models/resnet50/runs"
+        # Verify name is present
+        assert exp.run.prefix == "experiments/resnet50/runs"
 
         with exp.run:
-            assert exp._folder_path == "experiments/vision/models/resnet50/runs"
+            assert exp._folder_path == "experiments/resnet50/runs"
 
     print("✓ Template with multiple variables works")
 
@@ -104,7 +69,7 @@ def test_template_with_multiple_vars():
 def test_static_folder_still_works():
     """Test that static prefixes without templates still work."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="test", prefix="test", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/test", local_path=tmpdir)
         exp.run.prefix = "static/folder/path"
 
         assert exp.run.prefix == "static/folder/path"
@@ -118,7 +83,7 @@ def test_static_folder_still_works():
 def test_unknown_template_variable():
     """Test that unknown template variables raise AttributeError."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(project="test", prefix="test", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/test", local_path=tmpdir)
 
         # Unknown variables raise AttributeError
         try:
@@ -130,6 +95,22 @@ def test_unknown_template_variable():
     print("✓ Unknown template variables raise AttributeError")
 
 
+def test_template_with_date():
+    """Test template with {EXP.date} variable."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exp = Experiment(prefix="test/project/experiment", local_path=tmpdir)
+        exp.run.prefix = "{EXP.name}.{EXP.date}"
+
+        # Should have name and YYYYMMDD format date
+        assert exp.run.prefix.startswith("experiment.")
+        parts = exp.run.prefix.split(".")
+        assert len(parts) == 2
+        assert len(parts[1]) == 8  # YYYYMMDD
+        assert parts[1].isdigit()
+
+    print("✓ Template with {EXP.date} works")
+
+
 def demo_folder_templates():
     """Demo showing prefix template usage."""
     print("\n" + "="*60)
@@ -139,50 +120,46 @@ def demo_folder_templates():
     with tempfile.TemporaryDirectory() as tmpdir:
         ml_dash_dir = Path(tmpdir) / "ml-dash-test-templates-demo"
 
-        # Clean up first
-        if dxp._is_open:
-            dxp.run.complete()
-
-        # Configure dxp for local mode testing
-        dxp._storage = LocalStorage(root_path=ml_dash_dir)
-        dxp._client = None
-
         # Reset EXP for clean demo
         EXP._reset()
 
+        # Create experiment
+        exp = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
+
         # Example 1: Using {EXP.name}
         print("\n1. Template with {EXP.name}:")
-        dxp.run.prefix = "iclr_2024/{EXP.name}"
+        exp.run.prefix = "iclr_2024/{EXP.name}"
         print(f"   Template: 'iclr_2024/{{EXP.name}}'")
-        print(f"   Expanded: '{dxp.run.prefix}'")
+        print(f"   Expanded: '{exp.run.prefix}'")
 
-        with dxp.run:
-            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with exp.run:
+            print(f"   ✓ Experiment prefix: {exp._folder_path}")
 
         # Example 2: Using EXP.id for unique folders (dot notation)
         EXP._reset()
+        exp2 = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
         print("\n2. Template with {EXP.name}.{EXP.id}:")
-        dxp.run.prefix = "runs/{EXP.name}.{EXP.id}"
+        exp2.run.prefix = "runs/{EXP.name}.{EXP.id}"
         print(f"   Template: 'runs/{{EXP.name}}.{{EXP.id}}'")
-        print(f"   Expanded: '{dxp.run.prefix}'")
+        print(f"   Expanded: '{exp2.run.prefix}'")
 
-        with dxp.run:
-            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with exp2.run:
+            print(f"   ✓ Experiment prefix: {exp2._folder_path}")
 
         # Example 3: Using date/time templates
         EXP._reset()
+        exp3 = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
         print("\n3. Template with {EXP.date}:")
-        dxp.run.prefix = "{EXP.project}/{EXP.name}.{EXP.date}"
-        print(f"   Template: '{{EXP.project}}/{{EXP.name}}.{{EXP.date}}'")
-        print(f"   Expanded: '{dxp.run.prefix}'")
+        exp3.run.prefix = "{EXP.name}.{EXP.date}"
+        print(f"   Template: '{{EXP.name}}.{{EXP.date}}'")
+        print(f"   Expanded: '{exp3.run.prefix}'")
 
-        with dxp.run:
-            print(f"   ✓ Experiment prefix: {dxp._folder_path}")
+        with exp3.run:
+            print(f"   ✓ Experiment prefix: {exp3._folder_path}")
 
         print("\n" + "="*60)
         print("EXP attributes:")
         print(f"  • EXP.name = '{EXP.name}' (experiment name)")
-        print(f"  • EXP.project = '{EXP.project}' (project name)")
         print(f"  • EXP.id = {EXP.id} (numeric run ID)")
         print(f"  • EXP.date = '{EXP.date}' (YYYYMMDD)")
         print(f"  • EXP.datetime = '{EXP.datetime}' (YYYYMMDD.HHMMSS)")
@@ -198,9 +175,8 @@ if __name__ == "__main__":
     print("Running tests...\n")
     test_template_with_run_name()
     test_template_with_run_id()
-    test_template_with_run_project()
-    test_template_with_dxp()
     test_template_with_multiple_vars()
     test_static_folder_still_works()
     test_unknown_template_variable()
+    test_template_with_date()
     print("\n✅ All tests passed!")

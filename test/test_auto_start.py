@@ -10,10 +10,12 @@ import pytest
 @pytest.fixture(autouse=True)
 def cleanup_dxp():
   """Clean up .dash directory and reset dxp state before and after each test."""
+  import getpass
   from ml_dash.auto_start import dxp
   from ml_dash.storage import LocalStorage
 
   ml_dash_dir = Path(".dash")
+  owner = getpass.getuser()
 
   # Close dxp and clean up before test
   if dxp._is_open:
@@ -22,9 +24,10 @@ def cleanup_dxp():
     shutil.rmtree(ml_dash_dir)
 
   # Configure dxp for local mode testing
+  # Use the full prefix format: owner/project/name
   dxp._storage = LocalStorage(root_path=ml_dash_dir)
   dxp._client = None  # Disable remote
-  dxp._folder_path = "dxp"  # Set prefix for local mode
+  dxp._folder_path = f"{owner}/scratch/dxp"  # Set full prefix for local mode
 
   # Reopen dxp for the test
   dxp.run.start()

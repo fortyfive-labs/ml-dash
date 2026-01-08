@@ -31,9 +31,12 @@ from .experiment import Experiment
 # Uses default remote server (https://api.dash.ml)
 # Token is auto-loaded from storage when first used
 # If not authenticated, operations will fail with AuthenticationError
+# Prefix format: {owner}/{project}/path...
+# Using getpass to get current user as owner for local convenience
+import getpass
+_owner = getpass.getuser()
 dxp = Experiment(
-    project="scratch",
-    prefix="dxp",
+    prefix=f"{_owner}/scratch/dxp",
     remote="https://api.dash.ml",
 )
 

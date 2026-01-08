@@ -11,7 +11,7 @@ import functools
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .client import RemoteClient
 from .files import BindrsBuilder, FilesAccessor
@@ -19,6 +19,37 @@ from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
 from .run import EXP
 from .storage import LocalStorage
+
+
+def _expand_exp_template(template: str) -> str:
+  """
+  Expand {EXP.attr} placeholders in template string.
+
+  Handles both regular attributes and property descriptors on the EXP class.
+
+  Args:
+      template: String containing {EXP.attr} placeholders
+
+  Returns:
+      String with placeholders expanded to actual values
+  """
+  import re
+
+  def replace_match(match):
+    attr_name = match.group(1)
+    # Get the attribute from the class __dict__, handling properties correctly
+    # EXP is a params_proto class where properties are stored in EXP.__dict__
+    attr = EXP.__dict__.get(attr_name)
+    if isinstance(attr, property):
+      # For properties, call the getter with EXP as self
+      return str(attr.fget(EXP))
+    else:
+      # For regular attributes, access via getattr
+      return str(getattr(EXP, attr_name))
+
+  # Match {EXP.attr_name} pattern
+  pattern = r'\{EXP\.(\w+)\}'
+  return re.sub(pattern, replace_match, template)
 
 
 class OperationMode(Enum):
@@ -92,11 +123,11 @@ class RunManager:
 
     Supports template variables:
     - {EXP.name} - Experiment name
-    - {EXP.project} - Project name
+    - {EXP.id} - Experiment ID
 
     Args:
         value: Folder prefix path with optional template variables
-               (e.g., "experiments/{EXP.name}" or None)
+               (e.g., "ge/myproject/{EXP.name}" or None)
 
     Raises:
         RuntimeError: If experiment is already initialized/open
@@ -105,13 +136,10 @@ class RunManager:
         from ml_dash import dxp
 
         # Static folder
-        dxp.run.prefix = "experiments/vision/resnet"
+        dxp.run.prefix = "ge/myproject/experiments/resnet"
 
         # Template with experiment name
-        dxp.run.prefix = "iclr_2024/{EXP.name}"
-
-        # Template with multiple variables
-        dxp.run.prefix = "{EXP.project}/experiments/{EXP.name}"
+        dxp.run.prefix = "ge/iclr_2024/{EXP.name}"
 
         # Now start the experiment
         with dxp.run:
@@ -124,15 +152,14 @@ class RunManager:
       )
 
     if value:
-      # Sync RUN with this experiment's values
+      # Sync EXP with this experiment's values
       EXP.name = self._experiment.name
-      EXP.project = self._experiment.project
       EXP.description = self._experiment.description
       # Generate id/timestamp if not already set
       if EXP.id is None:
         EXP._init_run()
-      # Format with RUN - no-op if no placeholders
-      value = value.format(EXP=EXP)
+      # Format with EXP - use helper to expand properties correctly
+      value = _expand_exp_template(value)
 
     # Update the folder on the experiment
     self._experiment._folder_path = value
@@ -171,41 +198,41 @@ class Experiment:
   """
   ML-Dash experiment for metricing experiments.
 
+  Prefix format: {owner}/{project}/path.../[name]
+    - owner: First segment (e.g., your username)
+    - project: Second segment (e.g., project name)
+    - path: Remaining segments form the folder structure
+    - name: Derived from last segment (may be a seed/id)
+
   Usage examples:
 
   # Default: Remote mode with production server (https://api.dash.ml)
-  experiment = Experiment(
-      project="my-project",
-      prefix="experiments/my-experiment"
-  )
+  experiment = Experiment(prefix="ge/my-project/experiments/exp1")
 
   # Local mode only
   experiment = Experiment(
-      project="my-project",
-      prefix="experiments/my-experiment",
+      prefix="ge/my-project/experiments/exp1",
       local_path=".dash"
   )
 
   # Custom remote server
   experiment = Experiment(
-      project="my-project",
-      prefix="experiments/my-experiment",
+      prefix="ge/my-project/experiments/exp1",
       remote="https://custom-server.com"
   )
 
   # Context manager
-  with Experiment(...) as exp:
+  with Experiment(prefix="ge/my-project/exp1").run as exp:
       exp.log(...)
 
   # Decorator
-  @ml_dash_experiment(project="ws", prefix="experiments/exp", remote="...")
+  @ml_dash_experiment(prefix="ge/ws/experiments/exp", remote="...")
   def train():
       ...
   """
 
   def __init__(
     self,
-    project: Optional[str] = None,
     prefix: Optional[str] = None,
     *,
     description: Optional[str] = None,
@@ -213,8 +240,8 @@ class Experiment:
     bindrs: Optional[List[str]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
-    remote: Optional[str] = None,
-    local_path: Optional[str] = None,
+    remote: Optional[Union[str, bool]] = None,
+    local_path: Optional[str] = ".dash",
     # Internal parameters
     _write_protected: bool = False,
   ):
@@ -222,33 +249,44 @@ class Experiment:
     Initialize an ML-Dash experiment.
 
     Args:
-        project: Project name (defaults to DASH_PROJECT env var or "scratch")
-        prefix: Experiment prefix path like "folder_1/folder_2/.../exp_name" (defaults to DASH_PREFIX env var)
+        prefix: Full experiment path like "owner/project/folder.../name" (defaults to DASH_PREFIX env var).
+                Format: {owner}/{project}/path.../[name]
+                - owner: First segment (e.g., username)
+                - project: Second segment (e.g., project name)
+                - path: Remaining segments form the folder path
+                - name: Derived from last segment (may be a seed/id, not always meaningful)
         description: Optional experiment description
         tags: Optional list of tags
         bindrs: Optional list of bindrs
         metadata: Optional metadata dict
-        remote: Remote API URL (defaults to "https://api.dash.ml"). Token auto-loaded from ~/.dash/token.enc
-        local_path: Local storage root path. If specified without remote, uses local-only mode.
+        remote: Remote API. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
+        local_path: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
         _write_protected: Internal parameter - if True, experiment becomes immutable after creation
 
     Mode Selection:
-        - No parameters: Remote mode with "https://api.dash.ml" (default)
-        - local_path only: Local-only mode
-        - remote only: Remote mode with custom URL
-        - Both: Hybrid mode (local + remote)
+        - Default (no remote): Local-only mode (writes to ".dash/")
+        - remote + local_path: Hybrid mode (local + remote)
+        - remote + local_path=None: Remote-only mode
     """
     import os
 
-    # Resolve defaults from environment variables
-    self.project = project or os.getenv("DASH_PROJECT", "scratch")
+    # Resolve prefix from environment variable if not provided
     self._folder_path = prefix or os.getenv("DASH_PREFIX")
 
-    # Extract experiment name from last segment of prefix
-    if self._folder_path:
-      self.name = self._folder_path.rstrip("/").split("/")[-1]
-    else:
+    if not self._folder_path:
       raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
+
+    # Parse prefix: {owner}/{project}/path.../[name]
+    parts = self._folder_path.strip("/").split("/")
+    if len(parts) < 2:
+      raise ValueError(
+        f"prefix must have at least owner/project: got '{self._folder_path}'"
+      )
+
+    self.owner = parts[0]
+    self.project = parts[1]
+    # Name is the last segment (may be a seed/id, not always a meaningful name)
+    self.name = parts[-1] if len(parts) > 2 else parts[1]
 
     self.description = description
     self.tags = tags
@@ -258,19 +296,15 @@ class Experiment:
 
     # Initialize EXP with experiment values
     EXP.name = self.name
-    EXP.project = project
     EXP.description = description
 
-    # Determine operation mode and apply defaults
-    if not remote and not local_path:
-      # Default to remote mode with production server
-      remote = "https://api.dash.ml"
-      self.mode = OperationMode.REMOTE
-    elif remote and local_path:
+    # Determine operation mode
+    # local_path defaults to ".dash", remote defaults to None
+    if remote and local_path:
       self.mode = OperationMode.HYBRID
     elif remote:
       self.mode = OperationMode.REMOTE
-    else:  # local_path only
+    else:
       self.mode = OperationMode.LOCAL
 
     # Initialize backend
@@ -283,11 +317,11 @@ class Experiment:
 
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will auto-load token from ~/.dash/token.enc
-      self._client = RemoteClient(base_url=remote)
+      # Use EXP.API_URL if remote=True (boolean), otherwise use the provided URL
+      api_url = EXP.API_URL if remote is True else remote
+      self._client = RemoteClient(base_url=api_url)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
-      if not local_path:
-        raise ValueError("local_path is required for local mode")
       self._storage = LocalStorage(root_path=Path(local_path))
 
   def _open(self) -> "Experiment":
@@ -387,13 +421,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: create experiment directory structure
-      # For local storage, owner is needed for directory structure
-      import getpass
-
-      # Use current system user as owner
-      owner = getpass.getuser()
       self._storage.create_experiment(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         description=self.description,
@@ -620,11 +649,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: write to file immediately
-      import getpass
-
-      owner = getpass.getuser()
       self._storage.write_log(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         message=log_entry["message"],
@@ -798,11 +824,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: copy to local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.write_file(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         file_path=file_path,
@@ -841,11 +864,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: read from metadata file
-      import getpass
-
-      owner = getpass.getuser()
       files = self._storage.list_files(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         path_prefix=prefix,
@@ -873,11 +893,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: copy from local storage
-      import getpass
-
-      owner = getpass.getuser()
       return self._storage.read_file(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         file_id=file_id,
@@ -906,11 +923,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: soft delete in metadata
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.delete_file(
-        owner=owner, project=self.project, prefix=self._folder_path, file_id=file_id
+        owner=self.owner, project=self.project, prefix=self._folder_path, file_id=file_id
       )
 
     return result
@@ -948,11 +962,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: update in metadata file
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.update_file_metadata(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         file_id=file_id,
@@ -978,11 +989,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: write to file
-      import getpass
-
-      owner = getpass.getuser()
       self._storage.write_parameters(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         data=flattened_params,
@@ -1007,11 +1015,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: read from file
-      import getpass
-
-      owner = getpass.getuser()
       params = self._storage.read_parameters(
-        owner=owner, project=self.project, prefix=self._folder_path
+        owner=self.owner, project=self.project, prefix=self._folder_path
       )
 
     return params
@@ -1099,11 +1104,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: append to local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.append_to_metric(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         metric_name=name,
@@ -1151,11 +1153,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: append batch to local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.append_batch_to_metric(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         metric_name=name,
@@ -1194,11 +1193,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: read from local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.read_metric_data(
-        owner=owner,
+        owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
         metric_name=name,
@@ -1228,11 +1224,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: get stats from local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.get_metric_stats(
-        owner=owner, project=self.project, prefix=self._folder_path, metric_name=name
+        owner=self.owner, project=self.project, prefix=self._folder_path, metric_name=name
       )
 
     return result
@@ -1252,11 +1245,8 @@ class Experiment:
 
     if self._storage:
       # Local mode: list from local storage
-      import getpass
-
-      owner = getpass.getuser()
       result = self._storage.list_metrics(
-        owner=owner, project=self.project, prefix=self._folder_path
+        owner=self.owner, project=self.project, prefix=self._folder_path
       )
 
     return result or []
@@ -1272,19 +1262,17 @@ class Experiment:
     return self._experiment_data
 
 
-def ml_dash_experiment(project: str, prefix: str, **kwargs) -> Callable:
+def ml_dash_experiment(prefix: str, **kwargs) -> Callable:
   """
   Decorator for wrapping functions with an ML-Dash experiment.
 
   Args:
-      project: Project name
-      prefix: Experiment prefix path (e.g., "experiments/my-experiment")
+      prefix: Full experiment path like "owner/project/folder.../name"
       **kwargs: Additional arguments passed to Experiment constructor
 
   Usage:
       @ml_dash_experiment(
-          project="my-project",
-          prefix="experiments/my-experiment",
+          prefix="ge/my-project/experiments/my-experiment",
           remote="https://api.dash.ml"
       )
       def train_model():
@@ -1298,7 +1286,7 @@ def ml_dash_experiment(project: str, prefix: str, **kwargs) -> Callable:
   def decorator(func: Callable) -> Callable:
     @functools.wraps(func)
     def wrapper(*args, **func_kwargs):
-      with Experiment(project=project, prefix=prefix, **kwargs).run as experiment:
+      with Experiment(prefix=prefix, **kwargs).run as experiment:
         # Inject experiment into function kwargs
         func_kwargs["experiment"] = experiment
         return func(*args, **func_kwargs)
