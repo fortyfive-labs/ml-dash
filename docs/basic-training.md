@@ -22,11 +22,11 @@ def train_simple_model():
     """Train a simple model and metric everything with ML-Dash."""
 
     with Experiment(
-        name="simple-training",
+        prefix="simple-training",
         project="tutorials",
         description="Basic training loop example",
         tags=["tutorial", "simple"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(name="...", project="...", local_path=".dash").run as experiment:
+with Experiment(prefix="...", project="...").run as experiment:
     # Your code here
 ```
 
@@ -129,7 +129,7 @@ experiment.params.set(learning_rate=0.001, batch_size=32)
 
 **Metric metrics in the loop** - Every epoch:
 ```python
-experiment.metrics("loss").append(value=loss, epoch=epoch)
+experiment.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
 **Log important events** - Progress and completion:

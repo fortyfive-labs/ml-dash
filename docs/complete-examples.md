@@ -15,11 +15,11 @@ def train_simple_model():
     """Train a simple model and metric with ML-Dash."""
 
     with Experiment(
-        name="simple-training",
+        prefix="simple-training",
         project="tutorials",
         description="Simple training example",
         tags=["tutorial", "simple"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -117,11 +117,11 @@ def train_mnist():
 
     # ML-Dash experiment
     with Experiment(
-        name="mnist-pytorch",
+        prefix="mnist-pytorch",
         project="computer-vision",
         description="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"],
-        local_path=".dash"
+        
     ).run as experiment:
         # Metric configuration
         experiment.params.set({
@@ -277,7 +277,7 @@ def hyperparameter_search():
             project="hyperparameter-search",
             description=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-            local_path=".dash"
+            
         ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
@@ -332,7 +332,7 @@ def train_model(architecture, experiment):
 
     for epoch in range(epochs):
         acc = min(base_lr, 0.5 + epoch * (base_lr - 0.5) / epochs + random.uniform(-0.02, 0.02))
-        experiment.metrics("accuracy").append(value=acc, epoch=epoch)
+        experiment.metrics("train").log(accuracy=acc, epoch=epoch)
 
     return acc
 
@@ -348,7 +348,7 @@ def compare_architectures():
             project="architecture-comparison",
             description=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"],
-            local_path=".dash"
+            
         ).run as experiment:
             # Configuration
             experiment.params.set(
@@ -391,11 +391,11 @@ def train_with_debug():
     """Training with extensive debugging logs."""
 
     with Experiment(
-        name="debug-training",
+        prefix="debug-training",
         project="debugging",
         description="Training with debug logging",
         tags=["debug"],
-        local_path=".dash"
+        
     ).run as experiment:
         experiment.params.set(
             learning_rate=0.001,
@@ -429,7 +429,7 @@ def train_with_debug():
                     metadata={"gradient_norm": 15.5, "max_norm": 10.0}
                 )
 
-            experiment.metrics("loss").append(value=loss, epoch=epoch)
+            experiment.metrics("train").log(loss=loss, epoch=epoch)
 
             experiment.log(
                 f"Epoch {epoch + 1} complete",

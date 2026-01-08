@@ -11,8 +11,8 @@ Experiments are the foundation of ML-Dash. Each experiment represents a single e
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as experiment:
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
     # Experiment automatically closed on exit
@@ -25,14 +25,14 @@ with Experiment(name="my-experiment", project="project",
 
 from ml_dash import ml_dash_experiment
 
-@ml_dash_experiment(name="my-experiment", project="project")
+@ml_dash_experiment(prefix="my-experiment", project="project")
 def train_model(experiment):
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
 
     for epoch in range(10):
         loss = train_epoch()
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, epoch=epoch)
 
     return "Training complete!"
 
@@ -46,8 +46,8 @@ result = train_model()
 
 from ml_dash import Experiment
 
-experiment = Experiment(name="my-experiment", project="project",
-        local_path=".dash")
+experiment = Experiment(prefix="my-experiment", project="project",
+        )
 experiment.run.start()
 
 try:
@@ -65,9 +65,9 @@ finally:
 :linenos:
 
 with Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="project",
-    local_path=".dash"
+    
 ).run as experiment:
     experiment.log("Using local storage")
 ```
@@ -78,7 +78,7 @@ with Experiment(
 :linenos:
 
 with Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="project",
     remote="https://api.dash.ml",
     user_name="alice"
@@ -94,9 +94,9 @@ Add description, tags, bindrs, and folders for organization:
 :linenos:
 
 with Experiment(
-    name="resnet50-imagenet",
+    prefix="resnet50-imagenet",
     project="computer-vision",
-    local_path=".dash",
+    
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
     bindrs=["gpu-cluster", "team-a"],
@@ -126,13 +126,13 @@ Experiments automatically track their status through the lifecycle:
 :linenos:
 
 # Normal completion - status becomes COMPLETED
-with Experiment(name="training", project="ml",
+with Experiment(prefix="training", project="ml",
         remote="https://api.dash.ml").run as experiment:
     experiment.log("Training...")
     # Status automatically set to COMPLETED on exit
 
 # Exception handling - status becomes FAILED
-with Experiment(name="training", project="ml",
+with Experiment(prefix="training", project="ml",
         remote="https://api.dash.ml").run as experiment:
     experiment.log("Training...")
     raise ValueError("Training failed!")
@@ -146,7 +146,7 @@ with Experiment(name="training", project="ml",
 
 from ml_dash import Experiment
 
-experiment = Experiment(name="training", project="ml",
+experiment = Experiment(prefix="training", project="ml",
         remote="https://api.dash.ml")
 experiment.run.start()
 
@@ -171,16 +171,16 @@ Experiments use **upsert behavior** - reopen by using the same name:
 :linenos:
 
 # First run
-with Experiment(name="long-training", project="ml",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="long-training", project="ml",
+        ).run as experiment:
     experiment.log("Starting epoch 1")
-    experiment.metrics("loss").append(value=0.5, epoch=1)
+    experiment.metrics("train").log(loss=0.5, epoch=1)
 
 # Later - continues same experiment
-with Experiment(name="long-training", project="ml",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="long-training", project="ml",
+        ).run as experiment:
     experiment.log("Resuming from checkpoint")
-    experiment.metrics("loss").append(value=0.3, epoch=2)
+    experiment.metrics("train").log(loss=0.3, epoch=2)
 ```
 
 ## Available Operations
@@ -190,8 +190,8 @@ Once a experiment is open, you can use all ML-Dash features:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="demo", project="test",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="demo", project="test",
+        ).run as experiment:
     # Logging
     experiment.log("Training started", level="info")
 
@@ -199,7 +199,7 @@ with Experiment(name="demo", project="test",
     experiment.params.set(lr=0.001, batch_size=32)
 
     # Metrics tracking
-    experiment.metrics("loss").append(value=0.5, epoch=1)
+    experiment.metrics("train").log(loss=0.5, epoch=1)
 
     # File uploads
     experiment.files("models").save("model.pth")
@@ -217,7 +217,7 @@ with Experiment(name="demo", project="test",
         │   └── logs.jsonl
         ├── parameters.json
         ├── metrics/
-        │   └── loss/
+        │   └── train/
         │       └── data.jsonl
         └── files/
             └── models/

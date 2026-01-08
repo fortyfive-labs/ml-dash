@@ -42,7 +42,7 @@ with dxp.run:
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        dxp.metrics("loss").append(value=loss, epoch=epoch)
+        dxp.metrics("train").log(loss=loss, epoch=epoch)
 
     dxp.log().info("Training completed")
 ```
@@ -59,8 +59,8 @@ Local mode stores everything on your filesystem - perfect for offline work:
 from ml_dash import Experiment
 
 # Create a experiment (stores data in .dash/ directory)
-with Experiment(name="my-first-experiment", project="tutorial",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="my-first-experiment", project="tutorial",
+        ).run as experiment:
     # Log messages
     experiment.log().info("Training started")
 
@@ -74,7 +74,7 @@ with Experiment(name="my-first-experiment", project="tutorial",
     # Track metrics over time
     for epoch in range(10):
         loss = 1.0 - epoch * 0.08  # Simulated decreasing loss
-        experiment.metrics("loss").append(value=loss, epoch=epoch)
+        experiment.metrics("train").log(loss=loss, epoch=epoch)
 
     experiment.log().info("Training completed")
 ```
@@ -94,7 +94,8 @@ After running the code above, your data is organized like this:
         ├── parameters/
         │   └── parameters.json  # your hyperparameters
         └── metrics/
-            └── loss.jsonl       # your metrics
+            └── train/
+                └── data.jsonl   # your metrics
 ```
 
 ## Common Patterns
@@ -106,8 +107,8 @@ After running the code above, your data is organized like this:
 
 from ml_dash import Experiment
 
-with Experiment(name="train-model", project="project",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="train-model", project="project",
+        ).run as experiment:
     # Set hyperparameters
     experiment.params.set(
         model="resnet50",
@@ -140,8 +141,8 @@ with Experiment(name="train-model", project="project",
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as experiment:
     # Train your model...
     # model.save("model.pth")
 
@@ -167,7 +168,7 @@ from ml_dash import Experiment
 # First authenticate: ml-dash login
 
 with Experiment(
-    name="my-experiment",
+    prefix="my-experiment",
     project="team-project",
     remote="https://api.dash.ml"  # token auto-loaded from keychain
 ).run as experiment:

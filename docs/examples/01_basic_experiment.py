@@ -11,9 +11,9 @@ def main():
 
     # Create a experiment in local mode
     with Experiment(
-        name="hello-ml-dash",
+        prefix="hello-ml-dash",
         project="tutorials",
-        local_path="./tutorial_data",
+        
         description="My first ML-Dash experiment",
         tags=["tutorial", "basic"]
     ).run as experiment:

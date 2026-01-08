@@ -11,8 +11,8 @@ The folder API uses a fluent interface that supports multiple styles:
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Upload file from disk
     dxp.files("checkpoints").upload("./model.pt")
@@ -53,8 +53,8 @@ with Experiment(name="my-experiment", project="project",
 
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Upload a file to a prefix
     result = dxp.files("models").upload("./model.pth")
@@ -71,8 +71,8 @@ Save Python objects directly without creating intermediate files:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Save dict/list as JSON
     config = {"model": "resnet50", "lr": 0.001}
@@ -95,8 +95,8 @@ You can also use the direct method style without specifying a prefix:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Upload file directly
     dxp.files.upload("./model.pt", to="models/model.pt")
@@ -114,8 +114,8 @@ Use paths to organize files logically:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Models
     dxp.files("models").upload("model.pth")
@@ -138,8 +138,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # List all files
     files = dxp.files().list()
@@ -156,8 +156,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # List files in specific prefix
     model_files = dxp.files("/models").list()
@@ -169,8 +169,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # List files matching pattern
     png_files = dxp.files("images").list("*.png")
@@ -185,8 +185,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Download by filename/path
     dxp.files("model.pt").download()  # Downloads to current directory
@@ -201,8 +201,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Download all PNG files from images prefix
     paths = dxp.files("images").download("*.png", to="./local_images")
@@ -218,8 +218,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Upload a file first
     upload_result = dxp.files("models").upload("./model.pth")
@@ -237,8 +237,8 @@ Downloads automatically verify checksums to ensure file integrity:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Upload
     upload_result = dxp.files("models").upload("./model.pth")
@@ -257,8 +257,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Delete by filename/path
     result = dxp.files("some.text").delete()
@@ -272,8 +272,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Delete all PNG files from images prefix
     results = dxp.files("images").delete("*.png")
@@ -291,8 +291,8 @@ Add description, tags, and custom metadata:
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     result = dxp.files("models").save_torch(
         model,
@@ -314,8 +314,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Save text content
     yaml_content = """
@@ -334,8 +334,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     config = {"model": "resnet50", "lr": 0.001}
 
@@ -351,8 +351,8 @@ with Experiment(name="my-experiment", project="project",
 ```{code-block} python
 :linenos:
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     binary_data = b"\x00\x01\x02\x03"
 
@@ -373,8 +373,8 @@ Save models during training:
 import torch
 from ml_dash import Experiment
 
-with Experiment(name="resnet-training", project="cv",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="resnet-training", project="cv",
+        ).run as dxp:
 
     dxp.params.set(model="resnet50", epochs=100)
     dxp.log("Starting training")
@@ -434,8 +434,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Generate plot
     losses = [0.5, 0.4, 0.3, 0.25, 0.2]
@@ -471,8 +471,8 @@ Upload video frame stacks using the `save_video()` method. This is useful for sa
 import numpy as np
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="my-experiment", project="project",
+        ).run as dxp:
 
     # Generate frame stack
     frames = [np.random.rand(200, 200) for _ in range(20)]
@@ -504,8 +504,8 @@ def render_frame(x, y):
     canvas[max(0, x-5):x+5, max(0, y-5):y+5] = 1.0
     return canvas
 
-with Experiment(name="agent-rollout", project="rl",
-        local_path=".dash").run as dxp:
+with Experiment(prefix="agent-rollout", project="rl",
+        ).run as dxp:
 
     # Simulate agent moving across the canvas
     frames = [render_frame(100 + i, 80) for i in range(20)]

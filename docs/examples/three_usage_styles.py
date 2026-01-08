@@ -15,9 +15,9 @@ from ml_dash import Experiment, ml_dash_experiment
 
 
 @ml_dash_experiment(
-  name="decorator-example",
+  prefix="decorator-example",
   project="usage-styles",
-  local_path="./decorator_demo",
+  
   description="Demonstrating decorator style",
   tags=["decorator", "demo"],
 )
@@ -43,7 +43,7 @@ def train_with_decorator(experiment):
   # Simulate training
   for epoch in range(3):
     loss = 1.0 / (epoch + 1)  # Fake decreasing loss
-    experiment.metrics("loss").append(value=loss, epoch=epoch)
+    experiment.metrics("train").log(loss=loss, epoch=epoch)
     experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
   experiment.log("Training completed", level="info")
@@ -70,9 +70,9 @@ def train_with_context_manager():
   print("=" * 50)
 
   with Experiment(
-    name="context-manager-example",
+    prefix="context-manager-example",
     project="usage-styles",
-    local_path="./context_manager_demo",
+    
     description="Demonstrating context manager style",
     tags=["context-manager", "demo"],
   ).run as experiment:
@@ -85,7 +85,7 @@ def train_with_context_manager():
     # Simulate training
     for epoch in range(3):
       loss = 0.8 / (epoch + 1)  # Fake decreasing loss
-      experiment.metrics("loss").append(value=loss, epoch=epoch)
+      experiment.metrics("train").log(loss=loss, epoch=epoch)
       experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     experiment.log("Training completed", level="info")
@@ -114,9 +114,9 @@ def train_with_direct_instantiation():
 
   # Create experiment object
   experiment = Experiment(
-    name="direct-example",
+    prefix="direct-example",
     project="usage-styles",
-    local_path="./direct_demo",
+    
     description="Demonstrating direct instantiation style",
     tags=["direct", "demo"],
   )
@@ -134,7 +134,7 @@ def train_with_direct_instantiation():
     # Simulate training
     for epoch in range(3):
       loss = 0.6 / (epoch + 1)  # Fake decreasing loss
-      experiment.metrics("loss").append(value=loss, epoch=epoch)
+      experiment.metrics("train").log(loss=loss, epoch=epoch)
       experiment.log(f"Epoch {epoch}: loss={loss:.4f}")
 
     experiment.log("Training completed", level="info")
@@ -169,7 +169,7 @@ def train_remote_decorator(experiment):
   experiment.params.set(mode="remote", style="decorator")
 
   for i in range(3):
-    experiment.metrics("metrics").append(value=i * 0.1, step=i)
+    experiment.metrics("train").log(loss=i * 0.1, step=i)
 
   print("✓ Data stored remotely (MongoDB + S3)")
 
@@ -190,7 +190,7 @@ def train_remote_context_manager():
     experiment.params.set(mode="remote", style="context_manager")
 
     for i in range(3):
-      experiment.metrics("metrics").append(value=i * 0.2, step=i)
+      experiment.metrics("train").log(loss=i * 0.2, step=i)
 
     print("✓ Data stored remotely (MongoDB + S3)")
 

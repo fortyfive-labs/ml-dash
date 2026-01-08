@@ -22,7 +22,7 @@ def main():
   print("=" * 60)
 
   with Experiment(
-    name="logging-demo", project="tutorials", local_path="./tutorial_data"
+    prefix="logging-demo", project="tutorials"
   ).run as experiment:
     # Different log levels //
     experiment.log("Debug information", level="debug")

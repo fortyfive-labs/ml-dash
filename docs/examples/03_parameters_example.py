@@ -20,7 +20,7 @@ def main():
   print("=" * 60)
 
   with Experiment(
-    name="parameters-demo", project="tutorials", local_path="./tutorial_data"
+    prefix="parameters-demo", project="tutorials"
   ).run as experiment:
     # Simple parameters
     experiment.params.set(learning_rate=0.001, batch_size=32, epochs=100)
