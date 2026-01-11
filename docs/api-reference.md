@@ -247,10 +247,10 @@ exp.log("Epoch completed", level="info", epoch=1, loss=0.5, accuracy=0.85)
 ### Fluent Logging API
 
 ```python
-# Fluent style (returns LogBuilder)
-exp.log(metadata={"epoch": 1}).info("Training started")
-exp.log().error("Failed to load data", error_code=500)
-exp.log().warning("GPU memory low", memory_available="1GB")
+# Fluent style logging
+exp.logs.info("Training started", metadata={"epoch": 1})
+exp.logs.error("Failed to load data", error_code=500)
+exp.logs.warn("GPU memory low", memory_available="1GB")
 ```
 
 ### Log Levels

@@ -560,8 +560,8 @@ class Experiment:
        Returns a LogBuilder that allows chaining with level methods.
 
        Examples:
-           experiment.log(metadata={"epoch": 1}).info("Training started")
-           experiment.log().error("Failed", error_code=500)
+           exp.logs.info("Training started", epoch=1)
+           exp.logs.error("Failed", error_code=500)
 
     2. Traditional style (message provided):
        Writes the log immediately and returns None.

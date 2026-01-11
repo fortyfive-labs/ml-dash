@@ -69,8 +69,8 @@ class LogBuilder:
     the log level method is called to write the log.
 
     Example:
-        experiment.log(metadata={"epoch": 1}).info("Training started")
-        experiment.log().error("Failed", error_code=500)
+        exp.logs.info("Training started", epoch=1)
+        exp.logs.error("Failed", error_code=500)
     """
 
     def __init__(self, experiment: 'Experiment', metadata: Optional[Dict[str, Any]] = None):
@@ -107,7 +107,7 @@ class LogBuilder:
             **extra_metadata: Additional metadata as keyword arguments
 
         Example:
-            experiment.log().warn("High loss detected", loss=1.5)
+            exp.logs.warn("High loss detected", loss=1.5)
         """
         self._write(LogLevel.WARN.value, message, extra_metadata)
 
@@ -120,7 +120,7 @@ class LogBuilder:
             **extra_metadata: Additional metadata as keyword arguments
 
         Example:
-            experiment.log().error("Failed to save", path="/models/checkpoint.pth")
+            exp.logs.error("Failed to save", path="/models/checkpoint.pth")
         """
         self._write(LogLevel.ERROR.value, message, extra_metadata)
 
@@ -133,7 +133,7 @@ class LogBuilder:
             **extra_metadata: Additional metadata as keyword arguments
 
         Example:
-            experiment.log().debug("Memory usage", memory_mb=2500)
+            exp.logs.debug("Memory usage", memory_mb=2500)
         """
         self._write(LogLevel.DEBUG.value, message, extra_metadata)
 

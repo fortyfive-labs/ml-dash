@@ -19,7 +19,7 @@ Usage:
     # With Experiment (EXP is auto-populated)
     from ml_dash import Experiment
     with Experiment(prefix=EXP.PREFIX).run as exp:
-        exp.log().info(f"Running {EXP.name}")
+        exp.logs.info(f"Running {EXP.name}")
 """
 
 from datetime import datetime, timezone
