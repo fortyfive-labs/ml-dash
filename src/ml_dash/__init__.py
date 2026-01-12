@@ -40,7 +40,7 @@ from .client import RemoteClient
 from .experiment import Experiment, OperationMode, RunManager, ml_dash_experiment
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
-from .run import EXP
+from .run import RUN
 from .storage import LocalStorage
 
 __version__ = "0.1.0"
@@ -55,5 +55,5 @@ __all__ = [
   "LogLevel",
   "LogBuilder",
   "ParametersBuilder",
-  "EXP",
+  "RUN",
 ]

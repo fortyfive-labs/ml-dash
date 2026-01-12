@@ -25,7 +25,6 @@ Usage:
 """
 
 import atexit
-from .experiment import Experiment
 
 # Create pre-configured singleton experiment in remote mode
 # Uses default remote server (https://api.dash.ml)
@@ -33,22 +32,31 @@ from .experiment import Experiment
 # If not authenticated, operations will fail with AuthenticationError
 # Prefix format: {owner}/{project}/path...
 # Using getpass to get current user as owner for local convenience
-import getpass
-_owner = getpass.getuser()
+from datetime import datetime
+
+from .auth.token_storage import get_jwt_user
+from .experiment import Experiment
+
+_user = get_jwt_user()
+_username = _user["username"]
+_now = datetime.now()
+
 dxp = Experiment(
-    prefix=f"{_owner}/scratch/dxp",
-    remote="https://api.dash.ml",
+  prefix=f"{_username}/scratch/{_now:%Y-%m-%d/%H%M%S}",
+  remote="https://api.dash.ml",
 )
+
 
 # Register cleanup handler to complete experiment on Python exit (if still open)
 def _cleanup():
-    """Complete the dxp experiment on exit if still open."""
-    if dxp._is_open:
-        try:
-            dxp.run.complete()
-        except Exception:
-            # Silently ignore errors during cleanup
-            pass
+  """Complete the dxp experiment on exit if still open."""
+  if dxp._is_open:
+    try:
+      dxp.run.complete()
+    except Exception:
+      # Silently ignore errors during cleanup
+      pass
+
 
 atexit.register(_cleanup)
 

@@ -1,13 +1,12 @@
 """Profile command for ml-dash CLI - shows current user and configuration."""
 
 import json
-from base64 import urlsafe_b64decode
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ml_dash.auth.token_storage import get_token_storage
+from ml_dash.auth.token_storage import decode_jwt_payload, get_token_storage
 from ml_dash.config import config
 
 
@@ -23,34 +22,6 @@ def add_parser(subparsers):
     action="store_true",
     help="Output as JSON",
   )
-
-
-def decode_jwt_payload(token: str) -> dict:
-  """Decode JWT payload without verification (for display only).
-
-  Args:
-      token: JWT token string
-
-  Returns:
-      Decoded payload dict
-  """
-  try:
-    # JWT format: header.payload.signature
-    parts = token.split(".")
-    if len(parts) != 3:
-      return {}
-
-    # Decode payload (second part)
-    payload = parts[1]
-    # Add padding if needed
-    padding = 4 - len(payload) % 4
-    if padding != 4:
-      payload += "=" * padding
-
-    decoded = urlsafe_b64decode(payload)
-    return json.loads(decoded)
-  except Exception:
-    return {}
 
 
 def cmd_profile(args) -> int:

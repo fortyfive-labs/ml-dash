@@ -20,6 +20,9 @@ ml-dash login
 
 This opens your browser for secure OAuth2 authentication. Your token is stored securely in your system keychain.
 
+| Ge: new feature: we also want to be able to pass in the prefix as a template string.
+| 
+
 ### 2. Start Tracking
 
 ```{code-block} python

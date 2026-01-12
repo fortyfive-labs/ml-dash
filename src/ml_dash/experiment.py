@@ -11,13 +11,13 @@ import functools
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Unpack
 
 from .client import RemoteClient
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
-from .run import EXP
+from .run import RUN
 from .storage import LocalStorage
 
 
@@ -39,16 +39,16 @@ def _expand_exp_template(template: str) -> str:
     attr_name = match.group(1)
     # Get the attribute from the class __dict__, handling properties correctly
     # EXP is a params_proto class where properties are stored in EXP.__dict__
-    attr = EXP.__dict__.get(attr_name)
+    attr = RUN.__dict__.get(attr_name)
     if isinstance(attr, property):
       # For properties, call the getter with EXP as self
-      return str(attr.fget(EXP))
+      return str(attr.fget(RUN))
     else:
       # For regular attributes, access via getattr
-      return str(getattr(EXP, attr_name))
+      return str(getattr(RUN, attr_name))
 
   # Match {EXP.attr_name} pattern
-  pattern = r'\{EXP\.(\w+)\}'
+  pattern = r"\{EXP\.(\w+)\}"
   return re.sub(pattern, replace_match, template)
 
 
@@ -153,11 +153,11 @@ class RunManager:
 
     if value:
       # Sync EXP with this experiment's values
-      EXP.name = self._experiment.name
-      EXP.description = self._experiment.description
+      RUN.name = self._experiment.name
+      RUN.description = self._experiment.description
       # Generate id/timestamp if not already set
-      if EXP.id is None:
-        EXP._init_run()
+      if RUN.id is None:
+        RUN._init_run()
       # Format with EXP - use helper to expand properties correctly
       value = _expand_exp_template(value)
 
@@ -235,15 +235,23 @@ class Experiment:
     self,
     prefix: Optional[str] = None,
     *,
-    description: Optional[str] = None,
+    readme: Optional[str] = None,
+    # Ge: this is an instance only property
     tags: Optional[List[str]] = None,
+    # Ge: Bindrs is an instance-only property, it is not set inside the RUN namespace.
     bindrs: Optional[List[str]] = None,
+    # Ge: This is also instance-only
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
     remote: Optional[Union[str, bool]] = None,
+    # local_path -> dash_dir. should be ".dash" under project root.
     local_path: Optional[str] = ".dash",
+    # Ge: can we hide this?
     # Internal parameters
     _write_protected: bool = False,
+    # The rest of the params go directly to populate the RUN object.
+    # can remove this. - Ge
+    **run_params: Unpack[RUN],
   ):
     """
     Initialize an ML-Dash experiment.
@@ -270,33 +278,35 @@ class Experiment:
     """
     import os
 
+    print(tags, bindrs, metadata)
+
     # Resolve prefix from environment variable if not provided
-    self._folder_path = prefix or os.getenv("DASH_PREFIX")
+    self._folder_path = prefix.rsplit("/", 2) or os.getenv("DASH_PREFIX")
 
     if not self._folder_path:
       raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
 
     # Parse prefix: {owner}/{project}/path.../[name]
-    parts = self._folder_path.strip("/").split("/")
-    if len(parts) < 2:
-      raise ValueError(
-        f"prefix must have at least owner/project: got '{self._folder_path}'"
-      )
+    # parts = prefix.strip("/").split("/")
+    # if len(parts) < 2:
+    #   raise ValueError(
+    #     f"prefix must have at least owner/project: got '{self._folder_path}'"
+    #   )
+    #
+    # self.owner = parts[0]
+    # self.project = parts[1]
+    # # Name is the last segment (may be a seed/id, not always a meaningful name)
+    # self.name = parts[-1] if len(parts) > 2 else parts[1]
+    #
+    # self.description = description
+    # self.tags = tags
+    # self._bindrs_list = bindrs
+    # self._write_protected = _write_protected
+    # self.metadata = metadata
 
-    self.owner = parts[0]
-    self.project = parts[1]
-    # Name is the last segment (may be a seed/id, not always a meaningful name)
-    self.name = parts[-1] if len(parts) > 2 else parts[1]
-
-    self.description = description
-    self.tags = tags
-    self._bindrs_list = bindrs
-    self._write_protected = _write_protected
-    self.metadata = metadata
-
-    # Initialize EXP with experiment values
-    EXP.name = self.name
-    EXP.description = description
+    # # Initialize EXP with experiment values
+    # RUN.name = self.name
+    # RUN.description = description
 
     # Determine operation mode
     # local_path defaults to ".dash", remote defaults to None
@@ -318,7 +328,7 @@ class Experiment:
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will auto-load token from ~/.dash/token.enc
       # Use EXP.API_URL if remote=True (boolean), otherwise use the provided URL
-      api_url = EXP.API_URL if remote is True else remote
+      api_url = RUN.api_url if remote is True else remote
       self._client = RemoteClient(base_url=api_url)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
@@ -333,10 +343,6 @@ class Experiment:
     """
     if self._is_open:
       return self
-
-    # Ensure EXP.id is generated when run starts
-    if EXP.id is None:
-      EXP._init_run()
 
     if self._client:
       # Remote mode: create/update experiment via API
@@ -490,7 +496,7 @@ class Experiment:
     self._is_open = False
 
     # Reset RUN for next experiment
-    EXP._reset()
+    RUN._reset()
 
   @property
   def run(self) -> RunManager:
@@ -924,7 +930,10 @@ class Experiment:
     if self._storage:
       # Local mode: soft delete in metadata
       result = self._storage.delete_file(
-        owner=self.owner, project=self.project, prefix=self._folder_path, file_id=file_id
+        owner=self.owner,
+        project=self.project,
+        prefix=self._folder_path,
+        file_id=file_id,
       )
 
     return result
@@ -1225,7 +1234,10 @@ class Experiment:
     if self._storage:
       # Local mode: get stats from local storage
       result = self._storage.get_metric_stats(
-        owner=self.owner, project=self.project, prefix=self._folder_path, metric_name=name
+        owner=self.owner,
+        project=self.project,
+        prefix=self._folder_path,
+        metric_name=name,
       )
 
     return result
