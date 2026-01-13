@@ -16,7 +16,7 @@ def test_info_goes_to_stdout():
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
-                exp.logs.info("This is an info message")
+                exp.log().info("This is an info message")
 
             output = sys.stdout.getvalue()
             assert "[INFO] This is an info message" in output
@@ -33,7 +33,7 @@ def test_warn_goes_to_stdout():
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
-                exp.logs.warn("This is a warning")
+                exp.log().warn("This is a warning")
 
             output = sys.stdout.getvalue()
             assert "[WARN] This is a warning" in output
@@ -50,7 +50,7 @@ def test_error_goes_to_stderr():
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
-                exp.logs.error("This is an error")
+                exp.log().error("This is an error")
 
             output = sys.stderr.getvalue()
             assert "[ERROR] This is an error" in output
@@ -67,7 +67,7 @@ def test_fatal_goes_to_stderr():
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
-                exp.logs.fatal("This is fatal")
+                exp.log().fatal("This is fatal")
 
             output = sys.stderr.getvalue()
             assert "[FATAL] This is fatal" in output
@@ -84,7 +84,7 @@ def test_metadata_in_output():
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
-                exp.logs.info("Training started", epoch=1, lr=0.001)
+                exp.log().info("Training started", epoch=1, lr=0.001)
 
             output = sys.stdout.getvalue()
             assert "[INFO] Training started" in output

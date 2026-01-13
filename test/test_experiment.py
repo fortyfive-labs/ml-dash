@@ -15,7 +15,7 @@ class TestExperimentCreation:
 
   def test_context_manager_local(self, local_experiment, tmp_proj):
     """Test experiment creation using context manager in local mode."""
-    with local_experiment(name="test-ctx", project="test-ws").run as experiment:
+    with local_experiment("57block/test-ws/test-ctx").run as experiment:
       assert experiment._is_open
       assert experiment.name == "test-ctx"
       assert experiment.project == "test-ws"
@@ -31,7 +31,7 @@ class TestExperimentCreation:
   def test_context_manager_remote(self, remote_experiment):
     """Test experiment creation using context manager in remote mode."""
     with remote_experiment(
-      name="test-ctx-remote", project="test-ws-remote"
+      "test-user/test-ws-remote/test-ctx-remote"
     ).run as experiment:
       assert experiment._is_open
       # Name has timestamp suffix for uniqueness
@@ -43,7 +43,7 @@ class TestExperimentCreation:
 
   def test_manual_open_close_local(self, local_experiment, tmp_proj):
     """Test manual experiment lifecycle management in local mode."""
-    experiment = local_experiment(name="manual-test", project="test-ws")
+    experiment = local_experiment("57block/test-ws/manual-test")
     assert not experiment._is_open
 
     experiment.run.start()
@@ -64,7 +64,7 @@ class TestExperimentCreation:
   @pytest.mark.remote
   def test_manual_open_close_remote(self, remote_experiment):
     """Test manual experiment lifecycle management in remote mode."""
-    experiment = remote_experiment(name="manual-test-remote", project="test-ws")
+    experiment = remote_experiment("57block/test-ws/manual-test-remote")
     assert not experiment._is_open
 
     experiment.run.start()
@@ -80,18 +80,22 @@ class TestExperimentCreation:
     """Test experiment with description, tags, and prefix in local mode."""
     owner = getpass.getuser()
     with local_experiment(
-      name="meta-experiment",
-      project="meta-ws",
+      f"{owner}/meta-ws/experiments/meta/meta-experiment",
       description="Test experiment with metadata",
       tags=["test", "metadata", "local"],
-      prefix="experiments/meta/meta-experiment",
     ).run as experiment:
       experiment.log("Experiment with metadata")
 
     # Verify metadata
     # New structure: root / prefix (where prefix = owner/project/path)
     experiment_file = (
-      tmp_proj / owner / "meta-ws/experiments/meta/meta-experiment/experiment.json"
+      tmp_proj
+      / owner
+      / "meta-ws"
+      / "experiments"
+      / "meta"
+      / "meta-experiment"
+      / "experiment.json"
     )
     assert experiment_file.exists()
 
@@ -109,8 +113,7 @@ class TestExperimentCreation:
   def test_experiment_with_metadata_remote(self, remote_experiment):
     """Test experiment with description, tags, and prefix in remote mode."""
     with remote_experiment(
-      prefix="experiments/remote/meta-experiment-remote",
-      project="meta-ws-remote",
+      "test-user/meta-ws-remote/experiments/remote/meta-experiment-remote",
       description="Remote test experiment with metadata",
       tags=["test", "metadata", "remote"],
     ).run as experiment:
@@ -123,7 +126,7 @@ class TestExperimentProperties:
 
   def test_experiment_properties_local(self, local_experiment):
     """Test accessing experiment properties in local mode."""
-    with local_experiment(name="props-test", project="props-ws").run as experiment:
+    with local_experiment("57block/props-ws/props-test").run as experiment:
       assert experiment.name == "props-test"
       assert experiment.project == "props-ws"
       assert experiment._is_open
@@ -132,7 +135,7 @@ class TestExperimentProperties:
   def test_experiment_properties_remote(self, remote_experiment):
     """Test accessing experiment properties in remote mode."""
     with remote_experiment(
-      name="props-test-remote", project="props-ws-remote"
+      "test-user/props-ws-remote/props-test-remote"
     ).run as experiment:
       # Name has timestamp suffix for uniqueness
       assert experiment.name.startswith("props-test-remote-")
@@ -145,15 +148,15 @@ class TestMultipleExperiments:
 
   def test_experiments_same_project_local(self, local_experiment, tmp_proj):
     """Test experiments in the same project."""
-    with local_experiment(name="experiment-1", project="shared-ws").run as experiment:
+    with local_experiment("57block/shared-ws/experiment-1").run as experiment:
       experiment.log("Experiment 1")
       experiment.params.set(experiment_id=1)
 
-    with local_experiment(name="experiment-2", project="shared-ws").run as experiment:
+    with local_experiment("57block/shared-ws/experiment-2").run as experiment:
       experiment.log("Experiment 2")
       experiment.params.set(experiment_id=2)
 
-    with local_experiment(name="experiment-3", project="shared-ws").run as experiment:
+    with local_experiment("57block/shared-ws/experiment-3").run as experiment:
       experiment.log("Experiment 3")
       experiment.params.set(experiment_id=3)
 
@@ -168,26 +171,26 @@ class TestMultipleExperiments:
   def test_experiments_same_project_remote(self, remote_experiment):
     """Test experiments in the same project in remote mode."""
     with remote_experiment(
-      name="remote-experiment-1", project="shared-ws-remote"
+      "test-user/shared-ws-remote/remote-experiment-1"
     ).run as experiment:
       experiment.log("Remote Experiment 1")
       experiment.params.set(experiment_id=1)
 
     with remote_experiment(
-      name="remote-experiment-2", project="shared-ws-remote"
+      "test-user/shared-ws-remote/remote-experiment-2"
     ).run as experiment:
       experiment.log("Remote Experiment 2")
       experiment.params.set(experiment_id=2)
 
   def test_experiments_different_projects_local(self, local_experiment, tmp_proj):
     """Test experiments in different projects."""
-    with local_experiment(name="experiment-a", project="project-1").run as experiment:
+    with local_experiment("57block/project-1/experiment-a").run as experiment:
       experiment.log("Experiment A in project 1")
 
-    with local_experiment(name="experiment-b", project="project-2").run as experiment:
+    with local_experiment("57block/project-2/experiment-b").run as experiment:
       experiment.log("Experiment B in project 2")
 
-    with local_experiment(name="experiment-c", project="project-3").run as experiment:
+    with local_experiment("57block/project-3/experiment-c").run as experiment:
       experiment.log("Experiment C in project 3")
 
     # Verify all projects and experiments exist
@@ -198,10 +201,12 @@ class TestMultipleExperiments:
 
   def test_experiments_local(self, local_experiment):
     """Test experiments sequentially."""
+    import getpass
+    owner = getpass.getuser()
     experiments = []
     for i in range(5):
       with local_experiment(
-        name=f"seq-experiment-{i}", project="sequential"
+        f"{owner}/sequential/seq-experiment-{i}"
       ).run as experiment:
         experiment.log(f"Sequential experiment {i}")
         experiment.params.set(index=i)
@@ -218,7 +223,7 @@ class TestExperimentErrorHandling:
   def test_experiment_error_still_saves_data_local(self, local_experiment, tmp_proj):
     """Test that experiment saves data even when errors occur."""
     try:
-      with local_experiment(name="error-test", project="error-ws").run as experiment:
+      with local_experiment("57block/error-ws/error-test").run as experiment:
         experiment.log("Starting work")
         experiment.params.set(param="value")
         experiment.metrics("metric").log(loss=0.5, step=0)
@@ -238,7 +243,7 @@ class TestExperimentErrorHandling:
     """Test that remote experiment handles errors gracefully."""
     try:
       with remote_experiment(
-        name="error-test-remote", project="error-ws-remote"
+      "test-user/error-ws-remote/error-test-remote"
       ).run as experiment:
         experiment.log("Starting remote work")
         experiment.params.set(param="remote_value")
@@ -249,7 +254,7 @@ class TestExperimentErrorHandling:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test experiment handling multiple errors."""
-    with local_experiment(name="multi-error", project="error-ws").run as experiment:
+    with local_experiment("57block/error-ws/multi-error").run as experiment:
       try:
         experiment.log("Attempt 1")
         raise ValueError("Error 1")
@@ -280,23 +285,24 @@ class TestExperimentReuse:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test reopening an existing experiment (upsert behavior)."""
+    owner = getpass.getuser()
     # Create initial experiment
     with local_experiment(
-      name="reuse-experiment", project="reuse-ws"
+      f"{owner}/reuse-ws/reuse-experiment"
     ).run as experiment:
       experiment.log("Initial experiment")
       experiment.params.set(version=1)
 
     # Reopen same experiment
     with local_experiment(
-      name="reuse-experiment", project="reuse-ws"
+      f"{owner}/reuse-ws/reuse-experiment"
     ).run as experiment:
       experiment.log("Reopened experiment")
       experiment.params.set(version=2, new_param="added")
 
     # Verify both operations are recorded
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "reuse-ws/reuse-experiment"
+    experiment_dir = tmp_proj / owner / "reuse-ws" / "reuse-experiment"
     logs_file = experiment_dir / "logs/logs.jsonl"
 
     with open(logs_file) as f:
@@ -309,14 +315,14 @@ class TestExperimentReuse:
     """Test reopening an existing experiment in remote mode."""
     # Create initial experiment
     with remote_experiment(
-      name="reuse-experiment-remote", project="reuse-ws-remote"
+      "test-user/reuse-ws-remote/reuse-experiment-remote"
     ).run as experiment:
       experiment.log("Initial remote experiment")
       experiment.params.set(version=1)
 
     # Reopen same experiment
     with remote_experiment(
-      name="reuse-experiment-remote", project="reuse-ws-remote"
+      "test-user/reuse-ws-remote/reuse-experiment-remote"
     ).run as experiment:
       experiment.log("Reopened remote experiment")
       experiment.params.set(version=2)
@@ -327,46 +333,60 @@ class TestExperimentEdgeCases:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test experiment with no operations."""
+    owner = getpass.getuser()
     with local_experiment(
-      name="empty-experiment", project="empty-ws"
+      f"{owner}/empty-ws/empty-experiment"
     ).run as experiment:
       pass  # Do nothing
 
     # Experiment directory should still be created
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "empty-ws/empty-experiment"
+    experiment_dir = tmp_proj / owner / "empty-ws" / "empty-experiment"
     assert experiment_dir.exists()
 
   def test_experiment_with_special_characters_local(self, local_experiment, tmp_proj):
     """Test experiment names with special characters."""
+    owner = getpass.getuser()
     with local_experiment(
-      name="test-experiment_v1.0", project="special-ws"
+      f"{owner}/special-ws/test-experiment_v1.0"
     ).run as experiment:
       experiment.log("Experiment with special chars in name")
 
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "special-ws/test-experiment_v1.0"
+    experiment_dir = tmp_proj / owner / "special-ws" / "test-experiment_v1.0"
     assert experiment_dir.exists()
 
   def test_experiment_with_long_name_local(self, local_experiment):
     """Test experiment with very long name."""
+    import getpass
+    owner = getpass.getuser()
     long_name = "a" * 200
-    with local_experiment(name=long_name, project="long-ws").run as experiment:
+    with local_experiment(f"{owner}/long-ws/{long_name}").run as experiment:
       experiment.log("Experiment with long name")
 
   def test_deeply_nested_prefix_local(self, local_experiment, tmp_proj):
     """Test experiment with deeply nested prefix structure."""
     owner = getpass.getuser()
     with local_experiment(
-      name="nested-experiment",
-      project="nested-ws",
-      prefix="a/b/c/d/e/f/g/h/nested-experiment",
+      f"{owner}/nested-ws/a/b/c/d/e/f/g/h/nested-experiment",
     ).run as experiment:
       experiment.log("Deeply nested experiment")
 
     # New structure: root / prefix (where prefix = owner/project/path)
     experiment_file = (
-      tmp_proj / owner / "nested-ws/a/b/c/d/e/f/g/h/nested-experiment/experiment.json"
+      tmp_proj
+      / owner
+      / "nested-ws"
+      / "a"
+      / "b"
+      / "c"
+      / "d"
+      / "e"
+      / "f"
+      / "g"
+      / "h"
+      / "nested-experiment"
+      / "experiment.json"
     )
     with open(experiment_file) as f:
       metadata = json.load(f)
@@ -377,23 +397,23 @@ class TestExperimentEdgeCases:
 
   def test_experiment_with_many_tags_local(self, local_experiment, tmp_proj):
     """Test experiment with many tags."""
+    owner = getpass.getuser()
     tags = [f"tag-{i}" for i in range(50)]
     with local_experiment(
-      name="many-tags",
-      project="tags-ws",
+      f"{owner}/tags-ws/many-tags",
       tags=tags,
     ).run as experiment:
       experiment.log("Experiment with many tags")
 
     # New structure: root / owner / project / prefix
-    experiment_file = tmp_proj / getpass.getuser() / "tags-ws/many-tags/experiment.json"
+    experiment_file = tmp_proj / owner / "tags-ws" / "many-tags" / "experiment.json"
     with open(experiment_file) as f:
       metadata = json.load(f)
       assert len(metadata["tags"]) == 50
 
   def test_experiment_double_close_local(self, local_experiment):
     """Test that closing a experiment twice doesn't cause issues."""
-    experiment = local_experiment(name="double-close", project="test-ws")
+    experiment = local_experiment("57block/test-ws/double-close")
     experiment.run.start()
     experiment.run.complete()
     experiment.run.complete()  # Should not raise error
@@ -401,7 +421,7 @@ class TestExperimentEdgeCases:
 
   def test_operations_before_open_local(self, local_experiment):
     """Test that operations before open are handled gracefully."""
-    experiment = local_experiment(name="not-opened", project="test-ws")
+    experiment = local_experiment("57block/test-ws/not-opened")
     # Attempting operations before opening should handle gracefully
     # The actual behavior depends on implementation
 

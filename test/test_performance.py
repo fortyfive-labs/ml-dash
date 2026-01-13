@@ -67,7 +67,7 @@ class TestMetricPerformance:
     start_time = time.time()
 
     with remote_experiment(
-      name="million-metrics-remote", project="perf-test"
+      "test-user/perf-test/million-metrics-remote"
     ).run as experiment:
       metric = experiment.metrics("train")
       for step in range(total_metrics):
@@ -183,7 +183,7 @@ class TestMetricPerformance:
 
     print(f"\nTesting logging performance with {points_per_test:,} points...")
 
-    with local_experiment(name="logging-perf", project="perf-test").run as experiment:
+    with local_experiment("57block/perf-test/logging-perf").run as experiment:
       start_time = time.time()
       metric = experiment.metrics("train")
 
@@ -210,7 +210,7 @@ class TestMetricReadPerformance:
 
     print(f"\nCreating {total_metrics:,} metrics for read performance test...")
 
-    with local_experiment(name="read-perf", project="perf-test").run as experiment:
+    with local_experiment("57block/perf-test/read-perf").run as experiment:
       # Create data
       metric = experiment.metrics("train")
       for step in range(total_metrics):
