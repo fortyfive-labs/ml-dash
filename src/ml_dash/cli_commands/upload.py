@@ -137,28 +137,53 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
   )
 
   # Remote configuration
-  parser.add_argument(
-    "--remote",
-    type=str,
-    help="Remote server URL (required unless set in config)",
-  )
+  # Ge: remote -> api_uri
+  # parser.add_argument(
+  #   "--remote",
+  #   type=str,
+  #   help="Remote server URL (required unless set in config)",
+  # )
   parser.add_argument(
     "--api-key",
     type=str,
     help="JWT token for authentication (optional - auto-loads from 'ml-dash login' if not provided)",
   )
 
+  """
+  
+  cd .dash/geyang
+  cd iclr_2026
+  
+  ml-dash upload -p geyang/new-run *  # this uploads all of the folders to geyang/new-run.
+  
+  or
+  
+  ml-dash upload --prefix geyang/new-run/local-results ./*  # uploads under the local-results prefix.
+  
+  ml-dash download --prefix geyang/new-run/zehua-results --filter *.mp4 --dryrun --verbose
+  
+  mo-dash list --prefix geyang/new-run/zehua-results --filter xxx-xxx --verbose
+  
+  mo-dash list-exp --prefix geyang/new-run/zehua-results --filter xxx-xxx --verbose
+  
+  """
+
   # Scope control
+  # Ge: project should be {owner}/{proj_name}
   parser.add_argument(
+    "-p",
+    "--pref",
+    "--prefix",
+    "--proj",
     "--project",
     type=str,
     help="Upload only experiments from this project",
   )
-  parser.add_argument(
-    "--experiment",
-    type=str,
-    help="Upload only this specific experiment (requires --project)",
-  )
+  # parser.add_argument(
+  #   "--experiment",
+  #   type=str,
+  #   help="Upload only this specific experiment (requires --project)",
+  # )
 
   # Data filtering
   parser.add_argument(

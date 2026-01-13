@@ -30,7 +30,7 @@ from pathlib import Path
 # Add src to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from ml_dash import EXP, Experiment
+from ml_dash import RUN, Experiment
 
 
 def demo_project_root():
@@ -53,18 +53,18 @@ def demo_project_root():
   print(f"   Train script: {train_script}")
 
   # Set project_root (normally done in experiments/__init__.py)
-  EXP.project_root = str(project_root)
-  print(f"\n2. Set EXP.project_root = '{EXP.project_root}'")
+  RUN.project_root = str(project_root)
+  print(f"\n2. Set EXP.project_root = '{RUN.project_root}'")
 
   # Call __post_init__ with the training script path
   # (normally this would be __file__ in the training script)
-  EXP.__post_init__(entry=str(train_script))
+  RUN.__post_init__(entry=str(train_script))
 
   print(f"\n3. Called EXP.__post_init__(entry='{train_script}')")
   print("   Result:")
-  print(f"   - EXP.prefix = '{EXP.prefix}'")
-  print(f"   - EXP.name = '{EXP.name}'")
-  print(f"   - EXP.entry = '{EXP.entry}'")
+  print(f"   - EXP.prefix = '{RUN.prefix}'")
+  print(f"   - EXP.name = '{RUN.name}'")
+  print(f"   - EXP.entry = '{RUN.entry}'")
 
   # Now use with Experiment
   print("\n4. Creating experiment with auto-detected prefix:")
@@ -72,12 +72,12 @@ def demo_project_root():
   data_dir = Path(__file__).parent / "tutorial_data"
   # Prefix format: owner/project/experiment-name
   with Experiment(
-    prefix=f"demo/project/{EXP.prefix}",  # Uses auto-detected prefix
+    prefix=f"demo/project/{RUN.prefix}",  # Uses auto-detected prefix
     local_path=str(data_dir),
     description="Demo using project_root",
   ).run as exp:
     exp.log("Training started!")
-    exp.params.set(script=EXP.entry, model="resnet50", lr=0.001)
+    exp.params.set(script=RUN.entry, model="resnet50", lr=0.001)
     print(f"   Experiment: {exp.project}/{exp.name}")
     print(f"   Data stored in: {exp._storage.root_path}")
 
@@ -104,9 +104,9 @@ def demo_with_sweep_directory():
   print("=" * 60)
 
   # Reset EXP for this demo
-  EXP.prefix = None
-  EXP.name = "scratch"
-  EXP.entry = None
+  RUN.prefix = None
+  RUN.name = "scratch"
+  RUN.entry = None
 
   # Simulate project structure with sweep files
   project_root = Path(__file__).parent.parent / "experiments"
@@ -120,15 +120,15 @@ def demo_with_sweep_directory():
   print(f"   Sweep file: {sweep_file}")
 
   # Set project_root
-  EXP.project_root = str(project_root)
+  RUN.project_root = str(project_root)
 
   # Use sweep directory as entry (instead of __file__)
-  EXP.__post_init__(entry=str(sweep_dir))
+  RUN.__post_init__(entry=str(sweep_dir))
 
   print(f"\n2. Called EXP.__post_init__(entry='{sweep_dir}')")
   print("   Result:")
-  print(f"   - EXP.prefix = '{EXP.prefix}'")
-  print(f"   - EXP.name = '{EXP.name}'")
+  print(f"   - EXP.prefix = '{RUN.prefix}'")
+  print(f"   - EXP.name = '{RUN.name}'")
 
   # Cleanup
   import shutil

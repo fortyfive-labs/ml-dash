@@ -7,7 +7,11 @@ import pytest
 
 
 class TestExperimentCreation:
-  """Tests for basic experiment creation and lifecycle."""
+  """Tests for basic experiment creation and lifecycle.
+
+  Ge: the expected usage:
+
+  """
 
   def test_context_manager_local(self, local_experiment, tmp_proj):
     """Test experiment creation using context manager in local mode."""
@@ -387,7 +391,9 @@ class TestExperimentEdgeCases:
     with open(experiment_file) as f:
       metadata = json.load(f)
       # Prefix is now full path: owner/project/path
-      assert metadata["prefix"] == f"{owner}/nested-ws/a/b/c/d/e/f/g/h/nested-experiment"
+      assert (
+        metadata["prefix"] == f"{owner}/nested-ws/a/b/c/d/e/f/g/h/nested-experiment"
+      )
 
   def test_experiment_with_many_tags_local(self, local_experiment, tmp_proj):
     """Test experiment with many tags."""

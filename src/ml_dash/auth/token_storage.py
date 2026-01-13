@@ -2,6 +2,7 @@
 
 import json
 from abc import ABC, abstractmethod
+from base64 import urlsafe_b64decode
 from pathlib import Path
 from typing import Optional
 
@@ -261,3 +262,41 @@ def get_token_storage(config_dir: Optional[Path] = None) -> TokenStorage:
 
   # Fallback to plaintext (with warning)
   return PlaintextFileStorage(config_dir)
+
+
+def decode_jwt_payload(token: str) -> dict:
+  """Decode JWT payload without verification (for display only).
+
+  Args:
+      token: JWT token string
+
+  Returns:
+      Decoded payload dict
+  """
+  try:
+    # JWT format: header.payload.signature
+    parts = token.split(".")
+    if len(parts) != 3:
+      return {}
+
+    # Decode payload (second part)
+    payload = parts[1]
+    # Add padding if needed
+    padding = 4 - len(payload) % 4
+    if padding != 4:
+      payload += "=" * padding
+
+    decoded = urlsafe_b64decode(payload)
+    return json.loads(decoded)
+  except Exception:
+    return {}
+
+
+def get_jwt_user():
+  # Load token
+  storage = get_token_storage()
+  token = storage.load("ml-dash-token")
+
+  if token:
+    user = decode_jwt_payload(token)
+  return user

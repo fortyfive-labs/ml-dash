@@ -1,173 +1,231 @@
 """
-EXP - Global experiment configuration object for ML-Dash.
+RUN - Global experiment configuration object for ML-Dash.
 
-This module provides a global EXP object that serves as the single source
+This module provides a global RUN object that serves as the single source
 of truth for experiment metadata. Uses params-proto for configuration.
 
 Usage:
-    from ml_dash import EXP
+    from ml_dash import RUN
 
     # Configure via environment variable
     # export ML_DASH_PREFIX="ge/myproject/experiments/exp1"
 
     # Or set directly
-    EXP.PREFIX = "ge/myproject/experiments/exp1"
+    RUN.PREFIX = "ge/myproject/experiments/exp1"
 
     # Use in templates
-    prefix = "{EXP.PREFIX}/{EXP.name}.{EXP.id}".format(EXP=EXP)
+    prefix = "{RUN.PREFIX}/{RUN.name}.{RUN.id}".format(RUN=RUN)
 
-    # With Experiment (EXP is auto-populated)
+    # With Experiment (RUN is auto-populated)
     from ml_dash import Experiment
-    with Experiment(prefix=EXP.PREFIX).run as exp:
-        exp.logs.info(f"Running {EXP.name}")
+    with Experiment(prefix=RUN.PREFIX).run as exp:
+        exp.logs.info(f"Running {RUN.name}")
 """
 
-from datetime import datetime, timezone
-from params_proto import proto, EnvVar
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Union
+
+from params_proto import EnvVar, proto
+
+PROJECT_ROOT_FILES = ("pyproject.toml", "requirements.txt", "setup.py", "setup.cfg")
+
+
+def find_project_root(
+  start: Union[str, Path] = None,
+  verbose: bool = False,
+) -> str:
+  """Find the nearest project root by looking for common project files.
+
+  Walks up the directory tree from `start` until it finds a directory
+  containing pyproject.toml, requirements.txt, setup.py, or setup.cfg.
+
+  Args:
+      start: Starting directory or file path. Defaults to cwd.
+      verbose: If True, print search progress.
+
+  Returns:
+      String path to the project root directory, or cwd if not found.
+  """
+  if start is None:
+    start = Path.cwd()
+  else:
+    start = Path(start)
+
+  if start.is_file():
+    start = start.parent
+
+  if verbose:
+    print(f"Searching for project root from: {start}")
+
+  for parent in [start, *start.parents]:
+    if verbose:
+      print(f"  Checking: {parent}")
+    for filename in PROJECT_ROOT_FILES:
+      if (parent / filename).exists():
+        if verbose:
+          print(f"  Found: {parent / filename}")
+        return str(parent)
+
+  if verbose:
+    print(f"  No project root found, using cwd: {Path.cwd()}")
+  return str(Path.cwd())
 
 
 @proto.prefix
-class EXP:
+class RUN:
+  """
+  Global Experiment Run Configuration.
+
+  This class is the single source of truth for experiment metadata.
+  Configure it before starting an experiment, or through the Experiment
+  constructor.
+
+  Default prefix template:
+      {project}/{now:%Y/%m-%d}/{path_stem}/{job_name}
+
+  Example:
+      # Set prefix via environment variable
+      # export ML_DASH_PREFIX="ge/myproject/exp1"
+
+      # Or configure directly
+      from ml_dash.run import RUN
+
+      RUN.project = "my-project"
+      RUN.prefix = "{username}/{project}/{now:%Y-%m-%d}/{entry}"
+
+  Auto-detection:
+      project_root is auto-detected by searching for pyproject.toml,
+      requirements.txt, setup.py, or setup.cfg in parent directories.
+  """
+
+  user: str = EnvVar @ "ML_DASH_USER" @ "USER"
+
+  api_url: str = EnvVar @ "ML_DASH_API_URL" | "https://api.dash.ml"
+  """Remote API server URL"""
+
+  ### Experiment and project information
+  project = "{user}/scratch"  # default project name
+
+  prefix: str = (
+    EnvVar @ "ML_DASH_PREFIX" | "{project}/{now:%Y/%m-%d}/{path_stem}/{job_name}"
+  )
+  """Full experiment path: {owner}/{project}/path.../[name]"""
+
+  readme = None
+
+  id: int = None
+  """Unique experiment ID (snowflake, auto-generated at run start)"""
+
+  now = datetime.now()
+  """Timestamp at import time. Does not change during the session."""
+
+  timestamp: str = None
+  """Timestamp created at instantiation"""
+
+  ### file properties
+  project_root: str = None
+  """Root directory for experiment hierarchy (for auto-detection)"""
+
+  entry: Union[Path, str] = None
+  """Entry point file/directory path"""
+
+  path_stem: str = None
+
+  job_counter: int = 1  # Default to 0. Use True to increment by 1.
+
+  job_name: str = "{now:%H.%M.%S}/{job_counter:03d}"
+
+  """ 
+      Default to '{now:%H.%M.%S}'. use '{now:%H.%M.%S}/{job_counter:03d}'
+      
+      for multiple launches. You can do so by setting:
+
+      ```python
+      RUN.job_name += "/{job_counter}"
+
+      for params in sweep:
+         thunk = instr(main)
+         jaynes.run(thun)
+      jaynes.listen()
+      ```
+  """
+
+  debug = "pydevd" in sys.modules
+  "set to True automatically for pyCharm"
+
+  def __post_init__(self):
     """
-    Global experiment configuration.
+    Initialize RUN with auto-detected prefix from entry path.
 
-    This class is the single source of truth for experiment metadata.
-    Configure it before starting an experiment, or let Experiment auto-configure.
+    Args:
+        entry: Path to entry file/directory (e.g., __file__ or directory
+               containing sweep.jsonl). If not provided, uses caller's
+               __file__ automatically.
 
-    Prefix format: {owner}/{project}/path.../[name]
-
-    Template variables available:
-        {EXP.PREFIX}    - Full experiment prefix from env or direct setting
-        {EXP.name}      - Experiment name (last segment of prefix)
-        {EXP.id}        - Unique experiment ID (snowflake)
-        {EXP.date}      - Date string (YYYYMMDD)
-        {EXP.time}      - Time string (HHMMSS)
-        {EXP.datetime}  - DateTime string (YYYYMMDD.HHMMSS)
-        {EXP.timestamp} - ISO timestamp
+    Computes prefix as relative path from project_root to entry's directory.
 
     Example:
-        # Set prefix via env var or directly
-        EXP.PREFIX = "ge/myproject/exp1"
+        # experiments/__init__.py
+        from ml_dash import RUN
 
-        # Or use environment variable
-        # export ML_DASH_PREFIX="ge/myproject/exp1"
+        RUN.project_root = "/path/to/my-project/experiments"
 
-    Auto-detection from file path:
-        # In experiments/__init__.py
-        from ml_dash import EXP
-        EXP.project_root = "/path/to/my-project/experiments"
+        # experiments/vision/resnet/train.py
+        from ml_dash import RUN
 
-        # In experiments/vision/resnet/train.py
-        from ml_dash import EXP
-        EXP.__post_init__(entry=__file__)
-        # Result: EXP.prefix = "vision/resnet", EXP.name = "resnet"
+        RUN.__post_init__(entry=__file__)
+        # Result: RUN.prefix = "vision/resnet", RUN.name = "resnet"
     """
-    PREFIX: str = EnvVar @ "ML_DASH_PREFIX" | None
-    """Full experiment path: {owner}/{project}/path.../[name]"""
 
-    API_URL: str = EnvVar @ "ML_DASH_API_URL" | "https://api.dash.ml"
-    """Remote API server URL"""
+    # Use provided entry or try to auto-detect from caller
+    if self.entry is None:
+      import inspect
 
-    name: str = "scratch"
-    """Experiment name (last segment of prefix)"""
+      # Walk up the stack to find the actual caller (skip params_proto frames)
+      frame = inspect.currentframe().f_back
+      while frame:
+        file_path = frame.f_globals.get("__file__", "")
+        if "params_proto" not in file_path and "ml_dash/run.py" not in file_path:
+          break
+        frame = frame.f_back
 
-    description: str = None
-    """Experiment description"""
+      self.entry = frame.f_globals.get("__file__") if frame else None
 
-    id: int = None
-    """Unique experiment ID (snowflake, auto-generated at run start)"""
+    if not self.path_stem:
 
-    timestamp: str = None
-    """ISO timestamp (auto-generated at run start)"""
+      def stem(path):
+        return os.path.splitext(str(path))[0]
 
-    prefix: str = None
-    """Resolved prefix after template substitution"""
+      def truncate(path, depth):
+        return "/".join(str(path).split("/")[depth:])
 
-    project_root: str = None
-    """Root directory for experiment hierarchy (for auto-detection)"""
+      self.project_root = str(self.project_root or find_project_root(self.entry))
+      script_root_depth = self.project_root.split("/").__len__()
 
-    entry: str = None
-    """Entry point file/directory path"""
+      script_truncated = truncate(os.path.abspath(self.entry), depth=script_root_depth)
 
-    def __post_init__(self, entry: str = None):
-        """
-        Initialize EXP with auto-detected prefix from entry path.
+      self.path_stem = stem(script_truncated)
 
-        Args:
-            entry: Path to entry file/directory (e.g., __file__ or directory
-                   containing sweep.jsonl). If not provided, uses caller's
-                   __file__ automatically.
+    if isinstance(RUN.job_counter, int) or isinstance(RUN.job_counter, float):
+      RUN.job_counter += 1
 
-        Computes prefix as relative path from project_root to entry's directory.
+    while "{" in self.prefix:
+      data = vars(self)
+      for k, v in data.items():
+        if isinstance(v, str):
+          setattr(self, k, v.format(**data))
 
-        Example:
-            # experiments/__init__.py
-            from ml_dash import EXP
-            EXP.project_root = "/path/to/my-project/experiments"
+    # for k, v in data.items():
+    #   print(f"> {k:>30}: {v}")
 
-            # experiments/vision/resnet/train.py
-            from ml_dash import EXP
-            EXP.__post_init__(entry=__file__)
-            # Result: EXP.prefix = "vision/resnet", EXP.name = "resnet"
-        """
-        from pathlib import Path
 
-        # Use provided entry or try to auto-detect from caller
-        if entry is None:
-            import inspect
-            frame = inspect.currentframe().f_back
-            entry = frame.f_globals.get('__file__')
+if __name__ == "__main__":
+  RUN.description = ""
+  RUN.entry = __file__
+  RUN.prefix = "you you"
 
-        if entry and self.project_root:
-            entry_path = Path(entry).resolve()
-            entry_dir = entry_path.parent if entry_path.is_file() else entry_path
-            root = Path(self.project_root).resolve()
-
-            try:
-                relative = entry_dir.relative_to(root)
-                self.prefix = str(relative)
-                self.name = entry_dir.name
-                self.entry = str(entry_path)
-            except ValueError:
-                # entry is not under project_root, keep current values
-                pass
-
-    @property
-    def date(cls) -> str:
-        """Date string in YYYYMMDD format."""
-        now = datetime.now(timezone.utc)
-        return now.strftime('%Y%m%d')
-
-    @property
-    def time(cls) -> str:
-        """Time string in HHMMSS format."""
-        now = datetime.now(timezone.utc)
-        return now.strftime('%H%M%S')
-
-    @property
-    def datetime(cls) -> str:
-        """DateTime string in YYYYMMDD.HHMMSS format."""
-        now = datetime.now(timezone.utc)
-        return now.strftime('%Y%m%d.%H%M%S')
-
-    @classmethod
-    def _init_run(cls):
-        """Initialize run with unique ID and timestamp."""
-        if cls.id is None:
-            # Generate unique Snowflake ID
-            from .snowflake import generate_id
-            cls.id = generate_id()
-
-        if cls.timestamp is None:
-            # Generate ISO timestamp
-            from datetime import datetime, timezone
-            cls.timestamp = datetime.now(timezone.utc).isoformat()
-
-    @classmethod
-    def _reset(cls):
-        """Reset run state for next experiment."""
-        cls.id = None
-        cls.timestamp = None
-        cls.prefix = None
-        cls.description = None
-
+  run = RUN()
+  print(vars(run))
