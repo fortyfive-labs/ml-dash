@@ -11,7 +11,7 @@ class TestBasicMetrics:
 
   def test_single_metric_append_local(self, local_experiment, tmp_proj):
     """Test appending single data points to a metric."""
-    with local_experiment(name="metric-test", project="test").run as experiment:
+    with local_experiment("57block/test/metric-test").run as experiment:
       for i in range(5):
         experiment.metrics("train").log(loss=1.0 / (i + 1), epoch=i)
 
@@ -36,13 +36,13 @@ class TestBasicMetrics:
   @pytest.mark.remote
   def test_single_metric_append_remote(self, remote_experiment):
     """Test appending data points in remote mode."""
-    with remote_experiment(name="metric-test-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/metric-test-remote").run as experiment:
       for i in range(10):
         experiment.metrics("train").log(loss=0.5 - i * 0.05, epoch=i)
 
   def test_multiple_metrics_local(self, local_experiment, tmp_proj):
     """Test metricing multiple different metrics."""
-    with local_experiment(name="multi-metric", project="test").run as experiment:
+    with local_experiment("57block/test/multi-metric").run as experiment:
       for epoch in range(5):
         experiment.metrics("train").log(loss=0.5 - epoch * 0.1, epoch=epoch)
         experiment.metrics("eval").log(loss=0.6 - epoch * 0.1, epoch=epoch)
@@ -57,7 +57,7 @@ class TestBasicMetrics:
   def test_multiple_metrics_remote(self, remote_experiment):
     """Test metricing multiple metrics in remote mode."""
     with remote_experiment(
-      name="multi-metric-remote", project="test"
+      "test-user/test/multi-metric-remote"
     ).run as experiment:
       for epoch in range(3):
         experiment.metrics("train").log(loss=0.4 - epoch * 0.1, epoch=epoch)
@@ -69,7 +69,7 @@ class TestMultipleLogCalls:
 
   def test_multiple_log_calls_local(self, local_experiment, tmp_proj, sample_data):
     """Test logging multiple data points via individual log calls."""
-    with local_experiment(name="multi-metric", project="test").run as experiment:
+    with local_experiment("57block/test/multi-metric").run as experiment:
       for point in sample_data["metric_data"]:
         experiment.metrics("train").log(**point)
 
@@ -93,14 +93,14 @@ class TestMultipleLogCalls:
   def test_multiple_log_calls_remote(self, remote_experiment, sample_data):
     """Test logging multiple data points in remote mode."""
     with remote_experiment(
-      name="multi-metric-remote", project="test"
+      "test-user/test/multi-metric-remote"
     ).run as experiment:
       for point in sample_data["metric_data"]:
         experiment.metrics("metrics").log(**point)
 
   def test_many_log_calls_local(self, local_experiment, tmp_proj):
     """Test logging many data points."""
-    with local_experiment(name="many-logs", project="test").run as experiment:
+    with local_experiment("57block/test/many-logs").run as experiment:
       for i in range(1000):
         experiment.metrics("metric").log(loss=i * 0.01, step=i)
 
@@ -124,7 +124,7 @@ class TestFlexibleSchema:
 
   def test_multi_field_metricing_local(self, local_experiment, tmp_proj):
     """Test metrics with multiple fields per data point."""
-    with local_experiment(name="multi-field", project="test").run as experiment:
+    with local_experiment("57block/test/multi-field").run as experiment:
       experiment.metrics("all_metrics").log(
         epoch=5,
         train_loss=0.3,
@@ -154,13 +154,13 @@ class TestFlexibleSchema:
   @pytest.mark.remote
   def test_multi_field_metricing_remote(self, remote_experiment, sample_data):
     """Test multi-field metricing in remote mode."""
-    with remote_experiment(name="multi-field-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/multi-field-remote").run as experiment:
       for data in sample_data["multi_metric_data"]:
         experiment.metrics("combined").log(**data)
 
   def test_varying_schemas_local(self, local_experiment, tmp_proj):
     """Test that schema can vary between data points."""
-    with local_experiment(name="varying-schema", project="test").run as experiment:
+    with local_experiment("57block/test/varying-schema").run as experiment:
       experiment.metrics("flexible").log(field_a=1, field_b=2)
       experiment.metrics("flexible").log(field_a=3, field_c=4)
       experiment.metrics("flexible").log(field_a=5, field_b=6, field_c=7)
@@ -182,7 +182,7 @@ class TestMetricMetadata:
 
   def test_metric_metadata_creation_local(self, local_experiment, tmp_proj):
     """Test that metric metadata is created."""
-    with local_experiment(name="metric-meta", project="test").run as experiment:
+    with local_experiment("57block/test/metric-meta").run as experiment:
       for i in range(15):
         experiment.metrics("metric").log(loss=i * 0.1, step=i)
 
@@ -200,7 +200,7 @@ class TestMetricMetadata:
 
   def test_metric_stats_local(self, local_experiment):
     """Test getting metric statistics."""
-    with local_experiment(name="metric-stats", project="test").run as experiment:
+    with local_experiment("57block/test/metric-stats").run as experiment:
       for i in range(20):
         experiment.metrics("eval").log(loss=0.5 + i * 0.02, step=i)
 
@@ -213,7 +213,7 @@ class TestMetricMetadata:
   def test_metric_stats_remote(self, remote_experiment):
     """Test getting metric stats in remote mode."""
     with remote_experiment(
-      name="metric-stats-remote", project="test"
+      "test-user/test/metric-stats-remote"
     ).run as experiment:
       for i in range(10):
         experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
@@ -227,7 +227,7 @@ class TestMetricRead:
 
   def test_read_metric_data_local(self, local_experiment):
     """Test reading metric data."""
-    with local_experiment(name="metric-read", project="test").run as experiment:
+    with local_experiment("57block/test/metric-read").run as experiment:
       # Write data
       for i in range(20):
         experiment.metrics("metric").log(loss=i * 0.1, step=i)
@@ -241,7 +241,7 @@ class TestMetricRead:
 
   def test_read_with_pagination_local(self, local_experiment):
     """Test reading metric data with pagination."""
-    with local_experiment(name="metric-page", project="test").run as experiment:
+    with local_experiment("57block/test/metric-page").run as experiment:
       # Write 100 data points
       for i in range(100):
         experiment.metrics("metric").log(loss=i, step=i)
@@ -258,7 +258,7 @@ class TestMetricRead:
   @pytest.mark.remote
   def test_read_metric_data_remote(self, remote_experiment):
     """Test reading metric data in remote mode."""
-    with remote_experiment(name="metric-read-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/metric-read-remote").run as experiment:
       for i in range(15):
         experiment.metrics("metric").log(loss=i * 0.05, step=i)
 
@@ -271,7 +271,7 @@ class TestListMetrics:
 
   def test_list_all_metrics_local(self, local_experiment):
     """Test listing all metrics in a experiment."""
-    with local_experiment(name="metric-list", project="test").run as experiment:
+    with local_experiment("57block/test/metric-list").run as experiment:
       experiment.metrics("train").log(loss=0.5, step=0)
       experiment.metrics("eval").log(loss=0.8, step=0)
       experiment.metrics("train").log(lr=0.001, step=0)
@@ -286,7 +286,7 @@ class TestListMetrics:
   @pytest.mark.remote
   def test_list_all_metrics_remote(self, remote_experiment):
     """Test listing metrics in remote mode."""
-    with remote_experiment(name="metric-list-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/metric-list-remote").run as experiment:
       experiment.metrics("metric1").log(loss=1.0, step=0)
       experiment.metrics("metric2").log(loss=2.0, step=0)
 
@@ -299,7 +299,7 @@ class TestMetricIndexing:
 
   def test_metric_sequential_indices_local(self, local_experiment, tmp_proj):
     """Test that metric data points have sequential indices."""
-    with local_experiment(name="metric-index", project="test").run as experiment:
+    with local_experiment("57block/test/metric-index").run as experiment:
       for i in range(10):
         experiment.metrics("metric").log(loss=i * 10)
 
@@ -320,7 +320,7 @@ class TestMetricIndexing:
 
   def test_metric_indices_with_multiple_logs_local(self, local_experiment, tmp_proj):
     """Test indices with multiple log calls."""
-    with local_experiment(name="multi-index", project="test").run as experiment:
+    with local_experiment("57block/test/multi-index").run as experiment:
       for i in range(5):
         experiment.metrics("metric").log(loss=i)
       for i in range(5, 10):
@@ -348,7 +348,7 @@ class TestMetricEdgeCases:
 
   def test_empty_metric_local(self, local_experiment, tmp_proj):
     """Test experiment with no metrics."""
-    with local_experiment(name="no-metrics", project="test").run as experiment:
+    with local_experiment("57block/test/no-metrics").run as experiment:
       experiment.log("No metrics created")
 
     metrics_dir = tmp_proj / getpass.getuser() / "test/no-metrics/metrics"
@@ -358,7 +358,7 @@ class TestMetricEdgeCases:
 
   def test_metric_with_null_values_local(self, local_experiment, tmp_proj):
     """Test metricing data with null values."""
-    with local_experiment(name="null-metric", project="test").run as experiment:
+    with local_experiment("57block/test/null-metric").run as experiment:
       experiment.metrics("metric").log(loss=None, step=0, status="pending")
       experiment.metrics("metric").log(loss=0.5, step=1, status="complete")
 
@@ -379,7 +379,7 @@ class TestMetricEdgeCases:
 
   def test_metric_with_special_characters_local(self, local_experiment, tmp_proj):
     """Test metric names with special characters."""
-    with local_experiment(name="special-metric", project="test").run as experiment:
+    with local_experiment("57block/test/special-metric").run as experiment:
       experiment.metrics("metric_1").log(loss=1.0)
       experiment.metrics("metric-2").log(loss=2.0)
       experiment.metrics("metric.3").log(loss=3.0)
@@ -390,7 +390,7 @@ class TestMetricEdgeCases:
 
   def test_very_frequent_metricing_local(self, local_experiment, tmp_proj):
     """Test rapid, frequent metricing."""
-    with local_experiment(name="frequent-metric", project="test").run as experiment:
+    with local_experiment("57block/test/frequent-metric").run as experiment:
       for i in range(1000):
         experiment.metrics("metric").log(loss=i * 0.001, step=i)
 
@@ -412,14 +412,14 @@ class TestMetricEdgeCases:
   def test_frequent_metricing_remote(self, remote_experiment):
     """Test rapid metricing in remote mode."""
     with remote_experiment(
-      name="frequent-metric-remote", project="test"
+      "test-user/test/frequent-metric-remote"
     ).run as experiment:
       for i in range(100):
         experiment.metrics("metric").log(loss=i * 0.01, step=i)
 
   def test_metric_with_large_values_local(self, local_experiment, tmp_proj):
     """Test metricing with very large numeric values."""
-    with local_experiment(name="large-values", project="test").run as experiment:
+    with local_experiment("57block/test/large-values").run as experiment:
       experiment.metrics("metric").log(
         huge_int=999999999999999, huge_float=1.23e100, tiny_float=1.23e-100
       )
@@ -440,7 +440,7 @@ class TestMetricEdgeCases:
 
   def test_metric_with_nested_data_local(self, local_experiment, tmp_proj):
     """Test metricing with nested data structures."""
-    with local_experiment(name="nested-metric", project="test").run as experiment:
+    with local_experiment("57block/test/nested-metric").run as experiment:
       experiment.metrics("metric").log(
         epoch=1,
         metrics={"train": {"loss": 0.5, "acc": 0.8}, "val": {"loss": 0.6, "acc": 0.75}},
@@ -463,7 +463,7 @@ class TestMetricEdgeCases:
 
   def test_metric_name_collision_local(self, local_experiment, tmp_proj):
     """Test multiple appends to same metric name."""
-    with local_experiment(name="collision", project="test").run as experiment:
+    with local_experiment("57block/test/collision").run as experiment:
       experiment.metrics("train").log(loss=1.0, epoch=0)
       experiment.metrics("train").log(loss=0.9, epoch=1)
       experiment.metrics("train").log(loss=0.8, epoch=2)

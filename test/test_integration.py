@@ -12,9 +12,10 @@ class TestCompleteWorkflows:
 
   def test_complete_ml_workflow_local(self, local_experiment, tmp_proj, sample_files):
     """Test complete ML experiment workflow in local mode."""
+    import getpass
+    owner = getpass.getuser()
     with local_experiment(
-      prefix="experiments/2024/ml-experiment",
-      project="experiments",
+      f"{owner}/experiments/experiments/2024/ml-experiment",
       description="Complete ML training experiment",
       tags=["ml", "training", "test"],
     ).run as experiment:
@@ -75,8 +76,7 @@ class TestCompleteWorkflows:
   def test_complete_ml_workflow_remote(self, remote_experiment, sample_files):
     """Test complete ML workflow in remote mode."""
     with remote_experiment(
-      name="ml-experiment-remote",
-      project="experiments",
+      "test-user/experiments/ml-experiment-remote",
       description="Remote ML training experiment",
       tags=["ml", "remote"],
     ).run as experiment:
@@ -100,6 +100,8 @@ class TestHyperparameterSearch:
 
   def test_grid_search_local(self, local_experiment, tmp_proj):
     """Test grid search hyperparameter optimization."""
+    import getpass
+    owner = getpass.getuser()
     learning_rates = [0.1, 0.01, 0.001]
     batch_sizes = [16, 32, 64]
 
@@ -108,8 +110,7 @@ class TestHyperparameterSearch:
         experiment_name = f"grid-lr{lr}-bs{bs}".replace(".", "_")
 
         with local_experiment(
-          name=experiment_name,
-          project="hyperparam-search",
+          f"{owner}/hyperparam-search/{experiment_name}",
           description=f"Grid search: lr={lr}, bs={bs}",
           tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
         ).run as experiment:
@@ -138,7 +139,7 @@ class TestHyperparameterSearch:
       bs = random.choice([16, 32, 64])
 
       with remote_experiment(
-        name=f"random-search-run-{run}", project="random-search", tags=["random-search"]
+      f"test-user/random-search/random-search-run-{run}", tags=["random-search"]
       ).run as experiment:
         experiment.params.set(learning_rate=lr, batch_size=bs)
         acc = 0.6 + random.random() * 0.3
@@ -151,6 +152,8 @@ class TestIterativeExperimentation:
 
   def test_iterative_improvements_local(self, local_experiment, tmp_proj):
     """Test iterative model improvements."""
+    import getpass
+    owner = getpass.getuser()
     experiments = [
       {
         "name": "baseline",
@@ -180,8 +183,7 @@ class TestIterativeExperimentation:
 
     for exp in experiments:
       with local_experiment(
-        name=f"exp-{exp['name']}",
-        project="iterative",
+        f"{owner}/iterative/exp-{exp['name']}",
         description=exp["description"],
         tags=["iterative", exp["name"]],
       ).run as experiment:
@@ -202,10 +204,11 @@ class TestMultiExperimentPipeline:
 
   def test_ml_pipeline_local(self, local_experiment, tmp_proj, sample_files):
     """Test complete ML pipeline with multiple stages."""
+    import getpass
+    owner = getpass.getuser()
     # Stage 1: Data preprocessing
     with local_experiment(
-      prefix="pipeline/stage-1/01-preprocessing",
-      project="pipeline",
+      f"{owner}/pipeline/pipeline/stage-1/01-preprocessing",
       tags=["pipeline", "preprocessing"],
     ).run as experiment:
       experiment.log("Starting data preprocessing", level="info")
@@ -219,8 +222,7 @@ class TestMultiExperimentPipeline:
 
     # Stage 2: Training
     with local_experiment(
-      prefix="pipeline/stage-2/02-training",
-      project="pipeline",
+      f"{owner}/pipeline/pipeline/stage-2/02-training",
       tags=["pipeline", "training"],
     ).run as experiment:
       experiment.log("Starting model training", level="info")
@@ -232,8 +234,7 @@ class TestMultiExperimentPipeline:
 
     # Stage 3: Evaluation
     with local_experiment(
-      prefix="pipeline/stage-3/03-evaluation",
-      project="pipeline",
+      f"{owner}/pipeline/pipeline/stage-3/03-evaluation",
       tags=["pipeline", "evaluation"],
     ).run as experiment:
       experiment.log("Starting model evaluation", level="info")
@@ -256,8 +257,7 @@ class TestMultiExperimentPipeline:
 
     for i, stage in enumerate(stages):
       with remote_experiment(
-        name=f"stage-{i + 1}-{stage}",
-        project="pipeline-remote",
+      f"test-user/pipeline-remote/stage-{i + 1}-{stage}",
         tags=["pipeline", stage],
       ).run as experiment:
         experiment.log(f"Starting {stage}")
@@ -271,9 +271,10 @@ class TestDebuggingWorkflow:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test comprehensive debugging workflow."""
+    import getpass
+    owner = getpass.getuser()
     with local_experiment(
-      name="debug-training",
-      project="debugging",
+      f"{owner}/debugging/debug-training",
       description="Training with debug logging",
       tags=["debug", "verbose"],
     ).run as experiment:
@@ -323,9 +324,10 @@ class TestAllFeaturesCombined:
 
   def test_kitchen_sink_local(self, local_experiment, tmp_proj, sample_files):
     """Test experiment using every available feature."""
+    import getpass
+    owner = getpass.getuser()
     with local_experiment(
-      prefix="tests/comprehensive/kitchen-sink",
-      project="full-test",
+      f"{owner}/full-test/tests/comprehensive/kitchen-sink",
       description="Test of all features combined",
       tags=["test", "comprehensive", "all-features"],
     ).run as experiment:
@@ -387,8 +389,7 @@ class TestAllFeaturesCombined:
   def test_kitchen_sink_remote(self, remote_experiment, sample_files):
     """Test all features combined in remote mode."""
     with remote_experiment(
-      name="kitchen-sink-remote",
-      project="full-test-remote",
+      "test-user/full-test-remote/kitchen-sink-remote",
       description="Remote test of all features",
       tags=["test", "remote", "comprehensive"],
     ).run as experiment:
@@ -420,8 +421,9 @@ class TestRealWorldScenarios:
   def test_failed_experiment_recovery_local(self, local_experiment, tmp_proj):
     """Test recovering from failed experiment."""
     # First attempt (fails)
+    owner = getpass.getuser()
     try:
-      with local_experiment(name="recovery-test", project="recovery").run as experiment:
+      with local_experiment(f"{owner}/recovery/recovery-test").run as experiment:
         experiment.params.set(attempt=1)
         experiment.log("Starting experiment attempt 1")
         experiment.metrics("train").log(loss=0.5, epoch=0)
@@ -430,7 +432,7 @@ class TestRealWorldScenarios:
       pass
 
     # Recovery attempt
-    with local_experiment(name="recovery-test", project="recovery").run as experiment:
+    with local_experiment(f"{owner}/recovery/recovery-test").run as experiment:
       experiment.params.set(attempt=2, recovered=True)
       experiment.log("Recovered and restarting")
       experiment.metrics("train").log(loss=0.4, epoch=1)
@@ -443,12 +445,13 @@ class TestRealWorldScenarios:
 
   def test_comparison_experiments_local(self, local_experiment, tmp_proj):
     """Test running comparison experiments."""
+    import getpass
+    owner = getpass.getuser()
     models = ["resnet18", "resnet50", "vit-base"]
 
     for model_name in models:
       with local_experiment(
-        name=f"comparison-{model_name}",
-        project="comparisons",
+        f"{owner}/comparisons/comparison-{model_name}",
         tags=["comparison", model_name],
       ).run as experiment:
         experiment.params.set(model=model_name, epochs=10)
@@ -469,7 +472,9 @@ class TestRealWorldScenarios:
   @pytest.mark.slow
   def test_long_running_experiment_local(self, local_experiment):
     """Test long-running experiment with many data points."""
-    with local_experiment(name="long-run", project="longtest").run as experiment:
+    import getpass
+    owner = getpass.getuser()
+    with local_experiment(f"{owner}/longtest/long-run").run as experiment:
       experiment.params.set(total_steps=1000)
 
       # Metric many data points

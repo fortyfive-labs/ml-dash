@@ -7,7 +7,7 @@ class TestSummaryCacheLocal:
 
     def test_basic_store_and_summarize(self, local_experiment):
         """Test basic store and summarize workflow."""
-        exp = local_experiment(name="test_basic", project="test")
+        exp = local_experiment("57block/test/test_basic")
         exp.run.start()
         metric = exp.metrics("train")
 
@@ -31,7 +31,7 @@ class TestSummaryCacheLocal:
 
     def test_multiple_calls_to_metrics(self, local_experiment):
         """Test that multiple calls to metrics() return cached instance."""
-        exp = local_experiment(name="test_cache", project="test")
+        exp = local_experiment("57block/test/test_cache")
         exp.run.start()
 
         # Store using multiple calls (natural usage pattern)
@@ -54,7 +54,7 @@ class TestSummaryCacheLocal:
 
     def test_rolling_window(self, local_experiment):
         """Test rolling window behavior (clear=True)."""
-        exp = local_experiment(name="test_rolling", project="test")
+        exp = local_experiment("57block/test/test_rolling")
         exp.run.start()
         metric = exp.metrics("train")
 
@@ -81,7 +81,7 @@ class TestSummaryCacheLocal:
 
     def test_training_loop_pattern(self, local_experiment):
         """Test realistic training loop pattern."""
-        exp = local_experiment(name="test_loop", project="test")
+        exp = local_experiment("57block/test/test_loop")
         exp.run.start()
         train_metric = exp.metrics("train")
         log_interval = 10
@@ -119,7 +119,7 @@ class TestSummaryCacheRemote:
 
     def test_basic_store_and_summarize(self, remote_experiment):
         """Test basic store and summarize workflow in remote mode."""
-        exp = remote_experiment(name="test_basic_remote", project="test_summary")
+        exp = remote_experiment("57block/test_summary/test_basic_remote")
         exp.run.start()
         metric = exp.metrics("train")
 
@@ -138,7 +138,7 @@ class TestSummaryCacheRemote:
 
     def test_multiple_calls_to_metrics(self, remote_experiment):
         """Test that multiple calls to metrics() return cached instance in remote mode."""
-        exp = remote_experiment(name="test_cache_remote", project="test_summary")
+        exp = remote_experiment("57block/test_summary/test_cache_remote")
         exp.run.start()
 
         # Store using multiple calls
@@ -158,7 +158,7 @@ class TestSummaryCacheRemote:
 
     def test_rolling_window(self, remote_experiment):
         """Test rolling window behavior in remote mode."""
-        exp = remote_experiment(name="test_rolling_remote", project="test_summary")
+        exp = remote_experiment("57block/test_summary/test_rolling_remote")
         exp.run.start()
         metric = exp.metrics("train")
 
@@ -182,7 +182,7 @@ class TestSummaryCacheRemote:
 
     def test_training_loop_pattern(self, remote_experiment):
         """Test realistic training loop pattern in remote mode."""
-        exp = remote_experiment(name="test_loop_remote", project="test_summary")
+        exp = remote_experiment("57block/test_summary/test_loop_remote")
         exp.run.start()
         train_metric = exp.metrics("train")
         log_interval = 10

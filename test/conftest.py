@@ -60,35 +60,17 @@ def local_experiment(tmp_proj):
   Returns a function that creates experiments with default config but allows overrides.
   Prefix format: {owner}/{project}/path.../[name]
 
-  For backward compatibility, accepts old parameters:
-  - name: becomes the last segment of prefix (or full path if contains /)
-  - project: becomes the second segment of prefix
-  - prefix: if provided with project, appends to owner/project/
-
-  When using old parameters, the owner defaults to getpass.getuser() to match
-  the expected test paths.
+  Usage:
+    local_experiment("test-user/test-project/exp-1")
+    local_experiment("test-user/my-proj/experiments/baseline")
   """
   import getpass
-  DEFAULT_PREFIX = "test-user/test-project/test-experiment"
+
+  # Use current username for test isolation
+  owner = getpass.getuser()
+  DEFAULT_PREFIX = f"{owner}/test-project/test-experiment"
 
   def _create_experiment(prefix=DEFAULT_PREFIX, **kwargs):
-    # Handle backward compatibility for old parameters
-    name = kwargs.pop("name", None)
-    project = kwargs.pop("project", None)
-
-    if name or project:
-      # Build prefix from old-style parameters
-      # Use current username as owner for backward compatibility with test assertions
-      owner = getpass.getuser()
-      proj = project if project else "test-project"
-      exp_name = name if name else "test-experiment"
-
-      # If caller passed an explicit prefix (not default), use it as a path under owner/project
-      if prefix != DEFAULT_PREFIX:
-        prefix = f"{owner}/{proj}/{prefix}"
-      else:
-        prefix = f"{owner}/{proj}/{exp_name}"
-
     defaults = {
       "local_path": str(tmp_proj),
       "prefix": prefix,
@@ -149,25 +131,13 @@ def remote_experiment(mock_remote_token):
   Generates unique experiment names using timestamps to avoid collisions between test runs.
   Prefix format: {owner}/{project}/path.../[name]
 
-  For backward compatibility, accepts old parameters:
-  - name: becomes the last segment of prefix
-  - project: becomes the second segment of prefix
+  Usage:
+    remote_experiment("test-user/test-project/exp-1")
+    remote_experiment("test-user/my-proj/experiments/baseline")
   """
   import time
 
   def _create_experiment(prefix="test-user/test-project/test-experiment", **kwargs):
-    # Handle backward compatibility for old parameters
-    name = kwargs.pop("name", None)
-    project = kwargs.pop("project", None)
-
-    if name or project:
-      # Build prefix from old-style parameters
-      parts = prefix.strip("/").split("/")
-      owner = parts[0] if len(parts) > 0 else "test-user"
-      proj = project if project else (parts[1] if len(parts) > 1 else "test-project")
-      exp_name = name if name else (parts[-1] if len(parts) > 2 else "test-experiment")
-      prefix = f"{owner}/{proj}/{exp_name}"
-
     # Add timestamp suffix to make it unique
     timestamp_suffix = str(int(time.time() * 1000000))  # microsecond precision
 

@@ -11,7 +11,7 @@ class TestBasicParameters:
 
   def test_simple_parameters_local(self, local_experiment, tmp_proj, sample_data):
     """Test setting simple parameters in local mode."""
-    with local_experiment(name="params-test", project="test").run as experiment:
+    with local_experiment("57block/test/params-test").run as experiment:
       experiment.params.set(**sample_data["simple_params"])
 
     params_file = tmp_proj / getpass.getuser() / "test/params-test/parameters.json"
@@ -28,12 +28,12 @@ class TestBasicParameters:
   @pytest.mark.remote
   def test_simple_parameters_remote(self, remote_experiment, sample_data):
     """Test setting simple parameters in remote mode."""
-    with remote_experiment(name="params-test-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/params-test-remote").run as experiment:
       experiment.params.set(**sample_data["simple_params"])
 
   def test_parameter_types_local(self, local_experiment, tmp_proj):
     """Test different parameter data types."""
-    with local_experiment(name="param-types", project="test").run as experiment:
+    with local_experiment("57block/test/param-types").run as experiment:
       experiment.params.set(
         int_param=42,
         float_param=3.14159,
@@ -60,7 +60,7 @@ class TestBasicParameters:
   @pytest.mark.remote
   def test_parameter_types_remote(self, remote_experiment):
     """Test different parameter types in remote mode."""
-    with remote_experiment(name="param-types-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/param-types-remote").run as experiment:
       experiment.params.set(
         int_param=100, float_param=2.71828, str_param="remote test", bool_param=True
       )
@@ -73,7 +73,7 @@ class TestNestedParameters:
     self, local_experiment, tmp_proj, sample_data
   ):
     """Test that nested parameters are automatically flattened."""
-    with local_experiment(name="nested-params", project="test").run as experiment:
+    with local_experiment("57block/test/nested-params").run as experiment:
       experiment.params.set(**sample_data["nested_params"])
 
     params_file = tmp_proj / getpass.getuser() / "test/nested-params/parameters.json"
@@ -94,13 +94,13 @@ class TestNestedParameters:
   def test_nested_parameters_remote(self, remote_experiment, sample_data):
     """Test nested parameters in remote mode."""
     with remote_experiment(
-      name="nested-params-remote", project="test"
+      "test-user/test/nested-params-remote"
     ).run as experiment:
       experiment.params.set(**sample_data["nested_params"])
 
   def test_deeply_nested_parameters_local(self, local_experiment, tmp_proj):
     """Test deeply nested parameter structures."""
-    with local_experiment(name="deep-nested", project="test").run as experiment:
+    with local_experiment("57block/test/deep-nested").run as experiment:
       experiment.params.set(
         **{
           "config": {
@@ -125,7 +125,7 @@ class TestNestedParameters:
 
   def test_mixed_flat_and_nested_local(self, local_experiment, tmp_proj):
     """Test mixing flat and nested parameters."""
-    with local_experiment(name="mixed-params", project="test").run as experiment:
+    with local_experiment("57block/test/mixed-params").run as experiment:
       experiment.params.set(
         learning_rate=0.001,
         batch_size=32,
@@ -150,7 +150,7 @@ class TestParameterUpdates:
 
   def test_parameter_update_local(self, local_experiment, tmp_proj):
     """Test updating existing parameters."""
-    with local_experiment(name="param-update", project="test").run as experiment:
+    with local_experiment("57block/test/param-update").run as experiment:
       # Set initial parameters
       experiment.params.set(learning_rate=0.01, batch_size=32)
 
@@ -172,7 +172,7 @@ class TestParameterUpdates:
   def test_parameter_update_remote(self, remote_experiment):
     """Test updating parameters in remote mode."""
     with remote_experiment(
-      name="param-update-remote", project="test"
+      "test-user/test/param-update-remote"
     ).run as experiment:
       experiment.params.set(version=1)
       experiment.params.set(version=2)
@@ -180,7 +180,7 @@ class TestParameterUpdates:
 
   def test_multiple_parameter_updates_local(self, local_experiment, tmp_proj):
     """Test multiple parameter update operations."""
-    with local_experiment(name="multi-update", project="test").run as experiment:
+    with local_experiment("57block/test/multi-update").run as experiment:
       experiment.params.set(lr=0.1, batch_size=32)
       experiment.params.set(lr=0.01, ent_coef=0.01)
       experiment.params.set(lr=0.001, ent_coef=0.001)
@@ -194,7 +194,7 @@ class TestParameterUpdates:
 
   def test_overwrite_nested_parameter_local(self, local_experiment, tmp_proj):
     """Test overwriting nested parameters."""
-    with local_experiment(name="overwrite-nested", project="test").run as experiment:
+    with local_experiment("57block/test/overwrite-nested").run as experiment:
       experiment.params.set(**{"model": {"name": "vgg", "layers": 16}})
       experiment.params.set(**{"model": {"name": "resnet", "layers": 50}})
 
@@ -211,7 +211,7 @@ class TestParameterEdgeCases:
 
   def test_empty_parameters_local(self, local_experiment, tmp_proj):
     """Test experiment with no parameters set."""
-    with local_experiment(name="no-params", project="test").run as experiment:
+    with local_experiment("57block/test/no-params").run as experiment:
       experiment.log("No parameters")
 
     params_file = tmp_proj / getpass.getuser() / "test/no-params/parameters.json"
@@ -222,7 +222,7 @@ class TestParameterEdgeCases:
 
   def test_parameters_with_special_keys_local(self, local_experiment, tmp_proj):
     """Test parameters with special characters in keys."""
-    with local_experiment(name="special-keys", project="test").run as experiment:
+    with local_experiment("57block/test/special-keys").run as experiment:
       experiment.params.set(
         **{
           "key_with_underscore": 1,
@@ -243,7 +243,7 @@ class TestParameterEdgeCases:
     """Test setting a large number of parameters."""
     large_params = {f"param_{i}": i * 0.001 for i in range(1000)}
 
-    with local_experiment(name="large-params", project="test").run as experiment:
+    with local_experiment("57block/test/large-params").run as experiment:
       experiment.params.set(**large_params)
 
     params_file = tmp_proj / getpass.getuser() / "test/large-params/parameters.json"
@@ -258,7 +258,7 @@ class TestParameterEdgeCases:
     """Test parameter with very long string value."""
     long_value = "A" * 10000
 
-    with local_experiment(name="long-value", project="test").run as experiment:
+    with local_experiment("57block/test/long-value").run as experiment:
       experiment.params.set(long_param=long_value)
 
     params_file = tmp_proj / getpass.getuser() / "test/long-value/parameters.json"
@@ -269,7 +269,7 @@ class TestParameterEdgeCases:
 
   def test_unicode_parameter_values_local(self, local_experiment, tmp_proj):
     """Test parameters with unicode values."""
-    with local_experiment(name="unicode-params", project="test").run as experiment:
+    with local_experiment("57block/test/unicode-params").run as experiment:
       experiment.params.set(
         japanese="こんにちは", chinese="你好", emoji="🚀 🎉 💯", arabic="مرحبا"
       )
@@ -283,7 +283,7 @@ class TestParameterEdgeCases:
 
   def test_numeric_edge_values_local(self, local_experiment, tmp_proj):
     """Test parameters with edge case numeric values."""
-    with local_experiment(name="numeric-edge", project="test").run as experiment:
+    with local_experiment("57block/test/numeric-edge").run as experiment:
       experiment.params.set(
         zero=0,
         negative=-42,
@@ -307,7 +307,7 @@ class TestParameterEdgeCases:
     large_params = {f"param_{i}": i for i in range(100)}
 
     with remote_experiment(
-      name="large-params-remote", project="test"
+      "test-user/test/large-params-remote"
     ).run as experiment:
       experiment.params.set(**large_params)
 
@@ -317,7 +317,7 @@ class TestParameterCombinations:
 
   def test_ml_training_parameters_local(self, local_experiment, tmp_proj):
     """Test typical ML training parameter structure."""
-    with local_experiment(name="ml-params", project="test").run as experiment:
+    with local_experiment("57block/test/ml-params").run as experiment:
       experiment.params.set(
         **{
           "model": {
@@ -353,7 +353,7 @@ class TestParameterCombinations:
 
   def test_config_file_like_parameters_local(self, local_experiment, tmp_proj):
     """Test parameters structured like a config file."""
-    with local_experiment(name="config-params", project="test").run as experiment:
+    with local_experiment("57block/test/config-params").run as experiment:
       experiment.params.set(
         **{
           "experiment": {

@@ -11,7 +11,7 @@ class TestOptionalMetricName:
 
   def test_append_without_name_local(self, local_experiment, tmp_proj):
     """Test appending metric without specifying name (uses None)."""
-    with local_experiment(name="no-name-metric", project="test").run as experiment:
+    with local_experiment("57block/test/no-name-metric").run as experiment:
       experiment.metrics.log(loss=0.5, step=1)
       experiment.metrics.log(loss=0.4, step=2)
       experiment.metrics.log(loss=0.3, step=3)
@@ -32,7 +32,7 @@ class TestOptionalMetricName:
 
   def test_log_with_explicit_name_still_works(self, local_experiment, tmp_proj):
     """Test that explicit name via metrics() call works."""
-    with local_experiment(name="explicit-name", project="test").run as experiment:
+    with local_experiment("57block/test/explicit-name").run as experiment:
       experiment.metrics("train").log(loss=0.5, step=1)
       experiment.metrics("train").log(loss=0.4, step=2)
 
@@ -48,7 +48,7 @@ class TestOptionalMetricName:
 
   def test_multiple_logs_without_name_local(self, local_experiment, tmp_proj):
     """Test multiple log calls without name."""
-    with local_experiment(name="multi-no-name", project="test").run as experiment:
+    with local_experiment("57block/test/multi-no-name").run as experiment:
       experiment.metrics.log(loss=0.5, step=1)
       experiment.metrics.log(loss=0.4, step=2)
       experiment.metrics.log(loss=0.3, step=3)
@@ -65,7 +65,7 @@ class TestOptionalMetricName:
 
   def test_mixed_named_and_none_metrics(self, local_experiment, tmp_proj):
     """Test using both named and None metrics in same experiment."""
-    with local_experiment(name="mixed", project="test").run as experiment:
+    with local_experiment("57block/test/mixed").run as experiment:
       # Log to None metric (unnamed)
       experiment.metrics.log(loss=1.0, step=0)
 
@@ -93,7 +93,7 @@ class TestOptionalMetricName:
   @pytest.mark.remote
   def test_append_without_name_remote(self, remote_experiment):
     """Test appending without name in remote mode."""
-    with remote_experiment(name="no-name-remote", project="test").run as experiment:
+    with remote_experiment("57block/test/no-name-remote").run as experiment:
       experiment.metrics.log(loss=0.5, step=1)
       experiment.metrics.log(loss=0.4, step=2)
 
@@ -105,7 +105,7 @@ class TestOptionalMetricName:
   def test_multiple_logs_without_name_remote(self, remote_experiment):
     """Test multiple log calls without name in remote mode."""
     with remote_experiment(
-      name="multi-no-name-remote", project="test"
+      "test-user/test/multi-no-name-remote"
     ).run as experiment:
       for i in range(10):
         experiment.metrics.log(loss=i * 0.1, step=i)
@@ -120,7 +120,7 @@ class TestLogAndFlushMethods:
 
   def test_metrics_log_method_local(self, local_experiment, tmp_proj):
     """Test metrics().log() as alias for append()."""
-    with local_experiment(name="log-method", project="test").run as experiment:
+    with local_experiment("57block/test/log-method").run as experiment:
       experiment.metrics("train").log(loss=0.5, accuracy=0.8)
       experiment.metrics("train").log(loss=0.4, accuracy=0.85)
 
@@ -138,7 +138,7 @@ class TestLogAndFlushMethods:
 
   def test_metrics_log_with_flush_chain_local(self, local_experiment, tmp_proj):
     """Test metrics.log(epoch=n).flush() chaining pattern."""
-    with local_experiment(name="log-flush-chain", project="test").run as experiment:
+    with local_experiment("57block/test/log-flush-chain").run as experiment:
       experiment.metrics("train").log(loss=0.5, accuracy=0.8)
       experiment.metrics.log(epoch=1).flush()
 
@@ -169,7 +169,7 @@ class TestLogAndFlushMethods:
 
   def test_metrics_log_nested_dict_pattern(self, local_experiment, tmp_proj):
     """Test metrics.log() with nested dict pattern."""
-    with local_experiment(name="log-nested", project="test").run as experiment:
+    with local_experiment("57block/test/log-nested").run as experiment:
       experiment.metrics.log(
         epoch=100,
         train=dict(loss=0.142, accuracy=0.80),
@@ -202,7 +202,7 @@ class TestLogAndFlushMethods:
 
   def test_metrics_log_with_flush_param(self, local_experiment, tmp_proj):
     """Test metrics.log(_flush=True) parameter."""
-    with local_experiment(name="log-flush-param", project="test").run as experiment:
+    with local_experiment("57block/test/log-flush-param").run as experiment:
       experiment.metrics("train").log(loss=0.5, accuracy=0.8)
       experiment.metrics.log(epoch=1, _flush=True)
 
@@ -219,7 +219,7 @@ class TestLogAndFlushMethods:
 
   def test_fluent_method_chaining(self, local_experiment, tmp_proj):
     """Test that log() and flush() return self for chaining."""
-    with local_experiment(name="fluent-chain", project="test").run as experiment:
+    with local_experiment("57block/test/fluent-chain").run as experiment:
       # Test that these all return chainable objects
       result1 = experiment.metrics("train").log(loss=0.5)
       assert hasattr(result1, "log")  # Should return MetricBuilder
@@ -239,7 +239,7 @@ class TestLogAndFlushMethods:
     experiment.metrics("eval").log(loss=eval_loss, accuracy=eval_acc)
     experiment.metrics.log(epoch=epoch).flush()
     """
-    with local_experiment(name="complete-pattern", project="test").run as experiment:
+    with local_experiment("57block/test/complete-pattern").run as experiment:
       for epoch in range(3):
         train_loss = 1.0 - epoch * 0.1
         train_acc = 0.5 + epoch * 0.1

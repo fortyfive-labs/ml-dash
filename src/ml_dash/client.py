@@ -97,13 +97,12 @@ class RemoteClient:
             description: Optional description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            prefix: Full prefix path including name (e.g., "experiments/resnet/baseline-v1").
-                   The folder path is extracted by removing the last segment (name).
+            prefix: Full prefix path sent to backend for folder hierarchy creation
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
 
         Returns:
-            Response dict with experiment, project, prefix, and namespace data
+            Response dict with experiment, project, and namespace data
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -118,20 +117,12 @@ class RemoteClient:
             payload["tags"] = tags
         if bindrs is not None:
             payload["bindrs"] = bindrs
-        if prefix is not None:
-            # Extract folder path from prefix (remove last segment which is the name)
-            # Example: "experiments/resnet/baseline-v1" -> "experiments/resnet"
-            prefix_clean = prefix.strip('/')
-            parts = prefix_clean.split('/')
-            if len(parts) > 1:
-                # Remove last segment (name) to get folder path
-                folder_path = '/'.join(parts[:-1])
-                payload["folder"] = '/' + folder_path
-            # If only one segment (no folders), don't set folder (root level)
         if write_protected:
             payload["writeProtected"] = write_protected
         if metadata is not None:
             payload["metadata"] = metadata
+        if prefix is not None:
+            payload["prefix"] = prefix
 
         response = self._client.post(
             f"/projects/{project}/experiments",

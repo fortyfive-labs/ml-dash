@@ -8,7 +8,7 @@ import pytest
 
 def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
   """Test basic experiment creation using context manager."""
-  with local_experiment(name="hello-ml-dash", project="tutorials").run as experiment:
+  with local_experiment("57block/tutorials/hello-ml-dash").run as experiment:
     experiment.log("Hello from ML-Dash!", level="info")
     experiment.params.set(message="Hello World")
 
@@ -25,8 +25,7 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
   owner = getpass.getuser()
 
   with local_experiment(
-    name="mnist-baseline",
-    project="computer-vision",
+    f"{owner}/computer-vision/mnist-baseline",
     description="Baseline CNN for MNIST classification",
     tags=["mnist", "cnn", "baseline"],
   ).run as experiment:
@@ -34,7 +33,7 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
 
   # Verify metadata was saved
   # Files go to: root_path / prefix (where prefix = owner/project/name)
-  experiment_dir = tmp_proj / owner / "computer-vision/mnist-baseline"
+  experiment_dir = tmp_proj / owner / "computer-vision" / "mnist-baseline"
   experiment_file = experiment_dir / "experiment.json"
 
   assert experiment_file.exists()
@@ -51,7 +50,7 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
 
 def test_experiment_manual_open_close(local_experiment, tmp_proj):
   """Test manual experiment lifecycle management."""
-  experiment = local_experiment(name="manual-experiment", project="test")
+  experiment = local_experiment("57block/test/manual-experiment")
 
   # The experiment is not initially open
   assert not experiment._is_open
@@ -75,7 +74,7 @@ def test_experiment_manual_open_close(local_experiment, tmp_proj):
 
 def test_experiment_auto_close_on_context_exit(local_experiment):
   """Test that experiment is automatically closed when exiting context manager."""
-  with local_experiment(name="auto-close", project="test").run as experiment:
+  with local_experiment("57block/test/auto-close").run as experiment:
     assert experiment._is_open
     experiment.log("Working...")
 
@@ -86,11 +85,11 @@ def test_experiment_auto_close_on_context_exit(local_experiment):
 def test_experiments_same_project(local_experiment, tmp_proj):
   """Test experiments in the same project."""
   # Create first experiment
-  with local_experiment(name="experiment-1", project="shared").run as experiment:
+  with local_experiment("57block/shared/experiment-1").run as experiment:
     experiment.log("Experiment 1")
 
   # Create second experiment
-  with local_experiment(name="experiment-2", project="shared").run as experiment:
+  with local_experiment("57block/shared/experiment-2").run as experiment:
     experiment.log("Experiment 2")
 
   # Verify both experiments exist
@@ -102,7 +101,7 @@ def test_experiments_same_project(local_experiment, tmp_proj):
 
 def test_experiment_name_and_project_properties(local_experiment):
   """Test that experiment properties are accessible."""
-  with local_experiment(name="my-experiment", project="my-project").run as experiment:
+  with local_experiment("57block/my-project/my-experiment").run as experiment:
     assert experiment.name == "my-experiment"
     assert experiment.project == "my-project"
 
@@ -110,7 +109,7 @@ def test_experiment_name_and_project_properties(local_experiment):
 def test_experiment_error_handling(local_experiment, tmp_proj):
   """Test that experiment handles errors gracefully."""
   try:
-    with local_experiment(name="error-test", project="test").run as experiment:
+    with local_experiment("57block/test/error-test").run as experiment:
       experiment.log("Starting work")
       experiment.params.set(param="value")
       raise ValueError("Simulated error")
