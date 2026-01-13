@@ -278,35 +278,34 @@ class Experiment:
     """
     import os
 
-    print(tags, bindrs, metadata)
-
     # Resolve prefix from environment variable if not provided
-    self._folder_path = prefix.rsplit("/", 2) or os.getenv("DASH_PREFIX")
+    self._folder_path = prefix or os.getenv("DASH_PREFIX")
 
     if not self._folder_path:
       raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
 
     # Parse prefix: {owner}/{project}/path.../[name]
-    # parts = prefix.strip("/").split("/")
-    # if len(parts) < 2:
-    #   raise ValueError(
-    #     f"prefix must have at least owner/project: got '{self._folder_path}'"
-    #   )
-    #
-    # self.owner = parts[0]
-    # self.project = parts[1]
-    # # Name is the last segment (may be a seed/id, not always a meaningful name)
-    # self.name = parts[-1] if len(parts) > 2 else parts[1]
-    #
-    # self.description = description
-    # self.tags = tags
-    # self._bindrs_list = bindrs
-    # self._write_protected = _write_protected
-    # self.metadata = metadata
+    parts = self._folder_path.strip("/").split("/")
+    if len(parts) < 2:
+      raise ValueError(
+        f"prefix must have at least owner/project: got '{self._folder_path}'"
+      )
 
-    # # Initialize EXP with experiment values
-    # RUN.name = self.name
-    # RUN.description = description
+    self.owner = parts[0]
+    self.project = parts[1]
+    # Name is the last segment (may be a seed/id, not always a meaningful name)
+    self.name = parts[-1] if len(parts) > 2 else parts[1]
+
+    self.readme = readme
+    self.tags = tags
+    self._bindrs_list = bindrs
+    self._write_protected = _write_protected
+    self.metadata = metadata
+
+    # Initialize RUN with experiment values
+    RUN.name = self.name
+    if readme:
+      RUN.readme = readme
 
     # Determine operation mode
     # local_path defaults to ".dash", remote defaults to None
@@ -350,7 +349,7 @@ class Experiment:
         response = self._client.create_or_update_experiment(
           project=self.project,
           name=self.name,
-          description=self.description,
+          description=self.readme,
           tags=self.tags,
           bindrs=self._bindrs_list,
           prefix=self._folder_path,
@@ -431,7 +430,7 @@ class Experiment:
         owner=self.owner,
         project=self.project,
         prefix=self._folder_path,
-        description=self.description,
+        description=self.readme,
         tags=self.tags,
         bindrs=self._bindrs_list,
         metadata=self.metadata,
@@ -496,7 +495,8 @@ class Experiment:
     self._is_open = False
 
     # Reset RUN for next experiment
-    RUN._reset()
+    # TODO: RUN._reset() - method doesn't exist
+    # RUN._reset()
 
   @property
   def run(self) -> RunManager:
@@ -550,6 +550,36 @@ class Experiment:
 
     return ParametersBuilder(self)
 
+  @property
+  def logs(self) -> LogBuilder:
+    """
+    Get a LogBuilder for fluent-style logging.
+
+    Returns a LogBuilder that allows chaining with level methods like
+    .info(), .warn(), .error(), .debug(), .fatal().
+
+    Returns:
+        LogBuilder instance for fluent logging
+
+    Raises:
+        RuntimeError: If experiment is not open
+
+    Examples:
+        exp.logs.info("Training started", epoch=1)
+        exp.logs.error("Failed to load data", error_code=500)
+        exp.logs.warn("GPU memory low", memory_available="1GB")
+        exp.logs.debug("Debug info", step=100)
+    """
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      dxp.logs.info('Training started')"
+      )
+
+    return LogBuilder(self, metadata=None)
+
   def log(
     self,
     message: Optional[str] = None,
@@ -558,33 +588,29 @@ class Experiment:
     **extra_metadata,
   ) -> Optional[LogBuilder]:
     """
-    Create a log entry or return a LogBuilder for fluent API.
+    Create a log entry (traditional style).
 
-    This method supports two styles:
+    .. deprecated::
+        The fluent style (calling without message) is deprecated.
+        Use the `logs` property instead: `exp.logs.info("message")`
 
-    1. Fluent style (no message provided):
-       Returns a LogBuilder that allows chaining with level methods.
+    Recommended usage:
+        exp.logs.info("Training started", epoch=1)
+        exp.logs.error("Failed", error_code=500)
 
-       Examples:
-           exp.logs.info("Training started", epoch=1)
-           exp.logs.error("Failed", error_code=500)
-
-    2. Traditional style (message provided):
-       Writes the log immediately and returns None.
-
-       Examples:
-           experiment.log("Training started", level="info", epoch=1)
-           experiment.log("Training started")  # Defaults to "info"
+    Traditional style (still supported):
+        experiment.log("Training started", level="info", epoch=1)
+        experiment.log("Training started")  # Defaults to "info"
 
     Args:
-        message: Optional log message (for traditional style)
-        level: Optional log level (for traditional style, defaults to "info")
+        message: Log message (required for recommended usage)
+        level: Log level (defaults to "info")
         metadata: Optional metadata dict
         **extra_metadata: Additional metadata as keyword arguments
 
     Returns:
-        LogBuilder if no message provided (fluent mode)
-        None if log was written directly (traditional mode)
+        None when used in traditional style (message provided)
+        LogBuilder when used in deprecated fluent style (message=None)
 
     Raises:
         RuntimeError: If experiment is not open
@@ -595,11 +621,18 @@ class Experiment:
         "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
         "Example:\n"
         "  with dxp.run:\n"
-        "      dxp.log('Training started', level='info')"
+        "      dxp.logs.info('Training started')"
       )
 
-    # Fluent mode: return LogBuilder
+    # Fluent mode: return LogBuilder (deprecated)
     if message is None:
+      import warnings
+      warnings.warn(
+        "Using exp.log() without a message is deprecated. "
+        "Use exp.logs.info('message') instead.",
+        DeprecationWarning,
+        stacklevel=2
+      )
       combined_metadata = {**(metadata or {}), **extra_metadata}
       return LogBuilder(self, combined_metadata if combined_metadata else None)
 
