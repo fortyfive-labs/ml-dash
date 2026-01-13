@@ -18,7 +18,7 @@ def test_all_operations_use_folder_field():
   with tempfile.TemporaryDirectory() as tmpdir:
     # Create experiment with prefix (new format: owner/project/path/name)
     exp = Experiment(
-      prefix="test-user/test_project/iclr_2024/test_exp", local_path=tmpdir
+      prefix="test-user/test_project/iclr_2024/test_exp", dash_root=tmpdir
     )
 
     with exp.run:
@@ -90,7 +90,7 @@ def test_all_operations_use_folder_field():
 def test_folder_consistency_with_static_path():
   """Test folder consistency with a static path."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test-user/proj/custom/path/static_exp", local_path=tmpdir)
+    exp = Experiment(prefix="test-user/proj/custom/path/static_exp", dash_root=tmpdir)
 
     with exp.run:
       # Expected: root / prefix
@@ -118,7 +118,7 @@ def test_folder_consistency_with_static_path():
 def test_no_folder_field_still_works():
   """Test when prefix is just owner/project/name (minimal path)."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test-user/proj/no_folder_exp", local_path=tmpdir)
+    exp = Experiment(prefix="test-user/proj/no_folder_exp", dash_root=tmpdir)
 
     with exp.run:
       # Should use path: root / prefix

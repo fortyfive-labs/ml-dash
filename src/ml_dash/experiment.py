@@ -206,27 +206,27 @@ class Experiment:
 
   Usage examples:
 
-  # Default: Remote mode with production server (https://api.dash.ml)
+  # Local mode (default)
   experiment = Experiment(prefix="ge/my-project/experiments/exp1")
 
-  # Local mode only
+  # Custom local storage directory
   experiment = Experiment(
       prefix="ge/my-project/experiments/exp1",
-      local_path=".dash"
+      dash_root=".dash"
   )
 
-  # Custom remote server
+  # Remote mode with custom server
   experiment = Experiment(
       prefix="ge/my-project/experiments/exp1",
-      remote="https://custom-server.com"
+      dash_url="https://custom-server.com"
   )
 
   # Context manager
   with Experiment(prefix="ge/my-project/exp1").run as exp:
-      exp.log(...)
+      exp.logs.info("Training started")
 
   # Decorator
-  @ml_dash_experiment(prefix="ge/ws/experiments/exp", remote="...")
+  @ml_dash_experiment(prefix="ge/ws/experiments/exp", dash_url="https://api.dash.ml")
   def train():
       ...
   """
@@ -243,14 +243,14 @@ class Experiment:
     # Ge: This is also instance-only
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
+    dash_url: Optional[Union[str, bool]] = None,
+    dash_root: Optional[str] = ".dash",
+    # Deprecated parameters (for backward compatibility)
     remote: Optional[Union[str, bool]] = None,
-    # local_path -> dash_dir. should be ".dash" under project root.
-    local_path: Optional[str] = ".dash",
-    # Ge: can we hide this?
+    local_path: Optional[str] = None,
     # Internal parameters
     _write_protected: bool = False,
     # The rest of the params go directly to populate the RUN object.
-    # can remove this. - Ge
     **run_params: Unpack[RUN],
   ):
     """
@@ -263,20 +263,42 @@ class Experiment:
                 - project: Second segment (e.g., project name)
                 - path: Remaining segments form the folder path
                 - name: Derived from last segment (may be a seed/id, not always meaningful)
-        description: Optional experiment description
+        readme: Optional experiment readme/description
         tags: Optional list of tags
         bindrs: Optional list of bindrs
         metadata: Optional metadata dict
-        remote: Remote API. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
-        local_path: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
+        dash_url: Remote API URL. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
+        dash_root: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
+        remote: (Deprecated) Use dash_url instead
+        local_path: (Deprecated) Use dash_root instead
         _write_protected: Internal parameter - if True, experiment becomes immutable after creation
 
     Mode Selection:
-        - Default (no remote): Local-only mode (writes to ".dash/")
-        - remote + local_path: Hybrid mode (local + remote)
-        - remote + local_path=None: Remote-only mode
+        - Default (no dash_url): Local-only mode (writes to ".dash/")
+        - dash_url + dash_root: Hybrid mode (local + remote)
+        - dash_url + dash_root=None: Remote-only mode
     """
     import os
+    import warnings
+
+    # Handle backward compatibility
+    if remote is not None:
+      warnings.warn(
+        "Parameter 'remote' is deprecated. Use 'dash_url' instead.",
+        DeprecationWarning,
+        stacklevel=2
+      )
+      if dash_url is None:
+        dash_url = remote
+
+    if local_path is not None:
+      warnings.warn(
+        "Parameter 'local_path' is deprecated. Use 'dash_root' instead.",
+        DeprecationWarning,
+        stacklevel=2
+      )
+      if dash_root == ".dash":  # Only override if dash_root is default
+        dash_root = local_path
 
     # Resolve prefix from environment variable if not provided
     self._folder_path = prefix or os.getenv("DASH_PREFIX")
@@ -308,10 +330,10 @@ class Experiment:
       RUN.readme = readme
 
     # Determine operation mode
-    # local_path defaults to ".dash", remote defaults to None
-    if remote and local_path:
+    # dash_root defaults to ".dash", dash_url defaults to None
+    if dash_url and dash_root:
       self.mode = OperationMode.HYBRID
-    elif remote:
+    elif dash_url:
       self.mode = OperationMode.REMOTE
     else:
       self.mode = OperationMode.LOCAL
@@ -326,12 +348,12 @@ class Experiment:
 
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will auto-load token from ~/.dash/token.enc
-      # Use EXP.API_URL if remote=True (boolean), otherwise use the provided URL
-      api_url = RUN.api_url if remote is True else remote
+      # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
+      api_url = RUN.api_url if dash_url is True else dash_url
       self._client = RemoteClient(base_url=api_url)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
-      self._storage = LocalStorage(root_path=Path(local_path))
+      self._storage = LocalStorage(root_path=Path(dash_root))
 
   def _open(self) -> "Experiment":
     """
@@ -1318,7 +1340,7 @@ def ml_dash_experiment(prefix: str, **kwargs) -> Callable:
   Usage:
       @ml_dash_experiment(
           prefix="ge/my-project/experiments/my-experiment",
-          remote="https://api.dash.ml"
+          dash_url="https://api.dash.ml"
       )
       def train_model():
           # Function code here

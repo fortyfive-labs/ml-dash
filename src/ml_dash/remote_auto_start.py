@@ -39,7 +39,7 @@ import getpass
 from .experiment import Experiment
 
 _owner = getpass.getuser()
-rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", remote="https://api.dash.ml")
+rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", dash_url="https://api.dash.ml")
 
 
 # Register cleanup handler to complete experiment on Python exit (if still open)

@@ -13,10 +13,10 @@ def train_simple_model():
     prefix="/tmp/ml_dash/examples",
     description="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
     tags=["sweep", "best"],
-    # remote='http://localhost:3000',
-    # remote="https://api.dash.ml",
+    # dash_url='http://localhost:3000',
+    # dash_url="https://api.dash.ml",
     # user_name="tom"
-    local_path=".dash",
+    dash_root=".dash",
   ).run as experiment:
     # Metric hyperparameters
     initial_lr = 0.001

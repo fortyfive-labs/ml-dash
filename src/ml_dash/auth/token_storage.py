@@ -299,4 +299,5 @@ def get_jwt_user():
 
   if token:
     user = decode_jwt_payload(token)
-  return user
+    return user
+  return None

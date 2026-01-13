@@ -21,12 +21,12 @@ def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
 
 
 def test_experiment_with_metadata(local_experiment, tmp_proj):
-  """Test experiment creation with description, tags, and prefix."""
+  """Test experiment creation with readme, tags, and prefix."""
   owner = getpass.getuser()
 
   with local_experiment(
     f"{owner}/computer-vision/mnist-baseline",
-    description="Baseline CNN for MNIST classification",
+    readme="Baseline CNN for MNIST classification",
     tags=["mnist", "cnn", "baseline"],
   ).run as experiment:
     experiment.log("Experiment created with metadata")

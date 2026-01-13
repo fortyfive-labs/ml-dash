@@ -15,7 +15,7 @@ def test_params_with_class_object():
         epochs = 10
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/exp", dash_root=tmpdir)
         with exp.run:
             # Should automatically extract class attributes
             exp.params.log(Args=Args)
@@ -41,7 +41,7 @@ def test_params_with_nested_config():
         beta1 = 0.9
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/exp", dash_root=tmpdir)
         with exp.run:
             exp.params.log(
                 model=ModelConfig,
@@ -66,7 +66,7 @@ def test_params_mixed_class_and_dict():
         lr = 0.001
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/exp", dash_root=tmpdir)
         with exp.run:
             exp.params.log(
                 Args=Args,
@@ -92,7 +92,7 @@ def test_params_skips_private_attributes():
         __magic__ = "should be skipped"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        exp = Experiment(prefix="test/project/exp", local_path=tmpdir)
+        exp = Experiment(prefix="test/project/exp", dash_root=tmpdir)
         with exp.run:
             exp.params.log(Args=Args)
 
@@ -126,7 +126,7 @@ def demo_params_class_objects():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         print("\n1. Single config class:")
-        exp1 = Experiment(prefix="demo/project/exp", local_path=tmpdir)
+        exp1 = Experiment(prefix="demo/project/exp", dash_root=tmpdir)
         with exp1.run:
             exp1.params.log(Args=TrainingConfig)
             params = exp1.params.get()
@@ -136,7 +136,7 @@ def demo_params_class_objects():
                     print(f"   {key} = {params[key]}")
 
         print("\n2. Multiple config classes:")
-        exp2 = Experiment(prefix="demo/project/exp2", local_path=tmpdir)
+        exp2 = Experiment(prefix="demo/project/exp2", dash_root=tmpdir)
         with exp2.run:
             exp2.params.log(
                 training=TrainingConfig,

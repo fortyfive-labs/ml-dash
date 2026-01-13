@@ -72,7 +72,7 @@ def local_experiment(tmp_proj):
 
   def _create_experiment(prefix=DEFAULT_PREFIX, **kwargs):
     defaults = {
-      "local_path": str(tmp_proj),
+      "dash_root": str(tmp_proj),
       "prefix": prefix,
     }
     defaults.update(kwargs)
@@ -148,9 +148,9 @@ def remote_experiment(mock_remote_token):
     unique_prefix = "/".join(parts)
 
     defaults = {
-      "remote": REMOTE_SERVER_URL,
+      "dash_url": REMOTE_SERVER_URL,
       "prefix": unique_prefix,
-      "local_path": None,  # Remote only
+      "dash_root": None,  # Remote only
     }
     defaults.update(kwargs)
     return Experiment(**defaults)

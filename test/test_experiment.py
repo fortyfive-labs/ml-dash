@@ -77,11 +77,11 @@ class TestExperimentCreation:
     assert not experiment._is_open
 
   def test_experiment_with_metadata_local(self, local_experiment, tmp_proj):
-    """Test experiment with description, tags, and prefix in local mode."""
+    """Test experiment with readme, tags, and prefix in local mode."""
     owner = getpass.getuser()
     with local_experiment(
       f"{owner}/meta-ws/experiments/meta/meta-experiment",
-      description="Test experiment with metadata",
+      readme="Test experiment with metadata",
       tags=["test", "metadata", "local"],
     ).run as experiment:
       experiment.log("Experiment with metadata")
@@ -111,10 +111,10 @@ class TestExperimentCreation:
 
   @pytest.mark.remote
   def test_experiment_with_metadata_remote(self, remote_experiment):
-    """Test experiment with description, tags, and prefix in remote mode."""
+    """Test experiment with readme, tags, and prefix in remote mode."""
     with remote_experiment(
       "test-user/meta-ws-remote/experiments/remote/meta-experiment-remote",
-      description="Remote test experiment with metadata",
+      readme="Remote test experiment with metadata",
       tags=["test", "metadata", "remote"],
     ).run as experiment:
       experiment.log("Remote experiment with metadata")

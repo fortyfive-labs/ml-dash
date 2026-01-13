@@ -17,7 +17,7 @@ from ml_dash import RUN, Experiment
 def test_template_with_run_name():
   """Test template with {EXP.name} variable."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/my-experiment", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/my-experiment", dash_root=tmpdir)
     exp.run.prefix = "iclr_2024/{EXP.name}"
 
     # EXP.name is the last segment of the original prefix
@@ -33,7 +33,7 @@ def test_template_with_run_name():
 def test_template_with_run_id():
   """Test template with {EXP.id} for unique folders."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/my-experiment", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/my-experiment", dash_root=tmpdir)
     exp.run.prefix = "iclr_2024/{EXP.name}.{EXP.id}"
 
     # Should include both name and numeric id
@@ -54,7 +54,7 @@ def test_template_with_run_id():
 def test_template_with_multiple_vars():
   """Test template with multiple variables."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="vision/models/resnet50", local_path=tmpdir)
+    exp = Experiment(prefix="vision/models/resnet50", dash_root=tmpdir)
     exp.run.prefix = "experiments/{EXP.name}/runs"
 
     # Verify name is present
@@ -69,7 +69,7 @@ def test_template_with_multiple_vars():
 def test_static_folder_still_works():
   """Test that static prefixes without templates still work."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", dash_root=tmpdir)
     exp.run.prefix = "static/folder/path"
 
     assert exp.run.prefix == "static/folder/path"
@@ -83,7 +83,7 @@ def test_static_folder_still_works():
 def test_unknown_template_variable():
   """Test that unknown template variables raise AttributeError."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", dash_root=tmpdir)
 
     # Unknown variables raise AttributeError
     try:
@@ -98,7 +98,7 @@ def test_unknown_template_variable():
 def test_template_with_date():
   """Test template with {EXP.date} variable."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/experiment", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/experiment", dash_root=tmpdir)
     exp.run.prefix = "{EXP.name}.{EXP.date}"
 
     # Should have name and YYYYMMDD format date
@@ -124,7 +124,7 @@ def demo_folder_templates():
     RUN._reset()
 
     # Create experiment
-    exp = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
+    exp = Experiment(prefix="demo/project/dxp", dash_root=str(ml_dash_dir))
 
     # Example 1: Using {EXP.name}
     print("\n1. Template with {EXP.name}:")
@@ -137,7 +137,7 @@ def demo_folder_templates():
 
     # Example 2: Using EXP.id for unique folders (dot notation)
     RUN._reset()
-    exp2 = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
+    exp2 = Experiment(prefix="demo/project/dxp", dash_root=str(ml_dash_dir))
     print("\n2. Template with {EXP.name}.{EXP.id}:")
     exp2.run.prefix = "runs/{EXP.name}.{EXP.id}"
     print("   Template: 'runs/{EXP.name}.{EXP.id}'")
@@ -148,7 +148,7 @@ def demo_folder_templates():
 
     # Example 3: Using date/time templates
     RUN._reset()
-    exp3 = Experiment(prefix="demo/project/dxp", local_path=str(ml_dash_dir))
+    exp3 = Experiment(prefix="demo/project/dxp", dash_root=str(ml_dash_dir))
     print("\n3. Template with {EXP.date}:")
     exp3.run.prefix = "{EXP.name}.{EXP.date}"
     print("   Template: '{EXP.name}.{EXP.date}'")

@@ -15,7 +15,7 @@ def test_info_goes_to_stdout():
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
+            with Experiment(prefix="test/proj/exp", dash_root=tmpdir).run as exp:
                 exp.logs.info("This is an info message")
 
             output = sys.stdout.getvalue()
@@ -32,7 +32,7 @@ def test_warn_goes_to_stdout():
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
+            with Experiment(prefix="test/proj/exp", dash_root=tmpdir).run as exp:
                 exp.logs.warn("This is a warning")
 
             output = sys.stdout.getvalue()
@@ -49,7 +49,7 @@ def test_error_goes_to_stderr():
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
+            with Experiment(prefix="test/proj/exp", dash_root=tmpdir).run as exp:
                 exp.logs.error("This is an error")
 
             output = sys.stderr.getvalue()
@@ -66,7 +66,7 @@ def test_fatal_goes_to_stderr():
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
+            with Experiment(prefix="test/proj/exp", dash_root=tmpdir).run as exp:
                 exp.logs.fatal("This is fatal")
 
             output = sys.stderr.getvalue()
@@ -83,7 +83,7 @@ def test_metadata_in_output():
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            with Experiment(prefix="test/proj/exp", local_path=tmpdir).run as exp:
+            with Experiment(prefix="test/proj/exp", dash_root=tmpdir).run as exp:
                 exp.logs.info("Training started", epoch=1, lr=0.001)
 
             output = sys.stdout.getvalue()

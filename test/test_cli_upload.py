@@ -237,7 +237,7 @@ class TestUploadState:
     state_file = tmp_proj / "state.json"
 
     state = UploadState(
-      local_path="/path/to/local",
+      dash_root="/path/to/local",
       remote_url="http://localhost:3000",
       completed_experiments=["proj1/exp1", "proj1/exp2"],
       failed_experiments=["proj2/exp1"],
@@ -270,7 +270,7 @@ class TestUploadState:
   def test_state_to_dict(self):
     """Test converting state to dictionary."""
     state = UploadState(
-      local_path="/path/to/local",
+      dash_root="/path/to/local",
       remote_url="http://localhost:3000",
       completed_experiments=["proj1/exp1"],
     )
@@ -315,7 +315,7 @@ class TestUploadIntegration:
     # Create mock arguments
     args = argparse.Namespace(
       path=str(local_path),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
       project=None,
@@ -347,7 +347,7 @@ class TestUploadIntegration:
 
     args = argparse.Namespace(
       path=str(local_path),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
       project=None,
@@ -381,7 +381,7 @@ class TestUploadIntegration:
 
     args = argparse.Namespace(
       path=str(local_path),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
       project="proj1",
@@ -413,7 +413,7 @@ class TestUploadIntegration:
 
     args = argparse.Namespace(
       path=str(local_path),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
       project=None,
@@ -449,7 +449,7 @@ class TestUploadIntegration:
 
     # Create state file simulating partial upload
     state = UploadState(
-      local_path=str(local_path.absolute()),
+      dash_root=str(local_path.absolute()),
       remote_url="http://localhost:3000",
       completed_experiments=["resume-proj/resume-exp1"],
       failed_experiments=[],
@@ -458,7 +458,7 @@ class TestUploadIntegration:
 
     args = argparse.Namespace(
       path=str(local_path),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
       project=None,
@@ -490,7 +490,7 @@ class TestCLIErrors:
     """Test error when remote URL is missing."""
     args = argparse.Namespace(
       path=str(tmp_proj),
-      remote=None,
+      dash_url=None,
       api_key=None,
       user_name=None,
       project=None,
@@ -514,7 +514,7 @@ class TestCLIErrors:
     """Test error when authentication is missing."""
     args = argparse.Namespace(
       path=str(tmp_proj),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name=None,  # No auth provided
       project=None,
@@ -538,7 +538,7 @@ class TestCLIErrors:
     """Test error when local path doesn't exist."""
     args = argparse.Namespace(
       path="/nonexistent/path",
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
       project=None,
@@ -562,7 +562,7 @@ class TestCLIErrors:
     """Test error when local storage has no experiments."""
     args = argparse.Namespace(
       path=str(tmp_proj),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
       project=None,
@@ -586,7 +586,7 @@ class TestCLIErrors:
     """Test error when experiment filter is used without project."""
     args = argparse.Namespace(
       path=str(tmp_proj),
-      remote="http://localhost:3000",
+      dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
       project=None,

@@ -11,7 +11,7 @@ from ml_dash import Experiment
 def test_prefix_setter_before_init():
   """Test that prefix can be set before initialization."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", dash_root=tmpdir)
 
     # Should be able to set prefix before initialization
     exp.run.prefix = "experiments/vision"
@@ -28,7 +28,7 @@ def test_prefix_setter_before_init():
 def test_prefix_setter_fails_after_init():
   """Test that prefix cannot be set after initialization."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/test", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/test", dash_root=tmpdir)
 
     with exp.run:
       # Try to set prefix after initialization - should fail
@@ -44,7 +44,7 @@ def test_prefix_setter_fails_after_init():
 def test_prefix_getter():
   """Test prefix getter."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test/project/initial/folder", local_path=tmpdir)
+    exp = Experiment(prefix="test/project/initial/folder", dash_root=tmpdir)
 
     # Getter should work before initialization
     assert exp.run.prefix == "test/project/initial/folder"

@@ -32,18 +32,20 @@ import atexit
 # If not authenticated, operations will fail with AuthenticationError
 # Prefix format: {owner}/{project}/path...
 # Using getpass to get current user as owner for local convenience
+import getpass
 from datetime import datetime
 
 from .auth.token_storage import get_jwt_user
 from .experiment import Experiment
 
 _user = get_jwt_user()
-_username = _user["username"]
+# Fallback to system username if not authenticated
+_username = _user["username"] if _user else getpass.getuser()
 _now = datetime.now()
 
 dxp = Experiment(
   prefix=f"{_username}/scratch/{_now:%Y-%m-%d/%H%M%S}",
-  remote="https://api.dash.ml",
+  dash_url="https://api.dash.ml",
 )
 
 

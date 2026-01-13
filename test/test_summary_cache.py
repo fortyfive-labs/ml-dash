@@ -11,7 +11,7 @@ from ml_dash import Experiment
 @pytest.fixture
 def experiment():
   """Create a local experiment for testing."""
-  exp = Experiment(prefix="test-user/test_project/test_exp", local_path=".dash-test")
+  exp = Experiment(prefix="test-user/test_project/test_exp", dash_root=".dash-test")
   exp.run.start()
   yield exp
   exp.run.complete()
