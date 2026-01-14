@@ -138,6 +138,7 @@ Factory function to create local-mode experiments with default configuration.
 Usage:
 ```python
 def test_example(local_experiment, temp_project):
+    # Note: Test fixtures may still use name= and project= parameters
     with local_experiment(name="my-experiment", project="test").run as experiment:
         experiment.log("Test message")
 ```
@@ -149,6 +150,7 @@ Usage:
 ```python
 @pytest.mark.remote
 def test_remote_example(remote_experiment):
+    # Note: Test fixtures may still use name= and project= parameters
     with remote_experiment(name="my-experiment", project="test").run as experiment:
         experiment.log("Remote test message")
 ```

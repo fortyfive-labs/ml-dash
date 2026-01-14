@@ -14,20 +14,32 @@ The `ml-dash list` command allows you to explore what experiments are available 
 
 ## Quick Start
 
-### List All Projects
+### List All Experiments
 
-See all projects in your namespace:
+See all experiments available to you:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username your-username
+ml-dash list --dash-url https://api.dash.ml
 ```
 
-### List Experiments in a Project
+### List Experiments by Project Pattern
 
-See all experiments within a specific project:
+See experiments matching a project pattern:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username your-username --project my-project
+ml-dash list --dash-url https://api.dash.ml -p my-project
+```
+
+### List with Glob Patterns
+
+Use glob patterns to filter experiments:
+
+```bash
+# All projects starting with "test"
+ml-dash list -p "test*"
+
+# Specific experiments
+ml-dash list -p "alice/*/baseline-*"
 ```
 
 ### Filter by Status
@@ -35,8 +47,7 @@ ml-dash list --remote https://api.dash.ml --username your-username --project my-
 Show only completed experiments:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username your-username \
-  --project my-project --status COMPLETED
+ml-dash list --dash-url https://api.dash.ml -p my-project --status COMPLETED
 ```
 
 ## Installation
@@ -51,31 +62,35 @@ uv pip install ml-dash
 
 ## Authentication
 
-### Username-based Authentication (Recommended)
+### OAuth2 Device Flow (Recommended)
 
-The simplest way to authenticate is using your username. The CLI will automatically generate an API key:
+The recommended way to authenticate is using the OAuth2 device flow:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username john-doe
+# Login once (opens browser for authentication)
+ml-dash login --dash-url https://api.dash.ml
+
+# Then list without providing credentials
+ml-dash list
 ```
 
-**How it works:**
-- The CLI generates a deterministic JWT token from your username
-- Same username always produces the same token
+**Benefits:**
+- Secure OAuth2 authentication
+- Token stored in system keychain
 - No need to manage API keys manually
-- Token is used only for the current session (not stored)
+- Token auto-loaded for all CLI commands
 
 ### API Key Authentication
 
 For advanced users or production environments, you can use an explicit API key:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --api-key your-jwt-token
+ml-dash list --dash-url https://api.dash.ml --api-key your-jwt-token
 ```
 
 ### Configuration File
 
-Store your credentials in `~/.dash/config.json` to avoid passing them every time:
+Store your configuration in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {
@@ -94,14 +109,16 @@ ml-dash list
 
 ### Remote Configuration
 
-- `--remote URL` - Remote server URL (required unless set in config)
-- `--api-key TOKEN` - JWT token for authentication
-- `--username USERNAME` - Username for auto-generating API key
-- `--namespace NAMESPACE` - Namespace slug (defaults to username)
+- `--dash-url URL` - ML-Dash server URL (defaults to config or https://api.dash.ml)
+- `--api-key TOKEN` - JWT token for authentication (auto-loaded from login if not provided)
 
 ### Filtering Options
 
-- `--project PROJECT` - List experiments in this project
+- `-p`, `--pref`, `--prefix`, `--proj`, `--project` PATTERN - Filter experiments by project or pattern
+  - Supports glob patterns: `'test*'`, `'tom*/tutorials/*'`
+  - Simple project names: `my-project`
+  - Full paths with wildcards: `*/deep-learning/*`
+
 - `--status {COMPLETED,RUNNING,FAILED,ARCHIVED}` - Filter experiments by status
 - `--tags TAGS` - Filter experiments by tags (comma-separated)
 
@@ -109,39 +126,39 @@ ml-dash list
 
 - `--json` - Output as JSON (for scripting and automation)
 - `--detailed` - Show detailed information
-- `-v, --verbose` - Verbose output
+- `-v`, `--verbose` - Verbose output
 
 ## Usage Examples
 
-### Example 1: List All Projects
+### Example 1: List All Experiments
 
-Show all projects in your namespace:
+Show all experiments available to you:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom
+ml-dash list --dash-url https://api.dash.ml
 ```
 
 **Output:**
 ```
-📚 Projects in namespace 'tom':
+🔬 Experiments:
 
-┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Project            ┃ Experiments  ┃ Last Updated          ┃
-┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━┩
-│ vision-models      │ 24           │ 2025-12-08 09:23:45   │
-│ nlp-experiments    │ 15           │ 2025-12-07 18:42:10   │
-│ reinforcement      │ 8            │ 2025-12-06 14:15:33   │
-└────────────────────┴──────────────┴───────────────────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Experiment                         ┃ Status     ┃ Created               ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━┩
+│ tom/vision-models/resnet-50        │ COMPLETED  │ 2025-12-08 09:23:45   │
+│ tom/nlp-experiments/bert-base      │ COMPLETED  │ 2025-12-07 18:42:10   │
+│ alice/deep-learning/vit-base       │ RUNNING    │ 2025-12-06 14:15:33   │
+└────────────────────────────────────┴────────────┴───────────────────────┘
 
-Total: 3 projects, 47 experiments
+Total: 3 experiments
 ```
 
-### Example 2: List Experiments in a Project
+### Example 2: List Experiments by Project
 
 Show all experiments within a specific project:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom --project vision-models
+ml-dash list --dash-url https://api.dash.ml -p vision-models
 ```
 
 **Output:**
@@ -160,13 +177,27 @@ ml-dash list --remote https://api.dash.ml --username tom --project vision-models
 Total: 4 experiments
 ```
 
-### Example 3: Filter by Status
+### Example 3: List with Glob Patterns
+
+Use glob patterns to filter experiments:
+
+```bash
+# All projects starting with "test"
+ml-dash list --dash-url https://api.dash.ml -p "test*"
+
+# Specific experiments across all projects
+ml-dash list --dash-url https://api.dash.ml -p "*/deep-learning/baseline-*"
+
+# Complex patterns
+ml-dash list -p "tom*/tutorials/hyperparameter-*"
+```
+
+### Example 4: Filter by Status
 
 Show only completed experiments:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project vision-models --status COMPLETED
+ml-dash list --dash-url https://api.dash.ml -p vision-models --status COMPLETED
 ```
 
 **Output:**
@@ -189,13 +220,12 @@ Total: 2 experiments
 - `FAILED` - Experiment failed with an error
 - `ARCHIVED` - Experiment archived for reference
 
-### Example 4: Filter by Tags
+### Example 5: Filter by Tags
 
 Show experiments with specific tags:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project vision-models --tags "production,verified"
+ml-dash list --dash-url https://api.dash.ml -p vision-models --tags "production,verified"
 ```
 
 **Output:**
@@ -211,13 +241,12 @@ ml-dash list --remote https://api.dash.ml --username tom \
 Total: 1 experiment
 ```
 
-### Example 5: Detailed Information
+### Example 6: Detailed Information
 
 Show comprehensive details about experiments:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project vision-models --detailed
+ml-dash list --dash-url https://api.dash.ml -p vision-models --detailed
 ```
 
 **Output:**
@@ -251,13 +280,12 @@ Tags: production, verified, stable
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-### Example 6: JSON Output for Scripting
+### Example 7: JSON Output for Scripting
 
 Output as JSON for automated workflows:
 
 ```bash
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project vision-models --json
+ml-dash list --dash-url https://api.dash.ml -p vision-models --json
 ```
 
 **Output:**
@@ -305,6 +333,36 @@ ml-dash list --remote https://api.dash.ml --username tom \
 }
 ```
 
+## Glob Pattern Support
+
+The list command supports powerful glob pattern matching for filtering experiments:
+
+### Pattern Syntax
+
+- `*` - Matches any characters (including /)
+- `?` - Matches any single character
+- `[seq]` - Matches any character in seq
+- `[!seq]` - Matches any character not in seq
+
+### Pattern Examples
+
+```bash
+# All projects starting with "test"
+ml-dash list -p "test*"
+
+# Projects matching pattern
+ml-dash list -p "alice/project-[0-9]*"
+
+# Specific experiments
+ml-dash list -p "*/deep-learning/baseline-?"
+
+# Complex patterns
+ml-dash list -p "tom*/tutorials/hyperparameter-*"
+
+# All baseline experiments across all projects
+ml-dash list -p "*/*/baseline*"
+```
+
 ## Common Workflows
 
 ### Workflow 1: Discover and Download
@@ -312,15 +370,14 @@ ml-dash list --remote https://api.dash.ml --username tom \
 Find experiments, then download specific ones:
 
 ```bash
-# Step 1: List all projects
-ml-dash list --remote https://api.dash.ml --username tom
+# Step 1: List all experiments
+ml-dash list --dash-url https://api.dash.ml
 
-# Step 2: List experiments in interesting project
-ml-dash list --remote https://api.dash.ml --username tom --project vision-models
+# Step 2: List experiments in a specific project
+ml-dash list --dash-url https://api.dash.ml -p vision-models
 
-# Step 3: Download specific experiment
-ml-dash download ./data --remote https://api.dash.ml --username tom \
-  --project vision-models --experiment resnet-50-baseline
+# Step 3: Download matching experiments
+ml-dash download ./data --dash-url https://api.dash.ml -p vision-models
 ```
 
 ### Workflow 2: Find Completed Experiments
@@ -329,12 +386,10 @@ Filter for successful experiments only:
 
 ```bash
 # List all completed experiments
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project my-project --status COMPLETED
+ml-dash list --dash-url https://api.dash.ml -p my-project --status COMPLETED
 
 # Download all completed experiments
-ml-dash download ./completed --remote https://api.dash.ml --username tom \
-  --project my-project
+ml-dash download ./completed --dash-url https://api.dash.ml -p my-project
 ```
 
 ### Workflow 3: Automated Monitoring
@@ -346,9 +401,8 @@ Monitor running experiments with a script:
 
 # Get running experiments as JSON
 RUNNING=$(ml-dash list \
-  --remote https://api.dash.ml \
-  --username tom \
-  --project my-project \
+  --dash-url https://api.dash.ml \
+  -p my-project \
   --status RUNNING \
   --json)
 
@@ -359,9 +413,8 @@ echo "Currently running experiments: $COUNT"
 
 # Check for failed experiments
 FAILED=$(ml-dash list \
-  --remote https://api.dash.ml \
-  --username tom \
-  --project my-project \
+  --dash-url https://api.dash.ml \
+  -p my-project \
   --status FAILED \
   --json | jq '.total')
 
@@ -376,21 +429,34 @@ Find production-ready experiments:
 
 ```bash
 # List experiments tagged as production
-ml-dash list --remote https://api.dash.ml --username tom \
-  --project my-project --tags "production" --detailed
+ml-dash list --dash-url https://api.dash.ml -p my-project --tags "production" --detailed
 
 # Download production experiments for deployment
-ml-dash download ./production --remote https://api.dash.ml --username tom \
-  --project my-project  # Then filter locally by tags
+ml-dash download ./production --dash-url https://api.dash.ml -p my-project
 ```
 
-### Workflow 5: Export Experiment Catalog
+### Workflow 5: Glob Pattern Search
+
+Use glob patterns to find specific experiments:
+
+```bash
+# Find all baseline experiments across projects
+ml-dash list -p "*/*/baseline-*" --json
+
+# Find all test experiments
+ml-dash list -p "test*" --detailed
+
+# Find experiments in deep-learning projects
+ml-dash list -p "*/deep-learning/*"
+```
+
+### Workflow 6: Export Experiment Catalog
 
 Create a catalog of all experiments:
 
 ```bash
-# Export all projects to JSON
-ml-dash list --remote https://api.dash.ml --username tom --json > catalog.json
+# Export all experiments to JSON
+ml-dash list --dash-url https://api.dash.ml --json > catalog.json
 
 # Generate markdown report
 cat catalog.json | jq -r '
@@ -447,27 +513,38 @@ Created: 2025-12-08 08:00:00
 
 ## Troubleshooting
 
-### Issue: No Projects Found
+### Authentication Errors
+
+**Error:** `Not authenticated. Run 'ml-dash login' to authenticate`
+
+**Solution:** Login first:
+```bash
+ml-dash login --dash-url https://api.dash.ml
+```
+
+### Issue: No Experiments Found
 
 **Symptoms:**
-- "No projects found" message
+- "No experiments found" message
 - Empty list output
 
 **Solutions:**
 
-1. **Verify namespace**: Make sure you're using the correct username/namespace
+1. **Check authentication**: Ensure you're logged in
    ```bash
-   ml-dash list --namespace correct-namespace
+   ml-dash login --dash-url https://api.dash.ml
    ```
 
-2. **Check authentication**: Ensure you have permission to view projects
+2. **Verify the pattern**: Try listing without filters first
    ```bash
-   ml-dash list --username your-username --verbose
+   ml-dash list --dash-url https://api.dash.ml
    ```
 
-3. **Try explicit API key**:
+3. **Check glob pattern syntax**:
    ```bash
-   ml-dash list --api-key "eyJhbGc..."
+   # Make sure pattern is quoted
+   ml-dash list -p "test*"  # Correct
+   ml-dash list -p test*     # May not work (shell expansion)
    ```
 
 ### Issue: Connection Errors
@@ -483,11 +560,11 @@ Created: 2025-12-08 08:00:00
    curl https://api.dash.ml/health
    ```
 
-2. **Check remote URL**:
+2. **Check the URL**:
    ```bash
-   ml-dash list --remote https://api.dash.ml  # Correct production URL
+   ml-dash list --dash-url https://api.dash.ml  # Correct production URL
    # Or for local development:
-   ml-dash list --remote http://localhost:3000
+   ml-dash list --dash-url http://localhost:3000
    ```
 
 3. **Test with verbose output**:
@@ -528,9 +605,8 @@ Use multiple filters together:
 
 ```bash
 ml-dash list \
-  --remote https://api.dash.ml \
-  --username tom \
-  --project vision-models \
+  --dash-url https://api.dash.ml \
+  -p vision-models \
   --status COMPLETED \
   --tags "production" \
   --detailed
@@ -566,30 +642,42 @@ For very large result sets, results may be paginated:
 
 ## Best Practices
 
-### 1. Use List Before Download
+### 1. Login Once
+
+Use OAuth2 device flow for secure authentication:
+
+```bash
+ml-dash login --dash-url https://api.dash.ml
+```
+
+### 2. Use List Before Download
 
 Always explore before downloading to avoid unnecessary transfers:
 
 ```bash
 # First: see what's available
-ml-dash list --remote https://api.dash.ml --username tom
+ml-dash list --dash-url https://api.dash.ml
 
 # Then: download selectively
-ml-dash download --project specific-project
+ml-dash download -p specific-project
 ```
 
-### 2. Filter Aggressively
+### 3. Use Glob Patterns for Filtering
 
-Narrow down results to find exactly what you need:
+Narrow down results efficiently:
 
 ```bash
+# Find specific experiments
+ml-dash list -p "*/production/*"
+
+# Combine with other filters
 ml-dash list \
-  --project my-project \
+  -p "my-project/*" \
   --status COMPLETED \
   --tags "verified,production"
 ```
 
-### 3. Use JSON for Automation
+### 4. Use JSON for Automation
 
 Programmatic access is easier with JSON:
 
@@ -601,7 +689,7 @@ TOTAL=$(ml-dash list --json | jq '.total')
 FAILED=$(ml-dash list --status FAILED --json | jq '.total')
 ```
 
-### 4. Save Output for Reference
+### 5. Save Output for Reference
 
 Keep a record of experiments:
 
@@ -613,7 +701,7 @@ ml-dash list --json > experiments-$(date +%Y-%m-%d).json
 ml-dash list --detailed > experiments-report.txt
 ```
 
-### 5. Monitor Running Experiments
+### 6. Monitor Running Experiments
 
 Set up regular checks for running experiments:
 

@@ -39,7 +39,7 @@ class ModelConfig:
     hidden_size = 768
     num_layers = 12
 
-with Experiment(name="my-experiment", project="cv").run as experiment:
+with Experiment(prefix="alice/cv/my-experiment").run as experiment:
     # Pass classes directly - attributes extracted automatically
     experiment.params.log(training=TrainingConfig, model=ModelConfig)
 
@@ -71,7 +71,7 @@ class ModelParams(ParamsProto):
     num_layers: int = 12
     dropout: float = 0.1
 
-with Experiment(name="transformer-train", project="nlp").run as experiment:
+with Experiment(prefix="alice/nlp/transformer-train").run as experiment:
     # Works seamlessly with params-proto classes
     experiment.params.log(
         training=TrainingParams,
@@ -103,7 +103,7 @@ class Config:
     def get_lr_schedule(self):
         return None
 
-with Experiment(name="test").run as experiment:
+with Experiment(prefix="alice/ml/test").run as experiment:
     experiment.params.log(config=Config)
     # Only public attributes are logged
     # config.lr = 0.001
@@ -133,7 +133,7 @@ class AugmentationConfig:
     flip_prob = 0.5
     color_jitter = 0.4
 
-with Experiment(name="resnet-training", project="cv").run as experiment:
+with Experiment(prefix="alice/ml/resnet-training", project="cv").run as experiment:
     experiment.params.log(
         data=DataConfig,
         optimizer=OptimizerConfig,
@@ -150,7 +150,7 @@ class TrainingArgs:
     learning_rate = 0.001
     batch_size = 32
 
-with Experiment(name="hybrid-config", project="test").run as experiment:
+with Experiment(prefix="alice/ml/hybrid-config", project="test").run as experiment:
     experiment.params.log(
         training=TrainingArgs,  # Class object
         model={"name": "resnet50", "layers": 50},  # Dict
@@ -170,7 +170,7 @@ with Experiment(name="hybrid-config", project="test").run as experiment:
 Get parameters from logged class objects:
 
 ```python
-with Experiment(name="test", project="ml").run as experiment:
+with Experiment(prefix="alice/ml/test", project="ml").run as experiment:
     experiment.params.log(training=TrainingConfig)
 
     # Retrieve flattened parameters
@@ -192,7 +192,7 @@ with Experiment(name="test", project="ml").run as experiment:
 Update class-based parameters during training:
 
 ```python
-with Experiment(name="lr-decay", project="training").run as experiment:
+with Experiment(prefix="alice/ml/lr-decay", project="training").run as experiment:
     # Initial parameters
     experiment.params.log(config=InitialConfig)
 
@@ -224,7 +224,7 @@ class Config:
     max_length = 512
     train_split = 0.9
 
-with Experiment(name="bert-finetune").run as experiment:
+with Experiment(prefix="alice/ml/bert-finetune").run as experiment:
     experiment.params.log(config=Config)
 ```
 
@@ -239,7 +239,7 @@ class HyperParams(ParamsProto):
     dropout: float = 0.1
     num_layers: int = 12
 
-with Experiment(name="typed-config").run as experiment:
+with Experiment(prefix="alice/ml/typed-config").run as experiment:
     experiment.params.log(hyper=HyperParams)
 ```
 
@@ -258,7 +258,7 @@ class ProdConfig(BaseConfig):
 
 config = ProdConfig if os.getenv("ENV") == "prod" else BaseConfig
 
-with Experiment(name="env-aware").run as experiment:
+with Experiment(prefix="alice/ml/env-aware").run as experiment:
     experiment.params.log(config=config)
 ```
 

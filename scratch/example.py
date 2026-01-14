@@ -2,8 +2,8 @@
 #
 # with Experiment(
 #   prefix="geyang/scratch/test-run",
-#   remote="https://api.dash.ml",
-#   local_path=None,
+#   dash_url="https://api.dash.ml",
+#   dash_root=None,
 # ).run as exp:
 #   for i in range(10):
 #     exp.metrics("train").log(step=i, loss=1.0 / (i + 1))

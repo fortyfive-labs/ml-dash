@@ -28,8 +28,11 @@ keywords:
 ```python
 from ml_dash import Experiment
 
-with Experiment(name="my-experiment", project="project",
-        local_path=".dash").run as experiment:
+# Prefix format: owner/project/experiment-name
+with Experiment(
+    prefix="alice/my-project/my-experiment",
+    dash_root=".dash"
+).run as experiment:
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
     # Automatically closed on exit
@@ -39,11 +42,11 @@ with Experiment(name="my-experiment", project="project",
 ```python
 from ml_dash import ml_dash_experiment
 
-@ml_dash_experiment(name="my-experiment", project="project")
+@ml_dash_experiment(prefix="alice/my-project/my-experiment")
 def train_model(experiment):
     experiment.params.set(learning_rate=0.001)
     for epoch in range(10):
-        experiment.metrics("loss").append(value=0.5, epoch=epoch)
+        experiment.metrics("train").log(loss=0.5, epoch=epoch)
     return "Training complete!"
 
 result = train_model()
@@ -53,8 +56,10 @@ result = train_model()
 ```python
 from ml_dash import Experiment
 
-experiment = Experiment(name="my-experiment", project="project",
-        local_path=".dash")
+experiment = Experiment(
+    prefix="alice/my-project/my-experiment",
+    dash_root=".dash"
+)
 experiment.run.start()
 
 try:
@@ -68,9 +73,8 @@ finally:
 ### Local Mode (Filesystem)
 ```python
 with Experiment(
-    name="my-experiment",
-    project="project",
-    local_path=".dash"  # Storage directory
+    prefix="alice/my-project/my-experiment",
+    dash_root=".dash"  # Storage directory
 ).run as experiment:
     experiment.log("Using local storage")
 ```
@@ -79,10 +83,8 @@ with Experiment(
 ```python
 # First: ml-dash login
 with Experiment(
-    name="my-experiment",
-    project="project",
-    remote="https://api.dash.ml",
-    user_name="alice"
+    prefix="alice/my-project/my-experiment",
+    dash_url="https://api.dash.ml"  # Token auto-loaded from keychain
 ).run as experiment:
     experiment.log("Using remote server")
 ```
@@ -91,13 +93,11 @@ with Experiment(
 
 ```python
 with Experiment(
-    name="resnet50-imagenet",
-    project="computer-vision",
-    local_path=".dash",
+    prefix="alice/computer-vision/resnet50-imagenet",
+    dash_root=".dash",
     description="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
-    bindrs=["gpu-cluster", "team-a"],
-    folder="/experiments/2025/resnet"
+    bindrs=["gpu-cluster", "team-a"]
 ).run as experiment:
     pass
 ```
@@ -112,20 +112,26 @@ with Experiment(
 ### Automatic Status Management
 ```python
 # Normal completion -> COMPLETED
-with Experiment(name="training", project="ml",
-        remote="https://api.dash.ml").run as experiment:
+with Experiment(
+    prefix="alice/ml/training",
+    dash_url="https://api.dash.ml"
+).run as experiment:
     experiment.log("Training...")
 
 # Exception -> FAILED
-with Experiment(name="training", project="ml",
-        remote="https://api.dash.ml").run as experiment:
+with Experiment(
+    prefix="alice/ml/training",
+    dash_url="https://api.dash.ml"
+).run as experiment:
     raise ValueError("Training failed!")
 ```
 
 ### Manual Status Control
 ```python
-experiment = Experiment(name="training", project="ml",
-        remote="https://api.dash.ml")
+experiment = Experiment(
+    prefix="alice/ml/training",
+    dash_url="https://api.dash.ml"
+)
 experiment.run.start()
 
 try:
@@ -139,16 +145,20 @@ except Exception as e:
 
 ## Resuming Experiments
 
-Experiments use upsert behavior - reopen by using the same name:
+Experiments use upsert behavior - reopen by using the same prefix:
 
 ```python
 # First run
-with Experiment(name="long-training", project="ml",
-        local_path=".dash").run as experiment:
-    experiment.metrics("loss").append(value=0.5, epoch=1)
+with Experiment(
+    prefix="alice/ml/long-training",
+    dash_root=".dash"
+).run as experiment:
+    experiment.metrics("train").log(loss=0.5, epoch=1)
 
 # Later - continues same experiment
-with Experiment(name="long-training", project="ml",
-        local_path=".dash").run as experiment:
-    experiment.metrics("loss").append(value=0.3, epoch=2)
+with Experiment(
+    prefix="alice/ml/long-training",
+    dash_root=".dash"
+).run as experiment:
+    experiment.metrics("train").log(loss=0.3, epoch=2)
 ```

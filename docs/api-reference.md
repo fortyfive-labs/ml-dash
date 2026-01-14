@@ -32,8 +32,8 @@ Experiment(
     bindrs: Optional[List[str]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
-    remote: Optional[Union[str, bool]] = None,
-    local_path: Optional[str] = ".dash",
+    dash_url: Optional[Union[str, bool]] = None,
+    dash_root: Optional[str] = ".dash",
 )
 ```
 
@@ -64,7 +64,7 @@ The prefix is a universal key that identifies your experiment:
 ```python
 Experiment(
     prefix="alice/my-project/my-experiment",
-    local_path=".dash"  # Default
+    dash_root=".dash"  # Default
 )
 ```
 
@@ -78,7 +78,7 @@ Experiment(
 # Custom remote server
 Experiment(
     prefix="alice/my-project/my-experiment",
-    remote="https://custom-server.com"
+    dash_url="https://custom-server.com"
 )
 ```
 
@@ -898,7 +898,7 @@ from ml_dash import Experiment
 # Connect to shared ML-Dash server
 with Experiment(
     prefix="alice/shared-project/team-experiment",
-    remote="http://ml-dash-server:3000",
+    dash_url="http://ml-dash-server:3000",
     description="Collaborative experiment",
     tags=["team", "production"]
 ).run as exp:

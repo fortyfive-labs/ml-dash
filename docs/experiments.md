@@ -78,7 +78,7 @@ finally:
 
 with Experiment(
     prefix="alice/project/my-experiment",
-    local_path=".dash"
+    dash_root=".dash"
 ).run as exp:
     exp.log("Using local storage")
 ```
@@ -90,7 +90,7 @@ with Experiment(
 
 with Experiment(
     prefix="alice/project/my-experiment",
-    remote="https://api.dash.ml"
+    dash_url="https://api.dash.ml"
 ).run as exp:
     exp.log("Using remote server")
 ```
@@ -133,7 +133,7 @@ Experiments automatically track their status through the lifecycle:
 # Normal completion - status becomes COMPLETED
 with Experiment(
     prefix="alice/ml/training",
-    remote="https://api.dash.ml"
+    dash_url="https://api.dash.ml"
 ).run as exp:
     exp.log("Training...")
     # Status automatically set to COMPLETED on exit
@@ -141,7 +141,7 @@ with Experiment(
 # Exception handling - status becomes FAILED
 with Experiment(
     prefix="alice/ml/training",
-    remote="https://api.dash.ml"
+    dash_url="https://api.dash.ml"
 ).run as exp:
     exp.log("Training...")
     raise ValueError("Training failed!")
@@ -157,7 +157,7 @@ from ml_dash import Experiment
 
 exp = Experiment(
     prefix="alice/ml/training",
-    remote="https://api.dash.ml"
+    dash_url="https://api.dash.ml"
 )
 exp.run.start()
 

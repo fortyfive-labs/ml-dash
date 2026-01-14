@@ -148,7 +148,7 @@ def train_with_direct_instantiation():
 
 @ml_dash_experiment(
   prefix="demo/usage-styles/remote-decorator-example",
-  remote="https://api.dash.ml",
+  dash_url="https://api.dash.ml",
   description="Decorator with remote mode",
   tags=["remote", "decorator"],
 )
@@ -177,7 +177,7 @@ def train_remote_context_manager():
   # Prefix format: owner/project/experiment-name
   with Experiment(
     prefix="demo/usage-styles/remote-context-example",
-    remote="https://api.dash.ml",
+    dash_url="https://api.dash.ml",
     description="Context manager with remote mode",
     tags=["remote", "context-manager"],
   ).run as experiment:
@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
     🌐 Remote Mode:
        Uncomment the remote examples to test with a live server!
-       Just change: local_path="./path" → remote="https://..."
+       Just change: dash_root="./path" → dash_url="https://..."
        (Token auto-loaded from ~/.dash/token.enc, run 'ml-dash login' first)
     """)
 

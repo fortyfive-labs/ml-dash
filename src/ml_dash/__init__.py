@@ -16,7 +16,7 @@ Usage:
     # Local mode - explicit configuration
     with Experiment(
         prefix="ge/my-project/experiments/exp1",
-        local_path=".dash"
+        dash_root=".dash"
     ).run as exp:
         exp.log("Training started")
         exp.params.set(lr=0.001)
@@ -43,7 +43,7 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.1.0"
+__version__ = "0.6.2"
 
 __all__ = [
   "Experiment",

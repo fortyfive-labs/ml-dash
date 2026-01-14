@@ -73,7 +73,7 @@ from ml_dash import Experiment
 
 with Experiment(
   prefix="alice/my-project/my-experiment",
-  remote="https://api.dash.ml",  # token auto-loaded
+  dash_url="https://api.dash.ml",  # token auto-loaded
 ).run as experiment:
   experiment.log("Hello!", level="info")
   experiment.params.set(lr=0.001)
@@ -85,7 +85,7 @@ with Experiment(
 from ml_dash import Experiment
 
 with Experiment(
-  project="my-project", prefix="my-experiment", local_path=".dash"
+  project="my-project", prefix="my-experiment", dash_root=".dash"
 ).run as experiment:
   experiment.log("Running locally", level="info")
 

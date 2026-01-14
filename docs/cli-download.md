@@ -11,6 +11,7 @@ The `ml-dash download` command allows you to download experiment data from a rem
 - **Data migration**: Move experiments between environments
 - **Collaboration**: Share experiments by downloading and redistributing
 - **High-performance downloads**: Chunk-aware parallel downloads (218x faster than sequential)
+- **Glob pattern matching**: Download experiments using powerful glob patterns
 
 ## Quick Start
 
@@ -19,7 +20,7 @@ The `ml-dash download` command allows you to download experiment data from a rem
 Download all experiments from the remote server:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username your-username
+ml-dash download ./data --dash-url https://api.dash.ml
 ```
 
 ### Download Specific Project
@@ -27,16 +28,19 @@ ml-dash download ./data --remote https://api.dash.ml --username your-username
 Download only experiments from a specific project:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username your-username --project my-project
+ml-dash download ./data --dash-url https://api.dash.ml -p my-project
 ```
 
-### Download Specific Experiment
+### Download with Glob Patterns
 
-Download a single experiment:
+Download experiments matching a glob pattern:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username your-username \
-  --project my-project --experiment my-experiment
+# All projects starting with "test"
+ml-dash download -p "test*"
+
+# Specific experiments
+ml-dash download -p "alice/*/baseline-*"
 ```
 
 ### Dry Run
@@ -59,31 +63,35 @@ uv pip install ml-dash
 
 ## Authentication
 
-### Username-based Authentication (Recommended)
+### OAuth2 Device Flow (Recommended)
 
-The simplest way to authenticate is using your username. The CLI will automatically generate an API key:
+The recommended way to authenticate is using the OAuth2 device flow:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --username john-doe
+# Login once (opens browser for authentication)
+ml-dash login --dash-url https://api.dash.ml
+
+# Then download without providing credentials
+ml-dash download ./data
 ```
 
-**How it works:**
-- The CLI generates a deterministic JWT token from your username
-- Same username always produces the same token
+**Benefits:**
+- Secure OAuth2 authentication
+- Token stored in system keychain
 - No need to manage API keys manually
-- Token is used only for the current session (not stored)
+- Token auto-loaded for all CLI commands
 
 ### API Key Authentication
 
 For advanced users or production environments, you can use an explicit API key:
 
 ```bash
-ml-dash download ./data --remote https://api.dash.ml --api-key your-jwt-token
+ml-dash download ./data --dash-url https://api.dash.ml --api-key your-jwt-token
 ```
 
 ### Configuration File
 
-Store your credentials in `~/.dash/config.json` to avoid passing them every time:
+Store your configuration in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {
@@ -106,15 +114,17 @@ ml-dash download ./data
 
 ### Remote Configuration
 
-- `--remote URL` - Remote server URL (required unless set in config)
-- `--api-key TOKEN` - JWT token for authentication
-- `--username USERNAME` - Username for auto-generating API key
-- `--namespace NAMESPACE` - Namespace slug (defaults to username)
+- `--dash-url URL` - ML-Dash server URL (defaults to config or https://api.dash.ml)
+- `--api-key TOKEN` - JWT token for authentication (auto-loaded from login if not provided)
 
 ### Filtering Options
 
-- `--project PROJECT` - Download only this project
-- `--experiment EXPERIMENT` - Download specific experiment (requires `--project`)
+- `-p`, `--pref`, `--prefix`, `--proj`, `--project` PATTERN - Filter experiments by project or pattern
+  - Supports glob patterns: `'tut*'`, `'tom*/tutorials/*'`
+  - Simple project names: `my-project`
+  - Full paths with wildcards: `*/deep-learning/*`
+
+- `--experiment NAME` - Download specific experiment (requires exact project name)
 
 ### Content Selection
 
@@ -128,7 +138,7 @@ ml-dash download ./data
 - `--dry-run` - Preview without downloading
 - `--overwrite` - Overwrite existing experiments (default: skip existing)
 - `--resume` - Resume interrupted download
-- `--state-file STATE_FILE` - State file path for resume (default: `.dash-download-state.json`)
+- `--state-file FILE` - State file path for resume (default: `.dash-download-state.json`)
 
 ### Performance Options
 
@@ -138,7 +148,7 @@ ml-dash download ./data
 
 ### Output Options
 
-- `-v, --verbose` - Detailed progress output
+- `-v`, `--verbose` - Detailed progress output
 
 ## Usage Examples
 
@@ -147,51 +157,54 @@ ml-dash download ./data
 Download all experiments to a local directory:
 
 ```bash
-ml-dash download ./experiments --remote https://api.dash.ml --username tom --verbose
+ml-dash download ./experiments --dash-url https://api.dash.ml --verbose
 ```
 
 **Output:**
 ```
-🔍 Discovering experiments...
-Found 3 projects with 12 experiments
+Discovering experiments on remote server...
+Found 12 experiment(s)
 
-📥 Downloading experiments...
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 12/12
+Downloading 12 experiment(s)...
 
-✅ Download Summary:
-┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓
-┃ Category      ┃ Count     ┃
-┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩
-│ Projects      │ 3         │
-│ Experiments   │ 12        │
-│ Metrics       │ 48        │
-│ Files         │ 156       │
-│ Total Size    │ 2.3 GB    │
-└───────────────┴───────────┘
+[1/12] my-project/experiment-1
+  ✓ Downloaded successfully
 
-Download completed in 3m 45s
+...
+
+Download Summary
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Metric            ┃ Value    ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ Total Experiments │ 12       │
+│ Successful        │ 12       │
+│ Failed            │ 0        │
+│ Total Data        │ 2.3 GB   │
+│ Total Time        │ 3m 45s   │
+│ Avg Speed         │ 10 MB/s  │
+└───────────────────┴──────────┘
 ```
 
-### Example 2: Download Specific Project
+### Example 2: Download with Glob Patterns
 
-Download only experiments from the "training-runs" project:
+Download all experiments from projects starting with "training":
 
 ```bash
-ml-dash download ./training-data \
-  --remote https://api.dash.ml \
-  --username tom \
-  --project training-runs
+ml-dash download ./data -p "training*" --verbose
+```
+
+Download specific experiment pattern across all projects:
+
+```bash
+ml-dash download ./data -p "*/vision/resnet-*"
 ```
 
 ### Example 3: Download Without Large Files
 
-Download experiments but skip large artifact files (parameters and metrics only):
+Download experiments but skip large artifact files:
 
 ```bash
-ml-dash download ./lightweight \
-  --remote https://api.dash.ml \
-  --username tom \
-  --skip-files
+ml-dash download ./lightweight --dash-url https://api.dash.ml --skip-files
 ```
 
 This is useful for:
@@ -205,9 +218,8 @@ Download a specific experiment by name:
 
 ```bash
 ml-dash download ./specific \
-  --remote https://api.dash.ml \
-  --username tom \
-  --project vision-models \
+  --dash-url https://api.dash.ml \
+  -p vision-models \
   --experiment resnet-50-baseline
 ```
 
@@ -217,8 +229,7 @@ Download with optimized settings for large datasets:
 
 ```bash
 ml-dash download ./large-dataset \
-  --remote https://api.dash.ml \
-  --username tom \
+  --dash-url https://api.dash.ml \
   --batch-size 10000 \
   --max-concurrent-metrics 10 \
   --max-concurrent-files 5 \
@@ -236,18 +247,40 @@ If a download is interrupted, resume from where it left off:
 
 ```bash
 # Start download
-ml-dash download ./data --remote https://api.dash.ml --username tom --resume
+ml-dash download ./data --resume --verbose
 
 # ... download interrupted ...
 
 # Resume from checkpoint
-ml-dash download ./data --remote https://api.dash.ml --username tom --resume
+ml-dash download ./data --resume --verbose
 ```
 
-The download state is saved to `.dash-download-state.json` and includes:
-- Which experiments have been downloaded
-- Which metrics/files within each experiment are complete
-- Progress tracking for resuming exactly where you left off
+## Glob Pattern Support
+
+The download command supports powerful glob pattern matching for filtering experiments:
+
+### Pattern Syntax
+
+- `*` - Matches any characters (including /)
+- `?` - Matches any single character
+- `[seq]` - Matches any character in seq
+- `[!seq]` - Matches any character not in seq
+
+### Pattern Examples
+
+```bash
+# All projects starting with "test"
+ml-dash download -p "test*"
+
+# Projects matching pattern
+ml-dash download -p "alice/project-[0-9]*"
+
+# Specific experiments
+ml-dash download -p "*/deep-learning/baseline-?"
+
+# Complex patterns
+ml-dash download -p "tom*/tutorials/hyperparameter-*"
+```
 
 ## Download Process
 
@@ -255,21 +288,13 @@ The download command follows this workflow:
 
 ### 1. Discovery Phase
 
-```
-🔍 Discovering experiments...
-```
-
-- Connects to remote server
+Connects to remote server and discovers experiments:
 - Authenticates using provided credentials
 - Queries available projects and experiments
-- Applies filters (project, experiment, namespace)
+- Applies filters (glob patterns, project, experiment)
 - Shows summary of what will be downloaded
 
 ### 2. Download Phase
-
-```
-📥 Downloading experiments...
-```
 
 For each experiment:
 
@@ -298,12 +323,8 @@ For each experiment:
 
 ### 3. Summary Phase
 
-```
-✅ Download Summary:
-```
-
 Shows:
-- Number of projects, experiments, metrics, files
+- Number of experiments downloaded
 - Total data size downloaded
 - Total time elapsed
 - Any warnings or errors
@@ -345,18 +366,6 @@ Multiple operations run concurrently:
 - **File downloads**: Default 3 concurrent, configurable up to 10
 - **Chunk downloads**: Fixed 10 workers for optimal S3 performance
 
-### Configurable Batch Sizes
-
-Adjust batch size based on your network and data:
-
-```bash
-# Small batches for unstable connections
-ml-dash download --batch-size 100
-
-# Large batches for high-bandwidth connections
-ml-dash download --batch-size 10000
-```
-
 ## Common Workflows
 
 ### Workflow 1: Backup Production Experiments
@@ -366,8 +375,7 @@ Create a local backup of all production experiments:
 ```bash
 # Download everything to backup directory
 ml-dash download ./backups/$(date +%Y-%m-%d) \
-  --remote https://prod.example.com \
-  --username production-user \
+  --dash-url https://prod.example.com \
   --verbose
 
 # Verify download
@@ -381,9 +389,8 @@ Download experiments for offline analysis:
 ```bash
 # Download only metrics and parameters (skip large files)
 ml-dash download ./analysis \
-  --remote https://dash.example.com \
-  --username analyst \
-  --project deep-learning \
+  --dash-url https://dash.example.com \
+  -p deep-learning \
   --skip-files
 
 # Run analysis locally
@@ -411,14 +418,10 @@ Migrate experiments from one server to another:
 
 ```bash
 # Step 1: Download from old server
-ml-dash download ./migration \
-  --remote https://old-server.com \
-  --username john
+ml-dash download ./migration --dash-url https://old-server.com
 
 # Step 2: Upload to new server
-ml-dash upload ./migration \
-  --remote https://new-server.com \
-  --username john
+ml-dash upload ./migration --dash-url https://new-server.com
 ```
 
 ### Workflow 5: Resume Large Downloads
@@ -428,220 +431,87 @@ For very large datasets, use resume to handle interruptions:
 ```bash
 # Start download with resume enabled
 ml-dash download ./large-dataset \
-  --remote https://dash.example.com \
-  --username john \
+  --dash-url https://dash.example.com \
   --resume \
   --verbose
 
 # If interrupted (network issue, etc.), just run again
-# It will automatically continue from where it left off
-ml-dash download ./large-dataset \
-  --remote https://dash.example.com \
-  --username john \
-  --resume \
-  --verbose
+ml-dash download ./large-dataset --resume --verbose
 ```
 
 ## Troubleshooting
 
-### Issue: Slow Downloads
+### Authentication Errors
 
-**Symptoms:**
-- Downloads taking much longer than expected
-- Low network utilization
+**Error:** `Not authenticated. Run 'ml-dash login' to authenticate`
+
+**Solution:** Login first:
+```bash
+ml-dash login --dash-url https://api.dash.ml
+```
+
+### Connection Errors
+
+**Error:** Connection refused to `https://api.dash.ml`
+
+**Solutions:**
+- Verify the server is running: `curl https://api.dash.ml/health`
+- Check the URL is correct
+- Ensure no firewall is blocking the connection
+- Try with verbose mode: `ml-dash download -v`
+
+### Slow Downloads
 
 **Solutions:**
 
-1. **Increase batch size** (up to 10,000):
+1. Increase batch size (up to 10,000):
    ```bash
    ml-dash download --batch-size 10000
    ```
 
-2. **Increase concurrent downloads**:
+2. Increase concurrent downloads:
    ```bash
    ml-dash download --max-concurrent-metrics 10 --max-concurrent-files 5
    ```
 
-3. **Check server performance**:
-   ```bash
-   curl -w "@curl-format.txt" https://api.dash.ml/health
-   ```
+### Download Interrupted
 
-### Issue: Download Interrupted
-
-**Symptoms:**
-- Network error mid-download
-- Partial data downloaded
-
-**Solution:**
-
-Use `--resume` to continue from checkpoint:
+**Solution:** Use `--resume` to continue from checkpoint:
 
 ```bash
 ml-dash download ./data --resume --verbose
 ```
 
-State file (`.dash-download-state.json`) tracks:
-- Completed experiments
-- Completed metrics within each experiment
-- Completed files
-
-### Issue: Authentication Failed
-
-**Symptoms:**
-- "401 Unauthorized" error
-- "Invalid token" message
+### Disk Space
 
 **Solutions:**
 
-1. **Verify username matches server**:
-   ```bash
-   # Check what users exist on server
-   ml-dash list --remote https://api.dash.ml --username test-user
-   ```
-
-2. **Use explicit API key**:
-   ```bash
-   ml-dash download --api-key "eyJhbGc..."
-   ```
-
-3. **Check config file** (`~/.dash/config.json`):
-   ```json
-   {
-     "remote_url": "https://api.dash.ml",
-     "api_key": "valid-token-here"
-   }
-   ```
-
-### Issue: Disk Space
-
-**Symptoms:**
-- "No space left on device" error
-- Download stops mid-transfer
-
-**Solutions:**
-
-1. **Check available space before download**:
+1. Check available space before download:
    ```bash
    df -h .
    ```
 
-2. **Use `--dry-run` to preview size**:
+2. Use `--dry-run` to preview size:
    ```bash
    ml-dash download --dry-run --verbose
    ```
 
-3. **Download selectively**:
+3. Download selectively:
    ```bash
-   # Skip large files
    ml-dash download --skip-files
-
-   # Download only specific project
-   ml-dash download --project small-project
    ```
-
-### Issue: Overwrite Protection
-
-**Symptoms:**
-- Experiments skipped because they already exist
-- "Experiment already exists, skipping" message
-
-**Solution:**
-
-Use `--overwrite` to replace existing experiments:
-
-```bash
-ml-dash download ./data --overwrite
-```
-
-**Warning:** This will completely replace existing data. Make backups first!
-
-## Advanced Usage
-
-### Custom State File Location
-
-Specify a custom state file for resume functionality:
-
-```bash
-ml-dash download ./data \
-  --resume \
-  --state-file ~/my-downloads/custom-state.json
-```
-
-Useful for:
-- Multiple parallel downloads to different directories
-- Shared network drives with custom paths
-- CI/CD pipelines with specific state file locations
-
-### Dry Run with Verbose Output
-
-Preview exactly what will be downloaded:
-
-```bash
-ml-dash download ./data --dry-run --verbose
-```
-
-**Output includes:**
-- List of projects and experiments to download
-- Number of metrics, files, and logs per experiment
-- Estimated total size
-- Download order and strategy
-
-### JSON Output for Scripting
-
-Combine with `ml-dash list --json` for automated workflows:
-
-```bash
-# Get experiment list as JSON
-ml-dash list --project my-project --json > experiments.json
-
-# Process with jq
-cat experiments.json | jq '.experiments[] | select(.status == "COMPLETED") | .name'
-
-# Download completed experiments
-for exp in $(cat experiments.json | jq -r '.experiments[] | select(.status == "COMPLETED") | .name'); do
-  ml-dash download ./completed \
-    --project my-project \
-    --experiment "$exp"
-done
-```
-
-## Storage Format
-
-Downloaded experiments use the same local storage format as experiments logged in local mode:
-
-```
-{path}/
-└── {project}/
-    └── {experiment-name}/
-        ├── parameters.json         # Hyperparameters and metadata
-        ├── logs/
-        │   └── logs.jsonl         # Event logs (JSONL format)
-        ├── metrics/
-        │   └── {metric-name}/
-        │       └── data.jsonl     # Time-series data (JSONL format)
-        └── files/
-            └── {prefix}/
-                └── {file-id}/
-                    └── {filename}  # Original filename preserved
-```
-
-**File Formats:**
-
-- **JSONL (JSON Lines)**: Each line is a valid JSON object
-- **Metrics**: `{"index": 0, "data": {"loss": 0.5, "acc": 0.9}, "createdAt": "..."}`
-- **Logs**: `{"level": "INFO", "message": "...", "timestamp": "..."}`
-- **Parameters**: Single JSON object with all parameters
-
-This format is:
-- Human-readable (can inspect with text editor)
-- Line-by-line processable (stream processing)
-- Git-friendly (meaningful diffs)
-- Language-agnostic (any tool can parse JSON)
 
 ## Best Practices
 
-### 1. Use Dry Run First
+### 1. Login Once
+
+Use OAuth2 device flow for secure authentication:
+
+```bash
+ml-dash login --dash-url https://api.dash.ml
+```
+
+### 2. Use Dry Run First
 
 Always preview before downloading large datasets:
 
@@ -649,7 +519,7 @@ Always preview before downloading large datasets:
 ml-dash download --dry-run --verbose
 ```
 
-### 2. Enable Resume for Large Downloads
+### 3. Enable Resume for Large Downloads
 
 For downloads over 1GB or unreliable networks:
 
@@ -657,19 +527,15 @@ For downloads over 1GB or unreliable networks:
 ml-dash download --resume
 ```
 
-### 3. Optimize Concurrency
+### 4. Use Glob Patterns for Filtering
 
-Tune based on your network and server capacity:
+Download specific experiments efficiently:
 
 ```bash
-# High-bandwidth, powerful server
-ml-dash download --max-concurrent-metrics 10 --max-concurrent-files 5
-
-# Low-bandwidth or rate-limited server
-ml-dash download --max-concurrent-metrics 2 --max-concurrent-files 1
+ml-dash download -p "*/production/*"
 ```
 
-### 4. Skip Unnecessary Data
+### 5. Skip Unnecessary Data
 
 Save bandwidth and time:
 
@@ -681,33 +547,40 @@ ml-dash download --skip-files
 ml-dash download --skip-metrics --skip-files --skip-params
 ```
 
-### 5. Regular Backups
+## Storage Format
 
-Automate regular backups with cron:
+Downloaded experiments use the same local storage format as experiments logged in local mode:
 
-```bash
-# Add to crontab (daily backup at 2 AM)
-0 2 * * * ml-dash download ~/backups/$(date +\%Y-\%m-\%d) --remote https://dash.example.com --username backup-user
+```
+{path}/
+└── {namespace}/
+    └── {project}/
+        └── {experiment-name}/
+            ├── experiment.json         # Metadata
+            ├── parameters.json         # Hyperparameters
+            ├── logs/
+            │   └── logs.jsonl         # Event logs
+            ├── metrics/
+            │   └── {metric-name}/
+            │       └── data.jsonl     # Time-series data
+            └── files/
+                └── {prefix}/
+                    └── {file-id}/
+                        └── {filename}  # Original filename
 ```
 
-### 6. Verify Downloads
+**File Formats:**
+- **JSONL (JSON Lines)**: Each line is a valid JSON object
+- **Metrics**: `{"index": 0, "data": {"loss": 0.5}, "createdAt": "..."}`
+- **Logs**: `{"level": "INFO", "message": "...", "timestamp": "..."}`
 
-After downloading, verify data integrity:
+## See Also
 
-```bash
-# Check experiment structure
-tree .dash/my-project/my-experiment
-
-# Validate JSONL files
-cat .dash/my-project/my-experiment/metrics/loss/data.jsonl | jq '.'
-
-# Check file count
-find .dash -type f | wc -l
-```
-
-## Next Steps
-
-- [Upload Command](cli-upload.md) - Upload experiments to remote server
-- [List Command](cli-list.md) - Discover available experiments
-- [CLI Overview](cli.md) - General CLI documentation
+- [CLI Upload](cli-upload.md) - Upload experiments to remote server
+- [CLI List](cli-list.md) - Browse available experiments
 - [Getting Started](getting-started.md) - Learn ML-Dash fundamentals
+
+## Support
+
+For issues or questions:
+- GitHub Issues: [https://github.com/anthropics/ml-dash/issues](https://github.com/anthropics/ml-dash/issues)

@@ -39,7 +39,7 @@ Opens browser for OAuth2 authentication. Token stored in system keychain.
 
 ### Custom Server
 ```bash
-ml-dash login --remote https://your-server.com
+ml-dash login --dash-url https://your-server.com
 ```
 
 ### Logout
@@ -73,11 +73,13 @@ ml-dash upload
 # Upload from specific directory
 ml-dash upload ./experiments
 
-# Filter by project
-ml-dash upload --project my-project
+# Filter by project or pattern (supports glob patterns)
+ml-dash upload -p my-project
+ml-dash upload -p "test*"
+ml-dash upload -p "alice/*/baseline-*"
 
-# Filter by experiment
-ml-dash upload --project my-project --experiment specific-run
+# Upload to different location on server
+ml-dash upload -p "alice/experiments/*" -t "shared/team-experiments"
 
 # Dry run (preview only)
 ml-dash upload --dry-run --verbose
@@ -87,8 +89,8 @@ ml-dash upload --resume
 ```
 
 ### Key Options
-- `--project`: Filter by project name
-- `--experiment`: Filter by experiment name
+- `-p, --pref, --prefix, --proj, --project`: Filter by pattern (supports globs)
+- `-t, --target`: Target prefix on server
 - `--dry-run`: Preview without uploading
 - `--resume`: Continue from last state
 - `-v, --verbose`: Detailed output
@@ -103,11 +105,10 @@ Download experiments from remote server.
 # Download to directory
 ml-dash download ./data
 
-# Download specific project
-ml-dash download ./data --project my-project
-
-# Download specific experiment
-ml-dash download ./data --project my-project --experiment run-123
+# Download by project or pattern (supports glob patterns)
+ml-dash download ./data -p my-project
+ml-dash download ./data -p "test*"
+ml-dash download ./data -p "*/deep-learning/baseline-*"
 
 # Skip certain data types
 ml-dash download ./data --skip-files
@@ -136,25 +137,27 @@ ml-dash download --batch-size 10000
 Discover projects and experiments on remote server.
 
 ```bash
-# List all projects
+# List all experiments
 ml-dash list
 
-# List experiments in project
-ml-dash list --project vision-models
+# List by project or pattern (supports glob patterns)
+ml-dash list -p vision-models
+ml-dash list -p "test*"
+ml-dash list -p "*/deep-learning/*"
 
 # Filter by status
-ml-dash list --project ml --status COMPLETED
-ml-dash list --project ml --status RUNNING
-ml-dash list --project ml --status FAILED
+ml-dash list -p ml --status COMPLETED
+ml-dash list -p ml --status RUNNING
+ml-dash list -p ml --status FAILED
 
 # Filter by tags
-ml-dash list --project ml --tags baseline
+ml-dash list -p ml --tags baseline
 
 # Detailed output
-ml-dash list --project ml --detailed
+ml-dash list -p ml --detailed
 
 # JSON output (for scripting)
-ml-dash list --project ml --json
+ml-dash list -p ml --json
 ```
 
 ---
@@ -170,7 +173,7 @@ ml-dash upload               # Sync when internet available
 
 ### Download -> Analyze -> Re-upload
 ```bash
-ml-dash download ./analysis --project training-runs
+ml-dash download ./analysis -p training-runs
 python analyze.py            # Add metrics/files
 ml-dash upload ./analysis
 ```
@@ -178,19 +181,19 @@ ml-dash upload ./analysis
 ### Backup and Migration
 ```bash
 # Backup from production
-ml-dash login --remote https://prod.example.com
+ml-dash login --dash-url https://prod.example.com
 ml-dash download ./backup
 
 # Restore to development
-ml-dash login --remote https://api.dash.ml
+ml-dash login --dash-url https://api.dash.ml
 ml-dash upload ./backup
 ```
 
 ### Discovery and Selective Download
 ```bash
-ml-dash list                                    # See all projects
-ml-dash list --project vision-models            # See experiments
-ml-dash download ./data --project vision-models --experiment resnet-50
+ml-dash list                              # See all experiments
+ml-dash list -p vision-models             # See specific project
+ml-dash download ./data -p "vision-models/resnet-50"
 ```
 
 ---
@@ -198,7 +201,7 @@ ml-dash download ./data --project vision-models --experiment resnet-50
 ## Global Options
 
 All commands support:
-- `--remote URL`: Remote server URL (default: https://api.dash.ml)
+- `--dash-url URL`: Remote server URL (default: https://api.dash.ml)
 - `--api-key TOKEN`: JWT auth token
 - `-v, --verbose`: Detailed output
 - `--help`: Command help

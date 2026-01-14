@@ -10,6 +10,7 @@ The `ml-dash upload` command allows you to upload experiment data that was logge
 - **Batch uploads**: Upload multiple experiments at once
 - **Data migration**: Move experiments between environments
 - **Backup and sync**: Keep local and remote data synchronized
+- **Glob pattern matching**: Upload experiments using powerful glob patterns
 
 ## Quick Start
 
@@ -18,15 +19,27 @@ The `ml-dash upload` command allows you to upload experiment data that was logge
 Upload all experiments from the default local storage directory (`./.dash`):
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --username your-username
+ml-dash upload --dash-url https://api.dash.ml
 ```
 
 ### Upload Specific Project
 
-Upload only experiments from a specific project:
+Upload only experiments from a specific project using the `-p` alias:
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --username your-username --project my-project
+ml-dash upload --dash-url https://api.dash.ml -p my-project
+```
+
+### Upload with Glob Patterns
+
+Upload experiments matching a glob pattern:
+
+```bash
+# All projects starting with "test"
+ml-dash upload -p "test*"
+
+# Specific experiments in a project
+ml-dash upload -p "alice/*/baseline*"
 ```
 
 ### Dry Run
@@ -49,31 +62,35 @@ uv pip install ml-dash
 
 ## Authentication
 
-### Username-based Authentication (Recommended)
+### OAuth2 Device Flow (Recommended)
 
-The simplest way to authenticate is using your username. The CLI will automatically generate an API key:
+The recommended way to authenticate is using the OAuth2 device flow:
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --username john-doe
+# Login once (opens browser for authentication)
+ml-dash login --dash-url https://api.dash.ml
+
+# Then upload without providing credentials
+ml-dash upload
 ```
 
-**How it works:**
-- The CLI generates a deterministic JWT token from your username
-- Same username always produces the same token
+**Benefits:**
+- Secure OAuth2 authentication
+- Token stored in system keychain
 - No need to manage API keys manually
-- Token is used only for the current session (not stored)
+- Token auto-loaded for all CLI commands
 
 ### API Key Authentication
 
 For advanced users or production environments, you can use an explicit API key:
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --api-key your-jwt-token
+ml-dash upload --dash-url https://api.dash.ml --api-key your-jwt-token
 ```
 
 ### Configuration File
 
-Store your credentials in `~/.dash/config.json` to avoid passing them every time:
+Store your configuration in `~/.dash/config.json` to avoid passing them every time:
 
 ```json
 {
@@ -96,14 +113,19 @@ ml-dash upload
 
 ### Remote Configuration
 
-- `--remote URL` - Remote server URL (required unless set in config)
-- `--api-key TOKEN` - JWT token for authentication
-- `--username NAME` - Username for automatic authentication
+- `--dash-url URL` - ML-Dash server URL (defaults to config or https://api.dash.ml)
+- `--api-key TOKEN` - JWT token for authentication (auto-loaded from login if not provided)
 
 ### Filtering Options
 
-- `--project NAME` - Upload only experiments from this project
-- `--experiment NAME` - Upload only this specific experiment (requires `--project`)
+- `-p`, `--pref`, `--prefix`, `--proj`, `--project` PATTERN - Filter experiments by prefix pattern
+  - Supports glob patterns: `'tom/*/exp*'`, `'alice/project-?/baseline'`
+  - Simple project names: `my-project`
+  - Full paths: `alice/my-project/experiment-1`
+
+- `-t`, `--target` PREFIX - Target prefix on server (like `scp` destination)
+  - Upload to different location: `alice/shared-project`
+  - Combine with source pattern for remapping
 
 ### Data Filtering
 
@@ -116,7 +138,7 @@ ml-dash upload
 
 - `--dry-run` - Show what would be uploaded without uploading
 - `--strict` - Fail on any validation error (default: skip invalid data)
-- `-v, --verbose` - Show detailed progress
+- `-v`, `--verbose` - Show detailed progress
 - `--batch-size N` - Batch size for logs/metrics (default: 100)
 
 ### Resume Functionality
@@ -129,10 +151,7 @@ ml-dash upload
 ### Example 1: Upload All Experiments with Progress
 
 ```bash
-ml-dash upload \
-  --remote https://api.dash.ml \
-  --username john-doe \
-  --verbose
+ml-dash upload --dash-url https://api.dash.ml --verbose
 ```
 
 **Output:**
@@ -166,20 +185,45 @@ Uploading to: https://api.dash.ml
 └────────┴──────────────┘
 ```
 
-### Example 2: Upload Specific Project with Filters
+### Example 2: Upload with Glob Patterns
+
+Upload all experiments from projects starting with "test":
+
+```bash
+ml-dash upload -p "test*" --verbose
+```
+
+Upload specific experiment pattern across all projects:
+
+```bash
+ml-dash upload -p "*/deep-learning/baseline-*"
+```
+
+### Example 3: Upload with Target Prefix
+
+Upload experiments to a different location on the server (like `scp`):
+
+```bash
+# Upload from local alice/experiments/* to remote shared/team-experiments/
+ml-dash upload \
+  --prefix "alice/experiments/*" \
+  --target "shared/team-experiments" \
+  --verbose
+```
+
+### Example 4: Upload Specific Project with Filters
 
 Upload only parameters and metrics (skip logs and files):
 
 ```bash
 ml-dash upload \
-  --remote https://api.dash.ml \
-  --username john-doe \
-  --project deep-learning \
+  --dash-url https://api.dash.ml \
+  -p deep-learning \
   --skip-logs \
   --skip-files
 ```
 
-### Example 3: Dry Run Before Upload
+### Example 5: Dry Run Before Upload
 
 Preview what will be uploaded:
 
@@ -196,7 +240,7 @@ ml-dash upload --dry-run --verbose
 # Run without --dry-run to proceed with upload.
 ```
 
-### Example 4: Resume Interrupted Upload
+### Example 6: Resume Interrupted Upload
 
 If an upload is interrupted (network issue, etc.), resume it:
 
@@ -212,23 +256,54 @@ ml-dash upload --resume --verbose
 # ...continues with remaining experiments...
 ```
 
-### Example 5: Upload from Custom Directory
+### Example 7: Upload from Custom Directory
 
 ```bash
-ml-dash upload /path/to/custom/.dash \
-  --remote https://api.dash.ml \
-  --username john-doe
+ml-dash upload /path/to/custom/.dash --dash-url https://api.dash.ml
 ```
 
-### Example 6: Upload with Strict Validation
+### Example 8: Upload with Strict Validation
 
 Fail if any data validation errors occur:
 
 ```bash
+ml-dash upload --dash-url https://api.dash.ml --strict
+```
+
+## Glob Pattern Support
+
+The upload command supports powerful glob pattern matching for filtering experiments:
+
+### Pattern Syntax
+
+- `*` - Matches any characters (including /)
+- `?` - Matches any single character
+- `[seq]` - Matches any character in seq
+- `[!seq]` - Matches any character not in seq
+
+### Pattern Examples
+
+```bash
+# All projects starting with "test"
+ml-dash upload -p "test*"
+
+# Projects matching pattern
+ml-dash upload -p "alice/project-[0-9]*"
+
+# Specific experiments
+ml-dash upload -p "*/deep-learning/baseline-?"
+
+# Complex patterns
+ml-dash upload -p "tom*/tutorials/hyperparameter-*"
+```
+
+### Combined with Target
+
+```bash
+# Upload matching experiments to a different prefix
 ml-dash upload \
-  --remote https://api.dash.ml \
-  --username john-doe \
-  --strict
+  --prefix "alice/*/experiment-*" \
+  --target "archive/2024"
 ```
 
 ## Data Validation
@@ -264,7 +339,7 @@ The CLI automatically validates experiment data before uploading. Validation is 
 Skips invalid data and continues:
 
 ```bash
-ml-dash upload --remote https://api.dash.ml --username john-doe
+ml-dash upload --dash-url https://api.dash.ml
 ```
 
 **Behavior:**
@@ -279,7 +354,7 @@ ml-dash upload --remote https://api.dash.ml --username john-doe
 Fails on any validation error:
 
 ```bash
-ml-dash upload --strict --remote https://api.dash.ml --username john-doe
+ml-dash upload --strict --dash-url https://api.dash.ml
 ```
 
 **Behavior:**
@@ -287,24 +362,6 @@ ml-dash upload --strict --remote https://api.dash.ml --username john-doe
 - Warnings become errors
 - No data is uploaded if validation fails
 - Useful for production pipelines where data integrity is critical
-
-### Validation Output
-
-**Lenient mode output:**
-```
-Validating experiments...
-  ⚠ project1/exp1:
-      logs.jsonl has 3 invalid lines (e.g., [10, 15, 20]...) - will skip these
-3 experiment(s) ready to upload
-```
-
-**Strict mode output:**
-```
-Validating experiments...
-  ✗ project1/exp1:
-      logs.jsonl has 3 invalid lines (e.g., [10, 15, 20]...)
-Error: Validation failed in --strict mode
-```
 
 ## Upload Process
 
@@ -324,30 +381,16 @@ Logs and metrics are uploaded in batches for efficiency:
 
 ```bash
 # Default batch size (100)
-ml-dash upload --remote https://api.dash.ml --username john-doe
+ml-dash upload --dash-url https://api.dash.ml
 
 # Custom batch size
-ml-dash upload --batch-size 500 --remote https://api.dash.ml --username john-doe
+ml-dash upload --batch-size 500 --dash-url https://api.dash.ml
 ```
 
 **Performance considerations:**
 - Larger batches = fewer API calls = faster uploads
 - Smaller batches = more resilient to errors
 - Default (100) is a good balance for most cases
-
-### Error Handling
-
-The CLI handles errors gracefully:
-
-- **Network errors**: Experiment marked as failed, saved to state file
-- **Invalid data**: Skipped with warning (lenient) or fails (strict)
-- **Server errors**: Experiment marked as failed, error message displayed
-
-Failed experiments can be retried with `--resume`:
-
-```bash
-ml-dash upload --resume
-```
 
 ## Resume Functionality
 
@@ -363,7 +406,7 @@ Interrupted uploads can be resumed without re-uploading completed experiments.
 
 **First attempt (interrupted):**
 ```bash
-ml-dash upload --remote https://api.dash.ml --username john-doe
+ml-dash upload --dash-url https://api.dash.ml
 # ...uploads 3 experiments successfully...
 # ...network error on experiment 4...
 # State saved to .dash-upload-state.json. Use --resume to retry failed uploads.
@@ -380,36 +423,6 @@ ml-dash upload --resume
 # ...continues with remaining experiments...
 ```
 
-### Custom State File
-
-Use a custom state file location:
-
-```bash
-ml-dash upload --state-file /path/to/my-state.json
-ml-dash upload --resume --state-file /path/to/my-state.json
-```
-
-### State File Format
-
-The state file is a JSON file:
-
-```json
-{
-  "local_path": "/path/to/.dash",
-  "remote_url": "https://api.dash.ml",
-  "completed_experiments": [
-    "project1/exp1",
-    "project1/exp2",
-    "project2/exp1"
-  ],
-  "failed_experiments": [],
-  "in_progress_experiment": null,
-  "timestamp": "2024-12-03T10:30:00"
-}
-```
-
-**Note:** The state file is automatically deleted after a successful upload.
-
 ## Common Workflows
 
 ### Workflow 1: Offline Training with Upload
@@ -423,7 +436,7 @@ from ml_dash import Experiment
 with Experiment(
     prefix="resnet-training",
     project="image-classification",
-    
+    dash_root=".dash"
 ).run as exp:
     exp.params.set(
         model="resnet50",
@@ -436,12 +449,11 @@ with Experiment(
         loss = 1.0 / (epoch + 1)
         acc = 0.5 + epoch * 0.05
         exp.metrics("train").log(loss=loss, accuracy=acc)
-        exp.metrics.log(epoch=epoch).flush()
 ```
 
 ```bash
 # Later, when online - upload all experiments
-ml-dash upload --remote https://api.dash.ml --username john-doe
+ml-dash upload --dash-url https://api.dash.ml
 ```
 
 ### Workflow 2: Selective Upload
@@ -451,10 +463,8 @@ Upload only successful experiments:
 ```bash
 # Upload only the best experiment
 ml-dash upload \
-  --project image-classification \
-  --experiment resnet-training-final \
-  --remote https://api.dash.ml \
-  --username john-doe
+  -p image-classification/resnet-training-final \
+  --dash-url https://api.dash.ml
 ```
 
 ### Workflow 3: Data Migration
@@ -462,33 +472,14 @@ ml-dash upload \
 Move experiments from one server to another:
 
 ```bash
-# Step 1: Download experiments from old server (using local mode)
-# (This would be done during normal experiment logging)
+# Step 1: Download from old server
+ml-dash download ./backup --dash-url https://old-server.com
 
 # Step 2: Upload to new server
-ml-dash upload \
-  --remote http://new-server.com \
-  --username john-doe
+ml-dash upload ./backup --dash-url https://new-server.com
 ```
 
-### Workflow 4: Backup Strategy
-
-Regular backups from local to remote:
-
-```bash
-#!/bin/bash
-# backup-experiments.sh
-
-# Upload all new/modified experiments
-ml-dash upload \
-  --remote http://backup-server.com \
-  --username john-doe \
-  --verbose
-
-# The CLI automatically skips already-uploaded experiments
-```
-
-### Workflow 5: CI/CD Integration
+### Workflow 4: CI/CD Integration
 
 Upload experiment results from CI pipeline:
 
@@ -506,37 +497,27 @@ jobs:
       - name: Install dependencies
         run: pip install ml-dash
 
+      - name: Login
+        env:
+          ML_DASH_URL: ${{ secrets.ML_DASH_URL }}
+        run: ml-dash login --dash-url $ML_DASH_URL
+
       - name: Train model
         run: python train.py
 
       - name: Upload results
-        env:
-          ML_DASH_REMOTE: ${{ secrets.ML_DASH_REMOTE }}
-          ML_DASH_API_KEY: ${{ secrets.ML_DASH_API_KEY }}
-        run: |
-          ml-dash upload \
-            --remote $ML_DASH_REMOTE \
-            --api-key $ML_DASH_API_KEY \
-            --strict
+        run: ml-dash upload --strict
 ```
 
 ## Troubleshooting
 
 ### Authentication Errors
 
-**Error:** `Error: --api-key or --username is required`
+**Error:** `Not authenticated. Run 'ml-dash login' to authenticate`
 
-**Solution:** Provide authentication credentials:
+**Solution:** Login first:
 ```bash
-ml-dash upload --username your-username --remote https://api.dash.ml
-```
-
-Or create a config file at `~/.dash/config.json`:
-```json
-{
-  "remote_url": "https://api.dash.ml",
-  "api_key": "your-jwt-token"
-}
+ml-dash login --dash-url https://api.dash.ml
 ```
 
 ### Connection Errors
@@ -548,24 +529,6 @@ Or create a config file at `~/.dash/config.json`:
 - Check the remote URL is correct
 - Ensure no firewall is blocking the connection
 - Try with verbose mode: `ml-dash upload -v`
-
-### Invalid Data Errors
-
-**Error:** Experiments fail validation
-
-**Solutions:**
-
-1. Use verbose mode to see detailed errors:
-   ```bash
-   ml-dash upload --verbose
-   ```
-
-2. Use lenient mode (default) to skip invalid data:
-   ```bash
-   ml-dash upload  # automatically skips invalid data
-   ```
-
-3. Check the specific validation errors and fix the source data
 
 ### No Experiments Found
 
@@ -593,101 +556,21 @@ Or create a config file at `~/.dash/config.json`:
 
 3. Upload specific projects one at a time:
    ```bash
-   ml-dash upload --project project1
-   ml-dash upload --project project2
+   ml-dash upload -p project1
+   ml-dash upload -p project2
    ```
-
-### Interrupted Uploads
-
-**Error:** Upload interrupted due to network issues
-
-**Solution:** Use resume functionality:
-```bash
-ml-dash upload --resume
-```
-
-The CLI automatically saves progress and skips already-uploaded experiments.
-
-### State File Issues
-
-**Error:** `State file local path doesn't match`
-
-**Solution:** The state file is for a different local directory. Either:
-- Start fresh (delete `.dash-upload-state.json`)
-- Use the correct local directory
-- Specify a different state file: `--state-file my-state.json`
-
-## Advanced Usage
-
-### Custom Validation
-
-For advanced use cases, you can pre-validate data before upload:
-
-```python
-from ml_dash.cli_commands.upload import discover_experiments, ExperimentValidator
-from pathlib import Path
-
-# Discover experiments
-experiments = discover_experiments(Path("./.dash"))
-
-# Validate
-validator = ExperimentValidator(strict=True)
-for exp in experiments:
-    result = validator.validate_experiment(exp)
-    if not result.is_valid:
-        print(f"Invalid: {exp.project}/{exp.experiment}")
-        for error in result.errors:
-            print(f"  - {error}")
-```
-
-### Programmatic Upload
-
-Use the upload functionality in Python scripts:
-
-```python
-from ml_dash.cli_commands.upload import cmd_upload
-import argparse
-
-args = argparse.Namespace(
-    path="./.dash",
-    remote="https://api.dash.ml",
-    api_key=None,
-    user_name="john-doe",
-    project=None,
-    experiment=None,
-    dry_run=False,
-    strict=False,
-    verbose=True,
-    batch_size=100,
-    skip_logs=False,
-    skip_metrics=False,
-    skip_files=False,
-    skip_params=False,
-    resume=False,
-    state_file=".dash-upload-state.json",
-)
-
-exit_code = cmd_upload(args)
-print(f"Upload {'succeeded' if exit_code == 0 else 'failed'}")
-```
-
-### Monitoring Progress
-
-The CLI provides real-time progress feedback:
-
-- **Progress bars** show overall upload progress
-- **Spinners** indicate current operation
-- **Colored output** highlights success/failure
-- **Summary tables** show final statistics
-
-Enable verbose mode for maximum detail:
-```bash
-ml-dash upload --verbose
-```
 
 ## Best Practices
 
-### 1. Use Dry Run First
+### 1. Login Once
+
+Use OAuth2 device flow for secure authentication:
+
+```bash
+ml-dash login --dash-url https://api.dash.ml
+```
+
+### 2. Use Dry Run First
 
 Always preview uploads before running them:
 
@@ -695,34 +578,21 @@ Always preview uploads before running them:
 ml-dash upload --dry-run --verbose
 ```
 
-### 2. Store Credentials in Config
+### 3. Use Glob Patterns for Filtering
 
-Avoid passing credentials on command line:
+Upload specific experiments efficiently:
 
-```json
-// ~/.dash/config.json
-{
-  "remote_url": "https://api.dash.ml",
-  "api_key": "your-token"
-}
+```bash
+ml-dash upload -p "*/production/*"
 ```
 
-### 3. Use Resume for Large Uploads
+### 4. Use Resume for Large Uploads
 
 For many experiments or large files:
 
 ```bash
 ml-dash upload  # initial attempt
 ml-dash upload --resume  # if interrupted
-```
-
-### 4. Filter by Project
-
-Upload projects incrementally:
-
-```bash
-ml-dash upload --project project1
-ml-dash upload --project project2
 ```
 
 ### 5. Validate Strictly in CI/CD
@@ -733,32 +603,14 @@ Use strict mode in automated pipelines:
 ml-dash upload --strict
 ```
 
-### 6. Skip Large Files Initially
-
-Upload metadata/metrics first, files later:
-
-```bash
-ml-dash upload --skip-files  # fast initial upload
-ml-dash upload  # upload everything (including files)
-```
-
-### 7. Monitor with Verbose Mode
-
-For debugging or monitoring:
-
-```bash
-ml-dash upload --verbose 2>&1 | tee upload.log
-```
-
 ## See Also
 
 - [Getting Started](getting-started.md) - Initial setup and basic usage
+- [CLI Download](cli-download.md) - Download experiments from remote
+- [CLI List](cli-list.md) - Browse available experiments
 - [Experiments](experiments.md) - Working with experiments
-- [API Reference](api-reference.md) - Complete API documentation
-- [Local vs Remote Mode](getting-started.md#operation-modes) - Understanding operation modes
 
 ## Support
 
 For issues or questions:
 - GitHub Issues: [https://github.com/anthropics/ml-dash/issues](https://github.com/anthropics/ml-dash/issues)
-- Documentation: [https://ml-dash.readthedocs.io](https://ml-dash.readthedocs.io)

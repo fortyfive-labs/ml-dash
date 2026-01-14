@@ -73,7 +73,7 @@ def demo_project_root():
   # Prefix format: owner/project/experiment-name
   with Experiment(
     prefix=f"demo/project/{RUN.prefix}",  # Uses auto-detected prefix
-    local_path=str(data_dir),
+    dash_root=str(data_dir),
     description="Demo using project_root",
   ).run as exp:
     exp.log("Training started!")

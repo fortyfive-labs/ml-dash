@@ -20,9 +20,6 @@ ml-dash login
 
 This opens your browser for secure OAuth2 authentication. Your token is stored securely in your system keychain.
 
-| Ge: new feature: we also want to be able to pass in the prefix as a template string.
-| 
-
 ### 2. Start Tracking
 
 ```{code-block} python
@@ -66,7 +63,7 @@ from ml_dash import Experiment
 # Prefix format: owner/project/experiment-name
 with Experiment(
     prefix="alice/tutorial/my-first-experiment",
-    local_path=".dash"
+    dash_root=".dash"
 ).run as exp:
     # Log messages
     exp.log("Training started", level="info")
@@ -176,7 +173,7 @@ from ml_dash import Experiment
 
 with Experiment(
     prefix="alice/team-project/my-experiment",
-    remote="https://api.dash.ml"  # token auto-loaded from keychain
+    dash_url="https://api.dash.ml"  # token auto-loaded from keychain
 ).run as exp:
     # Use exactly the same API as local mode!
     exp.log("Running on remote server", level="info")

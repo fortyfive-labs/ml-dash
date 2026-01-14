@@ -83,7 +83,7 @@ This command:
 **Custom Server:**
 
 ```bash
-ml-dash login --remote https://your-server.com
+ml-dash login --dash-url https://your-server.com
 ```
 
 ### Logout
@@ -149,11 +149,11 @@ Backup experiments or migrate between servers:
 
 ```bash
 # Backup from production
-ml-dash login --remote https://prod.example.com
+ml-dash login --dash-url https://prod.example.com
 ml-dash download ./backup
 
 # Restore to development
-ml-dash login --remote https://api.dash.ml
+ml-dash login --dash-url https://api.dash.ml
 ml-dash upload ./backup
 ```
 
@@ -248,7 +248,7 @@ Discover and browse projects and experiments on a remote server.
 
 All commands support these common options:
 
-- `--remote URL` - Remote server URL (defaults to https://api.dash.ml)
+- `--dash-url URL` - Remote server URL (defaults to https://api.dash.ml)
 - `--api-key TOKEN` - JWT authentication token (optional if logged in)
 - `-v, --verbose` - Detailed progress output
 - `--help` - Show command-specific help
