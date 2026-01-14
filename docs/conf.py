@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath('../src'))
 project = 'ML-Dash'
 copyright = '2025, Ge Yang, Tom Tao'
 author = 'Ge Yang, Tom Tao'
-release = '0.5.1'
+release = '0.6.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
