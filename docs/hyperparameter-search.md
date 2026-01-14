@@ -49,11 +49,9 @@ def hyperparameter_search():
         experiment_name = f"search-lr{lr}-bs{bs}"
 
         with Experiment(
-            name=experiment_name,
-            project="hyperparameter-search",
+            prefix=f"alice/hyperparameter-search/{experiment_name}",
             description=f"Grid search: lr={lr}, batch_size={bs}",
-            tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-            
+            tags=["grid-search", f"lr-{lr}", f"bs-{bs}"]
         ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
@@ -144,8 +142,9 @@ for i in range(20):
     lr = 10 ** random.uniform(-4, -1)  # 0.0001 to 0.1
     bs = random.choice([16, 32, 64, 128])
 
-    with Experiment(prefix=f"random-{i}", project="random-search",
-            ).run as experiment:
+    with Experiment(
+        prefix=f"alice/random-search/random-{i}"
+    ).run as experiment:
         experiment.params.set(learning_rate=lr, batch_size=bs)
         # Train and metric...
 ```
@@ -156,8 +155,9 @@ for trial in range(100):
     # Get next params from Bayesian optimizer
     params = optimizer.suggest()
 
-    with Experiment(prefix=f"trial-{trial}", project="bayes-opt",
-            ).run as experiment:
+    with Experiment(
+        prefix=f"alice/bayes-opt/trial-{trial}"
+    ).run as experiment:
         experiment.params.set(**params)
         accuracy = train_and_evaluate(params, experiment)
 

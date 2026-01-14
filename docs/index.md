@@ -18,13 +18,13 @@ Or in your `CLAUDE.md`:
 You can install the package with uv or pip:
 
 ```shell
-uv add ml-dash==0.6.2rc1
+uv add ml-dash==0.6.2
 ```
 
 or
 
 ```shell
-pip install ml-dash==0.6.2rc1
+pip install ml-dash==0.6.2
 ```
 
 The core of ML-Dash is the `Experiment` class. It supports logging, upload, and download of

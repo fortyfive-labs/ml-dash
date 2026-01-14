@@ -15,11 +15,9 @@ def train_simple_model():
     """Train a simple model and metric with ML-Dash."""
 
     with Experiment(
-        prefix="simple-training",
-        project="tutorials",
+        prefix="alice/tutorials/simple-training",
         description="Simple training example",
-        tags=["tutorial", "simple"],
-        
+        tags=["tutorial", "simple"]
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -117,11 +115,9 @@ def train_mnist():
 
     # ML-Dash experiment
     with Experiment(
-        prefix="mnist-pytorch",
-        project="computer-vision",
+        prefix="alice/computer-vision/mnist-pytorch",
         description="MNIST classification with PyTorch",
-        tags=["mnist", "pytorch", "classification"],
-        
+        tags=["mnist", "pytorch", "classification"]
     ).run as experiment:
         # Metric configuration
         experiment.params.set({
@@ -273,11 +269,9 @@ def hyperparameter_search():
         experiment_name = f"search-lr{lr}-bs{bs}"
 
         with Experiment(
-            name=experiment_name,
-            project="hyperparameter-search",
+            prefix=f"alice/hyperparameter-search/{experiment_name}",
             description=f"Grid search: lr={lr}, batch_size={bs}",
-            tags=["grid-search", f"lr-{lr}", f"bs-{bs}"],
-            
+            tags=["grid-search", f"lr-{lr}", f"bs-{bs}"]
         ).run as experiment:
             # Metric hyperparameters
             experiment.params.set(
@@ -344,11 +338,9 @@ def compare_architectures():
 
     for arch in architectures:
         with Experiment(
-            name=f"comparison-{arch}",
-            project="architecture-comparison",
+            prefix=f"alice/architecture-comparison/comparison-{arch}",
             description=f"Training {arch} on CIFAR-10",
-            tags=["comparison", arch, "cifar10"],
-            
+            tags=["comparison", arch, "cifar10"]
         ).run as experiment:
             # Configuration
             experiment.params.set(
@@ -391,11 +383,9 @@ def train_with_debug():
     """Training with extensive debugging logs."""
 
     with Experiment(
-        prefix="debug-training",
-        project="debugging",
+        prefix="alice/debugging/debug-training",
         description="Training with debug logging",
-        tags=["debug"],
-        
+        tags=["debug"]
     ).run as experiment:
         experiment.params.set(
             learning_rate=0.001,

@@ -22,11 +22,9 @@ def train_simple_model():
     """Train a simple model and metric everything with ML-Dash."""
 
     with Experiment(
-        prefix="simple-training",
-        project="tutorials",
+        prefix="alice/tutorials/simple-training",
         description="Basic training loop example",
-        tags=["tutorial", "simple"],
-        
+        tags=["tutorial", "simple"]
     ).run as experiment:
         # Metric hyperparameters
         experiment.params.set(
@@ -118,7 +116,7 @@ if __name__ == "__main__":
 
 **Use experiment context manager** - Automatic cleanup:
 ```python
-with Experiment(prefix="...", project="...").run as experiment:
+with Experiment(prefix="owner/project/experiment-name").run as experiment:
     # Your code here
 ```
 

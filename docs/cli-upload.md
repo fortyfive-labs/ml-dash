@@ -434,8 +434,7 @@ Train models offline, then upload when connected:
 from ml_dash import Experiment
 
 with Experiment(
-    prefix="resnet-training",
-    project="image-classification",
+    prefix="alice/image-classification/resnet-training",
     dash_root=".dash"
 ).run as exp:
     exp.params.set(

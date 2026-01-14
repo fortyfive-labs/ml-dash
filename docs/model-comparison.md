@@ -52,12 +52,10 @@ def compare_architectures():
     # Train each architecture
     for arch in architectures:
         with Experiment(
-            name=f"comparison-{arch}",
-            project="architecture-comparison",
+            prefix=f"alice/architecture-comparison/comparison-{arch}",
             description=f"Training {arch} on CIFAR-10",
-            tags=["comparison", arch, "cifar10"],
-        
-        .run as experiment:
+            tags=["comparison", arch, "cifar10"]
+        ).run as experiment:
             # Same configuration for fair comparison
             experiment.params.set(
                 architecture=arch,
@@ -196,8 +194,9 @@ def train_and_evaluate(model, train_loader, val_loader, experiment):
 
 # Compare architectures
 for arch in ["cnn", "resnet", "vit"]:
-    with Experiment(prefix=f"comparison-{arch}", project="arch-comp",
-        ).run as experiment:
+    with Experiment(
+        prefix=f"alice/arch-comp/comparison-{arch}"
+    ).run as experiment:
         experiment.params.set(architecture=arch, dataset="cifar10")
 
         model = create_model(arch)
