@@ -36,9 +36,9 @@ def add_parser(subparsers):
   )
 
   parser.add_argument(
-    "--remote",
+    "--dash-url",
     type=str,
-    help="ML-Dash server URL (e.g., https://api.dash.com)",
+    help="ML-Dash server URL (e.g., https://api.dash.ml)",
   )
 
   parser.add_argument(
@@ -91,12 +91,12 @@ def cmd_login(args) -> int:
   console = Console()
 
   # Get remote URL
-  remote_url = args.remote or config.remote_url
+  remote_url = args.dash_url or config.remote_url
   if not remote_url:
     console.print(
       "[red]Error: No remote URL configured.[/red]\n\n"
-      "Please specify with --remote or set default:\n"
-      "  ml-dash login --remote https://api.dash.com"
+      "Please specify with --dash-url or set default:\n"
+      "  ml-dash login --dash-url https://api.dash.ml"
     )
     return 1
 

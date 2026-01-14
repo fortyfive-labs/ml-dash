@@ -1,3 +1,4 @@
+import getpass
 import random
 import time
 
@@ -7,16 +8,16 @@ from ml_dash import Experiment
 def train_simple_model():
   """Train a simple model and metric everything with ML-Dash."""
 
+  # Get current user for prefix
+  owner = getpass.getuser()
+
   with Experiment(
-    name="hyperparameter-schema-test-5",
-    project="tutorials",
-    prefix="/tmp/ml_dash/examples",
-    description="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
+    prefix=f"tom_tao_34833x/tutorials/examples/hyperparameter-schema-test-13",
+    readme="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
     tags=["sweep", "best"],
-    # dash_url='http://localhost:3000',
-    # dash_url="https://api.dash.ml",
-    # user_name="tom"
-    dash_root=".dash",
+    # dash_url='http://localhost:3000',  # Use for local server testing
+    dash_url="https://api.dash.ml",  # Use for remote mode
+    # dash_root=".dash",  # Local storage directory
   ).run as experiment:
     # Metric hyperparameters
     initial_lr = 0.001
@@ -133,30 +134,40 @@ def train_simple_model():
     with open("model.pth", "w") as f:
       f.write("model weights")
 
+    # Upload model file
     experiment.files("models").upload(
       "model.pth", description="Final trained model", tags=["final"]
     )
+
+    # Upload example image
     experiment.files("plots").upload(
       "/Users/57block/fortyfive/ml-dash/test/selfie.jpeg",
-      description="Final trained model",
-      tags=["final"],
+      description="Training visualization",
+      tags=["plot", "final"],
     )
+
+    # Upload configuration file
     experiment.files().upload(
-      "/Users/57block/fortyfive/ml-dash/test/view.yaml",
-      description="Final trained model",
-      tags=["final"],
+      "/Users/57block/fortyfive/ml-dash/test/.dashrc",
+      description="Configuration file",
+      tags=["config"],
     )
+
+    # Upload example video
     experiment.files("videos").upload(
       "/Users/57block/fortyfive/ml-dash/test/video.mp4",
-      description="Final trained model",
-      tags=["final"],
+      description="Training progress video",
+      tags=["video", "final"],
     )
+
+    # Upload README with metadata
     experiment.files().upload(
       "./README.md",
       description="Best model checkpoint",
       tags=["best", "checkpoint"],
       metadata={"epoch": 50, "val_accuracy": 0.96, "f1_score": 0.96},
     )
+
 
     experiment.log("Training complete!", level="info")
     print("✓ Experiment completed successfully with 18 metrics tracked")

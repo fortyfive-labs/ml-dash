@@ -137,12 +137,11 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
   )
 
   # Remote configuration
-  # Ge: remote -> api_uri
-  # parser.add_argument(
-  #   "--remote",
-  #   type=str,
-  #   help="Remote server URL (required unless set in config)",
-  # )
+  parser.add_argument(
+    "--dash-url",
+    type=str,
+    help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
+  )
   parser.add_argument(
     "--api-key",
     type=str,
@@ -177,7 +176,15 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     "--proj",
     "--project",
     type=str,
-    help="Upload only experiments from this project",
+    help="Filter experiments by prefix pattern (supports glob: 'tom/*/exp*', 'alice/project-?/baseline')",
+  )
+
+  # Target prefix for server (like scp destination)
+  parser.add_argument(
+    "-t",
+    "--target",
+    type=str,
+    help="Target prefix/directory on server where experiments will be uploaded (e.g., 'alice/shared-project'). Similar to 'scp local/ remote-path/'",
   )
   # parser.add_argument(
   #   "--experiment",
@@ -258,12 +265,14 @@ def discover_experiments(
 
   Args:
       local_path: Root path of local storage
-      project_filter: Only discover experiments in this project
+      project_filter: Glob pattern to filter experiments by prefix (e.g., "tom/*/exp*")
       experiment_filter: Only discover this experiment (requires project_filter)
 
   Returns:
       List of ExperimentInfo objects
   """
+  import fnmatch
+
   local_path = Path(local_path)
 
   if not local_path.exists():
@@ -275,33 +284,46 @@ def discover_experiments(
   for exp_json in local_path.rglob("*/experiment.json"):
     exp_dir = exp_json.parent
 
-    # Extract project and experiment names from path
-    # Path structure: local_path / [folder] / project / experiment
+    # Read prefix from experiment.json first
+    prefix = None
+    try:
+      with open(exp_json, "r") as f:
+        metadata = json.load(f)
+        prefix = metadata.get("prefix")
+    except:
+      pass
+
+    # Extract project and experiment names from PREFIX (not path)
+    # This handles nested folders correctly
+    # Prefix format: owner/project/folder.../experiment
     try:
       relative_path = exp_dir.relative_to(local_path)
-      parts = relative_path.parts
+      full_relative_path = str(relative_path)
 
-      if len(parts) < 2:
-        continue  # Need at least project/experiment
+      if prefix:
+        # Parse from prefix for accuracy
+        prefix_parts = prefix.strip("/").split("/")
+        if len(prefix_parts) < 3:
+          continue  # Need at least owner/project/experiment
 
-      # Last two parts are project/experiment
-      exp_name = parts[-1]
-      project_name = parts[-2]
+        # owner = prefix_parts[0]
+        project_name = prefix_parts[1]
+        exp_name = prefix_parts[-1]
+      else:
+        # Fallback to path-based parsing (legacy support)
+        parts = relative_path.parts
+        if len(parts) < 2:
+          continue
+        exp_name = parts[-1]
+        project_name = parts[-2]
 
-      # Apply filters
-      if project_filter and project_name != project_filter:
-        continue
+      # Apply filters with glob pattern support
+      if project_filter:
+        # Support glob pattern matching on the full relative path
+        if not fnmatch.fnmatch(full_relative_path, project_filter):
+          continue
       if experiment_filter and exp_name != experiment_filter:
         continue
-
-      # Read prefix from experiment.json
-      prefix = None
-      try:
-        with open(exp_json, "r") as f:
-          metadata = json.load(f)
-          prefix = metadata.get("prefix")
-      except:
-        pass
 
       # Create experiment info
       exp_info = ExperimentInfo(
@@ -570,6 +592,7 @@ class ExperimentUploader:
     verbose: bool = False,
     progress: Optional[Progress] = None,
     max_concurrent_metrics: int = 5,
+    target_prefix: Optional[str] = None,
   ):
     """
     Initialize uploader.
@@ -585,6 +608,7 @@ class ExperimentUploader:
         verbose: Show verbose output
         progress: Optional rich Progress instance for tracking
         max_concurrent_metrics: Maximum concurrent metric uploads (default: 5)
+        target_prefix: Target prefix on server (overrides local prefix)
     """
     self.local = local_storage
     self.remote = remote_client
@@ -596,6 +620,7 @@ class ExperimentUploader:
     self.verbose = verbose
     self.progress = progress
     self.max_concurrent_metrics = max_concurrent_metrics
+    self.target_prefix = target_prefix
     # Thread-safe lock for shared state updates
     self._lock = threading.Lock()
     # Thread-local storage for remote clients (for thread-safe HTTP requests)
@@ -605,8 +630,9 @@ class ExperimentUploader:
     """Get thread-local remote client for safe concurrent access."""
     if not hasattr(self._thread_local, "client"):
       # Create a new client for this thread
+      # Use graphql_base_url (without /api) since RemoteClient.__init__ will add /api
       self._thread_local.client = RemoteClient(
-        base_url=self.remote.base_url, api_key=self.remote.api_key
+        base_url=self.remote.graphql_base_url, api_key=self.remote.api_key
       )
     return self._thread_local.client
 
@@ -655,20 +681,36 @@ class ExperimentUploader:
 
       exp_data = validation_result.valid_data
 
-      # Construct full prefix from exp_info (folder path + experiment name)
-      # This matches how download saves it
-      if exp_info.prefix:
+      # Construct full prefix for server
+      # If --target is specified, use it as the base destination prefix
+      # Otherwise, preserve the local prefix structure
+      if self.target_prefix:
+        # User specified a target prefix (like scp destination directory)
+        # Append experiment name to it: target_prefix/experiment_name
+        full_prefix = f"{self.target_prefix.rstrip('/')}/{exp_info.experiment}"
+
+        # Extract project from target prefix for API call
+        # Target format: owner/project/path...
+        target_parts = self.target_prefix.strip("/").split("/")
+        if len(target_parts) >= 2:
+          target_project = target_parts[1]
+        else:
+          target_project = exp_info.project  # Fallback to original
+      elif exp_info.prefix:
+        # No target specified, preserve local prefix structure
         full_prefix = f"{exp_info.prefix}/{exp_info.experiment}"
+        target_project = exp_info.project
       else:
         full_prefix = exp_info.experiment
+        target_project = exp_info.project
 
       response = self.remote.create_or_update_experiment(
-        project=exp_info.project,
+        project=target_project,
         name=exp_info.experiment,
         description=exp_data.get("description"),
         tags=exp_data.get("tags"),
         bindrs=exp_data.get("bindrs"),
-        prefix=full_prefix,  # Send full prefix (folder + name)
+        prefix=full_prefix,  # Send full prefix (folder + name) or target prefix
         write_protected=exp_data.get("write_protected", False),
         metadata=exp_data.get("metadata"),
       )
@@ -941,9 +983,27 @@ class ExperimentUploader:
     files_dir = exp_info.path / "files"
     total_uploaded = 0
 
+    # Parse prefix to get owner, project, and experiment path
+    # Format: owner/project/folder.../experiment
+    parts = exp_info.prefix.split("/") if exp_info.prefix else []
+    if len(parts) < 3:
+      # Invalid prefix format, skip file upload
+      return 0
+
+    owner = parts[0]
+    project = parts[1]
+    # Note: _get_experiment_dir expects the FULL prefix, not just the experiment part
+    # So we pass the full prefix to list_files
+    full_prefix = exp_info.prefix
+
     # Use LocalStorage to list files
     try:
-      files_list = self.local.list_files(exp_info.project, exp_info.experiment)
+      files_list = self.local.list_files(owner, project, full_prefix)
+
+      # Debug: print file count
+      if self.verbose:
+        print(f"[DEBUG] Found {len(files_list)} files to upload")
+        print(f"[DEBUG] Full prefix: {full_prefix}")
 
       for file_info in files_list:
         # Skip deleted files
@@ -957,7 +1017,7 @@ class ExperimentUploader:
           # Get file path directly from storage without copying
           file_id = file_info["id"]
           experiment_dir = self.local._get_experiment_dir(
-            exp_info.project, exp_info.experiment
+            owner, project, full_prefix
           )
           files_dir = experiment_dir / "files"
 
@@ -1018,19 +1078,14 @@ def cmd_upload(args: argparse.Namespace) -> int:
   config = Config()
 
   # Get remote URL (command line > config)
-  remote_url = args.remote or config.remote_url
+  remote_url = args.dash_url or config.remote_url
   if not remote_url:
-    console.print("[red]Error:[/red] --remote URL is required (or set in config)")
+    console.print("[red]Error:[/red] --dash-url is required (or set in config)")
     return 1
 
   # Get API key (command line > config > auto-load from storage)
   # RemoteClient will auto-load from storage if api_key is None
   api_key = args.api_key or config.api_key
-
-  # Validate experiment filter requires project
-  if args.experiment and not args.project:
-    console.print("[red]Error:[/red] --experiment requires --project")
-    return 1
 
   # Discover experiments
   local_path = Path(args.path)
@@ -1079,17 +1134,13 @@ def cmd_upload(args: argparse.Namespace) -> int:
   console.print(f"[bold]Scanning local storage:[/bold] {local_path.absolute()}")
   experiments = discover_experiments(
     local_path,
-    project_filter=args.project,
-    experiment_filter=args.experiment,
+    project_filter=args.pref,  # Using --prefix/-p argument
+    experiment_filter=None,
   )
 
   if not experiments:
-    if args.project and args.experiment:
-      console.print(
-        f"[yellow]No experiment found:[/yellow] {args.project}/{args.experiment}"
-      )
-    elif args.project:
-      console.print(f"[yellow]No experiments found in project:[/yellow] {args.project}")
+    if args.pref:
+      console.print(f"[yellow]No experiments found matching pattern:[/yellow] {args.pref}")
     else:
       console.print("[yellow]No experiments found in local storage[/yellow]")
     return 1
@@ -1186,6 +1237,8 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
   # Upload experiments with progress tracking
   console.print(f"\n[bold]Uploading to:[/bold] {remote_url}")
+  if args.target:
+    console.print(f"[bold]Target prefix:[/bold] {args.target}")
   results = []
 
   # Track upload timing
@@ -1213,6 +1266,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
       skip_params=args.skip_params,
       verbose=args.verbose,
       progress=progress,
+      target_prefix=args.target,
     )
 
     for i, exp in enumerate(valid_experiments, start=1):

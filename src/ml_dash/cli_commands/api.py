@@ -52,7 +52,7 @@ Notes:
     help="Extract value using dot-path (e.g., .data.me.username)",
   )
   parser.add_argument(
-    "--remote",
+    "--dash-url",
     type=str,
     help="ML-Dash server URL (default: https://api.dash.ml)",
   )
@@ -129,7 +129,7 @@ def cmd_api(args) -> int:
   console = Console()
 
   # Get remote URL
-  remote_url = args.remote or config.remote_url or "https://api.dash.ml"
+  remote_url = args.dash_url or config.remote_url or "https://api.dash.ml"
 
   try:
     # Initialize client

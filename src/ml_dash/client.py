@@ -728,6 +728,9 @@ class RemoteClient:
             metadata
             project {
               slug
+              namespace {
+                slug
+              }
             }
             logMetadata {
               totalLogs
@@ -792,6 +795,9 @@ class RemoteClient:
             metadata
             project {
               slug
+              namespace {
+                slug
+              }
             }
             logMetadata {
               totalLogs
@@ -827,6 +833,73 @@ class RemoteClient:
 
         result = self.graphql_query(query, variables)
         return result.get("experiment")
+
+    def search_experiments_graphql(self, pattern: str) -> List[Dict[str, Any]]:
+        """
+        Search experiments using glob pattern via GraphQL.
+
+        Pattern format: namespace/project/experiment
+        Supports wildcards: *, ?, [0-9], [a-z], etc.
+
+        Args:
+            pattern: Glob pattern (e.g., "tom*/tutorials/*", "*/project-?/exp*")
+
+        Returns:
+            List of experiment dicts matching the pattern
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+
+        Examples:
+            >>> client.search_experiments_graphql("tom*/tutorials/*")
+            >>> client.search_experiments_graphql("*/my-project/baseline*")
+        """
+        query = """
+        query SearchExperiments($pattern: String!) {
+          searchExperiments(pattern: $pattern) {
+            id
+            name
+            description
+            tags
+            status
+            startedAt
+            endedAt
+            metadata
+            project {
+              id
+              slug
+              name
+              namespace {
+                id
+                slug
+              }
+            }
+            logMetadata {
+              totalLogs
+            }
+            metrics {
+              name
+              metricMetadata {
+                totalDataPoints
+              }
+            }
+            files {
+              id
+              filename
+              path
+              contentType
+              sizeBytes
+              checksum
+              description
+              tags
+              metadata
+            }
+          }
+        }
+        """
+        variables = {"pattern": pattern}
+        result = self.graphql_query(query, variables)
+        return result.get("searchExperiments", [])
 
     def download_file_streaming(
         self, experiment_id: str, file_id: str, dest_path: str

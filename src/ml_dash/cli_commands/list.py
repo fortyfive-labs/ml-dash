@@ -252,9 +252,9 @@ def cmd_list(args: argparse.Namespace) -> int:
     config = Config()
 
     # Get remote URL (command line > config)
-    remote_url = args.remote or config.remote_url
+    remote_url = args.dash_url or config.remote_url
     if not remote_url:
-        console.print("[red]Error:[/red] --remote URL is required (or set in config)")
+        console.print("[red]Error:[/red] --dash-url is required (or set in config)")
         return 1
 
     # Get API key (command line > config > auto-loaded from storage)
@@ -274,15 +274,135 @@ def cmd_list(args: argparse.Namespace) -> int:
         if args.tags:
             tags_filter = [tag.strip() for tag in args.tags.split(',')]
 
-        return list_experiments(
-            remote_client=remote_client,
-            project=args.project,
-            status_filter=args.status,
-            tags_filter=tags_filter,
-            output_json=args.json,
-            detailed=args.detailed,
-            verbose=args.verbose
-        )
+        # Check if pattern contains wildcards
+        has_wildcards = any(c in args.project for c in ['*', '?', '['])
+
+        if has_wildcards:
+            # Use searchExperiments GraphQL query for glob patterns
+            try:
+                # Expand simple project patterns to full namespace/project/experiment format
+                # If pattern has no slashes, assume it's just a project pattern
+                if '/' not in args.project:
+                    # Simple project pattern: "tut*" -> "*/tut*/*"
+                    search_pattern = f"*/{args.project}/*"
+                else:
+                    # Full or partial pattern: use as-is
+                    search_pattern = args.project
+
+                experiments = remote_client.search_experiments_graphql(search_pattern)
+
+                # Apply status filter if specified (server doesn't support it in searchExperiments yet)
+                if args.status:
+                    experiments = [
+                        exp for exp in experiments
+                        if exp.get('status') == args.status
+                    ]
+
+                # Apply tags filter if specified
+                if tags_filter:
+                    experiments = [
+                        exp for exp in experiments
+                        if any(tag in exp.get('tags', []) for tag in tags_filter)
+                    ]
+
+                if args.json:
+                    # JSON output
+                    output = {
+                        "pattern": search_pattern,
+                        "experiments": experiments,
+                        "count": len(experiments)
+                    }
+                    console.print(json.dumps(output, indent=2))
+                    return 0
+
+                # Human-readable output
+                if not experiments:
+                    console.print(f"[yellow]No experiments match pattern: {search_pattern}[/yellow]")
+                    return 0
+
+                # Group experiments by project for better display
+                from collections import defaultdict
+                projects_map = defaultdict(list)
+                for exp in experiments:
+                    project_slug = exp.get('project', {}).get('slug', 'unknown')
+                    projects_map[project_slug].append(exp)
+
+                # Display each project's experiments
+                for project_slug in sorted(projects_map.keys()):
+                    project_experiments = projects_map[project_slug]
+                    console.print(f"\n[bold]Experiments in project: {project_slug}[/bold]\n")
+
+                    # Create table
+                    table = Table(box=box.ROUNDED)
+                    table.add_column("Experiment", style="cyan", no_wrap=True)
+                    table.add_column("Status", justify="center")
+                    table.add_column("Metrics", justify="right")
+                    table.add_column("Logs", justify="right")
+                    table.add_column("Files", justify="right")
+
+                    if args.detailed:
+                        table.add_column("Tags", style="dim")
+                        table.add_column("Started", style="dim")
+
+                    for exp in project_experiments:
+                        status = exp.get('status', 'UNKNOWN')
+                        status_style = _get_status_style(status)
+
+                        # Count metrics
+                        metrics_count = len(exp.get('metrics', []))
+
+                        # Count logs
+                        log_metadata = exp.get('logMetadata') or {}
+                        logs_count = log_metadata.get('totalLogs', 0)
+
+                        # Count files
+                        files_count = len(exp.get('files', []))
+
+                        row = [
+                            exp['name'],
+                            f"[{status_style}]{status}[/{status_style}]",
+                            str(metrics_count),
+                            str(logs_count),
+                            str(files_count),
+                        ]
+
+                        if args.detailed:
+                            # Add tags
+                            tags = exp.get('tags', [])
+                            tags_str = ', '.join(tags[:3])
+                            if len(tags) > 3:
+                                tags_str += f" +{len(tags) - 3}"
+                            row.append(tags_str or '-')
+
+                            # Add started time (createdAt doesn't exist, use startedAt)
+                            started_at = exp.get('startedAt', '')
+                            row.append(_format_timestamp(started_at) if started_at else '-')
+
+                        table.add_row(*row)
+
+                    console.print(table)
+                    console.print(f"[dim]Total: {len(project_experiments)} experiment(s)[/dim]")
+
+                console.print(f"\n[dim]Grand total: {len(experiments)} experiment(s) across {len(projects_map)} project(s)[/dim]\n")
+                return 0
+
+            except Exception as e:
+                console.print(f"[red]Error searching experiments:[/red] {e}")
+                if args.verbose:
+                    import traceback
+                    console.print(traceback.format_exc())
+                return 1
+        else:
+            # No wildcards, use existing list method for exact project match
+            return list_experiments(
+                remote_client=remote_client,
+                project=args.project,
+                status_filter=args.status,
+                tags_filter=tags_filter,
+                output_json=args.json,
+                detailed=args.detailed,
+                verbose=args.verbose
+            )
     else:
         return list_projects(
             remote_client=remote_client,
@@ -300,14 +420,27 @@ def add_parser(subparsers) -> None:
     )
 
     # Remote configuration
-    parser.add_argument("--remote", type=str, help="Remote server URL")
+    parser.add_argument(
+        "--dash-url",
+        type=str,
+        help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
+    )
     parser.add_argument(
         "--api-key",
         type=str,
         help="JWT authentication token (auto-loaded from storage if not provided)"
     )
     # Filtering options
-    parser.add_argument("--project", type=str, help="List experiments in this project")
+    parser.add_argument(
+        "-p",
+        "--pref",
+        "--prefix",
+        "--proj",
+        "--project",
+        dest="project",
+        type=str,
+        help="List experiments in this project (supports glob: 'tutorial*', 'test-?', 'proj-[0-9]*')"
+    )
     parser.add_argument("--status", type=str,
                        choices=["COMPLETED", "RUNNING", "FAILED", "ARCHIVED"],
                        help="Filter experiments by status")

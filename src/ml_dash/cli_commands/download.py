@@ -35,6 +35,7 @@ class ExperimentInfo:
   project: str
   experiment: str
   experiment_id: str
+  owner: Optional[str] = None
   has_logs: bool = False
   has_params: bool = False
   metric_names: List[str] = field(default_factory=list)
@@ -125,10 +126,16 @@ def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
   metadata = graphql_data.get("metadata") or {}
   prefix = metadata.get("prefix") if isinstance(metadata, dict) else None
 
+  # Extract owner/namespace from project data
+  project_data = graphql_data.get("project", {})
+  namespace_data = project_data.get("namespace", {})
+  owner = namespace_data.get("slug") if namespace_data else None
+
   return ExperimentInfo(
-    project=graphql_data["project"]["slug"],
+    project=project_data.get("slug", "unknown"),
     experiment=graphql_data["name"],
     experiment_id=graphql_data["id"],
+    owner=owner,
     has_logs=log_metadata.get("totalLogs", 0) > 0,
     has_params=graphql_data.get("parameters") is not None,
     metric_names=[m["name"] for m in graphql_data.get("metrics", []) or []],
@@ -151,7 +158,7 @@ def discover_experiments(
 
   Args:
       remote_client: Remote API client
-      project_filter: Optional project slug filter
+      project_filter: Optional project slug or glob pattern
       experiment_filter: Optional experiment name filter
 
   Returns:
@@ -164,7 +171,23 @@ def discover_experiments(
       return [_experiment_from_graphql(exp_data)]
     return []
 
-  # Project filter - get all experiments in project
+  # Check if project_filter contains glob wildcards
+  has_wildcards = project_filter and any(c in project_filter for c in ['*', '?', '['])
+
+  if has_wildcards:
+    # Use searchExperiments for glob patterns
+    # Expand simple project patterns to full namespace/project/experiment format
+    if '/' not in project_filter:
+      # Simple project pattern: "tut*" -> "*/tut*/*"
+      search_pattern = f"*/{project_filter}/*"
+    else:
+      # Full or partial pattern: use as-is
+      search_pattern = project_filter
+
+    experiments_data = remote_client.search_experiments_graphql(search_pattern)
+    return [_experiment_from_graphql(exp) for exp in experiments_data]
+
+  # Project filter - get all experiments in project (exact match)
   if project_filter:
     experiments_data = remote_client.list_experiments_graphql(project_filter)
     return [_experiment_from_graphql(exp) for exp in experiments_data]
@@ -262,14 +285,22 @@ class ExperimentDownloader:
 
   def _download_metadata(self, exp_info: ExperimentInfo, result: DownloadResult):
     """Download and create experiment metadata."""
-    # Create experiment directory structure with prefix (folder + experiment name)
-    # Construct full prefix: folder/experiment_name
+    # Create experiment directory structure with prefix
+    # The prefix from server already includes the full path (owner/project/.../ experiment_name)
     if exp_info.prefix:
-      full_prefix = f"{exp_info.prefix}/{exp_info.experiment}"
+      full_prefix = exp_info.prefix
     else:
-      full_prefix = exp_info.experiment
+      # Build prefix from owner/project/experiment
+      if exp_info.owner:
+        full_prefix = f"{exp_info.owner}/{exp_info.project}/{exp_info.experiment}"
+      else:
+        full_prefix = f"{exp_info.project}/{exp_info.experiment}"
+
+    # Extract owner from prefix or use from exp_info
+    owner = exp_info.owner if exp_info.owner else full_prefix.split('/')[0]
 
     self.local.create_experiment(
+      owner=owner,
       project=exp_info.project,
       prefix=full_prefix,
       description=exp_info.description,
@@ -591,12 +622,12 @@ def cmd_download(args: argparse.Namespace) -> int:
   """Execute download command."""
   # Load configuration
   config = Config()
-  remote_url = args.remote or config.remote_url
+  remote_url = args.dash_url or config.remote_url
   api_key = args.api_key or config.api_key  # RemoteClient will auto-load if None
 
   # Validate inputs
   if not remote_url:
-    console.print("[red]Error:[/red] --remote is required (or set in config)")
+    console.print("[red]Error:[/red] --dash-url is required (or set in config)")
     return 1
 
   # Initialize clients (RemoteClient will auto-load token if api_key is None)
@@ -753,16 +784,29 @@ def add_parser(subparsers):
   )
 
   # Remote configuration
-  parser.add_argument("--remote", help="Remote server URL")
+  parser.add_argument(
+    "--dash-url",
+    help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
+  )
   parser.add_argument(
     "--api-key",
     help="JWT authentication token (optional - auto-loads from 'ml-dash login')",
   )
 
   # Scope control
-  parser.add_argument("--project", help="Download only this project")
   parser.add_argument(
-    "--experiment", help="Download specific experiment (requires --project)"
+    "-p",
+    "--pref",
+    "--prefix",
+    "--proj",
+    "--project",
+    dest="project",
+    type=str,
+    help="Filter experiments by project or pattern (supports glob: 'tut*', 'tom*/tutorials/*')"
+  )
+  parser.add_argument(
+    "--experiment",
+    help="Download specific experiment (requires --project)"
   )
 
   # Data filtering
