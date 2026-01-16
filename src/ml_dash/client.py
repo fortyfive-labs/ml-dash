@@ -9,12 +9,13 @@ import httpx
 class RemoteClient:
     """Client for communicating with ML-Dash server."""
 
-    def __init__(self, base_url: str, api_key: Optional[str] = None):
+    def __init__(self, base_url: str, namespace: str, api_key: Optional[str] = None):
         """
         Initialize remote client.
 
         Args:
             base_url: Base URL of ML-Dash server (e.g., "http://localhost:3000")
+            namespace: Namespace slug (e.g., "my-namespace")
             api_key: JWT token for authentication (optional - auto-loads from storage if not provided)
 
         Note:
@@ -27,6 +28,9 @@ class RemoteClient:
         # Add /api prefix to base URL for REST API calls
         self.base_url = base_url.rstrip("/") + "/api"
 
+        # Store namespace
+        self.namespace = namespace
+
         # If no api_key provided, try to load from storage
         if not api_key:
             from .auth.token_storage import get_token_storage
@@ -37,6 +41,7 @@ class RemoteClient:
         self.api_key = api_key
         self._rest_client = None
         self._gql_client = None
+        self._id_cache: Dict[str, str] = {}  # Cache for slug -> ID mappings
 
     def _ensure_authenticated(self):
         """Check if authenticated, raise error if not."""
@@ -77,6 +82,81 @@ class RemoteClient:
             )
         return self._gql_client
 
+    def _get_project_id(self, project_slug: str) -> str:
+        """
+        Resolve project ID from slug using GraphQL.
+
+        Args:
+            project_slug: Project slug
+
+        Returns:
+            Project ID (Snowflake ID)
+
+        Raises:
+            ValueError: If project not found
+        """
+        cache_key = f"project:{self.namespace}:{project_slug}"
+        if cache_key in self._id_cache:
+            return self._id_cache[cache_key]
+
+        query = """
+        query GetProject($namespace: String!, $projectSlug: String!) {
+          namespace(slug: $namespace) {
+            projects {
+              id
+              slug
+            }
+          }
+        }
+        """
+        result = self.graphql_query(query, {
+            "namespace": self.namespace,
+            "projectSlug": project_slug
+        })
+
+        projects = result.get("namespace", {}).get("projects", [])
+        for project in projects:
+            if project["slug"] == project_slug:
+                project_id = project["id"]
+                self._id_cache[cache_key] = project_id
+                return project_id
+
+        raise ValueError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
+
+    def _get_experiment_node_id(self, experiment_id: str) -> str:
+        """
+        Resolve node ID from experiment ID using GraphQL.
+
+        Args:
+            experiment_id: Experiment ID
+
+        Returns:
+            Node ID
+
+        Raises:
+            ValueError: If experiment node not found
+        """
+        cache_key = f"exp_node:{experiment_id}"
+        if cache_key in self._id_cache:
+            return self._id_cache[cache_key]
+
+        query = """
+        query GetExperimentNode($experimentId: ID!) {
+          experimentNode(experimentId: $experimentId) {
+            id
+          }
+        }
+        """
+        result = self.graphql_query(query, {"experimentId": experiment_id})
+
+        node = result.get("experimentNode")
+        if not node:
+            raise ValueError(f"No node found for experiment ID '{experiment_id}'")
+
+        node_id = node["id"]
+        self._id_cache[cache_key] = node_id
+        return node_id
+
     def create_or_update_experiment(
         self,
         project: str,
@@ -89,26 +169,33 @@ class RemoteClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Create or update an experiment.
+        Create or update an experiment using unified node API.
 
         Args:
-            project: Project name
-            name: Experiment name (last segment of prefix)
+            project: Project slug
+            name: Experiment name
             description: Optional description
             tags: Optional list of tags
             bindrs: Optional list of bindrs
-            prefix: Full prefix path sent to backend for folder hierarchy creation
+            prefix: Full prefix path (ignored in new API - use folders instead)
             write_protected: If True, experiment becomes immutable
             metadata: Optional metadata dict
 
         Returns:
-            Response dict with experiment, project, and namespace data
+            Response dict with experiment, node, and project data
 
         Raises:
             httpx.HTTPStatusError: If request fails
+            ValueError: If project not found
         """
+        # Resolve project ID from slug
+        project_id = self._get_project_id(project)
+
+        # Build payload for unified node API
         payload = {
+            "type": "EXPERIMENT",
             "name": name,
+            "projectId": project_id,
         }
 
         if description is not None:
@@ -121,15 +208,22 @@ class RemoteClient:
             payload["writeProtected"] = write_protected
         if metadata is not None:
             payload["metadata"] = metadata
-        if prefix is not None:
-            payload["prefix"] = prefix
 
+        # Call unified node creation API
         response = self._client.post(
-            f"/projects/{project}/experiments",
+            f"/namespaces/{self.namespace}/nodes",
             json=payload,
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+
+        # Cache the experiment node ID mapping
+        if "experiment" in result and "node" in result:
+            exp_id = result["experiment"]["id"]
+            node_id = result["node"]["id"]
+            self._id_cache[f"exp_node:{exp_id}"] = node_id
+
+        return result
 
     def update_experiment_status(
         self,
@@ -137,24 +231,27 @@ class RemoteClient:
         status: str,
     ) -> Dict[str, Any]:
         """
-        Update experiment status.
+        Update experiment status using unified node API.
 
         Args:
             experiment_id: Experiment ID
             status: Status value - "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED"
 
         Returns:
-            Response dict with updated experiment data
+            Response dict with updated node data
 
         Raises:
             httpx.HTTPStatusError: If request fails
+            ValueError: If experiment node not found
         """
-        payload = {
-            "status": status,
-        }
+        # Resolve node ID from experiment ID
+        node_id = self._get_experiment_node_id(experiment_id)
+
+        # Update node with new status
+        payload = {"status": status}
 
         response = self._client.patch(
-            f"/experiments/{experiment_id}/status",
+            f"/nodes/{node_id}",
             json=payload,
         )
         response.raise_for_status()
@@ -263,15 +360,17 @@ class RemoteClient:
         metadata: Optional[Dict[str, Any]],
         checksum: str,
         content_type: str,
-        size_bytes: int
+        size_bytes: int,
+        project_id: Optional[str] = None,
+        parent_id: str = "ROOT"
     ) -> Dict[str, Any]:
         """
-        Upload a file to an experiment.
+        Upload a file to an experiment using unified node API.
 
         Args:
             experiment_id: Experiment ID (Snowflake ID)
             file_path: Local file path
-            prefix: Logical path prefix
+            prefix: Logical path prefix (DEPRECATED - use parent_id for folder structure)
             filename: Original filename
             description: Optional description
             tags: Optional tags
@@ -279,23 +378,43 @@ class RemoteClient:
             checksum: SHA256 checksum
             content_type: MIME type
             size_bytes: File size in bytes
+            project_id: Project ID (optional - will be resolved from experiment if not provided)
+            parent_id: Parent node ID (folder) or "ROOT" for root level
 
         Returns:
-            File metadata dict
+            Response dict with node and physicalFile data
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
+        # If project_id not provided, need to resolve it from experiment
+        # For now, assuming we have it or it will be queried separately
+        if project_id is None:
+            # Query experiment to get project ID
+            query = """
+            query GetExperimentProject($experimentId: ID!) {
+              experimentById(id: $experimentId) {
+                projectId
+              }
+            }
+            """
+            result = self.graphql_query(query, {"experimentId": experiment_id})
+            project_id = result.get("experimentById", {}).get("projectId")
+            if not project_id:
+                raise ValueError(f"Could not resolve project ID for experiment {experiment_id}")
+
         # Prepare multipart form data
-        # Read file content first (httpx needs content, not file handle)
         with open(file_path, "rb") as f:
             file_content = f.read()
 
         files = {"file": (filename, file_content, content_type)}
         data = {
-            "prefix": prefix,
+            "type": "FILE",
+            "projectId": project_id,
+            "experimentId": experiment_id,
+            "parentId": parent_id,
+            "name": filename,
             "checksum": checksum,
-            "sizeBytes": str(size_bytes),
         }
         if description:
             data["description"] = description
@@ -305,9 +424,9 @@ class RemoteClient:
             import json
             data["metadata"] = json.dumps(metadata)
 
-        # httpx will automatically set multipart/form-data content-type
+        # Call unified node creation API
         response = self._client.post(
-            f"/experiments/{experiment_id}/files",
+            f"/namespaces/{self.namespace}/nodes",
             files=files,
             data=data
         )
@@ -322,48 +441,72 @@ class RemoteClient:
         tags: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
-        List files in an experiment.
+        List files in an experiment using GraphQL.
 
         Args:
             experiment_id: Experiment ID (Snowflake ID)
-            prefix: Optional prefix filter
+            prefix: Optional prefix filter (DEPRECATED - filtering not supported in new API)
             tags: Optional tags filter
 
         Returns:
-            List of file metadata dicts
+            List of file node dicts
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        params = {}
-        if prefix:
-            params["prefix"] = prefix
-        if tags:
-            params["tags"] = ",".join(tags)
+        query = """
+        query ListExperimentFiles($experimentId: ID!) {
+          experimentById(id: $experimentId) {
+            files {
+              id
+              name
+              description
+              tags
+              metadata
+              createdAt
+              pPath
+              physicalFile {
+                id
+                filename
+                contentType
+                sizeBytes
+                checksum
+                s3Url
+              }
+            }
+          }
+        }
+        """
+        result = self.graphql_query(query, {"experimentId": experiment_id})
+        files = result.get("experimentById", {}).get("files", [])
 
-        response = self._client.get(
-            f"/experiments/{experiment_id}/files",
-            params=params
-        )
-        response.raise_for_status()
-        result = response.json()
-        return result.get("files", [])
+        # Apply client-side filtering if tags specified
+        if tags:
+            filtered_files = []
+            for file in files:
+                file_tags = file.get("tags", [])
+                if any(tag in file_tags for tag in tags):
+                    filtered_files.append(file)
+            return filtered_files
+
+        return files
 
     def get_file(self, experiment_id: str, file_id: str) -> Dict[str, Any]:
         """
-        Get file metadata.
+        Get file metadata using unified node API.
 
         Args:
-            experiment_id: Experiment ID (Snowflake ID)
-            file_id: File ID (Snowflake ID)
+            experiment_id: Experiment ID (DEPRECATED - not used in new API)
+            file_id: File node ID (Snowflake ID)
 
         Returns:
-            File metadata dict
+            Node metadata dict
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        response = self._client.get(f"/experiments/{experiment_id}/files/{file_id}")
+        # file_id is actually the node ID in the new system
+        response = self._client.get(f"/nodes/{file_id}")
         response.raise_for_status()
         return response.json()
 
@@ -374,11 +517,11 @@ class RemoteClient:
         dest_path: Optional[str] = None
     ) -> str:
         """
-        Download a file from a experiment.
+        Download a file using unified node API.
 
         Args:
-            experiment_id: Experiment ID (Snowflake ID)
-            file_id: File ID (Snowflake ID)
+            experiment_id: Experiment ID (DEPRECATED - not used in new API)
+            file_id: File node ID (Snowflake ID)
             dest_path: Optional destination path (defaults to original filename)
 
         Returns:
@@ -390,40 +533,39 @@ class RemoteClient:
         """
         # Get file metadata first to get filename and checksum
         file_metadata = self.get_file(experiment_id, file_id)
-        filename = file_metadata["filename"]
-        expected_checksum = file_metadata["checksum"]
+        filename = file_metadata.get("name") or file_metadata.get("physicalFile", {}).get("filename")
+        expected_checksum = file_metadata.get("physicalFile", {}).get("checksum")
 
         # Determine destination path
         if dest_path is None:
             dest_path = filename
 
-        # Download file
-        response = self._client.get(
-            f"/experiments/{experiment_id}/files/{file_id}/download"
-        )
+        # Download file using node API
+        response = self._client.get(f"/nodes/{file_id}/download")
         response.raise_for_status()
 
         # Write to file
         with open(dest_path, "wb") as f:
             f.write(response.content)
 
-        # Verify checksum
-        from .files import verify_checksum
-        if not verify_checksum(dest_path, expected_checksum):
-            # Delete corrupted file
-            import os
-            os.remove(dest_path)
-            raise ValueError(f"Checksum verification failed for file {file_id}")
+        # Verify checksum if available
+        if expected_checksum:
+            from .files import verify_checksum
+            if not verify_checksum(dest_path, expected_checksum):
+                # Delete corrupted file
+                import os
+                os.remove(dest_path)
+                raise ValueError(f"Checksum verification failed for file {file_id}")
 
         return dest_path
 
     def delete_file(self, experiment_id: str, file_id: str) -> Dict[str, Any]:
         """
-        Delete a file (soft delete).
+        Delete a file using unified node API (soft delete).
 
         Args:
-            experiment_id: Experiment ID (Snowflake ID)
-            file_id: File ID (Snowflake ID)
+            experiment_id: Experiment ID (DEPRECATED - not used in new API)
+            file_id: File node ID (Snowflake ID)
 
         Returns:
             Dict with id and deletedAt
@@ -431,7 +573,7 @@ class RemoteClient:
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        response = self._client.delete(f"/experiments/{experiment_id}/files/{file_id}")
+        response = self._client.delete(f"/nodes/{file_id}")
         response.raise_for_status()
         return response.json()
 
@@ -444,17 +586,17 @@ class RemoteClient:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Update file metadata.
+        Update file metadata using unified node API.
 
         Args:
-            experiment_id: Experiment ID (Snowflake ID)
-            file_id: File ID (Snowflake ID)
+            experiment_id: Experiment ID (DEPRECATED - not used in new API)
+            file_id: File node ID (Snowflake ID)
             description: Optional description
             tags: Optional tags
             metadata: Optional metadata
 
         Returns:
-            Updated file metadata dict
+            Updated node metadata dict
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -468,7 +610,7 @@ class RemoteClient:
             payload["metadata"] = metadata
 
         response = self._client.patch(
-            f"/experiments/{experiment_id}/files/{file_id}",
+            f"/nodes/{file_id}",
             json=payload
         )
         response.raise_for_status()
@@ -905,11 +1047,11 @@ class RemoteClient:
         self, experiment_id: str, file_id: str, dest_path: str
     ) -> str:
         """
-        Download a file with streaming for large files.
+        Download a file with streaming for large files using unified node API.
 
         Args:
-            experiment_id: Experiment ID (Snowflake ID)
-            file_id: File ID (Snowflake ID)
+            experiment_id: Experiment ID (DEPRECATED - not used in new API)
+            file_id: File node ID (Snowflake ID)
             dest_path: Destination path to save file
 
         Returns:
@@ -921,22 +1063,23 @@ class RemoteClient:
         """
         # Get metadata first for checksum
         file_metadata = self.get_file(experiment_id, file_id)
-        expected_checksum = file_metadata["checksum"]
+        expected_checksum = file_metadata.get("physicalFile", {}).get("checksum")
 
-        # Stream download
-        with self._client.stream("GET", f"/experiments/{experiment_id}/files/{file_id}/download") as response:
+        # Stream download using node API
+        with self._client.stream("GET", f"/nodes/{file_id}/download") as response:
             response.raise_for_status()
 
             with open(dest_path, "wb") as f:
                 for chunk in response.iter_bytes(chunk_size=8192):
                     f.write(chunk)
 
-        # Verify checksum
-        from .files import verify_checksum
-        if not verify_checksum(dest_path, expected_checksum):
-            import os
-            os.remove(dest_path)
-            raise ValueError(f"Checksum verification failed for file {file_id}")
+        # Verify checksum if available
+        if expected_checksum:
+            from .files import verify_checksum
+            if not verify_checksum(dest_path, expected_checksum):
+                import os
+                os.remove(dest_path)
+                raise ValueError(f"Checksum verification failed for file {file_id}")
 
         return dest_path
 
