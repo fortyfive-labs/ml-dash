@@ -350,7 +350,7 @@ class Experiment:
       # RemoteClient will auto-load token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
-      self._client = RemoteClient(base_url=api_url)
+      self._client = RemoteClient(base_url=api_url, namespace=self.owner)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
       self._storage = LocalStorage(root_path=Path(dash_root))

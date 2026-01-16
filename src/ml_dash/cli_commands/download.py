@@ -240,7 +240,9 @@ class ExperimentDownloader:
     """Get thread-local remote client for safe concurrent access."""
     if not hasattr(self._thread_local, "client"):
       self._thread_local.client = RemoteClient(
-        base_url=self.remote.base_url, api_key=self.remote.api_key
+        base_url=self.remote.base_url,
+        namespace=self.remote.namespace,
+        api_key=self.remote.api_key
       )
     return self._thread_local.client
 
@@ -630,8 +632,23 @@ def cmd_download(args: argparse.Namespace) -> int:
     console.print("[red]Error:[/red] --dash-url is required (or set in config)")
     return 1
 
+  # Extract namespace from project argument
+  namespace = None
+  if args.project:
+    # Parse namespace from project filter (format: "owner/project" or "owner/project/exp")
+    project_parts = args.project.strip("/").split("/")
+    if len(project_parts) >= 2:  # Has at least "owner/project"
+      namespace = project_parts[0]
+
+  if not namespace:
+    console.print(
+      "[red]Error:[/red] --project must be in format 'namespace/project' or 'namespace/project/exp'"
+    )
+    console.print("Example: ml-dash download --project alice/my-project")
+    return 1
+
   # Initialize clients (RemoteClient will auto-load token if api_key is None)
-  remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
+  remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
   local_storage = LocalStorage(root_path=Path(args.path))
 
   # Load or create state

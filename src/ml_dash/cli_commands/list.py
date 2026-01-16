@@ -260,9 +260,26 @@ def cmd_list(args: argparse.Namespace) -> int:
     # Get API key (command line > config > auto-loaded from storage)
     api_key = args.api_key or config.api_key
 
+    # Extract namespace from project argument
+    namespace = None
+    if args.project:
+        # Parse namespace from project filter (format: "namespace/project")
+        project_parts = args.project.strip("/").split("/")
+        # For simple patterns without '/', treat as project-only pattern
+        if '/' in args.project and len(project_parts) >= 2:
+            namespace = project_parts[0]
+
+    if not namespace:
+        console.print(
+            "[red]Error:[/red] --project must be in format 'namespace/project'"
+        )
+        console.print("Example: ml-dash list --project alice/my-project")
+        console.print("Or use glob patterns: ml-dash list --project alice/proj-*")
+        return 1
+
     # Create remote client
     try:
-        remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
+        remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
     except Exception as e:
         console.print(f"[red]Error connecting to remote:[/red] {e}")
         return 1

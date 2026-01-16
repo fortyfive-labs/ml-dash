@@ -56,6 +56,12 @@ Notes:
     type=str,
     help="ML-Dash server URL (default: https://api.dash.ml)",
   )
+  parser.add_argument(
+    "--namespace",
+    type=str,
+    required=True,
+    help="Namespace to use for queries (required)",
+  )
 
 
 def extract_path(data, path: str):
@@ -131,9 +137,12 @@ def cmd_api(args) -> int:
   # Get remote URL
   remote_url = args.dash_url or config.remote_url or "https://api.dash.ml"
 
+  # Get namespace
+  namespace = args.namespace
+
   try:
     # Initialize client
-    client = RemoteClient(base_url=remote_url)
+    client = RemoteClient(base_url=remote_url, namespace=namespace)
 
     # Determine query type and build query
     if args.mutation:

@@ -632,7 +632,9 @@ class ExperimentUploader:
       # Create a new client for this thread
       # Use graphql_base_url (without /api) since RemoteClient.__init__ will add /api
       self._thread_local.client = RemoteClient(
-        base_url=self.remote.graphql_base_url, api_key=self.remote.api_key
+        base_url=self.remote.graphql_base_url,
+        namespace=self.remote.namespace,
+        api_key=self.remote.api_key
       )
     return self._thread_local.client
 
@@ -1231,8 +1233,27 @@ def cmd_upload(args: argparse.Namespace) -> int:
     f"[green]{len(valid_experiments)} experiment(s) ready to upload[/green]"
   )
 
+  # Extract namespace from target or first experiment
+  namespace = None
+  if args.target:
+    # Parse namespace from target prefix (format: "owner/project/...")
+    target_parts = args.target.strip("/").split("/")
+    if len(target_parts) >= 1:
+      namespace = target_parts[0]
+  if not namespace and valid_experiments:
+    # Parse namespace from first experiment's prefix
+    first_prefix = valid_experiments[0].prefix
+    if first_prefix:
+      prefix_parts = first_prefix.strip("/").split("/")
+      if len(prefix_parts) >= 1:
+        namespace = prefix_parts[0]
+
+  if not namespace:
+    console.print("[red]Error:[/red] Could not determine namespace from experiments or target")
+    return 1
+
   # Initialize remote client and local storage
-  remote_client = RemoteClient(base_url=remote_url, api_key=api_key)
+  remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
   local_storage = LocalStorage(root_path=local_path)
 
   # Upload experiments with progress tracking
