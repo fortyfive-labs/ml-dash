@@ -20,7 +20,7 @@ class TestExperimentDiscovery:
 
   def test_discover_single_experiment(self, local_experiment):
     """Test discovering a single experiment."""
-    exp = local_experiment("57block/proj1/exp1")
+    exp = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp.run as e:
       e.log("Test log message")
       e.params.set(**{"lr": 0.001})
@@ -36,15 +36,15 @@ class TestExperimentDiscovery:
 
   def test_discover_multiple_experiments(self, local_experiment):
     """Test discovering multiple experiments."""
-    exp1 = local_experiment("57block/proj1/exp1")
+    exp1 = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp1.run as e:
       e.log("Test")
 
-    exp2 = local_experiment("57block/proj1/exp2")
+    exp2 = local_experiment("tom_tao_34833x/proj1/exp2")
     with exp2.run as e:
       e.log("Test")
 
-    exp3 = local_experiment("57block/proj2/exp1")
+    exp3 = local_experiment("tom_tao_34833x/proj2/exp1")
     with exp3.run as e:
       e.log("Test")
 
@@ -58,11 +58,11 @@ class TestExperimentDiscovery:
 
   def test_discover_with_project_filter(self, local_experiment):
     """Test discovering experiments with project filter."""
-    exp1 = local_experiment("57block/proj1/exp1")
+    exp1 = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp1.run as e:
       e.log("Test")
 
-    exp2 = local_experiment("57block/proj2/exp2")
+    exp2 = local_experiment("tom_tao_34833x/proj2/exp2")
     with exp2.run as e:
       e.log("Test")
 
@@ -74,11 +74,11 @@ class TestExperimentDiscovery:
 
   def test_discover_with_experiment_filter(self, local_experiment):
     """Test discovering experiments with experiment and project filter."""
-    exp1 = local_experiment("57block/proj1/exp1")
+    exp1 = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp1.run as e:
       e.log("Test")
 
-    exp2 = local_experiment("57block/proj1/exp2")
+    exp2 = local_experiment("tom_tao_34833x/proj1/exp2")
     with exp2.run as e:
       e.log("Test")
 
@@ -92,7 +92,7 @@ class TestExperimentDiscovery:
 
   def test_discover_with_metrics(self, local_experiment):
     """Test discovering experiments with metrics."""
-    exp = local_experiment("57block/proj1/exp1")
+    exp = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp.run as e:
       e.metrics("train").log(loss=0.5)
       e.metrics("eval").log(loss=0.85)
@@ -120,7 +120,7 @@ class TestExperimentValidator:
 
   def test_validate_valid_experiment(self, local_experiment):
     """Test validating a valid experiment."""
-    exp = local_experiment("57block/proj1/exp1")
+    exp = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp.run as e:
       e.log("Test message")
       e.params.set(**{"lr": 0.001})
@@ -180,7 +180,7 @@ class TestExperimentValidator:
 
   def test_validate_with_warnings(self, local_experiment):
     """Test validating experiment with warnings (non-fatal issues)."""
-    exp = local_experiment("57block/proj1/exp1")
+    exp = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp.run as e:
       e.log("Test")
 
@@ -206,7 +206,7 @@ class TestExperimentValidator:
 
   def test_validate_strict_mode(self, local_experiment):
     """Test validating experiment in strict mode (warnings become errors)."""
-    exp = local_experiment("57block/proj1/exp1")
+    exp = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp.run as e:
       e.log("Test")
 
@@ -303,8 +303,10 @@ class TestUploadIntegration:
 
   def test_upload_single_experiment(self, local_experiment):
     """Test uploading a single experiment to remote server."""
-    # Create local experiment
-    exp = local_experiment("57block/cli-test-proj/cli-test-exp1")
+    # Create local experiment with unique name
+    import time
+    timestamp = str(int(time.time() * 1000000))
+    exp = local_experiment(f"tom_tao_34833x/cli-test-proj/cli-test-exp1-{timestamp}")
     with exp.run as e:
       e.log("Test log message")
       e.params.set(**{"lr": 0.001, "batch_size": 32})
@@ -318,7 +320,8 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -339,7 +342,7 @@ class TestUploadIntegration:
 
   def test_upload_dry_run(self, local_experiment):
     """Test dry run mode (no actual upload)."""
-    exp = local_experiment("57block/cli-test-proj/cli-test-exp2")
+    exp = local_experiment("tom_tao_34833x/cli-test-proj/cli-test-exp2")
     with exp.run as e:
       e.log("Test message")
 
@@ -350,7 +353,8 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=True,
       strict=False,
@@ -369,11 +373,11 @@ class TestUploadIntegration:
 
   def test_upload_with_project_filter(self, local_experiment):
     """Test uploading with project filter."""
-    exp1 = local_experiment("57block/proj1/exp1")
+    exp1 = local_experiment("tom_tao_34833x/proj1/exp1")
     with exp1.run as e:
       e.log("Test")
 
-    exp2 = local_experiment("57block/proj2/exp2")
+    exp2 = local_experiment("tom_tao_34833x/proj2/exp2")
     with exp2.run as e:
       e.log("Test")
 
@@ -403,7 +407,7 @@ class TestUploadIntegration:
 
   def test_upload_skip_options(self, local_experiment):
     """Test uploading with skip options."""
-    exp = local_experiment("57block/cli-test-proj/cli-test-exp3")
+    exp = local_experiment("tom_tao_34833x/cli-test-proj/cli-test-exp3")
     with exp.run as e:
       e.log("Test message")
       e.params.set(**{"lr": 0.001})
@@ -416,7 +420,8 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -436,11 +441,11 @@ class TestUploadIntegration:
   def test_upload_resume_functionality(self, local_experiment):
     """Test resume functionality after failed upload."""
     # Create multiple experiments
-    exp1 = local_experiment("57block/resume-proj/resume-exp1")
+    exp1 = local_experiment("tom_tao_34833x/resume-proj/resume-exp1")
     with exp1.run as e:
       e.log("Test")
 
-    exp2 = local_experiment("57block/resume-proj/resume-exp2")
+    exp2 = local_experiment("tom_tao_34833x/resume-proj/resume-exp2")
     with exp2.run as e:
       e.log("Test")
 
@@ -461,7 +466,8 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -493,7 +499,8 @@ class TestCLIErrors:
       dash_url=None,
       api_key=None,
       user_name=None,
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -517,7 +524,8 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name=None,  # No auth provided
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -541,7 +549,8 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -565,7 +574,8 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
       strict=False,
@@ -589,7 +599,8 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      project=None,
+      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      target=None,  # Added for namespace extraction
       experiment="exp1",  # Experiment without project
       dry_run=False,
       strict=False,

@@ -100,7 +100,7 @@ class RemoteClient:
             return self._id_cache[cache_key]
 
         query = """
-        query GetProject($namespace: String!, $projectSlug: String!) {
+        query GetProject($namespace: String!) {
           namespace(slug: $namespace) {
             projects {
               id
@@ -110,8 +110,7 @@ class RemoteClient:
         }
         """
         result = self.graphql_query(query, {
-            "namespace": self.namespace,
-            "projectSlug": project_slug
+            "namespace": self.namespace
         })
 
         projects = result.get("namespace", {}).get("projects", [])
