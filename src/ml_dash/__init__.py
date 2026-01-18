@@ -43,7 +43,7 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.2"
+__version__ = "0.6.4"
 
 __all__ = [
   "Experiment",

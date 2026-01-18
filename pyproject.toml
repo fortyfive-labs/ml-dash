@@ -1,6 +1,6 @@
 [project]
 name = "ml-dash"
-version = "0.6.2"
+version = "0.6.4"
 description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -31,7 +31,7 @@ dependencies = [
     "scikit-image>=0.21.0",
     "rich>=13.0.0",
     "cryptography>=42.0.0",
-    "params-proto==3.0.0rc27",
+    "params-proto>=3.0.0",
 ]
 
 [project.scripts]
