@@ -703,22 +703,40 @@ class Experiment:
     # Write immediately (no buffering)
     if self._client:
       # Remote mode: send to API (wrapped in array for batch API)
-      self._client.create_log_entries(
-        experiment_id=self._experiment_id,
-        logs=[log_entry],  # Single log in array
-      )
+      try:
+        self._client.create_log_entries(
+          experiment_id=self._experiment_id,
+          logs=[log_entry],  # Single log in array
+        )
+      except Exception as e:
+        # Log warning but don't crash training
+        import warnings
+        warnings.warn(
+          f"Failed to write log to remote server: {e}. Training will continue.",
+          RuntimeWarning,
+          stacklevel=4
+        )
+        # Fall through to local storage if available
 
     if self._storage:
       # Local mode: write to file immediately
-      self._storage.write_log(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
-        message=log_entry["message"],
-        level=log_entry["level"],
-        metadata=log_entry.get("metadata"),
-        timestamp=log_entry["timestamp"],
-      )
+      try:
+        self._storage.write_log(
+          owner=self.owner,
+          project=self.project,
+          prefix=self._folder_path,
+          message=log_entry["message"],
+          level=log_entry["level"],
+          metadata=log_entry.get("metadata"),
+          timestamp=log_entry["timestamp"],
+        )
+      except Exception as e:
+        import warnings
+        warnings.warn(
+          f"Failed to write log to local storage: {e}",
+          RuntimeWarning,
+          stacklevel=4
+        )
 
   def _print_log(
     self, message: str, level: str, metadata: Optional[Dict[str, Any]]
@@ -1139,7 +1157,7 @@ class Experiment:
     description: Optional[str],
     tags: Optional[List[str]],
     metadata: Optional[Dict[str, Any]],
-  ) -> Dict[str, Any]:
+  ) -> Optional[Dict[str, Any]]:
     """
     Internal method to append a single data point to a metric.
 
@@ -1151,33 +1169,54 @@ class Experiment:
         metadata: Optional metadata
 
     Returns:
-        Dict with metricId, index, bufferedDataPoints, chunkSize
+        Dict with metricId, index, bufferedDataPoints, chunkSize or None if all backends fail
     """
     result = None
 
     if self._client:
       # Remote mode: append via API
-      result = self._client.append_to_metric(
-        experiment_id=self._experiment_id,
-        metric_name=name,
-        data=data,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-      )
+      try:
+        result = self._client.append_to_metric(
+          experiment_id=self._experiment_id,
+          metric_name=name,
+          data=data,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+        )
+      except Exception as e:
+        # Log warning but don't crash training
+        import warnings
+        metric_display = f"'{name}'" if name else "unnamed metric"
+        warnings.warn(
+          f"Failed to log {metric_display} to remote server: {e}. "
+          f"Training will continue.",
+          RuntimeWarning,
+          stacklevel=3
+        )
+        # Fall through to local storage if available
 
     if self._storage:
       # Local mode: append to local storage
-      result = self._storage.append_to_metric(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
-        metric_name=name,
-        data=data,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-      )
+      try:
+        result = self._storage.append_to_metric(
+          owner=self.owner,
+          project=self.project,
+          prefix=self._folder_path,
+          metric_name=name,
+          data=data,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+        )
+      except Exception as e:
+        import warnings
+        metric_display = f"'{name}'" if name else "unnamed metric"
+        warnings.warn(
+          f"Failed to log {metric_display} to local storage: {e}",
+          RuntimeWarning,
+          stacklevel=3
+        )
 
     return result
 
@@ -1188,7 +1227,7 @@ class Experiment:
     description: Optional[str],
     tags: Optional[List[str]],
     metadata: Optional[Dict[str, Any]],
-  ) -> Dict[str, Any]:
+  ) -> Optional[Dict[str, Any]]:
     """
     Internal method to append multiple data points to a metric.
 
@@ -1200,33 +1239,54 @@ class Experiment:
         metadata: Optional metadata
 
     Returns:
-        Dict with metricId, startIndex, endIndex, count
+        Dict with metricId, startIndex, endIndex, count or None if all backends fail
     """
     result = None
 
     if self._client:
       # Remote mode: append batch via API
-      result = self._client.append_batch_to_metric(
-        experiment_id=self._experiment_id,
-        metric_name=name,
-        data_points=data_points,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-      )
+      try:
+        result = self._client.append_batch_to_metric(
+          experiment_id=self._experiment_id,
+          metric_name=name,
+          data_points=data_points,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+        )
+      except Exception as e:
+        # Log warning but don't crash training
+        import warnings
+        metric_display = f"'{name}'" if name else "unnamed metric"
+        warnings.warn(
+          f"Failed to log batch to {metric_display} on remote server: {e}. "
+          f"Training will continue.",
+          RuntimeWarning,
+          stacklevel=3
+        )
+        # Fall through to local storage if available
 
     if self._storage:
       # Local mode: append batch to local storage
-      result = self._storage.append_batch_to_metric(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
-        metric_name=name,
-        data_points=data_points,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-      )
+      try:
+        result = self._storage.append_batch_to_metric(
+          owner=self.owner,
+          project=self.project,
+          prefix=self._folder_path,
+          metric_name=name,
+          data_points=data_points,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+        )
+      except Exception as e:
+        import warnings
+        metric_display = f"'{name}'" if name else "unnamed metric"
+        warnings.warn(
+          f"Failed to log batch to {metric_display} in local storage: {e}",
+          RuntimeWarning,
+          stacklevel=3
+        )
 
     return result
 
