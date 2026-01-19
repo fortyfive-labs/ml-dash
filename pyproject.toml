@@ -31,7 +31,7 @@ dependencies = [
     "scikit-image>=0.21.0",
     "rich>=13.0.0",
     "cryptography>=42.0.0",
-    "params-proto==3.0.0rc27",
+    "params-proto>=3.0.0",
 ]
 
 [project.scripts]
@@ -59,6 +59,9 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.9.0",
 ]
+
+[tool.ruff]
+indent-width = 2
 
 [tool.uv]
 
