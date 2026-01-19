@@ -60,6 +60,9 @@ dev = [
     "mypy>=1.9.0",
 ]
 
+[tool.ruff]
+indent-width = 2
+
 [tool.uv]
 
 [build-system]
