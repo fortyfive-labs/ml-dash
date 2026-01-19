@@ -22,13 +22,40 @@ Usage:
         exp.logs.info(f"Running {RUN.name}")
 """
 
+import functools
 import os
 import sys
+import typing
 from datetime import datetime
 from pathlib import Path
 from typing import Union
 
 from params_proto import EnvVar, proto
+
+
+def requires_open(func):
+  """
+  Decorator that ensures the experiment is open before executing a method.
+
+  Raises:
+      RuntimeError: If experiment is not started
+  """
+
+  @functools.wraps(func)
+  def wrapper(self, *args, **kwargs):
+    if not self._is_open:
+      raise RuntimeError(
+        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
+        "Example:\n"
+        "  with dxp.run:\n"
+        "      dxp.params.set(lr=0.001)"
+      )
+    return func(self, *args, **kwargs)
+
+  return wrapper
+
+if typing.TYPE_CHECKING:
+  from .experiment import Experiment
 
 PROJECT_ROOT_FILES = ("pyproject.toml", "requirements.txt", "setup.py", "setup.cfg")
 
@@ -77,11 +104,18 @@ def find_project_root(
 @proto.prefix
 class RUN:
   """
-  Global Experiment Run Configuration.
+  Global Experiment Run Configuration and
+  Lifecycle manager for experiments
 
   This class is the single source of truth for experiment metadata.
   Configure it before starting an experiment, or through the Experiment
   constructor.
+
+  Supports three usage patterns:
+  1. Method calls: experiment.run.start(), experiment.run.complete()
+  2. Context manager: with Experiment(...).run as exp:
+      3. Decorator: @exp.run or @Experiment(...).run
+
 
   Default prefix template:
       {project}/{now:%Y/%m-%d}/{path_stem}/{job_name}
@@ -156,9 +190,13 @@ class RUN:
   debug = "pydevd" in sys.modules
   "set to True automatically for pyCharm"
 
+  _experiment: "Experiment" = None
+
   def __post_init__(self):
     """
+
     Initialize RUN with auto-detected prefix from entry path.
+
 
     Args:
         entry: Path to entry file/directory (e.g., __file__ or directory
@@ -179,7 +217,6 @@ class RUN:
         RUN.__post_init__(entry=__file__)
         # Result: RUN.prefix = "vision/resnet", RUN.name = "resnet"
     """
-
     # Use provided entry or try to auto-detect from caller
     if self.entry is None:
       import inspect
@@ -220,6 +257,39 @@ class RUN:
 
     # for k, v in data.items():
     #   print(f"> {k:>30}: {v}")
+
+  def start(self) -> "Experiment":
+    """
+    Start the experiment (sets status to RUNNING).
+
+    Returns:
+        The experiment instance for chaining
+    """
+    return self._experiment._open()
+
+  def complete(self) -> None:
+    """Mark experiment as completed (status: COMPLETED)."""
+    self._experiment._close(status="COMPLETED")
+
+  def fail(self) -> None:
+    """Mark experiment as failed (status: FAILED)."""
+    self._experiment._close(status="FAILED")
+
+  def cancel(self) -> None:
+    """Mark experiment as cancelled (status: CANCELLED)."""
+    self._experiment._close(status="CANCELLED")
+
+  def __enter__(self) -> "Experiment":
+    """Context manager entry - starts the experiment."""
+    return self.start()
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    """Context manager exit - completes or fails the experiment."""
+    if exc_type is not None:
+      self.fail()
+    else:
+      self.complete()
+    return False
 
 
 if __name__ == "__main__":
