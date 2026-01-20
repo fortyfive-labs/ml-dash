@@ -82,7 +82,7 @@ class RemoteClient:
             )
         return self._gql_client
 
-    def _get_project_id(self, project_slug: str) -> str:
+    def _get_project_id(self, project_slug: str) -> Optional[str]:
         """
         Resolve project ID from slug using GraphQL.
 
@@ -90,10 +90,8 @@ class RemoteClient:
             project_slug: Project slug
 
         Returns:
-            Project ID (Snowflake ID)
-
-        Raises:
-            ValueError: If project not found
+            Project ID (Snowflake ID) if found, None if not found
+            When None is returned, the server will auto-create the project
         """
         cache_key = f"project:{self.namespace}:{project_slug}"
         if cache_key in self._id_cache:
@@ -113,14 +111,19 @@ class RemoteClient:
             "namespace": self.namespace
         })
 
-        projects = result.get("namespace", {}).get("projects", [])
+        namespace_data = result.get("namespace")
+        if namespace_data is None:
+            raise ValueError(f"Namespace '{self.namespace}' not found. Please check the namespace exists on the server.")
+
+        projects = namespace_data.get("projects", [])
         for project in projects:
             if project["slug"] == project_slug:
                 project_id = project["id"]
                 self._id_cache[cache_key] = project_id
                 return project_id
 
-        raise ValueError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
+        # Project not found - return None to let server auto-create it
+        return None
 
     def _get_experiment_node_id(self, experiment_id: str) -> str:
         """
@@ -182,20 +185,84 @@ class RemoteClient:
 
         Returns:
             Response dict with experiment, node, and project data
+            Note: Project will be auto-created if it doesn't exist
 
         Raises:
             httpx.HTTPStatusError: If request fails
-            ValueError: If project not found
         """
-        # Resolve project ID from slug
+        # Resolve project ID from slug (returns None if not found)
         project_id = self._get_project_id(project)
+
+        # Parse prefix to create folder hierarchy for experiment
+        # prefix format: "namespace/project/folder1/folder2/experiment_name"
+        # We need to create folders: folder1 -> folder2 and place experiment under folder2
+        parent_id = "ROOT"
+
+        if prefix:
+            # Parse prefix to extract folder path
+            parts = prefix.strip('/').split('/')
+            # parts: [namespace, project, folder1, folder2, ..., experiment_name]
+
+            if len(parts) >= 3:
+                # We have at least namespace/project/something
+                # Extract folder parts (everything between project and experiment name)
+                # Skip namespace (parts[0]) and project (parts[1])
+                # Skip experiment name (parts[-1])
+                folder_parts = parts[2:-1] if len(parts) > 3 else []
+
+                if folder_parts:
+                    # Ensure we have a project_id for folder creation
+                    if not project_id:
+                        # Create the project first since we need its ID for folders
+                        project_response = self._client.post(
+                            f"/namespaces/{self.namespace}/nodes",
+                            json={
+                                "type": "PROJECT",
+                                "name": project,
+                                "slug": project,
+                            }
+                        )
+                        project_response.raise_for_status()
+                        project_data = project_response.json()
+                        project_id = project_data.get("project", {}).get("id")
+
+                    if project_id:
+                        # Create folder hierarchy
+                        current_parent_id = "ROOT"
+                        for folder_name in folder_parts:
+                            if not folder_name:
+                                continue
+                            # Create folder (server handles upsert)
+                            # NOTE: Do NOT pass experimentId for project-level folders
+                            folder_response = self._client.post(
+                                f"/namespaces/{self.namespace}/nodes",
+                                json={
+                                    "type": "FOLDER",
+                                    "projectId": project_id,
+                                    "parentId": current_parent_id,
+                                    "name": folder_name
+                                    # experimentId intentionally omitted - these are project-level folders
+                                }
+                            )
+                            folder_response.raise_for_status()
+                            folder_data = folder_response.json()
+                            current_parent_id = folder_data.get("node", {}).get("id")
+
+                        # Update parent_id for experiment
+                        parent_id = current_parent_id
 
         # Build payload for unified node API
         payload = {
             "type": "EXPERIMENT",
             "name": name,
-            "projectId": project_id,
+            "parentId": parent_id,
         }
+
+        # Send projectId if available, otherwise projectSlug (server will auto-create)
+        if project_id:
+            payload["projectId"] = project_id
+        else:
+            payload["projectSlug"] = project
 
         if description is not None:
             payload["description"] = description
@@ -369,7 +436,10 @@ class RemoteClient:
         Args:
             experiment_id: Experiment ID (Snowflake ID)
             file_path: Local file path
-            prefix: Logical path prefix (DEPRECATED - use parent_id for folder structure)
+            prefix: Logical path prefix for folder structure (e.g., "models/checkpoints")
+                   Will create nested folders automatically. May include namespace/project
+                   parts which will be stripped automatically (e.g., "ns/proj/folder1/folder2"
+                   will create folders: folder1 -> folder2)
             filename: Original filename
             description: Optional description
             tags: Optional tags
@@ -378,7 +448,8 @@ class RemoteClient:
             content_type: MIME type
             size_bytes: File size in bytes
             project_id: Project ID (optional - will be resolved from experiment if not provided)
-            parent_id: Parent node ID (folder) or "ROOT" for root level
+            parent_id: Parent node ID (folder) or "ROOT" for root level.
+                      If prefix is provided, folders will be created under this parent.
 
         Returns:
             Response dict with node and physicalFile data
@@ -401,6 +472,138 @@ class RemoteClient:
             project_id = result.get("experimentById", {}).get("projectId")
             if not project_id:
                 raise ValueError(f"Could not resolve project ID for experiment {experiment_id}")
+
+        # Resolve experiment node ID (files should be children of the experiment node, not ROOT)
+        # Check cache first, otherwise query
+        experiment_node_id = self._id_cache.get(f"exp_node:{experiment_id}")
+        if not experiment_node_id:
+            # Query to get the experiment node ID
+            query = """
+            query GetExperimentNode($experimentId: ID!) {
+              experimentById(id: $experimentId) {
+                id
+              }
+            }
+            """
+            # Note: experimentById returns the Experiment record, not the Node
+            # We need to find the Node with type=EXPERIMENT and experimentId=experiment_id
+            # Use the project nodes query instead
+            query = """
+            query GetExperimentNode($projectId: ID!, $experimentId: ID!) {
+              project(id: $projectId) {
+                nodes(parentId: null, maxDepth: 10) {
+                  id
+                  type
+                  experimentId
+                  children {
+                    id
+                    type
+                    experimentId
+                    children {
+                      id
+                      type
+                      experimentId
+                    }
+                  }
+                }
+              }
+            }
+            """
+            result = self.graphql_query(query, {"projectId": project_id, "experimentId": experiment_id})
+
+            # Find the experiment node
+            def find_experiment_node(nodes, exp_id):
+                for node in nodes:
+                    if node.get("type") == "EXPERIMENT" and node.get("experimentId") == exp_id:
+                        return node.get("id")
+                    if node.get("children"):
+                        found = find_experiment_node(node["children"], exp_id)
+                        if found:
+                            return found
+                return None
+
+            project_nodes = result.get("project", {}).get("nodes", [])
+            experiment_node_id = find_experiment_node(project_nodes, experiment_id)
+
+            if experiment_node_id:
+                # Cache it for future uploads
+                self._id_cache[f"exp_node:{experiment_id}"] = experiment_node_id
+            else:
+                # Fallback to ROOT if we can't find the experiment node
+                # This might happen for old experiments or legacy data
+                experiment_node_id = "ROOT"
+
+        # Use experiment node ID as the parent for file uploads
+        # Files and folders should be children of the experiment node
+        if parent_id == "ROOT" and experiment_node_id != "ROOT":
+            parent_id = experiment_node_id
+
+        # Parse prefix to create folder hierarchy
+        # prefix like "models/checkpoints" should create folders: models -> checkpoints
+        # NOTE: The prefix may contain namespace/project parts (e.g., "ns/proj/folder1/folder2")
+        # We need to strip the namespace and project parts since we're already in an experiment context
+        if prefix and prefix != '/' and prefix.strip():
+            # Clean and normalize prefix
+            prefix = prefix.strip('/')
+
+            # Try to detect and strip namespace/project from prefix
+            # Common patterns: "namespace/project/folders..." or just "folders..."
+            # Since we're in experiment context, we already know the namespace and project
+            # Check if prefix starts with namespace
+            if prefix.startswith(self.namespace + '/'):
+                # Strip namespace
+                prefix = prefix[len(self.namespace) + 1:]
+
+                # Now check if it starts with project slug/name
+                # We need to query the experiment to get the project info
+                query = """
+                query GetExperimentProject($experimentId: ID!) {
+                  experimentById(id: $experimentId) {
+                    project {
+                      slug
+                      name
+                    }
+                  }
+                }
+                """
+                exp_result = self.graphql_query(query, {"experimentId": experiment_id})
+                project_info = exp_result.get("experimentById", {}).get("project", {})
+                project_slug = project_info.get("slug", "")
+                project_name = project_info.get("name", "")
+
+                # Try to strip project slug or name
+                if project_slug and prefix.startswith(project_slug + '/'):
+                    prefix = prefix[len(project_slug) + 1:]
+                elif project_name and prefix.startswith(project_name + '/'):
+                    prefix = prefix[len(project_name) + 1:]
+
+            if prefix:
+                folder_parts = prefix.split('/')
+                current_parent_id = parent_id
+
+                # Create or find each folder in the hierarchy
+                # Server handles upsert - will return existing folder if it exists
+                for folder_name in folder_parts:
+                    if not folder_name:  # Skip empty parts
+                        continue
+
+                    # Create folder (server will return existing if duplicate)
+                    folder_response = self._client.post(
+                        f"/namespaces/{self.namespace}/nodes",
+                        json={
+                            "type": "FOLDER",
+                            "projectId": project_id,
+                            "experimentId": experiment_id,
+                            "parentId": current_parent_id,
+                            "name": folder_name
+                        }
+                    )
+                    folder_response.raise_for_status()
+                    folder_data = folder_response.json()
+                    current_parent_id = folder_data.get("node", {}).get("id")
+
+                # Update parent_id to the final folder in the hierarchy
+                parent_id = current_parent_id
 
         # Prepare multipart form data
         with open(file_path, "rb") as f:
@@ -431,7 +634,45 @@ class RemoteClient:
         )
 
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+
+        # Transform unified node response to expected file metadata format
+        # The server returns {node: {...}, physicalFile: {...}}
+        # We need to flatten it to match the expected format
+        node = result.get("node", {})
+        physical_file = result.get("physicalFile", {})
+
+        # Convert BigInt IDs and sizeBytes from string back to appropriate types
+        # Node ID should remain as string for consistency
+        node_id = node.get("id")
+        if isinstance(node_id, (int, float)):
+            # If it was deserialized as a number, convert to string to preserve full precision
+            node_id = str(int(node_id))
+
+        size_bytes = physical_file.get("sizeBytes")
+        if isinstance(size_bytes, str):
+            size_bytes = int(size_bytes)
+
+        # Use experimentId from node, not the parameter (which might be a path string)
+        experiment_id_from_node = node.get("experimentId")
+        if isinstance(experiment_id_from_node, (int, float)):
+            experiment_id_from_node = str(int(experiment_id_from_node))
+
+        return {
+            "id": node_id,
+            "experimentId": experiment_id_from_node or experiment_id,
+            "path": prefix,  # Use prefix as path for backward compatibility
+            "filename": filename,
+            "description": node.get("description"),
+            "tags": node.get("tags", []),
+            "contentType": physical_file.get("contentType"),
+            "sizeBytes": size_bytes,
+            "checksum": physical_file.get("checksum"),
+            "metadata": node.get("metadata"),
+            "uploadedAt": node.get("createdAt"),
+            "updatedAt": node.get("updatedAt"),
+            "deletedAt": node.get("deletedAt"),
+        }
 
     def list_files(
         self,
@@ -795,7 +1036,8 @@ class RemoteClient:
         if "errors" in result:
             raise Exception(f"GraphQL errors: {result['errors']}")
 
-        return result.get("data", {})
+        # Handle case where data is explicitly null in response
+        return result.get("data") or {}
 
     def list_projects_graphql(self) -> List[Dict[str, Any]]:
         """
