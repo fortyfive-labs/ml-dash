@@ -533,6 +533,95 @@ class RemoteClient:
                 # This might happen for old experiments or legacy data
                 experiment_node_id = "ROOT"
 
+        # Get experiment node path to strip from prefix
+        # When we use experiment_node_id as parent, we need to strip the experiment's
+        # folder path from the prefix to avoid creating duplicate folders
+        # We'll cache this in the id_cache to avoid repeated queries
+        cache_key = f"exp_folder_path:{experiment_id}"
+        experiment_folder_path = self._id_cache.get(cache_key)
+
+        if experiment_folder_path is None and experiment_node_id != "ROOT":
+            # Query experiment to get its project info for the GraphQL query
+            exp_query = """
+            query GetExpInfo($experimentId: ID!) {
+              experimentById(id: $experimentId) {
+                project {
+                  slug
+                  namespace {
+                    slug
+                  }
+                }
+              }
+            }
+            """
+            exp_result = self.graphql_query(exp_query, {"experimentId": experiment_id})
+            project_slug = exp_result.get("experimentById", {}).get("project", {}).get("slug")
+            namespace_slug = exp_result.get("experimentById", {}).get("project", {}).get("namespace", {}).get("slug")
+
+            if project_slug and namespace_slug:
+                # Query to get the experiment node's path
+                # This includes all ancestor folders up to the experiment
+                query = """
+                query GetExperimentPath($namespaceSlug: String!, $projectSlug: String!) {
+                  project(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
+                    nodes(parentId: null, maxDepth: 10) {
+                      id
+                      name
+                      type
+                      experimentId
+                      parentId
+                      children {
+                        id
+                        name
+                        type
+                        experimentId
+                        parentId
+                        children {
+                          id
+                          name
+                          type
+                          experimentId
+                          parentId
+                        }
+                      }
+                    }
+                  }
+                }
+                """
+                result = self.graphql_query(query, {"namespaceSlug": namespace_slug, "projectSlug": project_slug})
+
+                # Build path to experiment node
+                def find_node_path(nodes, target_id, current_path=None):
+                    if current_path is None:
+                        current_path = []
+                    for node in nodes:
+                        new_path = current_path + [node.get("name")]
+                        if node.get("id") == target_id:
+                            return new_path
+                        if node.get("children"):
+                            found = find_node_path(node["children"], target_id, new_path)
+                            if found:
+                                return found
+                    return None
+
+                project_nodes = result.get("project", {}).get("nodes", [])
+                path_parts = find_node_path(project_nodes, experiment_node_id)
+                if path_parts:
+                    # IMPORTANT: Don't include the experiment node's name itself
+                    # We want the path TO the experiment's parent folder, not the experiment
+                    # E.g., if path is ["examples", "exp-name"], we want "examples"
+                    if len(path_parts) > 1:
+                        experiment_folder_path = "/".join(path_parts[:-1])
+                    else:
+                        # Experiment is at root level, no parent folders
+                        experiment_folder_path = ""
+                    # Cache it
+                    self._id_cache[cache_key] = experiment_folder_path
+                else:
+                    # Couldn't find path, set empty string to avoid re-querying
+                    experiment_folder_path = ""
+                    self._id_cache[cache_key] = experiment_folder_path
+
         # Use experiment node ID as the parent for file uploads
         # Files and folders should be children of the experiment node
         if parent_id == "ROOT" and experiment_node_id != "ROOT":
@@ -576,6 +665,15 @@ class RemoteClient:
                     prefix = prefix[len(project_slug) + 1:]
                 elif project_name and prefix.startswith(project_name + '/'):
                     prefix = prefix[len(project_name) + 1:]
+
+            # Strip experiment folder path from prefix since we're using experiment node as parent
+            # For example: if prefix is "examples/exp1/models" and experiment is at "examples/exp1",
+            # strip "examples/exp1/" to get "models"
+            if experiment_folder_path and prefix.startswith(experiment_folder_path + '/'):
+                prefix = prefix[len(experiment_folder_path) + 1:]
+            elif experiment_folder_path and prefix == experiment_folder_path:
+                # Prefix is exactly the experiment path, no subfolders
+                prefix = ""
 
             if prefix:
                 folder_parts = prefix.split('/')
