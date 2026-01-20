@@ -108,3 +108,10 @@ Thumbs.db
 .ml-logger-test
 .ml-loggertest/test_save_pkl.py
 .download/
+
+# Test files and temporary scripts
+test_*.py
+TODO.MD
+*.pth
+*.ckpt
+test/.dashrc
