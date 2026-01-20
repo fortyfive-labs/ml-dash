@@ -37,7 +37,7 @@ Usage:
 """
 
 from .client import RemoteClient
-from .experiment import Experiment, OperationMode, RunManager, ml_dash_experiment
+from .experiment import Experiment, OperationMode, ml_dash_experiment
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
 from .run import RUN
@@ -49,7 +49,6 @@ __all__ = [
   "Experiment",
   "ml_dash_experiment",
   "OperationMode",
-  "RunManager",
   "RemoteClient",
   "LocalStorage",
   "LogLevel",

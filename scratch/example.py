@@ -1,22 +1,10 @@
-# from ml_dash import Experiment
-#
-# with Experiment(
-#   prefix="geyang/scratch/test-run",
-#   dash_url="https://api.dash.ml",
-#   dash_root=None,
-# ).run as exp:
-#   for i in range(10):
-#     exp.metrics("train").log(step=i, loss=1.0 / (i + 1))
-
-
-# Or using the auto-start singleton:
 from time import sleep
 
 from ml_dash.run import RUN
 
-if __name__ == "__main__":
-  # EXP.PREFIX = f"geyang/scratch/quick-test/{Path(__file__).stem}"
 
+def main():
+  RUN.prefix = "geyang/scratch/some-experiment"
   for k, v in vars(RUN).items():
     if k.startswith("_"):
       continue
@@ -32,3 +20,7 @@ if __name__ == "__main__":
 
       print("logged step", i)
       sleep(0.1)
+
+
+if __name__ == "__main__":
+  main()
