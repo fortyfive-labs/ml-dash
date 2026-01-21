@@ -1,6 +1,6 @@
 [project]
 name = "ml-dash"
-version = "0.6.5"
+version = "0.6.6"
 description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
