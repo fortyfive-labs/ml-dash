@@ -70,7 +70,14 @@ ml-dash profile        # Show current user
 
 ### Project Management
 ```bash
-ml-dash create --project my-project --namespace my-user
+# Create a project in current user's namespace
+ml-dash create -p new-project
+
+# Create a project in a specific namespace
+ml-dash create -p geyang/tutorials
+
+# Create with description
+ml-dash create -p geyang/tutorials -d "ML tutorials and examples"
 ```
 
 ### Data Operations
