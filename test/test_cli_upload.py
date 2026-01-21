@@ -184,21 +184,20 @@ class TestExperimentValidator:
     with exp.run as e:
       e.log("Test")
 
-    # Add invalid log line
-    import getpass
-
-    owner = getpass.getuser()
+    # Discover the experiment to get its actual path
     local_path = Path(exp._storage.root_path)
-    logs_dir = local_path / owner / "proj1/exp1/logs"
-    logs_file = logs_dir / "logs.jsonl"
+    experiments = discover_experiments(local_path)
+    exp_info = experiments[0]
+
+    # Add invalid log line using the discovered experiment path
+    logs_file = exp_info.path / "logs/logs.jsonl"
 
     # Append invalid JSON line
     with open(logs_file, "a") as f:
       f.write("invalid json line\n")
 
-    experiments = discover_experiments(local_path)
     validator = ExperimentValidator(strict=False)
-    result = validator.validate_experiment(experiments[0])
+    result = validator.validate_experiment(exp_info)
 
     # Should still be valid but with warnings
     assert result.is_valid is True
@@ -210,20 +209,19 @@ class TestExperimentValidator:
     with exp.run as e:
       e.log("Test")
 
-    # Add invalid log line
-    import getpass
-
-    owner = getpass.getuser()
+    # Discover the experiment to get its actual path
     local_path = Path(exp._storage.root_path)
-    logs_dir = local_path / owner / "proj1/exp1/logs"
-    logs_file = logs_dir / "logs.jsonl"
+    experiments = discover_experiments(local_path)
+    exp_info = experiments[0]
+
+    # Add invalid log line using the discovered experiment path
+    logs_file = exp_info.path / "logs/logs.jsonl"
 
     with open(logs_file, "a") as f:
       f.write("invalid json line\n")
 
-    experiments = discover_experiments(local_path)
     validator = ExperimentValidator(strict=True)
-    result = validator.validate_experiment(experiments[0])
+    result = validator.validate_experiment(exp_info)
 
     # In strict mode, warnings become errors
     assert result.is_valid is False
