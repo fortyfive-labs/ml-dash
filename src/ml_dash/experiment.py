@@ -11,13 +11,13 @@ import functools
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union, Unpack
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .client import RemoteClient
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
-from .run import RUN
+from .run import RUN, requires_open
 from .storage import LocalStorage
 
 
@@ -60,140 +60,6 @@ class OperationMode(Enum):
   HYBRID = "hybrid"  # Future: sync local to remote
 
 
-class RunManager:
-  """
-  Lifecycle manager for experiments.
-
-  Supports three usage patterns:
-  1. Method calls: experiment.run.start(), experiment.run.complete()
-  2. Context manager: with Experiment(...).run as exp:
-  3. Decorator: @exp.run or @Experiment(...).run
-  """
-
-  def __init__(self, experiment: "Experiment"):
-    """
-    Initialize RunManager.
-
-    Args:
-        experiment: Parent Experiment instance
-    """
-    self._experiment = experiment
-
-  def start(self) -> "Experiment":
-    """
-    Start the experiment (sets status to RUNNING).
-
-    Returns:
-        The experiment instance for chaining
-    """
-    return self._experiment._open()
-
-  def complete(self) -> None:
-    """Mark experiment as completed (status: COMPLETED)."""
-    self._experiment._close(status="COMPLETED")
-
-  def fail(self) -> None:
-    """Mark experiment as failed (status: FAILED)."""
-    self._experiment._close(status="FAILED")
-
-  def cancel(self) -> None:
-    """Mark experiment as cancelled (status: CANCELLED)."""
-    self._experiment._close(status="CANCELLED")
-
-  @property
-  def prefix(self) -> Optional[str]:
-    """
-    Get the current folder prefix for this experiment.
-
-    Returns:
-        Current folder prefix path or None
-
-    Example:
-        current_prefix = exp.run.prefix
-    """
-    return self._experiment._folder_path
-
-  @prefix.setter
-  def prefix(self, value: Optional[str]) -> None:
-    """
-    Set the folder prefix for this experiment before initialization.
-
-    This can ONLY be set before the experiment is started (initialized).
-    Once the experiment is opened, the prefix cannot be changed.
-
-    Supports template variables:
-    - {EXP.name} - Experiment name
-    - {EXP.id} - Experiment ID
-
-    Args:
-        value: Folder prefix path with optional template variables
-               (e.g., "ge/myproject/{EXP.name}" or None)
-
-    Raises:
-        RuntimeError: If experiment is already initialized/open
-
-    Examples:
-        from ml_dash import dxp
-
-        # Static folder
-        dxp.run.prefix = "ge/myproject/experiments/resnet"
-
-        # Template with experiment name
-        dxp.run.prefix = "ge/iclr_2024/{EXP.name}"
-
-        # Now start the experiment
-        with dxp.run:
-            dxp.params.set(lr=0.001)
-    """
-    if self._experiment._is_open:
-      raise RuntimeError(
-        "Cannot change prefix after experiment is initialized. "
-        "Set prefix before calling start() or entering 'with' block."
-      )
-
-    if value:
-      # Sync EXP with this experiment's values
-      RUN.name = self._experiment.name
-      RUN.description = self._experiment.description
-      # Generate id/timestamp if not already set
-      if RUN.id is None:
-        RUN._init_run()
-      # Format with EXP - use helper to expand properties correctly
-      value = _expand_exp_template(value)
-
-    # Update the folder on the experiment
-    self._experiment._folder_path = value
-
-  def __enter__(self) -> "Experiment":
-    """Context manager entry - starts the experiment."""
-    return self.start()
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    """Context manager exit - completes or fails the experiment."""
-    if exc_type is not None:
-      self.fail()
-    else:
-      self.complete()
-    return False
-
-  def __call__(self, func: Callable) -> Callable:
-    """
-    Decorator support for wrapping functions with experiment lifecycle.
-
-    Usage:
-        @exp.run
-        def train(exp):
-            exp.log("Training...")
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-      with self as exp:
-        return func(exp, *args, **kwargs)
-
-    return wrapper
-
-
 class Experiment:
   """
   ML-Dash experiment for metricing experiments.
@@ -231,6 +97,28 @@ class Experiment:
       ...
   """
 
+  run: RUN
+  """
+  Get the RunManager for lifecycle operations.
+
+  Usage:
+      # Method calls
+      experiment.run.start()
+      experiment.run.complete()
+
+      # Context manager
+      with Experiment(...).run as exp:
+          exp.log("Training...")
+
+      # Decorator
+      @experiment.run
+      def train(exp):
+          exp.log("Training...")
+
+  Returns:
+      RunManager instance
+  """
+
   def __init__(
     self,
     prefix: Optional[str] = None,
@@ -251,7 +139,7 @@ class Experiment:
     # Internal parameters
     _write_protected: bool = False,
     # The rest of the params go directly to populate the RUN object.
-    **run_params: Unpack[RUN],
+    **run_params,
   ):
     """
     Initialize an ML-Dash experiment.
@@ -278,7 +166,6 @@ class Experiment:
         - dash_url + dash_root: Hybrid mode (local + remote)
         - dash_url + dash_root=None: Remote-only mode
     """
-    import os
     import warnings
 
     # Handle backward compatibility
@@ -286,7 +173,7 @@ class Experiment:
       warnings.warn(
         "Parameter 'remote' is deprecated. Use 'dash_url' instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
       )
       if dash_url is None:
         dash_url = remote
@@ -295,39 +182,21 @@ class Experiment:
       warnings.warn(
         "Parameter 'local_path' is deprecated. Use 'dash_root' instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
       )
       if dash_root == ".dash":  # Only override if dash_root is default
         dash_root = local_path
 
-    # Resolve prefix from environment variable if not provided
-    self._folder_path = prefix or os.getenv("DASH_PREFIX")
+    if prefix:
+      run_params["prefix"] = prefix
 
-    if not self._folder_path:
-      raise ValueError("prefix (or DASH_PREFIX env var) must be provided")
-
-    # Parse prefix: {owner}/{project}/path.../[name]
-    parts = self._folder_path.strip("/").split("/")
-    if len(parts) < 2:
-      raise ValueError(
-        f"prefix must have at least owner/project: got '{self._folder_path}'"
-      )
-
-    self.owner = parts[0]
-    self.project = parts[1]
-    # Name is the last segment (may be a seed/id, not always a meaningful name)
-    self.name = parts[-1] if len(parts) > 2 else parts[1]
+    self.run = RUN(_experiment=self, **run_params)
 
     self.readme = readme
     self.tags = tags
     self._bindrs_list = bindrs
     self._write_protected = _write_protected
     self.metadata = metadata
-
-    # Initialize RUN with experiment values
-    RUN.name = self.name
-    if readme:
-      RUN.readme = readme
 
     # Determine operation mode
     # dash_root defaults to ".dash", dash_url defaults to None
@@ -339,21 +208,19 @@ class Experiment:
       self.mode = OperationMode.LOCAL
 
     # Initialize backend
-    self._client: Optional[RemoteClient] = None
-    self._storage: Optional[LocalStorage] = None
     self._experiment_id: Optional[str] = None
     self._experiment_data: Optional[Dict[str, Any]] = None
     self._is_open = False
     self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
 
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
-      # RemoteClient will auto-load token from ~/.dash/token.enc
+      # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
-      self._client = RemoteClient(base_url=api_url, namespace=self.owner)
+      self.run._client = RemoteClient(base_url=api_url, namespace=self.run.owner)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
-      self._storage = LocalStorage(root_path=Path(dash_root))
+      self.run._storage = LocalStorage(root_path=Path(dash_root))
 
   def _open(self) -> "Experiment":
     """
@@ -365,16 +232,16 @@ class Experiment:
     if self._is_open:
       return self
 
-    if self._client:
+    if self.run._client:
       # Remote mode: create/update experiment via API
       try:
-        response = self._client.create_or_update_experiment(
-          project=self.project,
-          name=self.name,
+        response = self.run._client.create_or_update_experiment(
+          project=self.run.project,
+          name=self.run.name,
           description=self.readme,
           tags=self.tags,
           bindrs=self._bindrs_list,
-          prefix=self._folder_path,
+          prefix=self.run._folder_path,
           write_protected=self._write_protected,
           metadata=self.metadata,
         )
@@ -387,13 +254,13 @@ class Experiment:
 
           console = Console()
           console.print(
-            f"[dim]✓ Experiment started: [bold]{self.name}[/bold] (project: {self.project})[/dim]\n"
+            f"[dim]✓ Experiment started: [bold]{self.run.name}[/bold] (project: {self.run.project})[/dim]\n"
             f"[dim]View your data, statistics, and plots online at:[/dim] "
             f"[link=https://dash.ml]https://dash.ml[/link]"
           )
         except ImportError:
           # Fallback if rich is not available
-          print(f"✓ Experiment started: {self.name} (project: {self.project})")
+          print(f"✓ Experiment started: {self.run.name} (project: {self.run.project})")
           print("View your data at: https://dash.ml")
 
       except Exception as e:
@@ -446,12 +313,11 @@ class Experiment:
           # Re-raise other exceptions
           raise
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: create experiment directory structure
-      self._storage.create_experiment(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      self.run._storage.create_experiment(
+        project=self.run.project,
+        prefix=self.run._folder_path,
         description=self.readme,
         tags=self.tags,
         bindrs=self._bindrs_list,
@@ -468,17 +334,19 @@ class Experiment:
     Args:
         status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
     """
-    if not self._is_open:
-      return
-
-    # Flush any pending writes
-    if self._storage:
-      self._storage.flush()
+    # if not self._is_open:
+    #   return
+    #
+    # note-ge: do NOT flush because the upload will be async. we will NEVER reuse
+    # experiment objects.
+    # # Flush any pending writes
+    # if self.run._storage:
+    #   self.run._storage.flush()
 
     # Update experiment status in remote mode
-    if self._client and self._experiment_id:
+    if self.run._client and self._experiment_id:
       try:
-        self._client.update_experiment_status(
+        self.run._client.update_experiment_status(
           experiment_id=self._experiment_id, status=status
         )
 
@@ -499,14 +367,14 @@ class Experiment:
           console = Console()
           console.print(
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
-            f"[bold]{self.name}[/bold] (project: {self.project})[/{status_color}]\n"
+            f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
             f"[dim]View results, statistics, and plots online at:[/dim] "
             f"[link=https://dash.ml]https://dash.ml[/link]"
           )
         except ImportError:
           # Fallback if rich is not available
           print(
-            f"{status_emoji} Experiment {status.lower()}: {self.name} (project: {self.project})"
+            f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
           print("View results at: https://dash.ml")
 
@@ -516,35 +384,8 @@ class Experiment:
 
     self._is_open = False
 
-    # Reset RUN for next experiment
-    # TODO: RUN._reset() - method doesn't exist
-    # RUN._reset()
-
   @property
-  def run(self) -> RunManager:
-    """
-    Get the RunManager for lifecycle operations.
-
-    Usage:
-        # Method calls
-        experiment.run.start()
-        experiment.run.complete()
-
-        # Context manager
-        with Experiment(...).run as exp:
-            exp.log("Training...")
-
-        # Decorator
-        @experiment.run
-        def train(exp):
-            exp.log("Training...")
-
-    Returns:
-        RunManager instance
-    """
-    return RunManager(self)
-
-  @property
+  @requires_open
   def params(self) -> ParametersBuilder:
     """
     Get a ParametersBuilder for parameter operations.
@@ -562,17 +403,10 @@ class Experiment:
     Raises:
         RuntimeError: If experiment is not open
     """
-    if not self._is_open:
-      raise RuntimeError(
-        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-        "Example:\n"
-        "  with dxp.run:\n"
-        "      dxp.params.set(lr=0.001)"
-      )
-
     return ParametersBuilder(self)
 
   @property
+  @requires_open
   def logs(self) -> LogBuilder:
     """
     Get a LogBuilder for fluent-style logging.
@@ -592,16 +426,9 @@ class Experiment:
         exp.logs.warn("GPU memory low", memory_available="1GB")
         exp.logs.debug("Debug info", step=100)
     """
-    if not self._is_open:
-      raise RuntimeError(
-        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-        "Example:\n"
-        "  with dxp.run:\n"
-        "      dxp.logs.info('Training started')"
-      )
-
     return LogBuilder(self, metadata=None)
 
+  @requires_open
   def log(
     self,
     message: Optional[str] = None,
@@ -638,22 +465,16 @@ class Experiment:
         RuntimeError: If experiment is not open
         ValueError: If log level is invalid
     """
-    if not self._is_open:
-      raise RuntimeError(
-        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-        "Example:\n"
-        "  with dxp.run:\n"
-        "      dxp.logs.info('Training started')"
-      )
 
     # Fluent mode: return LogBuilder (deprecated)
     if message is None:
       import warnings
+
       warnings.warn(
         "Using exp.log() without a message is deprecated. "
         "Use exp.logs.info('message') instead.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
       )
       combined_metadata = {**(metadata or {}), **extra_metadata}
       return LogBuilder(self, combined_metadata if combined_metadata else None)
@@ -701,30 +522,31 @@ class Experiment:
     self._print_log(message, level, metadata)
 
     # Write immediately (no buffering)
-    if self._client:
+    if self.run._client:
       # Remote mode: send to API (wrapped in array for batch API)
       try:
-        self._client.create_log_entries(
+        self.run._client.create_log_entries(
           experiment_id=self._experiment_id,
           logs=[log_entry],  # Single log in array
         )
       except Exception as e:
         # Log warning but don't crash training
         import warnings
+
         warnings.warn(
           f"Failed to write log to remote server: {e}. Training will continue.",
           RuntimeWarning,
-          stacklevel=4
+          stacklevel=4,
         )
         # Fall through to local storage if available
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: write to file immediately
       try:
-        self._storage.write_log(
-          owner=self.owner,
-          project=self.project,
-          prefix=self._folder_path,
+        self.run._storage.write_log(
+          owner=self.run.owner,
+          project=self.run.project,
+          prefix=self.run._folder_path,
           message=log_entry["message"],
           level=log_entry["level"],
           metadata=log_entry.get("metadata"),
@@ -732,10 +554,9 @@ class Experiment:
         )
       except Exception as e:
         import warnings
+
         warnings.warn(
-          f"Failed to write log to local storage: {e}",
-          RuntimeWarning,
-          stacklevel=4
+          f"Failed to write log to local storage: {e}", RuntimeWarning, stacklevel=4
         )
 
   def _print_log(
@@ -773,6 +594,7 @@ class Experiment:
       print(formatted_message, file=sys.stdout)
 
   @property
+  @requires_open
   def files(self) -> FilesAccessor:
     """
     Get a FilesAccessor for fluent file operations.
@@ -813,16 +635,9 @@ class Experiment:
         dxp.files.save_json(dict(hey="yo"), to="config.json")
         dxp.files.save_blob(b"xxx", to="data.bin")
     """
-    if not self._is_open:
-      raise RuntimeError(
-        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-        "Example:\n"
-        "  with dxp.run:\n"
-        "      dxp.files('path').upload()"
-      )
-
     return FilesAccessor(self)
 
+  @requires_open
   def bindrs(self, bindr_name: str) -> BindrsBuilder:
     """
     Get a BindrsBuilder for working with file collections (bindrs).
@@ -845,14 +660,6 @@ class Experiment:
     Note:
         This is a placeholder for future bindr functionality.
     """
-    if not self._is_open:
-      raise RuntimeError(
-        "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
-        "Example:\n"
-        "  with dxp.run:\n"
-        "      files = dxp.bindrs('my-bindr').list()"
-      )
-
     return BindrsBuilder(self, bindr_name)
 
   def _upload_file(
@@ -886,9 +693,9 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: upload to API
-      result = self._client.upload_file(
+      result = self.run._client.upload_file(
         experiment_id=self._experiment_id,
         file_path=file_path,
         prefix=prefix,
@@ -901,12 +708,12 @@ class Experiment:
         size_bytes=size_bytes,
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: copy to local storage
-      result = self._storage.write_file(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      result = self.run._storage.write_file(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         file_path=file_path,
         path=prefix,
         filename=filename,
@@ -935,18 +742,18 @@ class Experiment:
     """
     files = []
 
-    if self._client:
+    if self.run._client:
       # Remote mode: fetch from API
-      files = self._client.list_files(
+      files = self.run._client.list_files(
         experiment_id=self._experiment_id, prefix=prefix, tags=tags
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: read from metadata file
-      files = self._storage.list_files(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      files = self.run._storage.list_files(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         path_prefix=prefix,
         tags=tags,
       )
@@ -964,18 +771,18 @@ class Experiment:
     Returns:
         Path to downloaded file
     """
-    if self._client:
+    if self.run._client:
       # Remote mode: download from API
-      return self._client.download_file(
+      return self.run._client.download_file(
         experiment_id=self._experiment_id, file_id=file_id, dest_path=dest_path
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: copy from local storage
-      return self._storage.read_file(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      return self.run._storage.read_file(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         file_id=file_id,
         dest_path=dest_path,
       )
@@ -994,18 +801,18 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: delete via API
-      result = self._client.delete_file(
+      result = self.run._client.delete_file(
         experiment_id=self._experiment_id, file_id=file_id
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: soft delete in metadata
-      result = self._storage.delete_file(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      result = self.run._storage.delete_file(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         file_id=file_id,
       )
 
@@ -1032,9 +839,9 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: update via API
-      result = self._client.update_file(
+      result = self.run._client.update_file(
         experiment_id=self._experiment_id,
         file_id=file_id,
         description=description,
@@ -1042,12 +849,12 @@ class Experiment:
         metadata=metadata,
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: update in metadata file
-      result = self._storage.update_file_metadata(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      result = self.run._storage.update_file_metadata(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         file_id=file_id,
         description=description,
         tags=tags,
@@ -1063,18 +870,18 @@ class Experiment:
     Args:
         flattened_params: Already-flattened parameter dict with dot notation
     """
-    if self._client:
+    if self.run._client:
       # Remote mode: send to API
-      self._client.set_parameters(
+      self.run._client.set_parameters(
         experiment_id=self._experiment_id, data=flattened_params
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: write to file
-      self._storage.write_parameters(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      self.run._storage.write_parameters(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         data=flattened_params,
       )
 
@@ -1087,23 +894,24 @@ class Experiment:
     """
     params = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: fetch from API
       try:
-        params = self._client.get_parameters(experiment_id=self._experiment_id)
+        params = self.run._client.get_parameters(experiment_id=self._experiment_id)
       except Exception:
         # Parameters don't exist yet
         params = None
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: read from file
-      params = self._storage.read_parameters(
-        owner=self.owner, project=self.project, prefix=self._folder_path
+      params = self.run._storage.read_parameters(
+        owner=self.run.owner, project=self.run.project, prefix=self.run._folder_path
       )
 
     return params
 
   @property
+  @requires_open
   def metrics(self) -> "MetricsManager":
     """
     Get a MetricsManager for metric operations.
@@ -1139,12 +947,6 @@ class Experiment:
     """
     from .metric import MetricsManager
 
-    if not self._is_open:
-      raise RuntimeError(
-        "Cannot use metrics on closed experiment. "
-        "Use 'with Experiment(...).run as experiment:' or call experiment.run.start() first."
-      )
-
     # Cache the MetricsManager instance to preserve MetricBuilder cache across calls
     if self._metrics_manager is None:
       self._metrics_manager = MetricsManager(self)
@@ -1173,10 +975,10 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: append via API
       try:
-        result = self._client.append_to_metric(
+        result = self.run._client.append_to_metric(
           experiment_id=self._experiment_id,
           metric_name=name,
           data=data,
@@ -1187,22 +989,23 @@ class Experiment:
       except Exception as e:
         # Log warning but don't crash training
         import warnings
+
         metric_display = f"'{name}'" if name else "unnamed metric"
         warnings.warn(
           f"Failed to log {metric_display} to remote server: {e}. "
           f"Training will continue.",
           RuntimeWarning,
-          stacklevel=3
+          stacklevel=3,
         )
         # Fall through to local storage if available
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: append to local storage
       try:
-        result = self._storage.append_to_metric(
-          owner=self.owner,
-          project=self.project,
-          prefix=self._folder_path,
+        result = self.run._storage.append_to_metric(
+          owner=self.run.owner,
+          project=self.run.project,
+          prefix=self.run._folder_path,
           metric_name=name,
           data=data,
           description=description,
@@ -1211,11 +1014,12 @@ class Experiment:
         )
       except Exception as e:
         import warnings
+
         metric_display = f"'{name}'" if name else "unnamed metric"
         warnings.warn(
           f"Failed to log {metric_display} to local storage: {e}",
           RuntimeWarning,
-          stacklevel=3
+          stacklevel=3,
         )
 
     return result
@@ -1243,10 +1047,10 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: append batch via API
       try:
-        result = self._client.append_batch_to_metric(
+        result = self.run._client.append_batch_to_metric(
           experiment_id=self._experiment_id,
           metric_name=name,
           data_points=data_points,
@@ -1257,22 +1061,23 @@ class Experiment:
       except Exception as e:
         # Log warning but don't crash training
         import warnings
+
         metric_display = f"'{name}'" if name else "unnamed metric"
         warnings.warn(
           f"Failed to log batch to {metric_display} on remote server: {e}. "
           f"Training will continue.",
           RuntimeWarning,
-          stacklevel=3
+          stacklevel=3,
         )
         # Fall through to local storage if available
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: append batch to local storage
       try:
-        result = self._storage.append_batch_to_metric(
-          owner=self.owner,
-          project=self.project,
-          prefix=self._folder_path,
+        result = self.run._storage.append_batch_to_metric(
+          owner=self.run.owner,
+          project=self.run.project,
+          prefix=self.run._folder_path,
           metric_name=name,
           data_points=data_points,
           description=description,
@@ -1281,11 +1086,12 @@ class Experiment:
         )
       except Exception as e:
         import warnings
+
         metric_display = f"'{name}'" if name else "unnamed metric"
         warnings.warn(
           f"Failed to log batch to {metric_display} in local storage: {e}",
           RuntimeWarning,
-          stacklevel=3
+          stacklevel=3,
         )
 
     return result
@@ -1306,21 +1112,21 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: read via API
-      result = self._client.read_metric_data(
+      result = self.run._client.read_metric_data(
         experiment_id=self._experiment_id,
         metric_name=name,
         start_index=start_index,
         limit=limit,
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: read from local storage
-      result = self._storage.read_metric_data(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      result = self.run._storage.read_metric_data(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         metric_name=name,
         start_index=start_index,
         limit=limit,
@@ -1340,18 +1146,18 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: get stats via API
-      result = self._client.get_metric_stats(
+      result = self.run._client.get_metric_stats(
         experiment_id=self._experiment_id, metric_name=name
       )
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: get stats from local storage
-      result = self._storage.get_metric_stats(
-        owner=self.owner,
-        project=self.project,
-        prefix=self._folder_path,
+      result = self.run._storage.get_metric_stats(
+        owner=self.run.owner,
+        project=self.run.project,
+        prefix=self.run._folder_path,
         metric_name=name,
       )
 
@@ -1366,17 +1172,85 @@ class Experiment:
     """
     result = None
 
-    if self._client:
+    if self.run._client:
       # Remote mode: list via API
-      result = self._client.list_metrics(experiment_id=self._experiment_id)
+      result = self.run._client.list_metrics(experiment_id=self._experiment_id)
 
-    if self._storage:
+    if self.run._storage:
       # Local mode: list from local storage
-      result = self._storage.list_metrics(
-        owner=self.owner, project=self.project, prefix=self._folder_path
+      result = self.run._storage.list_metrics(
+        owner=self.run.owner, project=self.run.project, prefix=self.run._folder_path
       )
 
     return result or []
+
+  @property
+  def owner(self) -> Optional[str]:
+    """Get the owner (first segment of prefix)."""
+    return self.run.owner
+
+  @owner.setter
+  def owner(self, value: str) -> None:
+    """Set the owner."""
+    self.run.owner = value
+
+  @property
+  def project(self) -> Optional[str]:
+    """Get the project (second segment of prefix or RUN.project)."""
+    return self.run.project
+
+  @project.setter
+  def project(self, value: str) -> None:
+    """Set the project."""
+    self.run.project = value
+
+  @property
+  def name(self) -> Optional[str]:
+    """Get the experiment name (last segment of prefix)."""
+    return self.run.name
+
+  @name.setter
+  def name(self, value: str) -> None:
+    """Set the name."""
+    self.run.name = value
+
+  @property
+  def _folder_path(self) -> Optional[str]:
+    """Get the full folder path (same as prefix)."""
+    return self.run._folder_path
+
+  @_folder_path.setter
+  def _folder_path(self, value: str) -> None:
+    """Set the full folder path and re-parse into components."""
+    self.run._folder_path = value
+    self.run.prefix = value
+    # Re-parse prefix into components
+    if value:
+      parts = value.strip("/").split("/")
+      if len(parts) >= 2:
+        self.run.owner = parts[0]
+        self.run.project = parts[1]
+        self.run.name = parts[-1] if len(parts) > 2 else parts[1]
+
+  @property
+  def _client(self):
+    """Get the remote client."""
+    return self.run._client
+
+  @_client.setter
+  def _client(self, value) -> None:
+    """Set the remote client."""
+    self.run._client = value
+
+  @property
+  def _storage(self):
+    """Get the local storage."""
+    return self.run._storage
+
+  @_storage.setter
+  def _storage(self, value) -> None:
+    """Set the local storage."""
+    self.run._storage = value
 
   @property
   def id(self) -> Optional[str]:

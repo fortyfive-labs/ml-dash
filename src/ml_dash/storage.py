@@ -84,7 +84,6 @@ class LocalStorage:
 
   def create_experiment(
     self,
-    owner: str,
     project: str,
     prefix: str,
     description: Optional[str] = None,
@@ -99,7 +98,6 @@ class LocalStorage:
     where prefix = owner/project/folder_1/.../exp_name
 
     Args:
-        owner: Owner/user (extracted from prefix, kept for API compatibility)
         project: Project name (extracted from prefix, kept for API compatibility)
         prefix: Full experiment path (owner/project/folder_1/.../exp_name)
         description: Optional description

@@ -43,10 +43,7 @@ _user = get_jwt_user()
 _username = _user["username"] if _user else getpass.getuser()
 _now = datetime.now()
 
-dxp = Experiment(
-  prefix=f"{_username}/scratch/{_now:%Y-%m-%d/%H%M%S}",
-  dash_url="https://api.dash.ml",
-)
+dxp = Experiment()
 
 
 # Register cleanup handler to complete experiment on Python exit (if still open)
