@@ -265,7 +265,11 @@ def discover_experiments(
 
   Args:
       local_path: Root path of local storage
-      project_filter: Glob pattern to filter experiments by prefix (e.g., "tom/*/exp*")
+      project_filter: Either a simple project name (e.g., "proj1") or a glob
+                     pattern for the full path (e.g., "tom/*/exp*"). If the
+                     filter contains '/', '*', or '?', it's treated as a glob
+                     pattern matched against the full relative path. Otherwise,
+                     it's matched exactly against the project name.
       experiment_filter: Only discover this experiment (requires project_filter)
 
   Returns:
@@ -319,9 +323,18 @@ def discover_experiments(
 
       # Apply filters with glob pattern support
       if project_filter:
-        # Support glob pattern matching on the full relative path
-        if not fnmatch.fnmatch(full_relative_path, project_filter):
-          continue
+        # Check if project_filter is a glob pattern or simple project name
+        is_glob_pattern = any(c in project_filter for c in ['*', '?', '/'])
+
+        if is_glob_pattern:
+          # Treat as glob pattern - match against full relative path
+          if not fnmatch.fnmatch(full_relative_path, project_filter):
+            continue
+        else:
+          # Treat as simple project name - match against parsed project
+          if project_name != project_filter:
+            continue
+
       if experiment_filter and exp_name != experiment_filter:
         continue
 
