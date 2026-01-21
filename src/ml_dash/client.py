@@ -9,27 +9,25 @@ import httpx
 class RemoteClient:
     """Client for communicating with ML-Dash server."""
 
-    def __init__(self, base_url: str, namespace: str, api_key: Optional[str] = None):
+    def __init__(self, base_url: str, namespace: Optional[str] = None, api_key: Optional[str] = None):
         """
         Initialize remote client.
 
         Args:
             base_url: Base URL of ML-Dash server (e.g., "http://localhost:3000")
-            namespace: Namespace slug (e.g., "my-namespace")
+            namespace: Namespace slug (e.g., "my-namespace"). If not provided, will be queried from server.
             api_key: JWT token for authentication (optional - auto-loads from storage if not provided)
 
         Note:
             If no api_key is provided, token will be loaded from storage on first API call.
             If still not found, AuthenticationError will be raised at that time.
+            If no namespace is provided, it will be fetched from the server on first API call.
         """
         # Store original base URL for GraphQL (no /api prefix)
         self.graphql_base_url = base_url.rstrip("/")
 
         # Add /api prefix to base URL for REST API calls
         self.base_url = base_url.rstrip("/") + "/api"
-
-        # Store namespace
-        self.namespace = namespace
 
         # If no api_key provided, try to load from storage
         if not api_key:
@@ -39,9 +37,69 @@ class RemoteClient:
             api_key = storage.load("ml-dash-token")
 
         self.api_key = api_key
+
+        # Store namespace (can be None, will be fetched on first API call if needed)
+        self._namespace = namespace
+        self._namespace_fetched = False
+
         self._rest_client = None
         self._gql_client = None
         self._id_cache: Dict[str, str] = {}  # Cache for slug -> ID mappings
+
+    @property
+    def namespace(self) -> str:
+        """
+        Get namespace, fetching from server if not already set.
+
+        Returns:
+            Namespace slug
+
+        Raises:
+            AuthenticationError: If not authenticated
+            ValueError: If namespace cannot be determined
+        """
+        if self._namespace:
+            return self._namespace
+
+        if not self._namespace_fetched:
+            # Fetch namespace from server
+            self._namespace = self._fetch_namespace_from_server()
+            self._namespace_fetched = True
+
+        if not self._namespace:
+            raise ValueError("Could not determine namespace. Please provide --namespace explicitly.")
+
+        return self._namespace
+
+    @namespace.setter
+    def namespace(self, value: str):
+        """Set namespace."""
+        self._namespace = value
+        self._namespace_fetched = True
+
+    def _fetch_namespace_from_server(self) -> Optional[str]:
+        """
+        Fetch current user's namespace from server.
+
+        Returns:
+            Namespace slug or None if cannot be determined
+        """
+        try:
+            self._ensure_authenticated()
+
+            # Query server for current user's namespace
+            query = """
+            query GetMyNamespace {
+              me {
+                username
+              }
+            }
+            """
+            result = self.graphql_query(query)
+            username = result.get("me", {}).get("username")
+            return username
+        except Exception:
+            return None
 
     def _ensure_authenticated(self):
         """Check if authenticated, raise error if not."""
