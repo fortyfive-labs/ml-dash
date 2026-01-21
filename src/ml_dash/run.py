@@ -28,7 +28,7 @@ import sys
 import typing
 from datetime import datetime
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from params_proto import EnvVar, proto
 
@@ -55,7 +55,9 @@ def requires_open(func):
   return wrapper
 
 if typing.TYPE_CHECKING:
+  from .client import RemoteClient
   from .experiment import Experiment
+  from .storage import LocalStorage
 
 PROJECT_ROOT_FILES = ("pyproject.toml", "requirements.txt", "setup.py", "setup.cfg")
 
@@ -191,6 +193,13 @@ class RUN:
   "set to True automatically for pyCharm"
 
   _experiment: "Experiment" = None
+  _client: Optional["RemoteClient"] = None
+  _storage: Optional["LocalStorage"] = None
+
+  # Prefix components (parsed from prefix)
+  owner: Optional[str] = None
+  name: Optional[str] = None
+  _folder_path: Optional[str] = None
 
   def __post_init__(self):
     """
@@ -257,6 +266,16 @@ class RUN:
 
     # for k, v in data.items():
     #   print(f"> {k:>30}: {v}")
+
+    # Parse prefix into components: {owner}/{project}/path.../[name]
+    if self.prefix:
+      self._folder_path = self.prefix
+      parts = self.prefix.strip("/").split("/")
+      if len(parts) >= 2:
+        self.owner = parts[0]
+        self.project = parts[1]
+        # self.name is the last segment
+        self.name = parts[-1] if len(parts) > 2 else parts[1]
 
   def start(self) -> "Experiment":
     """
