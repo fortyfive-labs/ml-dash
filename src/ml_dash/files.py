@@ -56,6 +56,7 @@ class FileBuilder:
         experiment.files.save_blob(b"xxx", to="data.bin")
         experiment.files.save_torch(model, to="model.pt")
         experiment.files.save_pkl(data, to="data.pkl")
+        experiment.files.save_image(array, to="frame.png")
         experiment.files.save_fig(fig, to="plot.png")
         experiment.files.save_video(frames, to="video.mp4")
     """
@@ -184,8 +185,9 @@ class FileBuilder:
                 - str (file path): Uploads existing file
                 - bytes: Saves as binary blob (requires 'to' parameter)
                 - dict/list: Saves as JSON (requires 'to' parameter)
+                - numpy.ndarray: Saves as image (requires 'to' parameter with image extension)
                 - None: Uses file_path from constructor (backwards compatibility)
-            to: Target filename (required for bytes/dict/list, optional for file paths)
+            to: Target filename (required for bytes/dict/list/arrays, optional for file paths)
             description: Optional description
             tags: Optional list of tags
             metadata: Optional metadata dict
@@ -224,7 +226,17 @@ class FileBuilder:
                 raise ValueError("'to' parameter is required when saving dict/list")
             return self.save_json(content, to=to)
 
-        raise ValueError(f"Unsupported content type: {type(content)}. Expected str (file path), bytes, dict, or list.")
+        # Check if content is a numpy array (save as image)
+        try:
+            import numpy as np
+            if isinstance(content, np.ndarray):
+                if not to:
+                    raise ValueError("'to' parameter is required when saving numpy arrays")
+                return self.save_image(content, to=to)
+        except ImportError:
+            pass  # numpy not available
+
+        raise ValueError(f"Unsupported content type: {type(content)}. Expected str (file path), bytes, dict, list, or numpy.ndarray.")
 
     def _save_file(
         self,
@@ -288,22 +300,26 @@ class FileBuilder:
         temp_path = os.path.join(temp_dir, filename)
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        try:
-            with open(temp_path, 'wb') as f:
-                f.write(data)
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-        finally:
+
+        with open(temp_path, 'wb') as f:
+            f.write(data)
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
 
     def _save_json(
         self,
@@ -323,22 +339,26 @@ class FileBuilder:
         temp_path = os.path.join(temp_dir, filename)
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        try:
-            with open(temp_path, 'w') as f:
-                json.dump(content, f, indent=2)
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-        finally:
+
+        with open(temp_path, 'w') as f:
+            json.dump(content, f, indent=2)
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
 
     def _save_torch(
         self,
@@ -358,21 +378,25 @@ class FileBuilder:
         temp_path = os.path.join(temp_dir, filename)
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        try:
-            torch.save(model, temp_path)
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-        finally:
+
+        torch.save(model, temp_path)
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
 
     def _save_fig(
         self,
@@ -393,22 +417,26 @@ class FileBuilder:
         temp_path = os.path.join(temp_dir, filename)
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        try:
-            fig.savefig(temp_path, **kwargs)
-            plt.close(fig)
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-        finally:
+
+        fig.savefig(temp_path, **kwargs)
+        plt.close(fig)
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
 
     def _save_pickle(
         self,
@@ -428,22 +456,106 @@ class FileBuilder:
         temp_path = os.path.join(temp_dir, filename)
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        try:
-            with open(temp_path, 'wb') as f:
-                pickle.dump(content, f)
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=description,
-                tags=tags,
-                metadata=metadata
-            )
-        finally:
+
+        with open(temp_path, 'wb') as f:
+            pickle.dump(content, f)
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
+
+    def _save_image(
+        self,
+        array: Any,
+        filename: str,
+        prefix: str,
+        description: Optional[str],
+        tags: Optional[List[str]],
+        metadata: Optional[Dict[str, Any]],
+        quality: int = 95
+    ) -> Dict[str, Any]:
+        """Save numpy array as image file."""
+        import tempfile
+        import os
+
+        try:
+            from PIL import Image
+            import numpy as np
+        except ImportError:
+            raise ImportError("PIL/Pillow is required for saving images. Install it with: pip install Pillow")
+
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        # Create parent directories if filename contains path
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+
+        # Convert numpy array to PIL Image
+        # Handle different array shapes and dtypes
+        if array.dtype == np.uint8:
+            img = Image.fromarray(array)
+        else:
+            # Normalize to 0-255 range for non-uint8 arrays
+            if array.max() <= 1.0:
+                # Assume normalized float in [0, 1]
+                array_uint8 = (array * 255).astype(np.uint8)
+            else:
+                # Scale to 0-255
+                array_uint8 = ((array - array.min()) / (array.max() - array.min()) * 255).astype(np.uint8)
+            img = Image.fromarray(array_uint8)
+
+        # Handle JPEG-specific requirements
+        file_ext = os.path.splitext(filename)[1].lower()
+        save_kwargs = {}
+        if file_ext in ['.jpg', '.jpeg']:
+            # JPEG doesn't support alpha channel, convert RGBA to RGB
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # Create white background
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            elif img.mode not in ('RGB', 'L'):
+                # Convert other modes to RGB
+                img = img.convert('RGB')
+            # Set JPEG quality
+            save_kwargs['quality'] = quality
+            save_kwargs['optimize'] = True
+
+        # Save image to temp file
+        img.save(temp_path, **save_kwargs)
+
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        # If queued, the buffer manager will clean up after upload
+        if result.get("status") != "queued":
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
+
+        return result
 
     def list(self, pattern: Optional[str] = None) -> List[Dict[str, Any]]:
         """
@@ -881,6 +993,49 @@ class FileBuilder:
             metadata=self._metadata
         )
 
+    def save_image(
+        self,
+        array: Any,
+        *,
+        to: str,
+        quality: int = 95
+    ) -> Dict[str, Any]:
+        """
+        Save numpy array as an image file.
+
+        Args:
+            array: Numpy array representing the image (HxW or HxWxC)
+            to: Target filename (must have image extension like .png, .jpg, .jpeg)
+            quality: JPEG quality (1-100, default: 95). Only used for JPEG files.
+
+        Returns:
+            File metadata dict with id, path, filename, checksum, etc.
+
+        Examples:
+            # Save rendered frame from MuJoCo as PNG
+            pixels = renderer.render()
+            result = dxp.files("frames").save_image(pixels, to="frame_001.png")
+
+            # Save as JPEG with custom quality
+            result = dxp.files("frames").save_image(pixels, to="frame_001.jpg", quality=85)
+
+            # Save numpy array as image
+            import numpy as np
+            img_array = np.random.rand(480, 640, 3) * 255
+            result = dxp.files("images").save_image(img_array, to="random.png")
+        """
+        prefix = '/' + self._path.lstrip('/') if self._path else self._prefix
+
+        return self._save_image(
+            array=array,
+            filename=to,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata,
+            quality=quality
+        )
+
     def save_fig(
         self,
         fig: Optional[Any] = None,
@@ -974,28 +1129,31 @@ class FileBuilder:
         # Create parent directories if filename contains path
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
 
+        frames_ubyte = img_as_ubyte(frame_stack)
         try:
-            frames_ubyte = img_as_ubyte(frame_stack)
-            try:
-                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
-            except iio.core.NeedDownloadError:
-                import imageio.plugins.ffmpeg
-                imageio.plugins.ffmpeg.download()
-                iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
+            iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
+        except iio.core.NeedDownloadError:
+            import imageio.plugins.ffmpeg
+            imageio.plugins.ffmpeg.download()
+            iio.imwrite(temp_path, frames_ubyte, fps=fps, **imageio_kwargs)
 
-            return self._save_file(
-                fpath=temp_path,
-                prefix=prefix,
-                description=self._description,
-                tags=self._tags,
-                metadata=self._metadata
-            )
-        finally:
+        result = self._save_file(
+            fpath=temp_path,
+            prefix=prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata
+        )
+
+        # Only clean up if NOT queued for buffered upload
+        if result.get("status") != "queued":
             try:
                 os.unlink(temp_path)
                 os.rmdir(temp_dir)
             except Exception:
                 pass
+
+        return result
 
     def duplicate(self, source: Union[str, Dict[str, Any]], to: str) -> Dict[str, Any]:
         """

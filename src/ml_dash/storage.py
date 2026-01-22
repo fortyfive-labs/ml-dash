@@ -1095,3 +1095,406 @@ class LocalStorage:
             )
 
     return metrics
+
+  # ============================================================================
+  # Track Storage Methods
+  # ============================================================================
+
+  def _serialize_value(self, value: Any) -> Any:
+    """
+    Convert value to JSON-serializable format.
+
+    Handles numpy arrays, nested dicts/lists, etc.
+
+    Args:
+        value: Value to serialize
+
+    Returns:
+        JSON-serializable value
+    """
+    # Check for numpy array
+    if hasattr(value, '__array__') or (hasattr(value, 'tolist') and hasattr(value, 'dtype')):
+      # It's a numpy array
+      try:
+        return value.tolist()
+      except AttributeError:
+        pass
+
+    # Check for numpy scalar types
+    if hasattr(value, 'item'):
+      try:
+        return value.item()
+      except (AttributeError, ValueError):
+        pass
+
+    # Recursively handle dicts
+    if isinstance(value, dict):
+      return {k: self._serialize_value(v) for k, v in value.items()}
+
+    # Recursively handle lists
+    if isinstance(value, (list, tuple)):
+      return [self._serialize_value(v) for v in value]
+
+    # Return as-is for other types (int, float, str, bool, None)
+    return value
+
+  def _flatten_dict(self, obj: Any, prefix: str = '') -> Dict[str, Any]:
+    """
+    Flatten nested dict with dot notation (e.g., camera.pos).
+
+    Args:
+        obj: Object to flatten
+        prefix: Current key prefix
+
+    Returns:
+        Flattened dict
+    """
+    result = {}
+
+    if not isinstance(obj, dict):
+      # Serialize the value before returning
+      serialized = self._serialize_value(obj)
+      return {prefix: serialized} if prefix else serialized
+
+    for key, value in obj.items():
+      new_key = f"{prefix}.{key}" if prefix else key
+
+      if isinstance(value, dict):
+        result.update(self._flatten_dict(value, new_key))
+      else:
+        # Serialize the value
+        result[new_key] = self._serialize_value(value)
+
+    return result
+
+  def append_batch_to_track(
+    self,
+    owner: str,
+    project: str,
+    prefix: str,
+    topic: str,
+    entries: List[Dict[str, Any]],
+  ) -> Dict[str, Any]:
+    """
+    Append batch of timestamped entries to a track in local storage.
+
+    Storage format:
+    .dash/{owner}/{project}/{prefix}/tracks/{topic_safe}/
+        data.jsonl  # Timestamped entries (one JSON object per line)
+        metadata.json  # Track metadata (topic, columns, stats)
+
+    Args:
+        owner: Owner/user
+        project: Project name
+        prefix: Experiment prefix
+        topic: Track topic (e.g., "robot/position")
+        entries: List of entries with timestamp and data fields
+
+    Returns:
+        Dict with trackId, count
+    """
+    experiment_dir = self._get_experiment_dir(owner, project, prefix)
+    tracks_dir = experiment_dir / "tracks"
+    tracks_dir.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize topic for directory name (replace / with _)
+    topic_safe = topic.replace("/", "_")
+    track_dir = tracks_dir / topic_safe
+    track_dir.mkdir(exist_ok=True)
+
+    data_file = track_dir / "data.jsonl"
+    metadata_file = track_dir / "metadata.json"
+
+    # File-based lock for concurrent writes
+    lock_file = track_dir / ".metadata.lock"
+    with self._file_lock(lock_file):
+      # Load or initialize metadata
+      if metadata_file.exists():
+        try:
+          with open(metadata_file, "r") as f:
+            track_meta = json.load(f)
+        except (json.JSONDecodeError, IOError):
+          # Corrupted metadata, reinitialize
+          track_meta = {
+            "trackId": f"local-track-{topic_safe}",
+            "topic": topic,
+            "columns": [],
+            "totalEntries": 0,
+            "firstTimestamp": None,
+            "lastTimestamp": None,
+            "createdAt": datetime.utcnow().isoformat() + "Z",
+          }
+      else:
+        track_meta = {
+          "trackId": f"local-track-{topic_safe}",
+          "topic": topic,
+          "columns": [],
+          "totalEntries": 0,
+          "firstTimestamp": None,
+          "lastTimestamp": None,
+          "createdAt": datetime.utcnow().isoformat() + "Z",
+        }
+
+      # Process entries and update metadata
+      all_columns = set(track_meta["columns"])
+      min_ts = track_meta["firstTimestamp"]
+      max_ts = track_meta["lastTimestamp"]
+
+      processed_entries = []
+      for entry in entries:
+        timestamp = entry.get("timestamp")
+        if timestamp is None:
+          continue
+
+        # Extract data fields (everything except timestamp)
+        data_fields = {k: v for k, v in entry.items() if k != "timestamp"}
+
+        # Flatten nested structures
+        flattened = self._flatten_dict(data_fields)
+
+        # Update column set
+        all_columns.update(flattened.keys())
+
+        # Update timestamp range
+        if min_ts is None or timestamp < min_ts:
+          min_ts = timestamp
+        if max_ts is None or timestamp > max_ts:
+          max_ts = timestamp
+
+        processed_entries.append({
+          "timestamp": timestamp,
+          **flattened
+        })
+
+      # Append entries to JSONL file (sorted by timestamp for consistency)
+      processed_entries.sort(key=lambda x: x["timestamp"])
+      with open(data_file, "a") as f:
+        for entry in processed_entries:
+          f.write(json.dumps(entry) + "\n")
+
+      # Update metadata
+      track_meta["columns"] = sorted(list(all_columns))
+      track_meta["totalEntries"] += len(processed_entries)
+      track_meta["firstTimestamp"] = min_ts
+      track_meta["lastTimestamp"] = max_ts
+
+      # Write metadata
+      with open(metadata_file, "w") as f:
+        json.dump(track_meta, f, indent=2)
+
+      return {
+        "trackId": track_meta["trackId"],
+        "count": len(processed_entries),
+      }
+
+  def read_track_data(
+    self,
+    owner: str,
+    project: str,
+    prefix: str,
+    topic: str,
+    start_timestamp: Optional[float] = None,
+    end_timestamp: Optional[float] = None,
+    columns: Optional[List[str]] = None,
+    format: str = "json",
+  ) -> Any:
+    """
+    Read track data from local storage with optional filtering.
+
+    Args:
+        owner: Owner/user
+        project: Project name
+        prefix: Experiment prefix
+        topic: Track topic
+        start_timestamp: Optional start timestamp filter
+        end_timestamp: Optional end timestamp filter
+        columns: Optional list of columns to retrieve
+        format: Export format ('json', 'jsonl', 'parquet', 'mocap')
+
+    Returns:
+        Track data in requested format
+    """
+    experiment_dir = self._get_experiment_dir(owner, project, prefix)
+    topic_safe = topic.replace("/", "_")
+    track_dir = experiment_dir / "tracks" / topic_safe
+    data_file = track_dir / "data.jsonl"
+
+    if not data_file.exists():
+      if format == "json":
+        return {"entries": [], "count": 0}
+      elif format == "jsonl":
+        return b""
+      elif format == "parquet":
+        # Return empty parquet file
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        import io
+        table = pa.table({"timestamp": []})
+        buf = io.BytesIO()
+        pq.write_table(table, buf)
+        return buf.getvalue()
+      elif format == "mocap":
+        return {
+          "version": "1.0",
+          "metadata": {"topic": topic, "frameCount": 0, "duration": 0},
+          "channels": [],
+          "frames": []
+        }
+
+    # Read all entries from JSONL file
+    entries = []
+    with open(data_file, "r") as f:
+      for line in f:
+        if line.strip():
+          entry = json.loads(line)
+
+          # Filter by timestamp range
+          timestamp = entry.get("timestamp")
+          if start_timestamp is not None and timestamp < start_timestamp:
+            continue
+          if end_timestamp is not None and timestamp > end_timestamp:
+            continue
+
+          # Filter by columns
+          if columns:
+            filtered_entry = {"timestamp": timestamp}
+            for col in columns:
+              if col in entry:
+                filtered_entry[col] = entry[col]
+            entries.append(filtered_entry)
+          else:
+            entries.append(entry)
+
+    # Return in requested format
+    if format == "json":
+      return {"entries": entries, "count": len(entries)}
+
+    elif format == "jsonl":
+      lines = [json.dumps(entry) for entry in entries]
+      return "\n".join(lines).encode('utf-8')
+
+    elif format == "parquet":
+      # Convert to Apache Parquet
+      import pyarrow as pa
+      import pyarrow.parquet as pq
+      import io
+
+      if not entries:
+        table = pa.table({"timestamp": []})
+      else:
+        # Build schema from entries
+        table = pa.Table.from_pylist(entries)
+
+      buf = io.BytesIO()
+      pq.write_table(table, buf, compression='zstd')
+      return buf.getvalue()
+
+    elif format == "mocap":
+      # Read metadata
+      metadata_file = track_dir / "metadata.json"
+      track_meta = {}
+      if metadata_file.exists():
+        with open(metadata_file, "r") as f:
+          track_meta = json.load(f)
+
+      # Build mocap format
+      if not entries:
+        return {
+          "version": "1.0",
+          "metadata": {
+            "topic": topic,
+            "frameCount": 0,
+            "duration": 0,
+            "startTime": 0,
+            "endTime": 0,
+          },
+          "channels": [],
+          "frames": []
+        }
+
+      first_ts = entries[0]["timestamp"]
+      last_ts = entries[-1]["timestamp"]
+      duration = last_ts - first_ts
+      fps = track_meta.get("metadata", {}).get("fps", 30) if isinstance(track_meta.get("metadata"), dict) else 30
+
+      # Get all channels (columns)
+      all_channels = set()
+      for entry in entries:
+        all_channels.update(k for k in entry.keys() if k != "timestamp")
+
+      return {
+        "version": "1.0",
+        "metadata": {
+          "topic": topic,
+          "description": track_meta.get("description"),
+          "tags": track_meta.get("tags", []),
+          "fps": fps,
+          "duration": duration,
+          "frameCount": len(entries),
+          "startTime": first_ts,
+          "endTime": last_ts,
+        },
+        "channels": sorted(list(all_channels)),
+        "frames": [{"time": e["timestamp"], **{k: v for k, v in e.items() if k != "timestamp"}} for e in entries]
+      }
+
+    else:
+      raise ValueError(f"Unsupported format: {format}")
+
+  def list_tracks(
+    self,
+    owner: str,
+    project: str,
+    prefix: str,
+    topic_filter: Optional[str] = None,
+  ) -> List[Dict[str, Any]]:
+    """
+    List all tracks in an experiment.
+
+    Args:
+        owner: Owner/user
+        project: Project name
+        prefix: Experiment prefix
+        topic_filter: Optional topic filter (e.g., "robot/*")
+
+    Returns:
+        List of track summaries
+    """
+    experiment_dir = self._get_experiment_dir(owner, project, prefix)
+    tracks_dir = experiment_dir / "tracks"
+
+    if not tracks_dir.exists():
+      return []
+
+    tracks = []
+    for track_dir in tracks_dir.iterdir():
+      if track_dir.is_dir():
+        metadata_file = track_dir / "metadata.json"
+        if metadata_file.exists():
+          with open(metadata_file, "r") as f:
+            track_meta = json.load(f)
+
+            topic = track_meta["topic"]
+
+            # Apply topic filter
+            if topic_filter:
+              if topic_filter.endswith("/*"):
+                # Prefix match
+                prefix_match = topic_filter[:-2]
+                if not topic.startswith(prefix_match):
+                  continue
+              elif topic != topic_filter:
+                # Exact match
+                continue
+
+            tracks.append({
+              "id": track_meta["trackId"],
+              "topic": topic,
+              "totalEntries": track_meta["totalEntries"],
+              "firstTimestamp": track_meta.get("firstTimestamp"),
+              "lastTimestamp": track_meta.get("lastTimestamp"),
+              "columns": track_meta.get("columns", []),
+              "createdAt": track_meta.get("createdAt"),
+            })
+
+    return tracks

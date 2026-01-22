@@ -18,6 +18,101 @@ from ..config import Config
 console = Console()
 
 
+def list_tracks(
+    remote_client: RemoteClient,
+    experiment_path: str,
+    topic_filter: Optional[str] = None,
+    output_json: bool = False,
+    verbose: bool = False
+) -> int:
+    """
+    List tracks in an experiment.
+
+    Args:
+        remote_client: Remote API client
+        experiment_path: Experiment path (namespace/project/experiment)
+        topic_filter: Optional topic filter (e.g., "robot/*")
+        output_json: Output as JSON
+        verbose: Show verbose output
+
+    Returns:
+        Exit code (0 for success, 1 for error)
+    """
+    # Parse experiment path
+    parts = experiment_path.strip("/").split("/")
+    if len(parts) < 3:
+        console.print("[red]Error:[/red] Experiment path must be 'namespace/project/experiment'")
+        return 1
+
+    namespace = parts[0]
+    project = parts[1]
+    experiment = parts[2]
+
+    try:
+        # Get experiment ID
+        exp_data = remote_client.get_experiment_graphql(project, experiment)
+        if not exp_data:
+            console.print(f"[red]Error:[/red] Experiment '{experiment}' not found in project '{project}'")
+            return 1
+
+        experiment_id = exp_data["id"]
+
+        # List tracks
+        tracks = remote_client.list_tracks(experiment_id, topic_filter)
+
+        if output_json:
+            # JSON output
+            output = {
+                "tracks": tracks,
+                "count": len(tracks),
+                "experiment": experiment_path
+            }
+            console.print(json.dumps(output, indent=2))
+            return 0
+
+        # Human-readable output
+        if not tracks:
+            console.print(f"[yellow]No tracks found[/yellow]")
+            return 0
+
+        console.print(f"\n[bold]Tracks in {experiment_path}[/bold]\n")
+
+        # Create table
+        table = Table(box=box.ROUNDED)
+        table.add_column("Topic", style="cyan", no_wrap=True)
+        table.add_column("Entries", justify="right")
+        table.add_column("Columns", style="dim")
+        table.add_column("Time Range", style="dim")
+
+        for track in tracks:
+            topic = track["topic"]
+            entries = str(track.get("totalEntries", 0))
+            columns = ", ".join(track.get("columns", [])[:5])
+            if len(track.get("columns", [])) > 5:
+                columns += f", ... (+{len(track['columns']) - 5})"
+
+            first_ts = track.get("firstTimestamp")
+            last_ts = track.get("lastTimestamp")
+            if first_ts is not None and last_ts is not None:
+                time_range = f"{first_ts:.3f} - {last_ts:.3f}"
+            else:
+                time_range = "N/A"
+
+            table.add_row(topic, entries, columns, time_range)
+
+        console.print(table)
+        console.print(f"\n[dim]Total tracks: {len(tracks)}[/dim]\n")
+
+        return 0
+
+    except Exception as e:
+        console.print(f"[red]Error listing tracks:[/red] {e}")
+        if verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        return 1
+
+
 def _format_timestamp(iso_timestamp: str) -> str:
     """Format ISO timestamp as human-readable relative time."""
     try:
@@ -248,6 +343,45 @@ def cmd_list(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for error)
     """
+    # Handle track listing if --tracks is specified
+    if args.tracks:
+        # Load config
+        config = Config()
+        remote_url = args.dash_url or config.remote_url
+        api_key = args.api_key or config.api_key
+
+        if not remote_url:
+            console.print("[red]Error:[/red] --dash-url is required (or set in config)")
+            return 1
+
+        if not args.project:
+            console.print("[red]Error:[/red] --project is required for listing tracks")
+            console.print("Example: ml-dash list --tracks --project namespace/project/experiment")
+            return 1
+
+        # Extract namespace from project path
+        parts = args.project.strip("/").split("/")
+        if len(parts) < 3:
+            console.print("[red]Error:[/red] For tracks, --project must be 'namespace/project/experiment'")
+            return 1
+
+        namespace = parts[0]
+
+        # Create remote client
+        try:
+            remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
+        except Exception as e:
+            console.print(f"[red]Error connecting to remote:[/red] {e}")
+            return 1
+
+        return list_tracks(
+            remote_client=remote_client,
+            experiment_path=args.project,
+            topic_filter=args.topic_filter,
+            output_json=args.json,
+            verbose=args.verbose
+        )
+
     # Load config
     config = Config()
 
@@ -462,6 +596,18 @@ def add_parser(subparsers) -> None:
                        choices=["COMPLETED", "RUNNING", "FAILED", "ARCHIVED"],
                        help="Filter experiments by status")
     parser.add_argument("--tags", type=str, help="Filter experiments by tags (comma-separated)")
+
+    # Track listing mode
+    parser.add_argument(
+        "--tracks",
+        action="store_true",
+        help="List tracks in experiment (requires --project as 'namespace/project/experiment')"
+    )
+    parser.add_argument(
+        "--topic-filter",
+        type=str,
+        help="Filter tracks by topic (e.g., 'robot/*')"
+    )
 
     # Output options
     parser.add_argument("--json", action="store_true", help="Output as JSON")

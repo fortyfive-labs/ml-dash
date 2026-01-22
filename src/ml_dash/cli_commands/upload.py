@@ -148,6 +148,18 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     help="JWT token for authentication (optional - auto-loads from 'ml-dash login' if not provided)",
   )
 
+  # Track upload mode
+  parser.add_argument(
+    "--tracks",
+    type=str,
+    help="Upload track data file (e.g., robot_position.jsonl). Requires --remote-path.",
+  )
+  parser.add_argument(
+    "--remote-path",
+    type=str,
+    help="Remote path for track (e.g., 'namespace/project/exp/robot/position')",
+  )
+
   """
   
   cd .dash/geyang
@@ -1079,6 +1091,121 @@ class ExperimentUploader:
     return total_uploaded
 
 
+def cmd_upload_track(args: argparse.Namespace) -> int:
+  """Upload track data file to remote server."""
+  from datetime import datetime
+
+  # Load config
+  config = Config()
+  remote_url = args.dash_url or config.remote_url
+  api_key = args.api_key or config.api_key
+
+  if not remote_url:
+    console.print("[red]Error:[/red] --dash-url is required (or set in config)")
+    return 1
+
+  if not args.tracks or not args.remote_path:
+    console.print("[red]Error:[/red] Both --tracks and --remote-path are required for track upload")
+    console.print("Usage: ml-dash upload --tracks <local-file> --remote-path namespace/project/exp/topic")
+    return 1
+
+  # Parse local file path
+  local_file = Path(args.tracks)
+  if not local_file.exists():
+    console.print(f"[red]Error:[/red] File not found: {local_file}")
+    return 1
+
+  # Parse remote path: namespace/project/.../experiment/topic
+  remote_path = args.remote_path.strip("/")
+  parts = remote_path.split("/")
+
+  if len(parts) < 4:
+    console.print(
+      "[red]Error:[/red] Remote path must be: 'namespace/project/experiment/topic'"
+    )
+    console.print("Example: geyang/project/exp1/robot/position")
+    return 1
+
+  namespace = parts[0]
+  project = parts[1]
+  experiment_name = parts[-2]  # Second to last is experiment
+  topic = "/".join(parts[-1:])  # Last part is topic (could be multi-level)
+
+  console.print(f"[bold]Uploading track data...[/bold]")
+  console.print(f"  Local file: {local_file}")
+  console.print(f"  Namespace: {namespace}")
+  console.print(f"  Project: {project}")
+  console.print(f"  Experiment: {experiment_name}")
+  console.print(f"  Topic: {topic}")
+
+  try:
+    # Initialize remote client
+    remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
+
+    # Get experiment ID
+    exp_data = remote_client.get_experiment_graphql(project, experiment_name)
+    if not exp_data:
+      console.print(
+        f"[red]Error:[/red] Experiment '{experiment_name}' not found in project '{project}'"
+      )
+      return 1
+
+    experiment_id = exp_data["id"]
+
+    # Read local file (assume JSONL format)
+    console.print(f"\n[cyan]Reading local file...[/cyan]")
+    entries = []
+
+    with open(local_file, 'r') as f:
+      for line_num, line in enumerate(f, 1):
+        if line.strip():
+          try:
+            entry = json.loads(line)
+            if "timestamp" not in entry:
+              console.print(f"[yellow]Warning:[/yellow] Line {line_num} missing timestamp, skipping")
+              continue
+            entries.append(entry)
+          except json.JSONDecodeError as e:
+            console.print(f"[yellow]Warning:[/yellow] Line {line_num} invalid JSON: {e}")
+            continue
+
+    if not entries:
+      console.print("[red]Error:[/red] No valid entries found in file")
+      return 1
+
+    console.print(f"  Found {len(entries)} entries")
+
+    # Upload in batches
+    console.print(f"\n[cyan]Uploading to server...[/cyan]")
+    batch_size = 1000
+    total_uploaded = 0
+
+    for i in range(0, len(entries), batch_size):
+      batch = entries[i:i + batch_size]
+      remote_client.append_batch_to_track(
+        experiment_id=experiment_id,
+        topic=topic,
+        entries=batch
+      )
+      total_uploaded += len(batch)
+      console.print(f"  Uploaded {total_uploaded}/{len(entries)} entries")
+
+    # Success
+    console.print(f"\n[green]✓ Track data uploaded successfully[/green]")
+    console.print(f"  Total entries: {total_uploaded}")
+    console.print(f"  Topic: {topic}")
+    console.print(f"  Experiment: {namespace}/{project}/{experiment_name}")
+
+    return 0
+
+  except Exception as e:
+    console.print(f"[red]Error uploading track data:[/red] {e}")
+    if args.verbose:
+      import traceback
+      console.print(traceback.format_exc())
+    return 1
+
+
 def cmd_upload(args: argparse.Namespace) -> int:
   """
   Execute upload command.
@@ -1089,6 +1216,10 @@ def cmd_upload(args: argparse.Namespace) -> int:
   Returns:
       Exit code (0 for success, 1 for error)
   """
+  # Handle track upload if --tracks is specified
+  if args.tracks:
+    return cmd_upload_track(args)
+
   # Load config
   config = Config()
 

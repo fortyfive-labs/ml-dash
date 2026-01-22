@@ -616,12 +616,168 @@ class ExperimentDownloader:
 
 
 # ============================================================================
+# Track Download Command
+# ============================================================================
+
+
+def cmd_download_track(args: argparse.Namespace) -> int:
+  """Download track data from remote server."""
+  # Load configuration
+  config = Config()
+  remote_url = args.dash_url or config.remote_url
+  api_key = args.api_key or config.api_key
+
+  # Validate inputs
+  if not remote_url:
+    console.print("[red]Error:[/red] --dash-url is required (or set in config)")
+    return 1
+
+  if not args.tracks:
+    console.print("[red]Error:[/red] Track path is required")
+    return 1
+
+  # Parse track path: namespace/project/experiment/topic...
+  # The challenge is determining where experiment ends and topic begins
+  # Strategy: Try to find the experiment by checking server, working backwards from the end
+  track_path = args.tracks.strip("/")
+  parts = track_path.split("/")
+
+  if len(parts) < 4:
+    console.print(
+      "[red]Error:[/red] Track path must be in format: "
+      "'namespace/project/experiment/topic'"
+    )
+    console.print("Examples:")
+    console.print("  geyang/project/experiment/position")
+    console.print("  geyang/project/experiment/robot/position")
+    console.print("  geyang/project/folder/experiment/robot/camera/position")
+    return 1
+
+  # Extract namespace and project (always first 2 parts)
+  namespace = parts[0]
+  project = parts[1]
+
+  # Try to find the experiment by iterating backwards
+  # We assume experiment is a single name (not a path), and topic comes after it
+  experiment_name = None
+  topic = None
+
+  # Initialize client early to test experiment existence
+  try:
+    remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
+  except Exception as e:
+    console.print(f"[red]Error:[/red] Failed to connect to server: {e}")
+    return 1
+
+  # Try different split points: experiment could be at index 2, 3, 4, etc.
+  # Topic is everything after the experiment
+  for exp_idx in range(2, len(parts) - 1):  # Experiment must leave at least 1 part for topic
+    potential_exp_name = parts[exp_idx]
+    potential_topic = "/".join(parts[exp_idx + 1:])
+
+    # Try to fetch this experiment from server
+    try:
+      exp_data = remote_client.get_experiment_graphql(project, potential_exp_name, namespace)
+      if exp_data:
+        # Found the experiment!
+        experiment_name = potential_exp_name
+        topic = potential_topic
+        break
+    except Exception:
+      # This experiment doesn't exist, try next index
+      continue
+
+  if not experiment_name or not topic:
+    console.print(
+      f"[red]Error:[/red] Could not find valid experiment in path: {track_path}"
+    )
+    console.print("\nTried the following experiment names:")
+    for exp_idx in range(2, len(parts) - 1):
+      console.print(f"  - {parts[exp_idx]}")
+    console.print(f"\nMake sure the experiment exists in project '{project}'")
+    return 1
+
+  console.print(f"[bold]Downloading track data...[/bold]")
+  console.print(f"  Namespace: {namespace}")
+  console.print(f"  Project: {project}")
+  console.print(f"  Experiment: {experiment_name}")
+  console.print(f"  Topic: {topic}")
+  console.print(f"  Format: {args.format}")
+
+  try:
+    # Get experiment ID (we already validated it exists during path parsing)
+    exp_data = remote_client.get_experiment_graphql(project, experiment_name, namespace)
+    experiment_id = exp_data["id"]
+
+    # Download track data
+    console.print(f"\n[cyan]Fetching track data from server...[/cyan]")
+    track_data = remote_client.get_track_data(
+      experiment_id=experiment_id,
+      topic=topic,
+      format=args.format,
+    )
+
+    # Determine output filename
+    if args.output:
+      output_path = Path(args.output)
+    else:
+      # Generate filename from topic and format
+      safe_topic = topic.replace("/", "_")
+      extension = {
+        "json": "json",
+        "jsonl": "jsonl",
+        "parquet": "parquet",
+        "mcap": "mcap",
+      }.get(args.format, args.format)
+      output_path = Path(f"{safe_topic}.{extension}")
+
+    # Write to file
+    if args.format in ("jsonl", "parquet", "mcap"):
+      # Binary data
+      output_path.write_bytes(track_data)
+    else:
+      # JSON data
+      if isinstance(track_data, dict):
+        output_path.write_text(json.dumps(track_data, indent=2))
+      else:
+        output_path.write_text(str(track_data))
+
+    # Show success message
+    file_size = output_path.stat().st_size
+    console.print(
+      f"\n[green]✓ Track data downloaded successfully[/green]"
+    )
+    console.print(f"  Output: {output_path}")
+    console.print(f"  Size: {_format_bytes(file_size)}")
+    console.print(f"  Format: {args.format}")
+
+    # Show entry count if available
+    if args.format == "json" and isinstance(track_data, dict):
+      entry_count = track_data.get("count", len(track_data.get("entries", [])))
+      if entry_count:
+        console.print(f"  Entries: {entry_count}")
+
+    return 0
+
+  except Exception as e:
+    console.print(f"[red]Error downloading track data:[/red] {e}")
+    if args.verbose:
+      import traceback
+      console.print(traceback.format_exc())
+    return 1
+
+
+# ============================================================================
 # Main Command
 # ============================================================================
 
 
 def cmd_download(args: argparse.Namespace) -> int:
   """Execute download command."""
+  # Handle track download if --tracks is specified
+  if args.tracks:
+    return cmd_download_track(args)
+
   # Load configuration
   config = Config()
   remote_url = args.dash_url or config.remote_url
@@ -798,6 +954,27 @@ def add_parser(subparsers):
     nargs="?",
     default="./.dash",
     help="Local storage directory (default: ./.dash)",
+  )
+
+  # Track download mode
+  parser.add_argument(
+    "--tracks",
+    type=str,
+    help="Download track data from path (e.g., 'namespace/project/exp/robot/position')",
+  )
+  parser.add_argument(
+    "-f",
+    "--format",
+    type=str,
+    choices=["json", "jsonl", "parquet", "mcap"],
+    default="jsonl",
+    help="Track export format (default: jsonl)",
+  )
+  parser.add_argument(
+    "-o",
+    "--output",
+    type=str,
+    help="Output file path (default: auto-generated from topic)",
   )
 
   # Remote configuration

@@ -6,6 +6,45 @@ from typing import Optional, Dict, Any, List
 import httpx
 
 
+def _serialize_value(value: Any) -> Any:
+    """
+    Convert value to JSON-serializable format.
+
+    Handles numpy arrays, nested dicts/lists, etc.
+
+    Args:
+        value: Value to serialize
+
+    Returns:
+        JSON-serializable value
+    """
+    # Check for numpy array
+    if hasattr(value, '__array__') or (hasattr(value, 'tolist') and hasattr(value, 'dtype')):
+        # It's a numpy array
+        try:
+            return value.tolist()
+        except AttributeError:
+            pass
+
+    # Check for numpy scalar types
+    if hasattr(value, 'item'):
+        try:
+            return value.item()
+        except (AttributeError, ValueError):
+            pass
+
+    # Recursively handle dicts
+    if isinstance(value, dict):
+        return {k: _serialize_value(v) for k, v in value.items()}
+
+    # Recursively handle lists
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(v) for v in value]
+
+    # Return as-is for other types (int, float, str, bool, None)
+    return value
+
+
 class RemoteClient:
     """Client for communicating with ML-Dash server."""
 
@@ -1282,14 +1321,18 @@ class RemoteClient:
             }
             files {
               id
-              filename
-              path
-              contentType
-              sizeBytes
-              checksum
+              name
+              pPath
               description
               tags
               metadata
+              physicalFile {
+                filename
+                contentType
+                sizeBytes
+                checksum
+                s3Url
+              }
             }
             parameters {
               id
@@ -1306,16 +1349,15 @@ class RemoteClient:
         return result.get("experiments", [])
 
     def get_experiment_graphql(
-        self, project_slug: str, experiment_name: str
+        self, project_slug: str, experiment_name: str, namespace_slug: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Get a single experiment via GraphQL.
 
-        Namespace is automatically inferred from JWT token on the server.
-
         Args:
             project_slug: Project slug
             experiment_name: Experiment name
+            namespace_slug: Namespace slug (optional - defaults to client's namespace)
 
         Returns:
             Experiment dict with metadata, or None if not found
@@ -1324,8 +1366,8 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Experiment($projectSlug: String!, $experimentName: String!) {
-          experiment(projectSlug: $projectSlug, experimentName: $experimentName) {
+        query Experiment($namespaceSlug: String, $projectSlug: String!, $experimentName: String!) {
+          experiment(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, experimentName: $experimentName) {
             id
             name
             description
@@ -1349,14 +1391,18 @@ class RemoteClient:
             }
             files {
               id
-              filename
-              path
-              contentType
-              sizeBytes
-              checksum
+              name
+              pPath
               description
               tags
               metadata
+              physicalFile {
+                filename
+                contentType
+                sizeBytes
+                checksum
+                s3Url
+              }
             }
             parameters {
               id
@@ -1365,7 +1411,11 @@ class RemoteClient:
           }
         }
         """
+        # Use provided namespace or fall back to client's namespace
+        ns = namespace_slug or self.namespace
+
         variables = {
+            "namespaceSlug": ns,
             "projectSlug": project_slug,
             "experimentName": experiment_name
         }
@@ -1424,14 +1474,18 @@ class RemoteClient:
             }
             files {
               id
-              filename
-              path
-              contentType
-              sizeBytes
-              checksum
+              name
+              pPath
               description
               tags
               metadata
+              physicalFile {
+                filename
+                contentType
+                sizeBytes
+                checksum
+                s3Url
+              }
             }
           }
         }
@@ -1600,6 +1654,197 @@ class RemoteClient:
         )
         response.raise_for_status()
         return response.json()
+
+    # =============================================================================
+    # Track Methods
+    # =============================================================================
+
+    def create_track(
+        self,
+        experiment_id: str,
+        topic: str,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a new track for timestamped multi-modal data.
+
+        Args:
+            experiment_id: Experiment ID (Snowflake ID)
+            topic: Track topic (e.g., "robot/position", "camera/rgb")
+            description: Optional track description
+            tags: Optional tags
+            metadata: Optional metadata (e.g., fps, units)
+
+        Returns:
+            Dict with track ID and metadata
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        payload = {
+            "topic": topic,
+        }
+        if description:
+            payload["description"] = description
+        if tags:
+            payload["tags"] = tags
+        if metadata:
+            payload["metadata"] = metadata
+
+        response = self._client.post(
+            f"/experiments/{experiment_id}/tracks",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def append_to_track(
+        self,
+        experiment_id: str,
+        topic: str,
+        timestamp: float,
+        data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Append a single entry to a track.
+
+        Args:
+            experiment_id: Experiment ID (Snowflake ID)
+            topic: Track topic (e.g., "robot/position")
+            timestamp: Numeric timestamp
+            data: Data fields as dict (will be flattened with dot-notation)
+
+        Returns:
+            Dict with timestamp and flattened data
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        import urllib.parse
+
+        topic_encoded = urllib.parse.quote(topic, safe='')
+
+        response = self._client.post(
+            f"/experiments/{experiment_id}/tracks/{topic_encoded}/append",
+            json={"timestamp": timestamp, "data": data},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def append_batch_to_track(
+        self,
+        experiment_id: str,
+        topic: str,
+        entries: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Append multiple entries to a track in batch.
+
+        Args:
+            experiment_id: Experiment ID (Snowflake ID)
+            topic: Track topic (e.g., "robot/position")
+            entries: List of entries, each with 'timestamp' and other data fields
+
+        Returns:
+            Dict with count of entries added
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        import urllib.parse
+
+        topic_encoded = urllib.parse.quote(topic, safe='')
+
+        # Serialize entries to handle numpy arrays
+        serialized_entries = [_serialize_value(entry) for entry in entries]
+
+        response = self._client.post(
+            f"/experiments/{experiment_id}/tracks/{topic_encoded}/append_batch",
+            json={"entries": serialized_entries},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_track_data(
+        self,
+        experiment_id: str,
+        topic: str,
+        start_timestamp: Optional[float] = None,
+        end_timestamp: Optional[float] = None,
+        columns: Optional[List[str]] = None,
+        format: str = "json",
+    ) -> Any:
+        """
+        Get track data with optional filtering.
+
+        Args:
+            experiment_id: Experiment ID
+            topic: Track topic
+            start_timestamp: Optional start timestamp filter
+            end_timestamp: Optional end timestamp filter
+            columns: Optional list of columns to retrieve
+            format: Export format ('json', 'jsonl', 'parquet', 'mcap')
+
+        Returns:
+            Track data in requested format (dict for json, bytes for jsonl/parquet/mcap)
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        import urllib.parse
+
+        topic_encoded = urllib.parse.quote(topic, safe='')
+        params: Dict[str, str] = {"format": format}
+
+        if start_timestamp is not None:
+            params["start_timestamp"] = str(start_timestamp)
+        if end_timestamp is not None:
+            params["end_timestamp"] = str(end_timestamp)
+        if columns:
+            params["columns"] = ",".join(columns)
+
+        response = self._client.get(
+            f"/experiments/{experiment_id}/tracks/{topic_encoded}/data",
+            params=params,
+        )
+        response.raise_for_status()
+
+        # Return bytes for binary formats, dict for JSON
+        if format in ("jsonl", "parquet", "mcap"):
+            return response.content
+        return response.json()
+
+    def list_tracks(
+        self,
+        experiment_id: str,
+        topic_filter: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all tracks in an experiment.
+
+        Args:
+            experiment_id: Experiment ID
+            topic_filter: Optional topic filter (e.g., "robot/*" for prefix match)
+
+        Returns:
+            List of track metadata dicts
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+        """
+        params: Dict[str, str] = {}
+        if topic_filter:
+            params["topic"] = topic_filter
+
+        response = self._client.get(
+            f"/experiments/{experiment_id}/tracks",
+            params=params,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result.get("tracks", [])
 
     def close(self):
         """Close the HTTP clients."""

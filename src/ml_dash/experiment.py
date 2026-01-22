@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from .buffer import BackgroundBufferManager, BufferConfig
 from .client import RemoteClient
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
@@ -212,6 +213,11 @@ class Experiment:
     self._experiment_data: Optional[Dict[str, Any]] = None
     self._is_open = False
     self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
+    self._tracks_manager: Optional["TracksManager"] = None  # Cached tracks manager
+
+    # Initialize buffer manager
+    self._buffer_config = BufferConfig.from_env()
+    self._buffer_manager: Optional[BackgroundBufferManager] = None
 
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
@@ -324,6 +330,11 @@ class Experiment:
         metadata=self.metadata,
       )
 
+    # Start background buffer
+    if self._buffer_config.buffer_enabled:
+      self._buffer_manager = BackgroundBufferManager(self, self._buffer_config)
+      self._buffer_manager.start()
+
     self._is_open = True
     return self
 
@@ -342,6 +353,11 @@ class Experiment:
     # # Flush any pending writes
     # if self.run._storage:
     #   self.run._storage.flush()
+
+    # Flush and stop buffer BEFORE status update
+    # Waits indefinitely for all data to be flushed (important for large files)
+    if self._buffer_manager:
+      self._buffer_manager.stop()
 
     # Update experiment status in remote mode
     if self.run._client and self._experiment_id:
@@ -500,8 +516,8 @@ class Experiment:
     timestamp: Optional[datetime],
   ) -> None:
     """
-    Internal method to write a log entry immediately.
-    No buffering - writes directly to storage/remote AND stdout/stderr.
+    Internal method to write a log entry.
+    Uses buffering if enabled, otherwise writes directly.
 
     Args:
         message: Log message
@@ -509,55 +525,59 @@ class Experiment:
         metadata: Optional metadata dict
         timestamp: Optional custom timestamp (defaults to now)
     """
-    log_entry = {
-      "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
-      "level": level,
-      "message": message,
-    }
-
-    if metadata:
-      log_entry["metadata"] = metadata
-
-    # Mirror to stdout/stderr before writing to storage
+    # Print to console immediately (user visibility)
     self._print_log(message, level, metadata)
 
-    # Write immediately (no buffering)
-    if self.run._client:
-      # Remote mode: send to API (wrapped in array for batch API)
-      try:
-        self.run._client.create_log_entries(
-          experiment_id=self._experiment_id,
-          logs=[log_entry],  # Single log in array
-        )
-      except Exception as e:
-        # Log warning but don't crash training
-        import warnings
+    # Buffer or write immediately
+    if self._buffer_manager and self._buffer_config.buffer_enabled:
+      self._buffer_manager.buffer_log(message, level, metadata, timestamp)
+    else:
+      # Immediate write (backward compatibility)
+      log_entry = {
+        "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
+        "level": level,
+        "message": message,
+      }
 
-        warnings.warn(
-          f"Failed to write log to remote server: {e}. Training will continue.",
-          RuntimeWarning,
-          stacklevel=4,
-        )
-        # Fall through to local storage if available
+      if metadata:
+        log_entry["metadata"] = metadata
 
-    if self.run._storage:
-      # Local mode: write to file immediately
-      try:
-        self.run._storage.write_log(
-          owner=self.run.owner,
-          project=self.run.project,
-          prefix=self.run._folder_path,
-          message=log_entry["message"],
-          level=log_entry["level"],
-          metadata=log_entry.get("metadata"),
-          timestamp=log_entry["timestamp"],
-        )
-      except Exception as e:
-        import warnings
+      if self.run._client:
+        # Remote mode: send to API (wrapped in array for batch API)
+        try:
+          self.run._client.create_log_entries(
+            experiment_id=self._experiment_id,
+            logs=[log_entry],  # Single log in array
+          )
+        except Exception as e:
+          # Log warning but don't crash training
+          import warnings
 
-        warnings.warn(
-          f"Failed to write log to local storage: {e}", RuntimeWarning, stacklevel=4
-        )
+          warnings.warn(
+            f"Failed to write log to remote server: {e}. Training will continue.",
+            RuntimeWarning,
+            stacklevel=4,
+          )
+          # Fall through to local storage if available
+
+      if self.run._storage:
+        # Local mode: write to file immediately
+        try:
+          self.run._storage.write_log(
+            owner=self.run.owner,
+            project=self.run.project,
+            prefix=self.run._folder_path,
+            message=log_entry["message"],
+            level=log_entry["level"],
+            metadata=log_entry.get("metadata"),
+            timestamp=log_entry["timestamp"],
+          )
+        except Exception as e:
+          import warnings
+
+          warnings.warn(
+            f"Failed to write log to local storage: {e}", RuntimeWarning, stacklevel=4
+          )
 
   def _print_log(
     self, message: str, level: str, metadata: Optional[Dict[str, Any]]
@@ -676,6 +696,7 @@ class Experiment:
   ) -> Dict[str, Any]:
     """
     Internal method to upload a file.
+    Uses buffering if enabled, otherwise uploads directly.
 
     Args:
         file_path: Local file path
@@ -689,43 +710,52 @@ class Experiment:
         size_bytes: File size in bytes
 
     Returns:
-        File metadata dict
+        File metadata dict (or pending status if buffering)
     """
-    result = None
-
-    if self.run._client:
-      # Remote mode: upload to API
-      result = self.run._client.upload_file(
-        experiment_id=self._experiment_id,
-        file_path=file_path,
-        prefix=prefix,
-        filename=filename,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-        checksum=checksum,
-        content_type=content_type,
-        size_bytes=size_bytes,
+    # Buffer or upload immediately
+    if self._buffer_manager and self._buffer_config.buffer_enabled:
+      self._buffer_manager.buffer_file(
+        file_path, prefix, filename, description, tags, metadata,
+        checksum, content_type, size_bytes
       )
+      return {"id": "pending", "status": "queued"}
+    else:
+      # Immediate upload (backward compatibility)
+      result = None
 
-    if self.run._storage:
-      # Local mode: copy to local storage
-      result = self.run._storage.write_file(
-        owner=self.run.owner,
-        project=self.run.project,
-        prefix=self.run._folder_path,
-        file_path=file_path,
-        path=prefix,
-        filename=filename,
-        description=description,
-        tags=tags,
-        metadata=metadata,
-        checksum=checksum,
-        content_type=content_type,
-        size_bytes=size_bytes,
-      )
+      if self.run._client:
+        # Remote mode: upload to API
+        result = self.run._client.upload_file(
+          experiment_id=self._experiment_id,
+          file_path=file_path,
+          prefix=prefix,
+          filename=filename,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+          checksum=checksum,
+          content_type=content_type,
+          size_bytes=size_bytes,
+        )
 
-    return result
+      if self.run._storage:
+        # Local mode: copy to local storage
+        result = self.run._storage.write_file(
+          owner=self.run.owner,
+          project=self.run.project,
+          prefix=self.run._folder_path,
+          file_path=file_path,
+          path=prefix,
+          filename=filename,
+          description=description,
+          tags=tags,
+          metadata=metadata,
+          checksum=checksum,
+          content_type=content_type,
+          size_bytes=size_bytes,
+        )
+
+      return result
 
   def _list_files(
     self, prefix: Optional[str] = None, tags: Optional[List[str]] = None
@@ -952,6 +982,50 @@ class Experiment:
       self._metrics_manager = MetricsManager(self)
     return self._metrics_manager
 
+  @property
+  @requires_open
+  def tracks(self) -> "TracksManager":
+    """
+    Get a TracksManager for timestamped track operations.
+
+    Supports topic-based logging with automatic timestamp merging:
+    - experiment.tracks("robot/position").append(q=[0.1, 0.2], _ts=0.0)
+    - experiment.tracks.flush()  # Flush all topics
+    - experiment.tracks("robot/position").flush()  # Flush specific topic
+
+    Returns:
+        TracksManager instance
+
+    Raises:
+        RuntimeError: If experiment is not open
+
+    Examples:
+        # Log track data with timestamp
+        experiment.tracks("robot/position").append(
+            q=[0.1, -0.22, 0.45],
+            e=[0.5, 0.0, 0.6],
+            _ts=2.0
+        )
+
+        # Entries with same timestamp are automatically merged
+        experiment.tracks("camera/rgb").append(frame_id=0, _ts=0.0)
+        experiment.tracks("camera/rgb").append(path="frame_0.png", _ts=0.0)
+
+        # Read track data
+        data = experiment.tracks("robot/position").read(format="json")
+
+        # Download in different formats
+        jsonl = experiment.tracks("robot/position").read(format="jsonl")
+        parquet = experiment.tracks("robot/position").read(format="parquet")
+        mocap = experiment.tracks("robot/position").read(format="mocap")
+    """
+    from .track import TracksManager
+
+    # Cache the TracksManager instance to preserve TrackBuilder cache across calls
+    if self._tracks_manager is None:
+      self._tracks_manager = TracksManager(self)
+    return self._tracks_manager
+
   def _append_to_metric(
     self,
     name: Optional[str],
@@ -962,6 +1036,7 @@ class Experiment:
   ) -> Optional[Dict[str, Any]]:
     """
     Internal method to append a single data point to a metric.
+    Uses buffering if enabled, otherwise writes directly.
 
     Args:
         name: Metric name (can be None for unnamed metrics)
@@ -971,58 +1046,125 @@ class Experiment:
         metadata: Optional metadata
 
     Returns:
-        Dict with metricId, index, bufferedDataPoints, chunkSize or None if all backends fail
+        Dict with metricId, index, bufferedDataPoints, chunkSize or None if buffering enabled/all backends fail
     """
-    result = None
+    # Buffer or write immediately
+    if self._buffer_manager and self._buffer_config.buffer_enabled:
+      self._buffer_manager.buffer_metric(name, data, description, tags, metadata)
+      return None  # No immediate response when buffering
+    else:
+      # Immediate write (backward compatibility)
+      result = None
 
-    if self.run._client:
-      # Remote mode: append via API
-      try:
-        result = self.run._client.append_to_metric(
-          experiment_id=self._experiment_id,
-          metric_name=name,
-          data=data,
-          description=description,
-          tags=tags,
-          metadata=metadata,
-        )
-      except Exception as e:
-        # Log warning but don't crash training
-        import warnings
+      if self.run._client:
+        # Remote mode: append via API
+        try:
+          result = self.run._client.append_to_metric(
+            experiment_id=self._experiment_id,
+            metric_name=name,
+            data=data,
+            description=description,
+            tags=tags,
+            metadata=metadata,
+          )
+        except Exception as e:
+          # Log warning but don't crash training
+          import warnings
 
-        metric_display = f"'{name}'" if name else "unnamed metric"
-        warnings.warn(
-          f"Failed to log {metric_display} to remote server: {e}. "
-          f"Training will continue.",
-          RuntimeWarning,
-          stacklevel=3,
-        )
-        # Fall through to local storage if available
+          metric_display = f"'{name}'" if name else "unnamed metric"
+          warnings.warn(
+            f"Failed to log {metric_display} to remote server: {e}. "
+            f"Training will continue.",
+            RuntimeWarning,
+            stacklevel=3,
+          )
+          # Fall through to local storage if available
 
-    if self.run._storage:
-      # Local mode: append to local storage
-      try:
-        result = self.run._storage.append_to_metric(
-          owner=self.run.owner,
-          project=self.run.project,
-          prefix=self.run._folder_path,
-          metric_name=name,
-          data=data,
-          description=description,
-          tags=tags,
-          metadata=metadata,
-        )
-      except Exception as e:
-        import warnings
+      if self.run._storage:
+        # Local mode: append to local storage
+        try:
+          result = self.run._storage.append_to_metric(
+            owner=self.run.owner,
+            project=self.run.project,
+            prefix=self.run._folder_path,
+            metric_name=name,
+            data=data,
+            description=description,
+            tags=tags,
+            metadata=metadata,
+          )
+        except Exception as e:
+          import warnings
 
-        metric_display = f"'{name}'" if name else "unnamed metric"
-        warnings.warn(
-          f"Failed to log {metric_display} to local storage: {e}",
-          RuntimeWarning,
-          stacklevel=3,
-        )
+          metric_display = f"'{name}'" if name else "unnamed metric"
+          warnings.warn(
+            f"Failed to log {metric_display} to local storage: {e}",
+            RuntimeWarning,
+            stacklevel=3,
+          )
 
-    return result
+      return result
+
+  def _write_track(
+    self,
+    topic: str,
+    timestamp: float,
+    data: Dict[str, Any],
+  ) -> None:
+    """
+    Internal method to write a track entry with timestamp.
+    Uses buffering with timestamp-based merging if enabled.
+
+    Args:
+        topic: Track topic (e.g., "robot/position")
+        timestamp: Entry timestamp
+        data: Data fields
+
+    Note:
+        Entries with the same timestamp are automatically merged in the buffer.
+    """
+    # Buffer or write immediately
+    if self._buffer_manager and self._buffer_config.buffer_enabled:
+      self._buffer_manager.buffer_track(topic, timestamp, data)
+    else:
+      # Immediate write (no buffering)
+      if self.run._client:
+        # Remote mode: append via API
+        try:
+          self.run._client.append_batch_to_track(
+            experiment_id=self._experiment_id,
+            topic=topic,
+            entries=[{"timestamp": timestamp, **data}],
+          )
+        except Exception as e:
+          # Log warning but don't crash training
+          import warnings
+
+          warnings.warn(
+            f"Failed to log track '{topic}' to remote server: {e}. "
+            f"Training will continue.",
+            RuntimeWarning,
+            stacklevel=3,
+          )
+
+      if self.run._storage:
+        # Local mode: append to local storage
+        try:
+          self.run._storage.append_batch_to_track(
+            owner=self.run.owner,
+            project=self.run.project,
+            prefix=self.run._folder_path,
+            topic=topic,
+            entries=[{"timestamp": timestamp, **data}],
+          )
+        except Exception as e:
+          import warnings
+
+          warnings.warn(
+            f"Failed to log track '{topic}' to local storage: {e}",
+            RuntimeWarning,
+            stacklevel=3,
+          )
 
   def _append_batch_to_metric(
     self,
@@ -1251,6 +1393,24 @@ class Experiment:
   def _storage(self, value) -> None:
     """Set the local storage."""
     self.run._storage = value
+
+  def flush(self) -> None:
+    """
+    Manually flush all buffered data.
+
+    Forces immediate flush of all queued logs, metrics, and files.
+    Waits for all file uploads to complete.
+
+    Examples:
+        with Experiment("my-project/exp").run as exp:
+            for epoch in range(100):
+                exp.metrics("train").log(loss=loss)
+
+            exp.flush()  # Ensure metrics written before checkpoint
+            torch.save(model, "model.pt")
+    """
+    if self._buffer_manager:
+      self._buffer_manager.flush_all()
 
   @property
   def id(self) -> Optional[str]:
