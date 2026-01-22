@@ -1,5 +1,5 @@
 ---
-description: Tracking parameters, metrics, and logs in ML-Dash experiments
+description: Tracking parameters, metrics, logs, and tracks in ML-Dash experiments
 globs:
   - "**/*.py"
   - "**/train*.py"
@@ -11,12 +11,12 @@ keywords:
   - metrics
   - log
   - logging
-  - append
-  - append_batch
-  - set
+  - tracks
   - time series
   - loss
   - accuracy
+  - trajectory
+  - sensor
 ---
 
 # ML-Dash Data Tracking
@@ -65,69 +65,40 @@ args = parser.parse_args()
 experiment.params.set(**vars(args))
 ```
 
-### From Dataclass
-```python
-from dataclasses import dataclass, asdict
-
-@dataclass
-class Config:
-    learning_rate: float = 0.001
-    batch_size: int = 32
-
-experiment.params.set(**asdict(Config()))
-```
-
 ---
 
 ## Metrics (Time Series)
 
 ### Basic Usage
 ```python
-experiment.metrics("train_loss").append(value=0.5, epoch=1)
-experiment.metrics("accuracy").append(value=0.85, step=100, epoch=1)
+# Log metrics with keyword arguments
+experiment.metrics("train").log(loss=0.5, epoch=1)
+experiment.metrics("eval").log(accuracy=0.85, step=100, epoch=1)
 ```
 
-### Flexible Schema
+### Multiple Fields Per Point
 ```python
-# Multiple fields per point
-experiment.metrics("metrics").append(
+experiment.metrics("metrics").log(
     loss=0.5,
     accuracy=0.85,
     learning_rate=0.001,
     epoch=1
 )
-
-# With timestamp
-import time
-experiment.metrics("system").append(
-    cpu_percent=45.2,
-    memory_mb=1024,
-    timestamp=time.time()
-)
 ```
 
-### Batch Append (Better Performance)
+### Multiple Metric Streams
 ```python
-experiment.metrics("train_loss").append_batch([
-    {"value": 0.5, "step": 1, "epoch": 1},
-    {"value": 0.45, "step": 2, "epoch": 1},
-    {"value": 0.40, "step": 3, "epoch": 1},
-])
+for epoch in range(5):
+    experiment.metrics("train").log(loss=0.5 - epoch * 0.1, epoch=epoch)
+    experiment.metrics("eval").log(loss=0.6 - epoch * 0.1, epoch=epoch)
 ```
 
-### Batch Collection Pattern
+### Flexible Schema
 ```python
-batch = []
-for step in range(1000):
-    loss = train_step()
-    batch.append({"value": loss, "step": step})
-
-    if len(batch) >= 100:
-        experiment.metrics("train_loss").append_batch(batch)
-        batch = []
-
-if batch:  # Remaining
-    experiment.metrics("train_loss").append_batch(batch)
+# Schema can vary between data points
+experiment.metrics("flexible").log(field_a=1, field_b=2)
+experiment.metrics("flexible").log(field_a=3, field_c=4)
+experiment.metrics("flexible").log(field_a=5, field_b=6, field_c=7)
 ```
 
 ### Reading Metrics
@@ -135,6 +106,60 @@ if batch:  # Remaining
 result = experiment.metrics("loss").read(start_index=0, limit=10)
 for point in result['data']:
     print(f"Index {point['index']}: {point['data']}")
+```
+
+### Get Stats
+```python
+stats = experiment.metrics("train").stats()
+print(f"Total points: {stats['totalDataPoints']}")
+```
+
+---
+
+## Tracks (Timestamped Multi-Modal Data)
+
+Tracks are for sparse timestamped data like robot trajectories, camera poses, sensor readings.
+
+### Basic Usage
+```python
+# Timestamp (_ts) is required
+experiment.tracks("robot/position").append(
+    q=[0.1, 0.2, 0.3],      # joint positions
+    e=[0.5, 0.0, 0.6],      # end effector
+    _ts=1.0                  # timestamp in seconds
+)
+```
+
+### Multiple Fields with Same Timestamp
+```python
+# Entries with same timestamp are merged
+experiment.tracks("robot/state").append(q=[0.1, 0.2], _ts=1.0)
+experiment.tracks("robot/state").append(v=[0.01, 0.02], _ts=1.0)
+# Result: {_ts: 1.0, q: [0.1, 0.2], v: [0.01, 0.02]}
+```
+
+### Flushing Tracks
+```python
+# Flush specific topic
+experiment.tracks("robot/position").flush()
+
+# Flush all track topics
+experiment.tracks.flush()
+```
+
+### Reading Track Data
+```python
+# Read all data
+data = experiment.tracks("robot/position").read()
+
+# Read with time range
+data = experiment.tracks("robot/position").read(
+    start_timestamp=0.0,
+    end_timestamp=10.0
+)
+
+# Export formats: json, jsonl, parquet, mocap
+parquet_data = experiment.tracks("robot/position").read(format="parquet")
 ```
 
 ---
@@ -165,19 +190,6 @@ experiment.log(
 )
 ```
 
-### Training Loop Pattern
-```python
-for epoch in range(10):
-    train_loss = train_one_epoch()
-    val_loss = validate()
-
-    experiment.log(
-        f"Epoch {epoch + 1} complete",
-        level="info",
-        metadata={"train_loss": train_loss, "val_loss": val_loss}
-    )
-```
-
 ### Error Tracking
 ```python
 try:
@@ -196,11 +208,13 @@ except Exception as e:
 ## Storage Format
 
 ### Local Mode
-- Parameters: `parameters/parameters.json`
+- Parameters: `parameters.json`
 - Metrics: `metrics/{name}/data.jsonl`
 - Logs: `logs/logs.jsonl`
+- Tracks: `tracks/{topic}/data.jsonl`
 
 ### Remote Mode
 - Parameters: MongoDB document
 - Metrics: MongoDB (hot) + S3 (cold, after 10K points)
 - Logs: MongoDB with timestamp/level indexing
+- Tracks: MongoDB with timestamp indexing

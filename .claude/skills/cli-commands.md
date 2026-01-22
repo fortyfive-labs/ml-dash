@@ -1,5 +1,5 @@
 ---
-description: ML-Dash CLI commands for authentication, uploading, downloading, and listing experiments
+description: ML-Dash CLI commands for authentication, creating projects, uploading, downloading, and listing experiments
 globs:
   - "**/*.sh"
   - "**/*.bash"
@@ -14,6 +14,7 @@ keywords:
   - upload
   - download
   - list
+  - create
   - authentication
   - OAuth
   - api-key
@@ -58,6 +59,23 @@ ml-dash upload --api-key your-jwt-token
 
 # Or config file ~/.dash/config.json
 {"remote_url": "https://api.dash.ml", "api_key": "your-jwt-token"}
+```
+
+---
+
+## Create Command
+
+Create projects on the remote server.
+
+```bash
+# Create a project in current user's namespace
+ml-dash create -p new-project
+
+# Create a project in a specific namespace
+ml-dash create -p geyang/new-project
+
+# Create with description
+ml-dash create -p geyang/tutorials -d "ML tutorials and examples"
 ```
 
 ---
@@ -194,6 +212,15 @@ ml-dash upload ./backup
 ml-dash list                              # See all experiments
 ml-dash list -p vision-models             # See specific project
 ml-dash download ./data -p "vision-models/resnet-50"
+```
+
+### Create Project Then Run Experiment
+```bash
+# Create project first
+ml-dash create -p geyang/new-research
+
+# Then run experiments
+python train.py  # Uses prefix="geyang/new-research/exp-name"
 ```
 
 ---

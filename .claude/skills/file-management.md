@@ -15,6 +15,9 @@ keywords:
   - save_fig
   - save_video
   - save_torch
+  - save_text
+  - save_json
+  - save_blob
   - model.pth
   - visualization
   - plot
@@ -23,14 +26,55 @@ keywords:
 
 # ML-Dash File Management
 
-## Basic Upload
+## Fluent File API
 
+### Save Existing File
 ```python
 result = experiment.files("models").save("model.pth")
 
 print(f"Uploaded: {result['filename']}")
 print(f"Size: {result['sizeBytes']} bytes")
 print(f"Checksum: {result['checksum']}")
+```
+
+### Save with Custom Filename
+```python
+result = experiment.files("data").save(b"hello world", to="greeting.bin")
+```
+
+### Save Dict/List as JSON
+```python
+config = {"model": "resnet50", "lr": 0.001}
+result = experiment.files("configs").save(config, to="config.json")
+
+data = [1, 2, 3, {"key": "value"}]
+result = experiment.files("data").save(data, to="array.json")
+```
+
+## Specialized Save Methods
+
+### Save Text
+```python
+content = "Hello, World!\nThis is a test."
+result = experiment.files("texts").save_text(content, to="greeting.txt")
+```
+
+### Save JSON
+```python
+data = {"hey": "yo", "count": 42}
+result = experiment.files("configs").save_json(data, to="config.json")
+```
+
+### Save Binary (Blob)
+```python
+data = b"\x00\x01\x02\x03\x04\x05"
+result = experiment.files("data").save_blob(data, to="binary.bin")
+```
+
+### Save with Path Including Prefix
+```python
+# Creates file at /configs/settings.json
+result = experiment.files().save({"key": "value"}, to="configs/settings.json")
 ```
 
 ## Organizing Files with Paths
@@ -61,32 +105,48 @@ experiment.files("models").save(
 )
 ```
 
-## Downloading Files
+## Listing Files
 
 ```python
-# Upload first
-upload_result = experiment.files("models").save("model.pth")
-file_id = upload_result["id"]
-
-# Download to specific path
-downloaded = experiment.files(file_id=file_id).download(dest_path="./downloaded_model.pth")
-
-# Download with original filename
-downloaded = experiment.files(file_id=file_id).download()
-```
-
-## List and Download
-
-```python
+# List all files
 files = experiment.files().list()
-
 for f in files:
     print(f"File: {f['filename']}, Path: {f['path']}, Size: {f['sizeBytes']}")
 
-# Download specific file
-best = next((f for f in files if "best" in f.get("tags", [])), None)
-if best:
-    experiment.files(file_id=best["id"]).download(dest_path="./best.pth")
+# List files in a prefix
+files = experiment.files("models").list()
+
+# List with glob pattern
+json_files = experiment.files("data").list("*.json")
+txt_files = experiment.files("data").list("*.txt")
+```
+
+## Downloading Files
+
+```python
+# Download by file_id
+upload_result = experiment.files("models").save("model.pth")
+file_id = upload_result["id"]
+downloaded = experiment.files(file_id=file_id).download(to="./downloaded_model.pth")
+
+# Download by filename
+downloaded = experiment.files("model.txt").download(to="./out.txt")
+
+# Download with glob pattern
+downloaded = experiment.files("data").download("*.txt", to="./downloads/")
+```
+
+## Deleting Files
+
+```python
+# Delete by filename
+result = experiment.files("model.txt").delete()
+
+# Delete with pattern
+results = experiment.files("data").delete("*.txt")
+
+# Delete using full path
+result = experiment.files.delete("models/model.txt")
 ```
 
 ## Saving Matplotlib Figures
@@ -136,11 +196,8 @@ experiment.files("videos").save_video(frames, to="animation.gif")
 ## Saving PyTorch Models
 
 ```python
-# Using the singleton
-from ml_dash import dxp
-
-dxp.files("models").save_torch(model, to="model.pt")
-dxp.files("models").save_torch(model.state_dict(), to="model_state.pt")
+experiment.files("models").save_torch(model, to="model.pt")
+experiment.files("models").save_torch(model.state_dict(), to="model_state.pt")
 ```
 
 ## Training Checkpoint Pattern
@@ -152,8 +209,8 @@ for epoch in range(100):
     train_loss = train_one_epoch(model)
     val_accuracy = validate(model)
 
-    experiment.metrics("train_loss").append(value=train_loss, epoch=epoch)
-    experiment.metrics("val_accuracy").append(value=val_accuracy, epoch=epoch)
+    experiment.metrics("train_loss").log(value=train_loss, epoch=epoch)
+    experiment.metrics("val_accuracy").log(value=val_accuracy, epoch=epoch)
 
     # Save checkpoint every 10 epochs
     if (epoch + 1) % 10 == 0:
@@ -176,20 +233,18 @@ for epoch in range(100):
         )
 ```
 
-## Storage Structure
+## Background Uploads
 
-### Local Mode
-```
-files/
-├── models/
-│   └── {snowflake_id}/model.pth
-├── checkpoints/
-│   └── {snowflake_id}/checkpoint.pth
-└── visualizations/
-    └── {snowflake_id}/plot.png
-```
+Files are automatically uploaded in the background for non-blocking performance:
 
-### Remote Mode
-- Files: S3 `s3://bucket/files/{namespace}/{project}/{experiment}/{prefix}/{file_id}/filename`
-- Metadata: MongoDB (path, size, SHA256 checksum, tags)
-- File size limit: 5GB
+```python
+with experiment.run:
+    # Non-blocking - returns immediately
+    experiment.files("models").save_torch(large_model, to="model.pt")
+
+    # Continue training while upload happens in background
+    for epoch in range(10):
+        train_step()
+
+# All uploads complete before context exits
+```

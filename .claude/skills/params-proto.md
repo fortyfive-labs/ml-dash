@@ -133,7 +133,7 @@ class AugmentationConfig:
     flip_prob = 0.5
     color_jitter = 0.4
 
-with Experiment(prefix="alice/ml/resnet-training", project="cv").run as experiment:
+with Experiment(prefix="alice/ml/resnet-training").run as experiment:
     experiment.params.log(
         data=DataConfig,
         optimizer=OptimizerConfig,
@@ -150,7 +150,7 @@ class TrainingArgs:
     learning_rate = 0.001
     batch_size = 32
 
-with Experiment(prefix="alice/ml/hybrid-config", project="test").run as experiment:
+with Experiment(prefix="alice/ml/hybrid-config").run as experiment:
     experiment.params.log(
         training=TrainingArgs,  # Class object
         model={"name": "resnet50", "layers": 50},  # Dict
@@ -170,18 +170,18 @@ with Experiment(prefix="alice/ml/hybrid-config", project="test").run as experime
 Get parameters from logged class objects:
 
 ```python
-with Experiment(prefix="alice/ml/test", project="ml").run as experiment:
+with Experiment(prefix="alice/ml/test").run as experiment:
     experiment.params.log(training=TrainingConfig)
 
     # Retrieve flattened parameters
     params = experiment.params.get()
     print(params)
-    # → {"training.learning_rate": 0.001, "training.batch_size": 32, ...}
+    # -> {"training.learning_rate": 0.001, "training.batch_size": 32, ...}
 
     # Retrieve nested structure
     params_nested = experiment.params.get(flatten=False)
     print(params_nested)
-    # → {"training": {"learning_rate": 0.001, "batch_size": 32, ...}}
+    # -> {"training": {"learning_rate": 0.001, "batch_size": 32, ...}}
 
     # Access specific parameter
     lr = params["training.learning_rate"]
@@ -192,7 +192,7 @@ with Experiment(prefix="alice/ml/test", project="ml").run as experiment:
 Update class-based parameters during training:
 
 ```python
-with Experiment(prefix="alice/ml/lr-decay", project="training").run as experiment:
+with Experiment(prefix="alice/ml/lr-decay").run as experiment:
     # Initial parameters
     experiment.params.log(config=InitialConfig)
 
@@ -277,10 +277,3 @@ Parameters are stored in `parameters.json`:
 
 ### Remote Storage
 In remote mode, stored in MongoDB with the same flattened structure for easy querying.
-
-### API Access
-```python
-# Query your experiment
-experiment = dxp.experiment(name="my-exp", project="ml")
-params = experiment.params.get()
-```
