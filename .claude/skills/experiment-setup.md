@@ -22,48 +22,30 @@ keywords:
 
 # ML-Dash Experiment Configuration
 
-## Three Usage Styles
+## Two Usage Styles
 
 ### Context Manager (Recommended)
 ```python
 from ml_dash import Experiment
 
 # Prefix format: owner/project/experiment-name
-with Experiment(
-    prefix="alice/my-project/my-experiment",
-    dash_root=".dash"
-).run as experiment:
+with Experiment(prefix="alice/my-project/my-experiment").run as experiment:
     experiment.log("Training started")
     experiment.params.set(learning_rate=0.001)
+    experiment.metrics("train").log(loss=0.5, epoch=0)
     # Automatically closed on exit
-```
-
-### Decorator Style
-```python
-from ml_dash import ml_dash_experiment
-
-@ml_dash_experiment(prefix="alice/my-project/my-experiment")
-def train_model(experiment):
-    experiment.params.set(learning_rate=0.001)
-    for epoch in range(10):
-        experiment.metrics("train").log(loss=0.5, epoch=epoch)
-    return "Training complete!"
-
-result = train_model()
 ```
 
 ### Direct (Manual Control)
 ```python
 from ml_dash import Experiment
 
-experiment = Experiment(
-    prefix="alice/my-project/my-experiment",
-    dash_root=".dash"
-)
+experiment = Experiment(prefix="alice/my-project/my-experiment")
 experiment.run.start()
 
 try:
     experiment.params.set(learning_rate=0.001)
+    experiment.metrics("train").log(loss=0.5, epoch=0)
 finally:
     experiment.run.complete()
 ```
@@ -72,6 +54,8 @@ finally:
 
 ### Local Mode (Filesystem)
 ```python
+from ml_dash import Experiment
+
 with Experiment(
     prefix="alice/my-project/my-experiment",
     dash_root=".dash"  # Storage directory
@@ -80,11 +64,18 @@ with Experiment(
 ```
 
 ### Remote Mode (Server)
+```bash
+# First authenticate
+ml-dash login
+```
+
 ```python
-# First: ml-dash login
+from ml_dash import Experiment
+
+# Token auto-loaded from keychain after login
 with Experiment(
     prefix="alice/my-project/my-experiment",
-    dash_url="https://api.dash.ml"  # Token auto-loaded from keychain
+    dash_url="https://api.dash.ml"
 ).run as experiment:
     experiment.log("Using remote server")
 ```
@@ -94,12 +85,10 @@ with Experiment(
 ```python
 with Experiment(
     prefix="alice/computer-vision/resnet50-imagenet",
-    dash_root=".dash",
-    description="ResNet-50 training with new augmentation",
+    readme="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
-    bindrs=["gpu-cluster", "team-a"]
 ).run as experiment:
-    pass
+    experiment.log("Training with metadata")
 ```
 
 ## Status Lifecycle
@@ -107,31 +96,21 @@ with Experiment(
 - **RUNNING**: Set when experiment opens
 - **COMPLETED**: Set on normal exit
 - **FAILED**: Set on exception
-- **CANCELLED**: Set manually
 
 ### Automatic Status Management
 ```python
 # Normal completion -> COMPLETED
-with Experiment(
-    prefix="alice/ml/training",
-    dash_url="https://api.dash.ml"
-).run as experiment:
+with Experiment(prefix="alice/ml/training").run as experiment:
     experiment.log("Training...")
 
 # Exception -> FAILED
-with Experiment(
-    prefix="alice/ml/training",
-    dash_url="https://api.dash.ml"
-).run as experiment:
-    raise ValueError("Training failed!")
+with Experiment(prefix="alice/ml/training").run as experiment:
+    raise ValueError("Training failed!")  # Status set to FAILED
 ```
 
 ### Manual Status Control
 ```python
-experiment = Experiment(
-    prefix="alice/ml/training",
-    dash_url="https://api.dash.ml"
-)
+experiment = Experiment(prefix="alice/ml/training")
 experiment.run.start()
 
 try:
@@ -149,16 +128,44 @@ Experiments use upsert behavior - reopen by using the same prefix:
 
 ```python
 # First run
-with Experiment(
-    prefix="alice/ml/long-training",
-    dash_root=".dash"
-).run as experiment:
+with Experiment(prefix="alice/ml/long-training").run as experiment:
     experiment.metrics("train").log(loss=0.5, epoch=1)
 
 # Later - continues same experiment
-with Experiment(
-    prefix="alice/ml/long-training",
-    dash_root=".dash"
-).run as experiment:
+with Experiment(prefix="alice/ml/long-training").run as experiment:
     experiment.metrics("train").log(loss=0.3, epoch=2)
 ```
+
+## Using RUN Configuration
+
+```python
+from ml_dash.run import RUN
+from ml_dash.auto_start import dxp
+
+# Configure prefix before use
+RUN.prefix = "geyang/scratch/some-experiment"
+
+# dxp will use RUN configuration
+with dxp.run:
+    dxp.metrics("train").log(step=0, loss=1.0)
+```
+
+## Background Buffering
+
+ML-Dash automatically buffers writes in the background for performance:
+
+```python
+with Experiment(prefix="alice/ml/fast-training").run as experiment:
+    for i in range(1000):
+        # Non-blocking writes buffered in background
+        experiment.metrics("train").log(loss=1.0 / (i + 1), step=i)
+
+    # Manual flush if needed
+    experiment.flush()  # Force immediate write
+# Automatic flush on context exit
+```
+
+Buffer configuration via environment variables:
+- `ML_DASH_FLUSH_INTERVAL`: Time-based flush interval (default: 5.0 seconds)
+- `ML_DASH_METRIC_BATCH_SIZE`: Max metric points per batch (default: 100)
+- `ML_DASH_LOG_BATCH_SIZE`: Max logs per batch (default: 100)

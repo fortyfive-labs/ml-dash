@@ -27,15 +27,33 @@ pip install ml-dash
 uv add ml-dash
 ```
 
-## Quick Start - Remote Mode (Recommended)
+## Quick Start - Local Mode
 
-### 1. Authenticate
+```python
+from ml_dash import Experiment
+
+# Prefix format: owner/project/experiment-name
+exp = Experiment(prefix="alice/tutorial/my-experiment")
+
+with exp.run:
+    exp.log("Training started", level="info")
+    exp.params.set(learning_rate=0.001, batch_size=32)
+
+    for epoch in range(10):
+        loss = 1.0 - epoch * 0.08
+        exp.metrics("train").log(loss=loss, epoch=epoch)
+
+    exp.log("Training completed", level="info")
+```
+
+Data stored in `.dash/alice/tutorial/my-experiment/`.
+
+## Quick Start - Remote Mode
+
 ```bash
+# First authenticate
 ml-dash login
 ```
-Opens browser for secure OAuth2 authentication. Token stored in system keychain.
-
-### 2. Start Tracking
 
 ```python
 from ml_dash.auto_start import dxp
@@ -51,33 +69,61 @@ with dxp.run:
     dxp.log("Training completed", level="info")
 ```
 
-## Quick Start - Local Mode (No Auth)
-
-```python
-from ml_dash import Experiment
-
-exp = Experiment(prefix="alice/tutorial/my-experiment")
-
-with exp.run:
-    exp.log("Training started", level="info")
-    exp.params.set(learning_rate=0.001, batch_size=32)
-
-    for epoch in range(10):
-        loss = 1.0 - epoch * 0.08
-        exp.metrics("train").log(loss=loss, epoch=epoch)
-```
-
-Data stored in `.dash/alice/tutorial/my-experiment/`.
-
 ## Pre-configured Singleton (dxp)
 
 ```python
 from ml_dash.auto_start import dxp
+from ml_dash.run import RUN
 
-# Ready to use immediately
-dxp.params.set(learning_rate=0.001)
-dxp.metrics("train").log(loss=0.5, accuracy=0.9)
-dxp.files.save_torch(model, "model.pt")
+# Configure prefix before use
+RUN.prefix = "geyang/scratch/my-experiment"
+
+with dxp.run:
+    dxp.params.set(learning_rate=0.001)
+    dxp.metrics("train").log(loss=0.5, accuracy=0.9)
+    dxp.files("models").save_torch(model, to="model.pt")
+```
+
+## Key APIs
+
+### Metrics (Time Series)
+```python
+# Log metrics with keyword arguments
+experiment.metrics("train").log(loss=0.5, epoch=1)
+experiment.metrics("eval").log(accuracy=0.85, epoch=1)
+```
+
+### Parameters
+```python
+experiment.params.set(
+    learning_rate=0.001,
+    batch_size=32,
+    optimizer="adam"
+)
+```
+
+### Logging
+```python
+experiment.log("Training started", level="info")
+experiment.log("GPU memory low", level="warn")
+experiment.log("Failed to load", level="error")
+```
+
+### Files
+```python
+# Save various file types
+experiment.files("models").save("model.pth")
+experiment.files("configs").save({"lr": 0.001}, to="config.json")
+experiment.files("data").save_text("content", to="notes.txt")
+```
+
+### Tracks (Timestamped Data)
+```python
+# For robot trajectories, sensor data, etc.
+experiment.tracks("robot/position").append(
+    q=[0.1, 0.2, 0.3],
+    _ts=1.0  # timestamp required
+)
 ```
 
 ## Data Storage Structure
@@ -87,7 +133,9 @@ dxp.files.save_torch(model, "model.pt")
 └── owner/
     └── project/
         └── experiment/
+            ├── experiment.json
+            ├── parameters.json
             ├── logs/logs.jsonl
-            ├── parameters/parameters.json
-            └── metrics/train.jsonl
+            ├── metrics/train/data.jsonl
+            └── files/
 ```
