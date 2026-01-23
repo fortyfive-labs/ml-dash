@@ -396,18 +396,18 @@ with Experiment(prefix="alice/fusion/experiment").run as exp:
 
     for t in np.arange(0, 10, 0.1):
         # From position sensor
-        experiment.tracks("fused").append(x=x, y=y, z=z, _ts=t)
+        exp.tracks("fused").append(x=x, y=y, z=z, _ts=t)
 
         # From velocity estimator (same timestamp)
-        experiment.tracks("fused").append(vx=vx, vy=vy, vz=vz, _ts=t)
+        exp.tracks("fused").append(vx=vx, vy=vy, vz=vz, _ts=t)
 
         # From orientation filter (same timestamp)
-        experiment.tracks("fused").append(qw=qw, qx=qx, qy=qy, qz=qz, _ts=t)
+        exp.tracks("fused").append(qw=qw, qx=qx, qy=qy, qz=qz, _ts=t)
 
     # Result: each timestamp has all fields merged
     # {timestamp: 0.0, x: ..., y: ..., z: ..., vx: ..., vy: ..., vz: ..., qw: ..., ...}
 
-    experiment.tracks.flush()
+    exp.tracks.flush()
 ```
 
 ---

@@ -49,7 +49,7 @@ from ml_dash import Experiment
 
 with Experiment(prefix="alice/robotics/experiment").run as exp:
     # Timestamp (_ts) is required
-    experiment.tracks("robot/position").append(
+    exp.tracks("robot/position").append(
         q=[0.1, 0.2, 0.3],      # joint positions
         e=[0.5, 0.0, 0.6],      # end effector
         _ts=1.0                  # timestamp in seconds
@@ -180,13 +180,13 @@ with Experiment(prefix="alice/robotics/pick-place").run as exp:
         q = get_joint_positions()
         ee_pos = get_end_effector_position()
 
-        experiment.tracks("robot/state").append(
+        exp.tracks("robot/state").append(
             q=q.tolist(),
             ee_pos=ee_pos.tolist(),
             _ts=t
         )
 
-    experiment.tracks.flush()
+    exp.tracks.flush()
 ```
 
 ### Multi-Sensor Logging
@@ -195,7 +195,7 @@ with Experiment(prefix="alice/robotics/pick-place").run as exp:
 with Experiment(prefix="alice/sensors/calibration").run as exp:
     # IMU at 200Hz
     for i in range(2000):
-        experiment.tracks("sensors/imu").append(
+        exp.tracks("sensors/imu").append(
             accel=[ax, ay, az],
             gyro=[gx, gy, gz],
             _ts=i * 0.005
@@ -203,12 +203,12 @@ with Experiment(prefix="alice/sensors/calibration").run as exp:
 
     # Force sensor at 1kHz
     for i in range(10000):
-        experiment.tracks("sensors/force").append(
+        exp.tracks("sensors/force").append(
             fx=fx, fy=fy, fz=fz,
             _ts=i * 0.001
         )
 
-    experiment.tracks.flush()
+    exp.tracks.flush()
 ```
 
 ### Time-Range Analysis
