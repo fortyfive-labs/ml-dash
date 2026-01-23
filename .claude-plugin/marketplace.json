@@ -1,0 +1,10 @@
+{
+  "name": "ml-dash",
+  "description": "ML experiment tracking skills for Claude Code",
+  "plugins": [
+    {
+      "name": "ml-dash",
+      "path": "./"
+    }
+  ]
+}
