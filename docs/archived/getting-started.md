@@ -194,6 +194,12 @@ If you have [Claude Code](https://claude.ai/download) installed, you can install
 /plugin install ml-dash@fortyfive-labs-ml-dash
 ```
 
+To update to the latest version:
+
+```
+/plugin update ml-dash@fortyfive-labs-ml-dash
+```
+
 ### Available Skills
 
 Once installed, the following skills are available:
@@ -206,6 +212,7 @@ Once installed, the following skills are available:
 | `getting-started` | Quick start guide |
 | `params-proto` | Parameter configuration patterns |
 | `tracking-data` | Logging metrics, params, and data |
+| `tracks` | Background buffering and track management |
 
 ### Ask Questions
 
