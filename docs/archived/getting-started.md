@@ -184,27 +184,19 @@ The API is identical across local and remote modes!
 
 ## Getting Help with Claude Code
 
-If you have [Claude Code](https://claude.ai/download) installed, you can load ML-Dash skills for intelligent assistance:
+If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin directly from GitHub:
 
-### Install the ML-Dash Plugin
-
-```bash
-# Add the marketplace
+```
 /plugin marketplace add fortyfive-labs/ml-dash
+```
 
-# Install the plugin
+```
 /plugin install ml-dash@fortyfive-labs-ml-dash
 ```
 
-Or use the interactive plugin manager:
-```bash
-/plugin
-```
-Then navigate to **Discover** → select **ml-dash**.
-
 ### Available Skills
 
-Once installed, the following skills are available (namespaced as `ml-dash:<skill>`):
+Once installed, the following skills are available:
 
 | Skill | Description |
 |-------|-------------|
