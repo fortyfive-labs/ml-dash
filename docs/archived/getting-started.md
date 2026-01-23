@@ -184,18 +184,45 @@ The API is identical across local and remote modes!
 
 ## Getting Help with Claude Code
 
-If you have [Claude Code](https://claude.com/claude-code) installed, you can get intelligent help directly in your IDE:
+If you have [Claude Code](https://claude.ai/download) installed, you can load ML-Dash skills for intelligent assistance:
+
+### Install the ML-Dash Plugin
 
 ```bash
-claude-code open
+# Add the marketplace
+/plugin marketplace add fortyfive-labs/ml-dash
+
+# Install the plugin
+/plugin install ml-dash@fortyfive-labs-ml-dash
 ```
 
-Then ask questions like:
+Or use the interactive plugin manager:
+```bash
+/plugin
+```
+Then navigate to **Discover** → select **ml-dash**.
+
+### Available Skills
+
+Once installed, the following skills are available (namespaced as `ml-dash:<skill>`):
+
+| Skill | Description |
+|-------|-------------|
+| `cli-commands` | CLI usage for upload, download, list, create |
+| `experiment-setup` | Setting up experiments with params-proto |
+| `file-management` | Storing and retrieving files and artifacts |
+| `getting-started` | Quick start guide |
+| `params-proto` | Parameter configuration patterns |
+| `tracking-data` | Logging metrics, params, and data |
+
+### Ask Questions
+
+With skills loaded, ask questions like:
 - "How do I log parameters from a config class?"
 - "Show me an example of tracking metrics during training"
-- "How do I upload files with metadata?"
+- "How do I upload experiments to the server?"
 
-Claude will provide code examples and best practices tailored to ML-Dash, powered by integrated **Claude skills** (.claude/skills/).
+Claude will provide code examples and best practices tailored to ML-Dash.
 
 ---
 
