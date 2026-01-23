@@ -68,6 +68,32 @@ experiment.tracks("sensor").append(temp=25.5, _ts=0.0)
 experiment.tracks("sensor").append(temp=25.5)  # Missing _ts!
 ```
 
+### Background Buffering
+
+Track data is buffered in background and flushed automatically:
+- On interval (configurable)
+- When batch size reached
+- When experiment exits (`with` block ends)
+- When manually calling `.flush()`
+
+```python
+# Manual flush if needed before experiment ends
+experiment.tracks("robot/state").flush()  # Flush one topic
+experiment.tracks.flush()                  # Flush all topics
+```
+
+### Method Chaining
+
+`append()` and `flush()` return self for chaining:
+
+```python
+experiment.tracks("robot/state") \
+    .append(q=[0.1], _ts=0.0) \
+    .append(q=[0.2], _ts=0.1) \
+    .append(q=[0.3], _ts=0.2) \
+    .flush()
+```
+
 ### Automatic Merging
 
 Entries with the same timestamp are automatically merged:
@@ -270,4 +296,24 @@ data = experiment.tracks("topic").read(
 
 # Get entries as list
 entries = experiment.tracks("topic").list_entries()
+```
+
+---
+
+## Tracks vs Metrics
+
+| | Tracks | Metrics |
+|---|---|---|
+| **Purpose** | Timestamped multi-modal data | Time-series metrics |
+| **Timestamp** | **Required** (`_ts=`) | Optional (auto-indexed) |
+| **Use case** | Robot trajectories, sensor data, poses | Loss, accuracy, learning rate |
+| **Merge behavior** | Same `_ts` entries merged | Append-only (no merge) |
+| **Query** | Time-range (`start_timestamp`, `end_timestamp`) | Index-range (`start_index`, `limit`) |
+
+```python
+# Use TRACKS for robotics/sensor data with explicit timestamps
+experiment.tracks("robot/state").append(q=[0.1, 0.2], _ts=1.5)
+
+# Use METRICS for training metrics (index-based)
+experiment.metrics("train").log(loss=0.5, epoch=10)
 ```
