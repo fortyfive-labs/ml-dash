@@ -1,5 +1,5 @@
 ---
-description: Tracking parameters, metrics, logs, and tracks in ML-Dash experiments
+description: Tracking parameters, metrics, and logs in ML-Dash experiments
 globs:
   - "**/*.py"
   - "**/train*.py"
@@ -11,12 +11,9 @@ keywords:
   - metrics
   - log
   - logging
-  - tracks
   - time series
   - loss
   - accuracy
-  - trajectory
-  - sensor
 ---
 
 # ML-Dash Data Tracking
@@ -112,54 +109,6 @@ for point in result['data']:
 ```python
 stats = experiment.metrics("train").stats()
 print(f"Total points: {stats['totalDataPoints']}")
-```
-
----
-
-## Tracks (Timestamped Multi-Modal Data)
-
-Tracks are for sparse timestamped data like robot trajectories, camera poses, sensor readings.
-
-### Basic Usage
-```python
-# Timestamp (_ts) is required
-experiment.tracks("robot/position").append(
-    q=[0.1, 0.2, 0.3],      # joint positions
-    e=[0.5, 0.0, 0.6],      # end effector
-    _ts=1.0                  # timestamp in seconds
-)
-```
-
-### Multiple Fields with Same Timestamp
-```python
-# Entries with same timestamp are merged
-experiment.tracks("robot/state").append(q=[0.1, 0.2], _ts=1.0)
-experiment.tracks("robot/state").append(v=[0.01, 0.02], _ts=1.0)
-# Result: {_ts: 1.0, q: [0.1, 0.2], v: [0.01, 0.02]}
-```
-
-### Flushing Tracks
-```python
-# Flush specific topic
-experiment.tracks("robot/position").flush()
-
-# Flush all track topics
-experiment.tracks.flush()
-```
-
-### Reading Track Data
-```python
-# Read all data
-data = experiment.tracks("robot/position").read()
-
-# Read with time range
-data = experiment.tracks("robot/position").read(
-    start_timestamp=0.0,
-    end_timestamp=10.0
-)
-
-# Export formats: json, jsonl, parquet, mocap
-parquet_data = experiment.tracks("robot/position").read(format="parquet")
 ```
 
 ---

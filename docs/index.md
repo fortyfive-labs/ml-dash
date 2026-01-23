@@ -95,7 +95,7 @@ The documentation is being reorganized. Current documentation can be found in th
 - [Experiments](archived/experiments.md)
 - [Parameters](archived/parameters.md)
 - [Metrics](archived/metrics.md)
-- [Tracks](archived/tracks.md)
+- [Tracks](tracks.md)
 - [Logging](archived/logging.md)
 - [Files](archived/files.md)
 - [API Reference](archived/api-reference.md)
@@ -117,7 +117,7 @@ archived/getting-started
 archived/experiments
 archived/parameters
 archived/metrics
-archived/tracks
+tracks
 archived/logging
 archived/files
 archived/api-reference

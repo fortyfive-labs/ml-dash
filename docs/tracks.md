@@ -43,21 +43,21 @@ from ml_dash import Experiment
 
 with Experiment(prefix="alice/robotics/manipulation").run as exp:
     # Log robot state with timestamp
-    experiment.tracks("robot/position").append(
+    exp.tracks("robot/position").append(
         q=[0.1, 0.2, 0.3],      # joint positions
         e=[0.5, 0.0, 0.6],      # end effector position
         _ts=1.0                  # timestamp in seconds (required)
     )
 
     # Log additional data at same timestamp (will be merged)
-    experiment.tracks("robot/position").append(
+    exp.tracks("robot/position").append(
         v=[0.01, 0.02, 0.03],   # velocities
         _ts=1.0                  # same timestamp
     )
     # Result: {timestamp: 1.0, q: [...], e: [...], v: [...]}
 
     # Log at different timestamp
-    experiment.tracks("robot/position").append(
+    exp.tracks("robot/position").append(
         q=[0.2, 0.3, 0.4],
         e=[0.6, 0.1, 0.7],
         _ts=2.0
@@ -301,7 +301,7 @@ with Experiment(prefix="alice/robotics/pick-place").run as exp:
         ee_quat = get_end_effector_orientation()
 
         # Log to track
-        experiment.tracks("robot/state").append(
+        exp.tracks("robot/state").append(
             q=q.tolist(),
             qd=qd.tolist(),
             ee_pos=ee_pos.tolist(),
@@ -310,17 +310,17 @@ with Experiment(prefix="alice/robotics/pick-place").run as exp:
         )
 
         # Log gripper separately
-        experiment.tracks("robot/gripper").append(
+        exp.tracks("robot/gripper").append(
             position=get_gripper_position(),
             force=get_gripper_force(),
             _ts=t
         )
 
     # Flush all track data
-    experiment.tracks.flush()
+    exp.tracks.flush()
 
     # Export trajectory for analysis
-    trajectory = experiment.tracks("robot/state").read()
+    trajectory = exp.tracks("robot/state").read()
     exp.log(f"Logged {len(trajectory['entries'])} trajectory points")
 ```
 
@@ -334,7 +334,7 @@ with Experiment(prefix="alice/sensors/calibration").run as exp:
 
     # IMU at 200Hz
     for i in range(2000):
-        experiment.tracks("sensors/imu").append(
+        exp.tracks("sensors/imu").append(
             accel=[ax, ay, az],
             gyro=[gx, gy, gz],
             _ts=i * 0.005
@@ -342,7 +342,7 @@ with Experiment(prefix="alice/sensors/calibration").run as exp:
 
     # Camera at 30Hz
     for i in range(300):
-        experiment.tracks("sensors/camera").append(
+        exp.tracks("sensors/camera").append(
             frame_id=i,
             exposure=0.01,
             _ts=i * 0.033
@@ -350,13 +350,13 @@ with Experiment(prefix="alice/sensors/calibration").run as exp:
 
     # Force sensor at 1kHz
     for i in range(10000):
-        experiment.tracks("sensors/force").append(
+        exp.tracks("sensors/force").append(
             fx=fx, fy=fy, fz=fz,
             tx=tx, ty=ty, tz=tz,
             _ts=i * 0.001
         )
 
-    experiment.tracks.flush()
+    exp.tracks.flush()
 ```
 
 ### Time-Range Analysis
@@ -369,7 +369,7 @@ exp = Experiment(prefix="alice/robotics/experiment-1")
 
 with exp.run:
     # Read specific time window
-    contact_data = experiment.tracks("sensors/force").read(
+    contact_data = exp.tracks("sensors/force").read(
         start_timestamp=5.0,
         end_timestamp=7.0
     )
@@ -380,7 +380,7 @@ with exp.run:
     exp.log(f"Max contact force: {max_force:.2f}N")
 
     # Export to Parquet for further analysis
-    parquet_data = experiment.tracks("robot/state").read(format="parquet")
+    parquet_data = exp.tracks("robot/state").read(format="parquet")
     with open("trajectory.parquet", "wb") as f:
         f.write(parquet_data)
 ```
