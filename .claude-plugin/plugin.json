@@ -1,0 +1,12 @@
+{
+  "name": "ml-dash",
+  "version": "0.6.8",
+  "description": "ML experiment tracking skills for Claude Code",
+  "author": {
+    "name": "Ge Yang"
+  },
+  "repository": "https://github.com/geyang/ml-dash",
+  "license": "MIT",
+  "keywords": ["machine-learning", "experiment-tracking", "mlops"],
+  "skills": "./skills/"
+}

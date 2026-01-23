@@ -101,9 +101,8 @@ tmp/
 # OS
 Thumbs.db
 
-# Claude (keep skills/, ignore settings)
+# Claude (ignore local settings)
 .claude/
-!.claude/skills/
 
 .ml-logger-test
 .ml-loggertest/test_save_pkl.py
