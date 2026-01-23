@@ -1,9 +1,10 @@
 # ML-Dash
 
-A simple and flexible SDK for ML experiment tracking and data storage.
+A simple and flexible SDK for ML experiment tracking and data storage with background buffering for high-performance training.
 
 ## Features
 
+### Core Features
 - **Three Usage Styles**: Pre-configured singleton (dxp), context manager, or direct instantiation
 - **Dual Operation Modes**: Remote (API server) or local (filesystem)
 - **OAuth2 Authentication**: Secure device flow authentication for CLI and SDK
@@ -13,6 +14,13 @@ A simple and flexible SDK for ML experiment tracking and data storage.
 - **Organized File Storage**: Prefix-based file organization with unique snowflake IDs
 - **Rich Metadata**: Tags, bindrs, descriptions, and custom metadata support
 - **Simple API**: Minimal configuration, maximum flexibility
+
+### Performance Features (New in 0.6.7)
+- **Background Buffering**: Non-blocking I/O operations eliminate training interruptions
+- **Automatic Batching**: Time-based (5s) and size-based (100 items) flush triggers
+- **Track API**: Time-series data tracking for robotics, RL, and sequential experiments
+- **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
+- **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
 ## Installation
 
@@ -25,14 +33,14 @@ A simple and flexible SDK for ML experiment tracking and data storage.
 <td>
 
 ```bash
-uv add ml-dash==0.6.2rc1
+uv add ml-dash
 ```
 
 </td>
 <td>
 
 ```bash
-pip install ml-dash==0.6.2rc1
+pip install ml-dash
 ```
 
 </td>
@@ -91,7 +99,75 @@ with Experiment(
 
 ```
 
-See [docs/getting-started.md](docs/getting-started.md) for more examples.
+## New Features in 0.6.7
+
+### 🚀 Background Buffering (Non-blocking I/O)
+
+All write operations are now buffered and executed in background threads:
+
+```python
+with Experiment("my-project/exp").run as experiment:
+    for i in range(10000):
+        # Non-blocking! Returns immediately
+        experiment.log(f"Step {i}")
+        experiment.metrics("train").log(loss=loss, accuracy=acc)
+        experiment.files("frames").save_image(frame, to=f"frame_{i}.jpg")
+
+    # All data automatically flushed when context exits
+```
+
+Configure buffering via environment variables:
+```bash
+export ML_DASH_BUFFER_ENABLED=true
+export ML_DASH_FLUSH_INTERVAL=5.0
+export ML_DASH_LOG_BATCH_SIZE=100
+```
+
+### 📊 Track API (Time-Series Data)
+
+Perfect for robotics, RL, and sequential experiments:
+
+```python
+with Experiment("robotics/training").run as experiment:
+    for step in range(1000):
+        # Track robot position over time
+        experiment.track("robot/position").append({
+            "step": step,
+            "x": position[0],
+            "y": position[1],
+            "z": position[2]
+        })
+
+        # Track control signals
+        experiment.track("robot/control").append({
+            "step": step,
+            "motor1": ctrl[0],
+            "motor2": ctrl[1]
+        })
+```
+
+### 🖼️ Numpy Image Support
+
+Save numpy arrays directly as images (PNG/JPEG):
+
+```python
+import numpy as np
+
+with Experiment("vision/training").run as experiment:
+    # From MuJoCo, OpenCV, PIL, etc.
+    pixels = renderer.render()  # numpy array
+
+    # Save as PNG (lossless)
+    experiment.files("frames").save_image(pixels, to="frame.png")
+
+    # Save as JPEG with quality control
+    experiment.files("frames").save_image(pixels, to="frame.jpg", quality=85)
+
+    # Auto-detection also works
+    experiment.files("frames").save(pixels, to="frame.jpg")
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for complete release notes.
 
 ## Development Setup
 

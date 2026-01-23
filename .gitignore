@@ -109,8 +109,16 @@ Thumbs.db
 .download/
 
 # Test files and temporary scripts
-test_*.py
 TODO.MD
 *.pth
 *.ckpt
 test/.dashrc
+
+# MuJoCo and robotics artifacts
+MUJOCO_LOG.TXT
+*.mcap
+robot.mcap
+
+# Demo and scratch files
+demo.py
+scratch/

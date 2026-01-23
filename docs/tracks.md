@@ -1,458 +1,468 @@
-# Tracks API
+# Track API
 
-Tracks are for storing sparse timestamped data like robot trajectories, camera poses, sensor readings, and other multi-modal time series data. Unlike metrics (which use index-based time series), tracks use explicit timestamps and support arbitrary data fields per entry.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Basic Usage](#basic-usage)
-- [TracksManager](#tracksmanager)
-- [TrackBuilder](#trackbuilder)
-- [Reading Track Data](#reading-track-data)
-- [Export Formats](#export-formats)
-- [Storage Format](#storage-format)
-- [Complete Examples](#complete-examples)
-
----
+The Track API provides efficient time-series data tracking for robotics, reinforcement learning, and any sequential experiments.
 
 ## Overview
 
-Tracks are designed for:
-
-- **Sparse data**: Unlike metrics that log every step, tracks log data at irregular intervals
-- **Timestamped entries**: Each entry requires an explicit `_ts` timestamp
-- **Multi-modal data**: Store different data fields (positions, velocities, sensors) together
-- **Automatic merging**: Entries with the same timestamp are automatically merged
-
-### When to Use Tracks vs Metrics
-
-| Use Tracks For | Use Metrics For |
-|----------------|-----------------|
-| Robot trajectories | Training loss per epoch |
-| Sensor readings at irregular intervals | Accuracy at regular steps |
-| Camera poses | Learning rate schedules |
-| Motion capture data | Batch statistics |
-| Event-driven data | Index-based time series |
-
----
+Tracks are perfect for:
+- **Robotics**: Robot positions, joint angles, sensor readings
+- **Reinforcement Learning**: Agent trajectories, rewards, states
+- **Simulations**: Physics parameters over time
+- **Sequential Data**: Any data that changes over time
 
 ## Basic Usage
 
 ```python
 from ml_dash import Experiment
 
-with Experiment(prefix="alice/robotics/manipulation").run as exp:
-    # Log robot state with timestamp
-    exp.tracks("robot/position").append(
-        q=[0.1, 0.2, 0.3],      # joint positions
-        e=[0.5, 0.0, 0.6],      # end effector position
-        _ts=1.0                  # timestamp in seconds (required)
-    )
-
-    # Log additional data at same timestamp (will be merged)
-    exp.tracks("robot/position").append(
-        v=[0.01, 0.02, 0.03],   # velocities
-        _ts=1.0                  # same timestamp
-    )
-    # Result: {timestamp: 1.0, q: [...], e: [...], v: [...]}
-
-    # Log at different timestamp
-    exp.tracks("robot/position").append(
-        q=[0.2, 0.3, 0.4],
-        e=[0.6, 0.1, 0.7],
-        _ts=2.0
-    )
+with Experiment("robotics/training").run as experiment:
+    for step in range(1000):
+        # Append data to a track
+        experiment.track("robot/position").append({
+            "step": step,
+            "x": position[0],
+            "y": position[1],
+            "z": position[2]
+        })
 ```
 
-### Timestamp Requirements
+## Timestamp-Based Tracking
 
-The `_ts` parameter is **required** for all track entries:
+Tracks automatically handle timestamps:
 
 ```python
-# Valid - numeric timestamp
-experiment.tracks("sensor").append(temp=25.5, _ts=0.0)
-experiment.tracks("sensor").append(temp=26.0, _ts=0.5)
-experiment.tracks("sensor").append(temp=26.5, _ts=1.0)
+import time
 
-# Invalid - missing timestamp (raises ValueError)
-experiment.tracks("sensor").append(temp=27.0)  # Error!
+with Experiment("my-project/exp").run as experiment:
+    for i in range(100):
+        timestamp = time.time()
 
-# Invalid - non-numeric timestamp (raises ValueError)
-experiment.tracks("sensor").append(temp=27.0, _ts="1.0")  # Error!
+        # Track with explicit timestamp
+        experiment.track("sensors/temperature").append(
+            timestamp=timestamp,
+            data={"value": temperature}
+        )
+
+        # Track with same timestamp (entries are merged)
+        experiment.track("sensors/pressure").append(
+            timestamp=timestamp,
+            data={"value": pressure}
+        )
 ```
 
----
+## Multiple Tracks
 
-## TracksManager
-
-The `TracksManager` is accessed via `experiment.tracks` and manages all track topics.
-
-### Getting a TrackBuilder
+Track different aspects of your experiment:
 
 ```python
-# Get TrackBuilder for a specific topic
-builder = experiment.tracks("robot/position")
+with Experiment("robotics/walker").run as experiment:
+    for step in range(1000):
+        # Robot position
+        experiment.track("robot/position").append({
+            "step": step,
+            "x": pos[0],
+            "y": pos[1],
+            "z": pos[2]
+        })
 
-# Topic names can use "/" for hierarchical organization
-experiment.tracks("robot/joints")
-experiment.tracks("robot/gripper")
-experiment.tracks("camera/rgb")
-experiment.tracks("camera/depth")
-experiment.tracks("sensors/imu")
+        # Joint angles
+        experiment.track("robot/joints").append({
+            "step": step,
+            "joint1": angles[0],
+            "joint2": angles[1],
+            "joint3": angles[2]
+        })
+
+        # Control signals
+        experiment.track("robot/control").append({
+            "step": step,
+            "motor1": ctrl[0],
+            "motor2": ctrl[1]
+        })
+
+        # Sensor readings
+        experiment.track("robot/sensors").append({
+            "step": step,
+            "imu_x": imu[0],
+            "imu_y": imu[1],
+            "imu_z": imu[2],
+            "force": force_sensor
+        })
 ```
 
-### Flushing All Topics
+## Numpy Array Serialization
+
+Tracks automatically serialize numpy arrays:
 
 ```python
-# Flush all buffered track data to storage
-experiment.tracks.flush()
-```
-
----
-
-## TrackBuilder
-
-The `TrackBuilder` provides methods for appending and reading track data.
-
-### append(**kwargs)
-
-Append a single timestamped entry to the track.
-
-```python
-experiment.tracks("robot/state").append(
-    q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6],  # joint positions (6 DOF)
-    qd=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06],  # joint velocities
-    tau=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],  # joint torques
-    gripper_pos=0.04,  # gripper position
-    gripper_force=10.5,  # gripper force
-    _ts=1.5  # timestamp in seconds
-)
-```
-
-**Parameters:**
-- `_ts` (float, required): Timestamp for the entry
-- `**kwargs`: Arbitrary data fields (lists, dicts, scalars)
-
-**Returns:** `TrackBuilder` (for method chaining)
-
-### flush()
-
-Flush this topic's buffered entries to storage.
-
-```python
-# Flush specific topic only
-experiment.tracks("robot/position").flush()
-```
-
-**Returns:** `TrackBuilder` (for method chaining)
-
-### Method Chaining
-
-```python
-# Chain multiple appends
-experiment.tracks("events").append(event="start", _ts=0.0).append(event="calibration", _ts=1.0).append(event="ready", _ts=2.0).flush()
-```
-
----
-
-## Reading Track Data
-
-### read()
-
-Read track data with optional filtering.
-
-```python
-# Read all data as JSON
-data = experiment.tracks("robot/position").read()
-
-# Read with time range filter
-data = experiment.tracks("robot/position").read(
-    start_timestamp=0.0,
-    end_timestamp=10.0
-)
-
-# Read specific columns only
-data = experiment.tracks("robot/position").read(
-    columns=["q", "e"]
-)
-
-# Combine filters
-data = experiment.tracks("robot/position").read(
-    start_timestamp=5.0,
-    end_timestamp=15.0,
-    columns=["q", "qd"]
-)
-```
-
-**Parameters:**
-- `start_timestamp` (float, optional): Start time filter (inclusive)
-- `end_timestamp` (float, optional): End time filter (inclusive)
-- `columns` (List[str], optional): Specific columns to retrieve
-- `format` (str, default="json"): Export format
-
-**Returns:** Data in the requested format
-
-### list_entries()
-
-Get all entries as a list of dictionaries.
-
-```python
-entries = experiment.tracks("robot/position").list_entries()
-for entry in entries:
-    print(f"t={entry['timestamp']}: q={entry.get('q')}")
-```
-
----
-
-## Export Formats
-
-Track data can be exported in multiple formats:
-
-### JSON (default)
-
-```python
-data = experiment.tracks("robot/position").read(format="json")
-# Returns: {"entries": [{"timestamp": 1.0, "q": [...], ...}, ...]}
-```
-
-### JSONL (JSON Lines)
-
-```python
-jsonl_bytes = experiment.tracks("robot/position").read(format="jsonl")
-# Returns: bytes with one JSON object per line
-```
-
-### Parquet
-
-```python
-parquet_bytes = experiment.tracks("robot/position").read(format="parquet")
-# Returns: bytes in Apache Parquet format
-# Use with pandas: pd.read_parquet(io.BytesIO(parquet_bytes))
-```
-
-### Mocap (Motion Capture JSON)
-
-```python
-mocap_data = experiment.tracks("robot/position").read(format="mocap")
-# Returns: Motion capture specific JSON format
-```
-
----
-
-## Storage Format
-
-### Local Mode
-
-Tracks are stored as JSONL files:
-
-```
-.dash/
-└── owner/
-    └── project/
-        └── experiment/
-            └── tracks/
-                ├── robot_position/    # "/" replaced with "_"
-                │   └── data.jsonl
-                ├── camera_rgb/
-                │   └── data.jsonl
-                └── sensors_imu/
-                    └── data.jsonl
-```
-
-Each line in `data.jsonl` contains one entry:
-
-```json
-{"timestamp": 1.0, "q": [0.1, 0.2, 0.3], "e": [0.5, 0.0, 0.6]}
-{"timestamp": 2.0, "q": [0.2, 0.3, 0.4], "e": [0.6, 0.1, 0.7]}
-```
-
-### Remote Mode
-
-- Entries are stored in MongoDB with timestamp indexing
-- Large datasets may be archived to S3
-- Supports efficient time-range queries
-
----
-
-## Complete Examples
-
-### Robot Trajectory Logging
-
-```python
-from ml_dash import Experiment
 import numpy as np
 
-with Experiment(prefix="alice/robotics/pick-place").run as exp:
-    exp.params.set(
-        robot="franka_panda",
-        task="pick_and_place",
-        controller="impedance"
-    )
+with Experiment("rl/training").run as experiment:
+    for episode in range(100):
+        state = env.reset()  # numpy array
 
-    # Log trajectory at 100Hz
-    dt = 0.01
+        # Numpy arrays are automatically converted to lists
+        experiment.track("agent/states").append({
+            "episode": episode,
+            "state": state,  # numpy array - auto-serialized!
+            "reward": 0.0
+        })
+```
+
+## MuJoCo Example
+
+Perfect for tracking robot simulations:
+
+```python
+import mujoco
+import numpy as np
+
+with Experiment("robotics/mujoco-sim").run as experiment:
+    model = mujoco.MjModel.from_xml_string(xml_content)
+    data = mujoco.MjData(model)
+    renderer = mujoco.Renderer(model, height=480, width=640)
+
     for i in range(1000):
-        t = i * dt
+        # Apply control
+        data.ctrl[0] = 4.0 * np.sin(i * 0.03)
+        data.ctrl[1] = 2.5 * np.sin(i * 0.05)
 
-        # Get robot state (from your controller)
-        q = get_joint_positions()
-        qd = get_joint_velocities()
-        ee_pos = get_end_effector_position()
-        ee_quat = get_end_effector_orientation()
+        # Step simulation
+        mujoco.mj_step(model, data)
 
-        # Log to track
-        exp.tracks("robot/state").append(
-            q=q.tolist(),
-            qd=qd.tolist(),
-            ee_pos=ee_pos.tolist(),
-            ee_quat=ee_quat.tolist(),
-            _ts=t
-        )
+        if i % 4 == 0:
+            # Get end effector position
+            ee_pos = data.site_xpos[model.site('end_effector').id].copy()
 
-        # Log gripper separately
-        exp.tracks("robot/gripper").append(
-            position=get_gripper_position(),
-            force=get_gripper_force(),
-            _ts=t
-        )
+            # Track position
+            experiment.track("robot/position").append({
+                "step": i,
+                "x": ee_pos[0],
+                "y": ee_pos[1],
+                "z": ee_pos[2]
+            })
 
-    # Flush all track data
-    exp.tracks.flush()
+            # Track control
+            experiment.track("robot/control").append({
+                "step": i,
+                "ctrl_1": float(data.ctrl[0]),
+                "ctrl_2": float(data.ctrl[1])
+            })
 
-    # Export trajectory for analysis
-    trajectory = exp.tracks("robot/state").read()
-    exp.log(f"Logged {len(trajectory['entries'])} trajectory points")
+            # Save frame aligned with track
+            renderer.update_scene(data)
+            pixels = renderer.render()
+            experiment.files("frames").save_image(
+                pixels,
+                to=f"frame_{i:05d}.jpg"
+            )
 ```
 
-### Multi-Sensor Logging
+## Aligning Frames with Tracks
+
+Use consistent step indices to align frames with track data:
 
 ```python
-from ml_dash import Experiment
+with Experiment("vision/tracking").run as experiment:
+    for step in range(1000):
+        # Track data
+        experiment.track("agent/position").append({
+            "step": step,
+            "x": x,
+            "y": y
+        })
 
-with Experiment(prefix="alice/sensors/calibration").run as exp:
-    # Log different sensors at different rates
-
-    # IMU at 200Hz
-    for i in range(2000):
-        exp.tracks("sensors/imu").append(
-            accel=[ax, ay, az],
-            gyro=[gx, gy, gz],
-            _ts=i * 0.005
+        # Save frame with same step index
+        experiment.files("frames").save_image(
+            frame,
+            to=f"frame_{step:05d}.jpg"
         )
 
-    # Camera at 30Hz
-    for i in range(300):
-        exp.tracks("sensors/camera").append(
-            frame_id=i,
-            exposure=0.01,
-            _ts=i * 0.033
-        )
-
-    # Force sensor at 1kHz
-    for i in range(10000):
-        exp.tracks("sensors/force").append(
-            fx=fx, fy=fy, fz=fz,
-            tx=tx, ty=ty, tz=tz,
-            _ts=i * 0.001
-        )
-
-    exp.tracks.flush()
+        # Now frames and tracks are aligned by step index!
 ```
 
-### Time-Range Analysis
+## Reinforcement Learning Example
 
 ```python
-from ml_dash import Experiment
+import gymnasium as gym
 
-# Resume experiment and analyze
-exp = Experiment(prefix="alice/robotics/experiment-1")
+with Experiment("rl/cartpole").run as experiment:
+    env = gym.make("CartPole-v1")
 
-with exp.run:
-    # Read specific time window
-    contact_data = exp.tracks("sensors/force").read(
-        start_timestamp=5.0,
-        end_timestamp=7.0
-    )
+    for episode in range(100):
+        state, info = env.reset()
+        done = False
+        total_reward = 0
+        step = 0
 
-    # Analyze contact forces during grasp
-    forces = [e["fx"] for e in contact_data["entries"]]
-    max_force = max(forces)
-    exp.log(f"Max contact force: {max_force:.2f}N")
+        while not done:
+            action = agent.act(state)
+            next_state, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
-    # Export to Parquet for further analysis
-    parquet_data = exp.tracks("robot/state").read(format="parquet")
-    with open("trajectory.parquet", "wb") as f:
-        f.write(parquet_data)
+            # Track episode trajectory
+            experiment.track("agent/trajectory").append({
+                "episode": episode,
+                "step": step,
+                "state": state.tolist(),  # numpy to list
+                "action": int(action),
+                "reward": float(reward),
+                "next_state": next_state.tolist()
+            })
+
+            state = next_state
+            total_reward += reward
+            step += 1
+
+        # Track episode summary
+        experiment.track("agent/episodes").append({
+            "episode": episode,
+            "total_reward": total_reward,
+            "steps": step
+        })
 ```
 
-### Merging Data at Same Timestamp
+## Buffering and Performance
+
+Tracks use the background buffering system:
 
 ```python
-from ml_dash import Experiment
+with Experiment("high-freq/tracking").run as experiment:
+    # All track appends are non-blocking
+    for i in range(100000):
+        experiment.track("sensor/data").append({
+            "step": i,
+            "value": sensor.read()
+        })
+        # Returns immediately! No blocking I/O
 
-with Experiment(prefix="alice/fusion/experiment").run as exp:
-    # Log from different sources at same timestamps
-    # Entries are automatically merged
-
-    for t in np.arange(0, 10, 0.1):
-        # From position sensor
-        exp.tracks("fused").append(x=x, y=y, z=z, _ts=t)
-
-        # From velocity estimator (same timestamp)
-        exp.tracks("fused").append(vx=vx, vy=vy, vz=vz, _ts=t)
-
-        # From orientation filter (same timestamp)
-        exp.tracks("fused").append(qw=qw, qx=qx, qy=qy, qz=qz, _ts=t)
-
-    # Result: each timestamp has all fields merged
-    # {timestamp: 0.0, x: ..., y: ..., z: ..., vx: ..., vy: ..., vz: ..., qw: ..., ...}
-
-    exp.tracks.flush()
+    # Automatically batched and uploaded in background
 ```
 
----
+Configure track buffering:
 
-## API Summary
+```bash
+export ML_DASH_TRACK_BATCH_SIZE=100  # Batch 100 track entries
+export ML_DASH_FLUSH_INTERVAL=5.0    # Flush every 5 seconds
+```
 
-### TracksManager (`experiment.tracks`)
+## Timestamp Merging
 
-| Method | Description |
-|--------|-------------|
-| `tracks(topic)` | Get TrackBuilder for a topic |
-| `tracks.flush()` | Flush all topics to storage |
-
-### TrackBuilder (`experiment.tracks(topic)`)
-
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `append(**kwargs)` | `_ts` (required), data fields | `TrackBuilder` | Append timestamped entry |
-| `flush()` | - | `TrackBuilder` | Flush this topic |
-| `read(...)` | start_timestamp, end_timestamp, columns, format | varies | Read track data |
-| `list_entries()` | - | `List[dict]` | Get all entries as list |
-
-### Quick Reference
+Entries with the same timestamp are automatically merged:
 
 ```python
-# Append data (timestamp required)
-experiment.tracks("topic").append(field=value, _ts=1.0)
+timestamp = 12345.67
 
-# Flush specific topic
-experiment.tracks("topic").flush()
-
-# Flush all topics
-experiment.tracks.flush()
-
-# Read all data
-data = experiment.tracks("topic").read()
-
-# Read with filters
-data = experiment.tracks("topic").read(
-    start_timestamp=0.0,
-    end_timestamp=10.0,
-    columns=["field1", "field2"],
-    format="json"  # or "jsonl", "parquet", "mocap"
+# First append
+experiment.track("multi-sensor").append(
+    timestamp=timestamp,
+    data={"temperature": 25.0}
 )
 
-# Get entries as list
-entries = experiment.tracks("topic").list_entries()
+# Second append with same timestamp - merged!
+experiment.track("multi-sensor").append(
+    timestamp=timestamp,
+    data={"pressure": 1013.0}
+)
+
+# Result: Single entry with both fields
+# {"timestamp": 12345.67, "temperature": 25.0, "pressure": 1013.0}
 ```
+
+## Best Practices
+
+### 1. Use Consistent Indexing
+
+```python
+# Good: Use step index consistently
+for step in range(1000):
+    experiment.track("data").append({"step": step, "value": v})
+    experiment.files("frames").save_image(frame, to=f"frame_{step:05d}.jpg")
+
+# Bad: Inconsistent indexing makes alignment hard
+for i in range(1000):
+    experiment.track("data").append({"index": i * 2, "value": v})
+    experiment.files("frames").save_image(frame, to=f"frame_{i}.jpg")
+```
+
+### 2. Include Step/Episode in Data
+
+```python
+# Good: Always include step/episode for easy querying
+experiment.track("agent/rewards").append({
+    "episode": episode,
+    "step": step,
+    "reward": reward
+})
+
+# Less useful: Missing context
+experiment.track("agent/rewards").append({
+    "reward": reward
+})
+```
+
+### 3. Organize by Topic
+
+```python
+# Good: Clear topic hierarchy
+experiment.track("robot/joints/arm").append(data)
+experiment.track("robot/joints/leg").append(data)
+experiment.track("robot/sensors/imu").append(data)
+
+# Less clear: Flat structure
+experiment.track("arm_data").append(data)
+experiment.track("leg_data").append(data)
+```
+
+### 4. Zero-Pad Filenames for Alignment
+
+```python
+# Good: Files sort correctly
+experiment.files("frames").save_image(frame, to=f"frame_{i:05d}.jpg")
+# frame_00000.jpg, frame_00001.jpg, frame_00002.jpg
+
+# Bad: Sorting breaks
+experiment.files("frames").save_image(frame, to=f"frame_{i}.jpg")
+# frame_1.jpg, frame_10.jpg, frame_2.jpg  (wrong order!)
+```
+
+### 5. Store Frame References in Tracks
+
+```python
+for step in range(1000):
+    frame_filename = f"frame_{step:05d}.jpg"
+
+    # Save frame
+    experiment.files("frames").save_image(frame, to=frame_filename)
+
+    # Reference frame in track
+    experiment.track("robot/position").append({
+        "step": step,
+        "frame": frame_filename,  # Link to frame
+        "x": x,
+        "y": y,
+        "z": z
+    })
+```
+
+## API Reference
+
+### `experiment.track(topic: str) -> TrackBuilder`
+
+Returns a TrackBuilder for the specified topic.
+
+**Parameters:**
+- `topic` (str): Topic name (e.g., "robot/position")
+
+**Returns:**
+- TrackBuilder instance
+
+### `TrackBuilder.append(data: Dict[str, Any] = None, *, timestamp: float = None) -> None`
+
+Append a data entry to the track.
+
+**Parameters:**
+- `data` (dict, optional): Data fields to track
+- `timestamp` (float, optional): Explicit timestamp (uses current time if not provided)
+
+**Examples:**
+
+```python
+# With automatic timestamp
+experiment.track("sensor/temp").append({"value": 25.0})
+
+# With explicit timestamp
+experiment.track("sensor/temp").append(
+    timestamp=time.time(),
+    data={"value": 25.0}
+)
+
+# Positional data argument
+experiment.track("sensor/temp").append({
+    "step": 100,
+    "value": 25.0
+})
+```
+
+## Comparison with Metrics
+
+| Feature | Tracks | Metrics |
+|---------|--------|---------|
+| Use Case | Time-series data, trajectories | Training metrics, losses |
+| Structure | Flexible dict per entry | Flat key-value pairs |
+| Timestamp | Explicit or auto | Implicit (step-based) |
+| Merging | Timestamp-based merging | No merging |
+| Best For | Robotics, RL, sensors | Training loss, accuracy |
+
+## Example: Complete Robot Tracking
+
+```python
+import mujoco
+import numpy as np
+from ml_dash import Experiment
+
+with Experiment(
+    prefix="robotics/complete-tracking",
+    tags=["mujoco", "tracking"],
+    dash_url="http://localhost:3000"
+).run as experiment:
+    experiment.log("Starting robot tracking experiment")
+
+    # Initialize MuJoCo
+    model = mujoco.MjModel.from_xml_string(xml_content)
+    data = mujoco.MjData(model)
+    renderer = mujoco.Renderer(model, height=480, width=640)
+
+    steps = 1000
+    record_interval = 4
+
+    for i in range(steps):
+        # Control
+        ctrl_1 = 4.0 * np.sin(i * 0.03)
+        ctrl_2 = 2.5 * np.sin(i * 0.05)
+        data.ctrl[0] = ctrl_1
+        data.ctrl[1] = ctrl_2
+
+        # Simulate
+        mujoco.mj_step(model, data)
+
+        # Record
+        if i % record_interval == 0:
+            # Render
+            renderer.update_scene(data)
+            pixels = renderer.render()
+
+            # Get state
+            ee_pos = data.site_xpos[model.site('end_effector').id].copy()
+
+            # Save frame
+            experiment.files("robot/frames").save_image(
+                pixels,
+                to=f"frame_{i:05d}.jpg",
+                quality=85
+            )
+
+            # Track position
+            experiment.track("robot/position").append({
+                "step": i,
+                "x": float(ee_pos[0]),
+                "y": float(ee_pos[1]),
+                "z": float(ee_pos[2])
+            })
+
+            # Track control
+            experiment.track("robot/control").append({
+                "step": i,
+                "ctrl_1": float(ctrl_1),
+                "ctrl_2": float(ctrl_2)
+            })
+
+            experiment.log(
+                f"Step {i:3d}: pos=({ee_pos[0]:.4f}, "
+                f"{ee_pos[1]:.4f}, {ee_pos[2]:.4f})"
+            )
+
+    experiment.log("Tracking complete!")
+```
+
+This creates a complete tracking dataset with aligned frames, positions, and control signals!

@@ -89,6 +89,14 @@ ml-dash list --prefix my-user/my-project
 
 ## Documentation
 
+### New Features (v0.6.7)
+
+- **[Background Buffering](buffering.md)** - Non-blocking I/O with automatic batching
+- **[Track API](tracks.md)** - Time-series data tracking for robotics & RL
+- **[Image Saving](images.md)** - Direct numpy array to PNG/JPEG conversion
+
+### Core Documentation
+
 The documentation is being reorganized. Current documentation can be found in the [archived](archived/) folder:
 
 - [Getting Started](archived/getting-started.md)
@@ -110,7 +118,17 @@ The documentation is being reorganized. Current documentation can be found in th
 
 ```{toctree}
 :maxdepth: 2
-:caption: Documentation
+:caption: New Features
+:hidden:
+
+buffering
+tracks
+images
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Core Documentation
 :hidden:
 
 archived/getting-started
