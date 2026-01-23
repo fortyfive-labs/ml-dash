@@ -10,292 +10,247 @@ globs:
 keywords:
   - tracks
   - trajectory
-  - trajectories
   - robot
   - robotics
   - sensor
-  - sensors
   - timestamp
-  - timestamped
   - motion capture
   - mocap
   - pose
-  - position
-  - velocity
+  - imu
   - joint
   - end effector
-  - gripper
-  - imu
-  - sparse data
 ---
 
 # ML-Dash Tracks API
 
-Tracks are for storing sparse timestamped data like robot trajectories, camera poses, sensor readings, and multi-modal time series data.
+Tracks store timestamped multi-modal data. The topic is an ID/prefix, and kwargs are the data fields logged together at each timestamp.
 
-## When to Use Tracks
+## Realistic Examples
 
-- Robot trajectories and joint states
-- Sensor readings at irregular intervals
-- Motion capture data
-- Camera poses and transforms
-- Event-driven data with timestamps
-- Any data that needs explicit timestamps (not index-based)
+### Robot State Logging
 
-## Basic Usage
+Log full robot state in a single call:
 
 ```python
 from ml_dash import Experiment
 
-with Experiment(prefix="alice/robotics/experiment").run as exp:
-    # Timestamp (_ts) is required
-    exp.tracks("robot/position").append(
-        q=[0.1, 0.2, 0.3],      # joint positions
-        e=[0.5, 0.0, 0.6],      # end effector
-        _ts=1.0                  # timestamp in seconds
-    )
+with Experiment(prefix="alice/franka/pick-place").run as exp:
+    for t in range(1000):
+        ts = t * 0.01  # 100Hz
+
+        exp.tracks("robot").append(
+            q=robot.joint_positions.tolist(),      # [7] joint positions
+            qd=robot.joint_velocities.tolist(),    # [7] joint velocities
+            tau=robot.joint_torques.tolist(),      # [7] joint torques
+            ee_pos=robot.ee_position.tolist(),     # [3] end effector xyz
+            ee_quat=robot.ee_quaternion.tolist(),  # [4] end effector orientation
+            gripper=robot.gripper_width,           # scalar
+            _ts=ts
+        )
 ```
 
-## Key Concepts
+### IMU Sensor Logging
 
-### Timestamps are Required
+Log all IMU channels together:
 
 ```python
-# Valid
-experiment.tracks("sensor").append(temp=25.5, _ts=0.0)
-
-# Invalid - raises ValueError
-experiment.tracks("sensor").append(temp=25.5)  # Missing _ts!
+with Experiment(prefix="alice/drone/flight-01").run as exp:
+    while running:
+        exp.tracks("imu").append(
+            accel=[ax, ay, az],      # accelerometer [m/s²]
+            gyro=[gx, gy, gz],       # gyroscope [rad/s]
+            mag=[mx, my, mz],        # magnetometer [μT]
+            temp=imu.temperature,    # temperature [°C]
+            _ts=time.time()
+        )
 ```
 
-### Background Buffering
-
-Track data is buffered in background and flushed automatically:
-- On interval (configurable)
-- When batch size reached
-- When experiment exits (`with` block ends)
-- When manually calling `.flush()`
+### Multi-Camera Setup
 
 ```python
-# Manual flush if needed before experiment ends
-experiment.tracks("robot/state").flush()  # Flush one topic
-experiment.tracks.flush()                  # Flush all topics
+with Experiment(prefix="alice/manipulation/demo").run as exp:
+    for frame_id in range(num_frames):
+        ts = frame_id / fps
+
+        # Each camera is a separate track
+        exp.tracks("cam/wrist").append(
+            path=f"frames/wrist_{frame_id:06d}.png",
+            intrinsics=K_wrist.tolist(),
+            pose=T_wrist.tolist(),
+            _ts=ts
+        )
+
+        exp.tracks("cam/overhead").append(
+            path=f"frames/overhead_{frame_id:06d}.png",
+            intrinsics=K_overhead.tolist(),
+            pose=T_overhead.tolist(),
+            _ts=ts
+        )
 ```
 
-### Method Chaining
-
-`append()` and `flush()` return self for chaining:
+### Force-Torque Sensor
 
 ```python
-experiment.tracks("robot/state") \
-    .append(q=[0.1], _ts=0.0) \
-    .append(q=[0.2], _ts=0.1) \
-    .append(q=[0.3], _ts=0.2) \
-    .flush()
-```
-
-### Automatic Merging
-
-Entries with the same timestamp are automatically merged:
-
-```python
-experiment.tracks("robot/state").append(q=[0.1, 0.2], _ts=1.0)
-experiment.tracks("robot/state").append(v=[0.01, 0.02], _ts=1.0)
-# Result: {timestamp: 1.0, q: [0.1, 0.2], v: [0.01, 0.02]}
-```
-
-### Topic Organization
-
-Use "/" for hierarchical topic names:
-
-```python
-experiment.tracks("robot/joints")
-experiment.tracks("robot/gripper")
-experiment.tracks("camera/rgb")
-experiment.tracks("sensors/imu")
-```
-
----
-
-## TracksManager API
-
-Access via `experiment.tracks`:
-
-```python
-# Get TrackBuilder for a topic
-builder = experiment.tracks("robot/position")
-
-# Flush all topics to storage
-experiment.tracks.flush()
+with Experiment(prefix="alice/assembly/insertion").run as exp:
+    while inserting:
+        exp.tracks("ft_sensor").append(
+            force=[fx, fy, fz],      # [N]
+            torque=[tx, ty, tz],     # [Nm]
+            contact=is_contact,      # bool
+            _ts=time.time()
+        )
 ```
 
 ---
 
-## TrackBuilder API
+## API Reference
 
-### append(**kwargs)
+### tracks(topic)
 
-Append a timestamped entry:
+Get a track builder for a topic ID:
 
 ```python
-experiment.tracks("robot/state").append(
-    q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6],  # joint positions
-    qd=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06],  # velocities
-    gripper_pos=0.04,
-    _ts=1.5  # timestamp (required)
+builder = experiment.tracks("robot")
+builder = experiment.tracks("imu")
+builder = experiment.tracks("cam/wrist")
+```
+
+### append(**kwargs, _ts=)
+
+Log data fields at a timestamp. **`_ts` is required.**
+
+```python
+experiment.tracks("robot").append(
+    q=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+    qd=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07],
+    gripper=0.04,
+    _ts=1.5
 )
 ```
 
 ### flush()
 
-Flush specific topic:
+Flush buffered data to storage:
 
 ```python
-experiment.tracks("robot/position").flush()
+experiment.tracks("robot").flush()  # Flush one track
+experiment.tracks.flush()           # Flush all tracks
 ```
 
 ### read()
 
-Read track data with optional filtering:
+Read track data:
 
 ```python
-# Read all data
-data = experiment.tracks("robot/position").read()
+# All data
+data = experiment.tracks("robot").read()
 
-# Read time range
-data = experiment.tracks("robot/position").read(
-    start_timestamp=0.0,
+# Time range
+data = experiment.tracks("robot").read(
+    start_timestamp=5.0,
     end_timestamp=10.0
 )
 
-# Read specific columns
-data = experiment.tracks("robot/position").read(
-    columns=["q", "e"]
-)
+# Specific columns only
+data = experiment.tracks("robot").read(columns=["q", "ee_pos"])
 
-# Export formats: json (default), jsonl, parquet, mocap
-parquet_data = experiment.tracks("robot/position").read(format="parquet")
-```
-
-### list_entries()
-
-Get entries as a list:
-
-```python
-entries = experiment.tracks("robot/position").list_entries()
-for entry in entries:
-    print(f"t={entry['timestamp']}: q={entry.get('q')}")
+# Export formats: json, jsonl, parquet, mocap
+parquet = experiment.tracks("robot").read(format="parquet")
 ```
 
 ---
 
-## Complete Examples
+## Key Behaviors
 
-### Robot Trajectory Logging
+### Timestamp Required
+
+```python
+# Valid
+experiment.tracks("imu").append(accel=[0, 0, 9.8], _ts=0.0)
+
+# Invalid - raises ValueError
+experiment.tracks("imu").append(accel=[0, 0, 9.8])  # Missing _ts!
+```
+
+### Same-Timestamp Merging
+
+Multiple appends at same `_ts` merge into one entry:
+
+```python
+experiment.tracks("robot").append(q=[0.1, 0.2], _ts=1.0)
+experiment.tracks("robot").append(gripper=0.04, _ts=1.0)
+# Result: {_ts: 1.0, q: [0.1, 0.2], gripper: 0.04}
+```
+
+### Background Buffering
+
+Data is buffered and flushed automatically:
+- On configurable interval
+- When batch size reached
+- When experiment exits
+- When `.flush()` called
+
+### Method Chaining
+
+```python
+experiment.tracks("robot") \
+    .append(q=[0.1], _ts=0.0) \
+    .append(q=[0.2], _ts=0.1) \
+    .flush()
+```
+
+---
+
+## Complete Robotics Example
 
 ```python
 from ml_dash import Experiment
+import numpy as np
 
-with Experiment(prefix="alice/robotics/pick-place").run as exp:
-    exp.params.set(robot="franka_panda", task="pick_and_place")
+with Experiment(prefix="alice/franka/demo-001").run as exp:
+    exp.params.set(
+        robot="franka_panda",
+        task="pick_and_place",
+        control_freq=100
+    )
 
-    # Log trajectory at 100Hz
     dt = 0.01
-    for i in range(1000):
-        t = i * dt
-        q = get_joint_positions()
-        ee_pos = get_end_effector_position()
+    for step in range(10000):
+        ts = step * dt
 
-        exp.tracks("robot/state").append(
-            q=q.tolist(),
-            ee_pos=ee_pos.tolist(),
-            _ts=t
+        # Robot state - all fields in one call
+        exp.tracks("robot").append(
+            q=env.robot.q.tolist(),
+            qd=env.robot.qd.tolist(),
+            tau=env.robot.tau.tolist(),
+            ee_pos=env.robot.ee_pos.tolist(),
+            ee_quat=env.robot.ee_quat.tolist(),
+            gripper_pos=env.robot.gripper_pos,
+            _ts=ts
         )
 
-    exp.tracks.flush()
-```
-
-### Multi-Sensor Logging
-
-```python
-with Experiment(prefix="alice/sensors/calibration").run as exp:
-    # IMU at 200Hz
-    for i in range(2000):
-        exp.tracks("sensors/imu").append(
-            accel=[ax, ay, az],
-            gyro=[gx, gy, gz],
-            _ts=i * 0.005
+        # Action commanded
+        exp.tracks("action").append(
+            target_q=action[:7].tolist(),
+            target_gripper=action[7],
+            _ts=ts
         )
 
-    # Force sensor at 1kHz
-    for i in range(10000):
-        exp.tracks("sensors/force").append(
-            fx=fx, fy=fy, fz=fz,
-            _ts=i * 0.001
-        )
+        # Observations
+        if step % 10 == 0:  # 10Hz camera
+            exp.tracks("obs").append(
+                rgb_path=f"rgb/{step:06d}.png",
+                depth_path=f"depth/{step:06d}.png",
+                _ts=ts
+            )
 
-    exp.tracks.flush()
-```
-
-### Time-Range Analysis
-
-```python
-# Read specific time window
-contact_data = experiment.tracks("sensors/force").read(
-    start_timestamp=5.0,
-    end_timestamp=7.0
-)
-
-# Export to Parquet
-parquet_data = experiment.tracks("robot/state").read(format="parquet")
-with open("trajectory.parquet", "wb") as f:
-    f.write(parquet_data)
-```
-
----
-
-## Storage Format
-
-### Local Mode
-
-```
-.dash/owner/project/experiment/tracks/{topic_safe}/data.jsonl
-```
-
-Each line is a JSON entry:
-```json
-{"timestamp": 1.0, "q": [0.1, 0.2, 0.3], "e": [0.5, 0.0, 0.6]}
-```
-
-### Remote Mode
-
-MongoDB with timestamp indexing, supporting efficient time-range queries.
-
----
-
-## Quick Reference
-
-```python
-# Append (timestamp required)
-experiment.tracks("topic").append(field=value, _ts=1.0)
-
-# Flush specific topic
-experiment.tracks("topic").flush()
-
-# Flush all topics
-experiment.tracks.flush()
-
-# Read data
-data = experiment.tracks("topic").read()
-data = experiment.tracks("topic").read(
-    start_timestamp=0.0,
-    end_timestamp=10.0,
-    columns=["field1"],
-    format="json"  # json, jsonl, parquet, mocap
-)
-
-# Get entries as list
-entries = experiment.tracks("topic").list_entries()
+    # Read back for analysis
+    robot_data = exp.tracks("robot").read(
+        start_timestamp=0.0,
+        end_timestamp=5.0,
+        columns=["q", "ee_pos"]
+    )
 ```
 
 ---
@@ -304,16 +259,15 @@ entries = experiment.tracks("topic").list_entries()
 
 | | Tracks | Metrics |
 |---|---|---|
-| **Purpose** | Timestamped multi-modal data | Time-series metrics |
-| **Timestamp** | **Required** (`_ts=`) | Optional (auto-indexed) |
-| **Use case** | Robot trajectories, sensor data, poses | Loss, accuracy, learning rate |
-| **Merge behavior** | Same `_ts` entries merged | Append-only (no merge) |
-| **Query** | Time-range (`start_timestamp`, `end_timestamp`) | Index-range (`start_index`, `limit`) |
+| **Purpose** | Timestamped multi-modal data | Training metrics |
+| **Timestamp** | Required (`_ts=`) | Auto-indexed |
+| **Use case** | Robot state, IMU, poses | Loss, accuracy |
+| **Query** | Time-range | Index-range |
 
 ```python
-# Use TRACKS for robotics/sensor data with explicit timestamps
-experiment.tracks("robot/state").append(q=[0.1, 0.2], _ts=1.5)
+# TRACKS: robotics data with explicit timestamps
+experiment.tracks("robot").append(q=[0.1, 0.2], ee_pos=[0.5, 0.0, 0.3], _ts=1.5)
 
-# Use METRICS for training metrics (index-based)
-experiment.metrics("train").log(loss=0.5, epoch=10)
+# METRICS: training metrics (auto-indexed)
+experiment.metrics("train").log(loss=0.5, accuracy=0.92, epoch=10)
 ```
