@@ -1,10 +1,14 @@
 {
   "name": "ml-dash",
+  "owner": {
+    "name": "Ge Yang"
+  },
   "description": "ML experiment tracking skills for Claude Code",
   "plugins": [
     {
       "name": "ml-dash",
-      "path": "./"
+      "source": "./",
+      "description": "ML-Dash skills for experiment tracking"
     }
   ]
 }
