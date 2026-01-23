@@ -1,25 +1,6 @@
 ---
-description: Timestamped multi-modal data logging for robotics, sensors, and trajectories
-globs:
-  - "**/*.py"
-  - "**/robot*.py"
-  - "**/trajectory*.py"
-  - "**/sensor*.py"
-  - "**/control*.py"
-  - "**/mocap*.py"
-keywords:
-  - tracks
-  - trajectory
-  - robot
-  - robotics
-  - sensor
-  - timestamp
-  - motion capture
-  - mocap
-  - pose
-  - imu
-  - joint
-  - end effector
+name: tracks
+description: Timestamped multi-modal data logging for robotics, sensors, and trajectories (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash Tracks API

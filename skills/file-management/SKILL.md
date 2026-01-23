@@ -1,27 +1,6 @@
 ---
-description: File uploads, downloads, artifacts, checkpoints, visualizations, and videos in ML-Dash
-globs:
-  - "**/*.py"
-  - "**/train*.py"
-  - "**/*checkpoint*"
-  - "**/*model*"
-keywords:
-  - files
-  - upload
-  - download
-  - artifact
-  - checkpoint
-  - save
-  - save_fig
-  - save_video
-  - save_torch
-  - save_text
-  - save_json
-  - save_blob
-  - model.pth
-  - visualization
-  - plot
-  - matplotlib
+name: file-management
+description: File uploads, downloads, artifacts, checkpoints, visualizations, and videos in ML-Dash (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash File Management

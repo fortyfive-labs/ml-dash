@@ -1,19 +1,6 @@
 ---
-description: Tracking parameters, metrics, and logs in ML-Dash experiments
-globs:
-  - "**/*.py"
-  - "**/train*.py"
-  - "**/config*.py"
-keywords:
-  - params
-  - parameters
-  - hyperparameters
-  - metrics
-  - log
-  - logging
-  - time series
-  - loss
-  - accuracy
+name: tracking-data
+description: Tracking parameters, metrics, logs, and tracks in ML-Dash experiments (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash Data Tracking

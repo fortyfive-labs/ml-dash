@@ -1,23 +1,6 @@
 ---
-description: Working with params-proto configuration classes in ML-Dash experiments
-globs:
-  - "**/*.py"
-  - "**/train*.py"
-  - "**/config*.py"
-  - "**/args.py"
-keywords:
-  - params-proto
-  - configuration
-  - config
-  - hyperparameters
-  - params
-  - class objects
-  - Args
-  - training config
-  - model config
-  - attributes
-  - params.log
-  - params.set
+name: params-proto
+description: Working with params-proto configuration classes in ML-Dash experiments (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash with params-proto

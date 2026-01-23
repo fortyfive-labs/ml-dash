@@ -1,23 +1,6 @@
 ---
-description: Experiment class configuration, usage patterns, local vs remote modes, and lifecycle management
-globs:
-  - "**/*.py"
-  - "**/train*.py"
-  - "**/experiment*.py"
-keywords:
-  - Experiment
-  - context manager
-  - decorator
-  - local mode
-  - remote mode
-  - experiment lifecycle
-  - run.start
-  - run.complete
-  - run.fail
-  - status
-  - RUNNING
-  - COMPLETED
-  - FAILED
+name: experiment-setup
+description: Experiment class configuration, usage patterns, local vs remote modes, and lifecycle management (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash Experiment Configuration

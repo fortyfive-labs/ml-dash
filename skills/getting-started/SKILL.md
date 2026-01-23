@@ -1,20 +1,6 @@
 ---
-description: ML-Dash installation, quick start, and basic usage patterns
-globs:
-  - "**/*.py"
-  - "**/requirements*.txt"
-  - "**/pyproject.toml"
-  - "**/setup.py"
-keywords:
-  - install
-  - setup
-  - getting started
-  - quick start
-  - pip install
-  - uv add
-  - ml-dash
-  - dxp
-  - import ml_dash
+name: getting-started
+description: ML-Dash installation, quick start, and basic usage patterns (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash Getting Started

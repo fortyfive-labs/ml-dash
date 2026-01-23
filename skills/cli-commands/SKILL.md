@@ -1,25 +1,6 @@
 ---
-description: ML-Dash CLI commands for authentication, creating projects, uploading, downloading, and listing experiments
-globs:
-  - "**/*.sh"
-  - "**/*.bash"
-  - "**/Makefile"
-  - "**/.github/**"
-keywords:
-  - ml-dash
-  - cli
-  - command line
-  - login
-  - logout
-  - upload
-  - download
-  - list
-  - create
-  - authentication
-  - OAuth
-  - api-key
-  - sync
-  - batch
+name: cli-commands
+description: ML-Dash CLI commands for authentication, creating projects, uploading, downloading, and listing experiments (plugin:ml-dash@ml-dash)
 ---
 
 # ML-Dash CLI Commands
