@@ -17,8 +17,8 @@ Once installed, ask questions like:
 
 ## Installation
 
-```shell
-pip install ml-dash
+```{parsed-literal}
+pip install ml-dash=={{version}}
 ```
 
 ## Quick Start

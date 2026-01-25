@@ -47,8 +47,8 @@ Claude will provide code examples and best practices tailored to ML-Dash.
 
 ## Installation
 
-```bash
-pip install ml-dash==0.6.2rc1
+```{parsed-literal}
+pip install ml-dash=={{version}}
 ```
 
 ## Quick Start with Remote Mode

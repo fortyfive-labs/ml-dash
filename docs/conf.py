@@ -5,7 +5,13 @@
 
 import os
 import sys
+import tomllib
 sys.path.insert(0, os.path.abspath('../src'))
+
+# Read version from pyproject.toml
+with open(os.path.join(os.path.dirname(__file__), '..', 'pyproject.toml'), 'rb') as f:
+    pyproject = tomllib.load(f)
+    release = pyproject['project']['version']
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -13,7 +19,6 @@ sys.path.insert(0, os.path.abspath('../src'))
 project = 'ML-Dash'
 copyright = '2025, Ge Yang, Tom Tao'
 author = 'Ge Yang, Tom Tao'
-release = '0.6.4'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -48,6 +53,11 @@ myst_enable_extensions = [
     "substitution",
     "tasklist",
 ]
+
+# MyST substitutions - use {{version}} in markdown files
+myst_substitutions = {
+    "version": release,
+}
 
 # Support both .rst and .md files
 source_suffix = {
