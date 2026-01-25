@@ -31,13 +31,13 @@ def add_parser(subparsers):
 
 Examples:
   # Create a project in current user's namespace
-  dash project create -p new-project
+  ml-dash project create -p new-project
 
   # Create a project in a specific namespace
-  dash project create -p geyang/new-project
+  ml-dash project create -p geyang/new-project
 
   # Create with description
-  dash project create -p geyang/tutorials -d "ML tutorials and examples"
+  ml-dash project create -p geyang/tutorials -d "ML tutorials and examples"
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -68,13 +68,13 @@ The project and its contents will be marked as deleted but can be recovered.
 
 Examples:
   # Remove a project in current user's namespace
-  dash project remove -p my-project
+  ml-dash project remove -p my-project
 
   # Remove a project in a specific namespace
-  dash project remove -p geyang/old-project
+  ml-dash project remove -p geyang/old-project
 
   # Skip confirmation prompt
-  dash project remove -p my-project --yes
+  ml-dash project remove -p my-project --yes
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -101,7 +101,7 @@ def cmd_project(args) -> int:
     console = Console()
 
     if args.project_command is None:
-        console.print("[yellow]Usage:[/yellow] dash project <create|remove> [options]")
+        console.print("[yellow]Usage:[/yellow] ml-dash project <create|remove> [options]")
         console.print("\nAvailable commands:")
         console.print("  create  Create a new project")
         console.print("  remove  Remove (soft delete) a project")
@@ -129,8 +129,8 @@ def _cmd_create(args, console: Console) -> int:
             f"[red]Error:[/red] Prefix can have at most 2 parts (namespace/project).\n"
             f"Got: {args.prefix}\n\n"
             f"Examples:\n"
-            f"  dash project create -p new-project\n"
-            f"  dash project create -p geyang/new-project"
+            f"  ml-dash project create -p new-project\n"
+            f"  ml-dash project create -p geyang/new-project"
         )
         return 1
 
@@ -166,8 +166,8 @@ def _cmd_remove(args, console: Console) -> int:
             f"[red]Error:[/red] Prefix can have at most 2 parts (namespace/project).\n"
             f"Got: {args.prefix}\n\n"
             f"Examples:\n"
-            f"  dash project remove -p my-project\n"
-            f"  dash project remove -p geyang/old-project"
+            f"  ml-dash project remove -p my-project\n"
+            f"  ml-dash project remove -p geyang/old-project"
         )
         return 1
 
