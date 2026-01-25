@@ -191,13 +191,13 @@ If you have [Claude Code](https://claude.ai/download) installed, you can install
 ```
 
 ```
-/plugin install ml-dash@fortyfive-labs-ml-dash
+/plugin install ml-dash@ml-dash
 ```
 
 To update to the latest version:
 
 ```
-/plugin update ml-dash@fortyfive-labs-ml-dash
+/plugin update ml-dash@ml-dash
 ```
 
 ### Available Skills
