@@ -69,6 +69,68 @@ finally:
     exp.run.complete()
 ```
 
+## Automatic Path Detection with RUN
+
+Use `RUN.entry = __file__` to automatically compute experiment prefixes from your project structure:
+
+```
+my-project/
+├── pyproject.toml              # Project root marker
+└── experiments/
+    ├── vision/
+    │   └── resnet/
+    │       └── train.py        # prefix = "vision/resnet"
+    └── nlp/
+        └── bert/
+            └── train.py        # prefix = "nlp/bert"
+```
+
+**Setup in your training script:**
+
+```{code-block} python
+:linenos:
+
+from ml_dash import RUN, Experiment
+
+# Set entry point - RUN auto-detects project root and computes prefix
+RUN.entry = __file__
+
+# Now use the auto-computed prefix
+with Experiment(
+    prefix=f"{RUN.user}/{RUN.project}/{RUN.path_stem}",
+    dash_root=".dash"
+).run as exp:
+    exp.log(f"Running from {RUN.entry}")
+    exp.params.set(script=str(RUN.entry))
+```
+
+**For sweeps**, use the sweep directory:
+
+```{code-block} python
+:linenos:
+
+from ml_dash import RUN, Experiment
+from pathlib import Path
+
+# Point to sweep directory instead of __file__
+sweep_dir = Path(__file__).parent
+RUN.entry = str(sweep_dir)
+
+# Each job gets organized under the sweep path
+for job_id, config in enumerate(sweep_configs):
+    with Experiment(
+        prefix=f"{RUN.user}/{RUN.path_stem}/job_{job_id:03d}"
+    ).run as exp:
+        exp.params.set(**config)
+```
+
+**RUN attributes:**
+- `RUN.entry` - Entry point file or directory
+- `RUN.path_stem` - Relative path from project root (e.g., "vision/resnet")
+- `RUN.project_root` - Auto-detected project root
+- `RUN.user` - Current user (from `$USER` or `$ML_DASH_USER`)
+- `RUN.now` - Timestamp at import
+
 ## Local vs Remote Mode
 
 **Local mode** - Zero setup, filesystem storage:

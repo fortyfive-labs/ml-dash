@@ -2,11 +2,43 @@
 
 Get started with ML-Dash in under 5 minutes.
 
-## Installation
+## Claude Code Plugin
 
-```bash
-pip install ml-dash==0.6.2rc1
+If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin directly from GitHub:
+
 ```
+/plugin marketplace add fortyfive-labs/ml-dash
+/plugin install ml-dash@ml-dash
+```
+
+To update to the latest version:
+
+```
+/plugin update ml-dash@ml-dash
+```
+
+### Available Skills
+
+Once installed, the following skills are available:
+
+| Skill | Description |
+|-------|-------------|
+| `cli-commands` | CLI usage for upload, download, list, create |
+| `experiment-setup` | Setting up experiments with params-proto |
+| `file-management` | Storing and retrieving files and artifacts |
+| `getting-started` | Quick start guide |
+| `params-proto` | Parameter configuration patterns |
+| `tracking-data` | Logging metrics, params, and data |
+| `tracks` | Background buffering and track management |
+
+### Ask Questions
+
+With skills loaded, ask questions like:
+- "How do I log parameters from a config class?"
+- "Show me an example of tracking metrics during training"
+- "How do I upload experiments to the server?"
+
+Claude will provide code examples and best practices tailored to ML-Dash.
 
 ## Quick Start with Remote Mode
 
@@ -181,49 +213,6 @@ with Experiment(
 ```
 
 The API is identical across local and remote modes!
-
-## Getting Help with Claude Code
-
-If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin directly from GitHub:
-
-```
-/plugin marketplace add fortyfive-labs/ml-dash
-```
-
-```
-/plugin install ml-dash@ml-dash
-```
-
-To update to the latest version:
-
-```
-/plugin update ml-dash@ml-dash
-```
-
-### Available Skills
-
-Once installed, the following skills are available:
-
-| Skill | Description |
-|-------|-------------|
-| `cli-commands` | CLI usage for upload, download, list, create |
-| `experiment-setup` | Setting up experiments with params-proto |
-| `file-management` | Storing and retrieving files and artifacts |
-| `getting-started` | Quick start guide |
-| `params-proto` | Parameter configuration patterns |
-| `tracking-data` | Logging metrics, params, and data |
-| `tracks` | Background buffering and track management |
-
-### Ask Questions
-
-With skills loaded, ask questions like:
-- "How do I log parameters from a config class?"
-- "Show me an example of tracking metrics during training"
-- "How do I upload experiments to the server?"
-
-Claude will provide code examples and best practices tailored to ML-Dash.
-
----
 
 ## Next Steps
 
