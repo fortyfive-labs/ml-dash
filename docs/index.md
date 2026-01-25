@@ -2,13 +2,20 @@
 
 ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage.
 
-## Installation
+## Claude Code Plugin
 
-```shell
-uv add ml-dash
+If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin:
+
+```
+/plugin marketplace add fortyfive-labs/ml-dash
+/plugin install ml-dash@ml-dash
 ```
 
-or
+Once installed, ask questions like:
+- "How do I log parameters from a config class?"
+- "Show me an example of tracking metrics during training"
+
+## Installation
 
 ```shell
 pip install ml-dash
@@ -34,8 +41,6 @@ with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
 ```bash
 # Authenticate first
 ml-dash login
-
-# Then use remote mode
 ```
 
 ```python
@@ -49,66 +54,25 @@ with Experiment(
     exp.params.set(learning_rate=0.001)
 ```
 
-## Pre-configured Singleton
-
-```python
-from ml_dash.auto_start import dxp
-
-with dxp.run:
-    dxp.log("Using pre-configured experiment")
-    dxp.params.set(learning_rate=0.001)
-```
-
-## CLI Commands
-
-### Authentication
-```bash
-ml-dash login          # Login to dash.ml
-ml-dash logout         # Logout
-ml-dash profile        # Show current user
-```
-
-### Project Management
-```bash
-# Create a project in current user's namespace
-ml-dash create -p new-project
-
-# Create a project in a specific namespace
-ml-dash create -p geyang/tutorials
-
-# Create with description
-ml-dash create -p geyang/tutorials -d "ML tutorials and examples"
-```
-
-### Data Operations
-```bash
-ml-dash upload --prefix my-user/my-project
-ml-dash download --prefix my-user/my-project
-ml-dash list --prefix my-user/my-project
-```
-
 ## Documentation
 
-### New Features (v0.6.7)
+### Core Documentation
+
+- [Getting Started](getting-started.md)
+- [Experiments](experiments.md)
+- [Parameters](parameters.md)
+- [Metrics](metrics.md)
+- [Logging](logging.md)
+- [Files](files.md)
+- [CLI Commands](cli.md)
+- [API Reference](api-reference.md)
+- [Examples](complete-examples.md)
+
+### Advanced Features
 
 - **[Background Buffering](buffering.md)** - Non-blocking I/O with automatic batching
 - **[Track API](tracks.md)** - Time-series data tracking for robotics & RL
 - **[Image Saving](images.md)** - Direct numpy array to PNG/JPEG conversion
-
-### Core Documentation
-
-The documentation is being reorganized. Current documentation can be found in the [archived](archived/) folder:
-
-- [Getting Started](archived/getting-started.md)
-- [Experiments](archived/experiments.md)
-- [Parameters](archived/parameters.md)
-- [Metrics](archived/metrics.md)
-- [Tracks](tracks.md)
-- [Logging](archived/logging.md)
-- [Files](archived/files.md)
-- [API Reference](archived/api-reference.md)
-- [CLI Commands](archived/cli.md)
-- [Examples](archived/complete-examples.md)
 
 ## Links
 
@@ -118,30 +82,26 @@ The documentation is being reorganized. Current documentation can be found in th
 
 ```{toctree}
 :maxdepth: 2
-:caption: New Features
+:caption: Core Documentation
+:hidden:
+
+getting-started
+experiments
+parameters
+metrics
+logging
+files
+cli
+api-reference
+complete-examples
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Advanced Features
 :hidden:
 
 buffering
 tracks
 images
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Core Documentation
-:hidden:
-
-archived/getting-started
-archived/experiments
-archived/parameters
-archived/metrics
-tracks
-archived/logging
-archived/files
-archived/api-reference
-archived/cli
-archived/basic-training
-archived/hyperparameter-search
-archived/model-comparison
-archived/complete-examples
 ```
