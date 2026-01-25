@@ -25,7 +25,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # Import and add command parsers
-    from .cli_commands import upload, download, list as list_cmd, login, logout, profile, api, create
+    from .cli_commands import upload, download, list as list_cmd, login, logout, profile, api, create, project
 
     # Authentication commands
     login.add_parser(subparsers)
@@ -36,7 +36,8 @@ def create_parser() -> argparse.ArgumentParser:
     api.add_parser(subparsers)
 
     # Project commands
-    create.add_parser(subparsers)
+    project.add_parser(subparsers)
+    create.add_parser(subparsers)  # Deprecated: use 'project create' instead
 
     # Data commands
     upload.add_parser(subparsers)
@@ -74,7 +75,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     elif args.command == "profile":
         from .cli_commands import profile
         return profile.cmd_profile(args)
+    elif args.command == "project":
+        from .cli_commands import project
+        return project.cmd_project(args)
     elif args.command == "create":
+        # Deprecated: redirect to project create
         from .cli_commands import create
         return create.cmd_create(args)
     elif args.command == "upload":
