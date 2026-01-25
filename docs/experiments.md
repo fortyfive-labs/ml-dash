@@ -69,6 +69,32 @@ finally:
     exp.run.complete()
 ```
 
+## Automatic Path Detection with RUN.entry
+
+Use `RUN.entry = __file__` to automatically detect the script path and generate a meaningful experiment prefix:
+
+```{code-block} python
+:linenos:
+
+from ml_dash.run import RUN
+from ml_dash.auto_start import dxp
+
+# Set entry point to current file - enables automatic path detection
+RUN.entry = __file__
+
+# Now dxp will use the script's path to generate the prefix
+# e.g., if running /home/user/project/experiments/train.py
+# prefix becomes: user/project/experiments/train
+with dxp.run:
+    dxp.log("Training with automatic prefix")
+    dxp.params.set(learning_rate=0.001)
+```
+
+This is useful when:
+- Running multiple scripts in the same project
+- You want the prefix to automatically reflect the file structure
+- Organizing experiments by script location
+
 ## Local vs Remote Mode
 
 **Local mode** - Zero setup, filesystem storage:

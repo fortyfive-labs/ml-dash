@@ -5,20 +5,10 @@ description: ML-Dash installation, quick start, and basic usage patterns (plugin
 
 # ML-Dash Getting Started
 
-## Installation
-
-### Python Package
+## Claude Plugin
 
 ```bash
-pip install ml-dash
-# or
-uv add ml-dash
-```
-
-### Claude Plugin (Skills)
-
-```bash
-# Add ml-dash marketplace
+# Add the marketplace
 /plugin marketplace add fortyfive-labs/ml-dash
 
 # Install ml-dash skills
@@ -26,6 +16,14 @@ uv add ml-dash
 ```
 
 Then enable in Settings > Plugins > `ml-dash@ml-dash`
+
+## Installation
+
+```bash
+pip install ml-dash
+# or
+uv add ml-dash
+```
 
 ## Quick Start - Local Mode
 
