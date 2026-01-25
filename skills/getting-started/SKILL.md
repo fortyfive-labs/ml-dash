@@ -5,9 +5,7 @@ description: ML-Dash installation, quick start, and basic usage patterns (plugin
 
 # ML-Dash Getting Started
 
-## Installation
-
-### Claude Plugin (Skills)
+## Claude Plugin (Skills)
 
 ```bash
 # Add ml-dash marketplace
@@ -18,6 +16,8 @@ description: ML-Dash installation, quick start, and basic usage patterns (plugin
 ```
 
 Then enable in Settings > Plugins > `ml-dash@ml-dash`
+
+## Installation
 
 ### Python Package
 
