@@ -2,43 +2,6 @@
 
 ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage.
 
-## Claude Code Plugin
-
-If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin:
-
-```
-/plugin marketplace add fortyfive-labs/ml-dash
-/plugin install ml-dash@ml-dash
-```
-
-Once installed, ask questions like:
-
-<pre class="terminal">
-<span class="prompt">$</span> claude <span class="string">"How do I log parameters from a config class?"</span>
-
-<span class="response">❯</span> You can log parameters using <span class="func">exp.params.set()</span>:
-
-    <span class="obj">exp</span>.<span class="method">params</span>.<span class="method">set</span>(
-        <span class="param">learning_rate</span>=<span class="num">0.001</span>,
-        <span class="param">batch_size</span>=<span class="num">32</span>,
-        <span class="param">model</span>=<span class="string">"resnet50"</span>
-    )
-
-  Or from a params-proto config: <span class="func">exp.params.update(Config)</span>
-</pre>
-
-<pre class="terminal">
-<span class="prompt">$</span> claude <span class="string">"Show me an example of tracking metrics"</span>
-
-<span class="response">❯</span> Here's a typical training loop with metrics:
-
-    <span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="builtin">range</span>(<span class="num">100</span>):
-        loss = train_epoch()
-        <span class="obj">exp</span>.<span class="method">metrics</span>(<span class="string">"train"</span>).<span class="method">log</span>(<span class="param">loss</span>=loss, <span class="param">epoch</span>=epoch)
-
-  <span class="dim">Metrics are automatically batched and synced in the background.</span>
-</pre>
-
 ## Installation
 
 ```{parsed-literal}
@@ -77,6 +40,39 @@ with Experiment(
     exp.log("Training on remote")
     exp.params.set(learning_rate=0.001)
 ```
+
+## Claude Code Plugin
+
+If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin:
+
+```
+/plugin marketplace add fortyfive-labs/ml-dash
+/plugin install ml-dash@ml-dash
+```
+
+Once installed, ask questions like:
+
+<pre class="terminal"><span class="prompt">$</span> claude <span class="string">"How do I log parameters from a config class?"</span>
+
+You can log parameters using <span class="func">exp.params.set()</span>:
+
+    <span class="obj">exp</span>.<span class="method">params</span>.<span class="method">set</span>(
+        <span class="param">learning_rate</span>=<span class="num">0.001</span>,
+        <span class="param">batch_size</span>=<span class="num">32</span>,
+        <span class="param">model</span>=<span class="string">"resnet50"</span>
+    )
+
+Or from a params-proto config: <span class="func">exp.params.update(Config)</span></pre>
+
+<pre class="terminal"><span class="prompt">$</span> claude <span class="string">"Show me an example of tracking metrics"</span>
+
+Here's a typical training loop with metrics:
+
+    <span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="builtin">range</span>(<span class="num">100</span>):
+        loss = train_epoch()
+        <span class="obj">exp</span>.<span class="method">metrics</span>(<span class="string">"train"</span>).<span class="method">log</span>(<span class="param">loss</span>=loss, <span class="param">epoch</span>=epoch)
+
+<span class="dim">Metrics are automatically batched and synced in the background.</span></pre>
 
 ## Documentation
 
