@@ -38,20 +38,56 @@ Once installed, the following skills are available:
 
 With skills loaded, ask questions like:
 
-```console
+````{card}
+```{code-block} console
 $ claude "How do I log parameters from a config class?"
-Use exp.params.set() or pass a params-proto config to experiment.params.update(Config)
 ```
+> You can log parameters using `exp.params.set()`:
+>
+> ```python
+> exp.params.set(
+>     learning_rate=0.001,
+>     batch_size=32,
+>     model="resnet50"
+> )
+> ```
+>
+> Or from a params-proto config: `exp.params.update(Config)`
+````
 
-```console
-$ claude "Show me an example of tracking metrics during training"
-Use exp.metrics("train").log(loss=0.5, epoch=1) inside your training loop
+````{card}
+```{code-block} console
+$ claude "Show me an example of tracking metrics"
 ```
+> Here's a typical training loop with metrics:
+>
+> ```python
+> for epoch in range(100):
+>     loss = train_epoch()
+>     exp.metrics("train").log(loss=loss, epoch=epoch)
+> ```
+>
+> *Metrics are automatically batched and synced in the background.*
+````
 
-```console
+````{card}
+```{code-block} console
 $ claude "How do I upload experiments to the server?"
-Use ml-dash upload -p prefix or set dash_url in your Experiment for auto-sync
 ```
+> Two options for syncing to dash.ml:
+>
+> **1. CLI upload:**
+> ```bash
+> ml-dash upload -p myuser/project/exp1
+> ```
+>
+> **2. Auto-sync in code:**
+> ```python
+> Experiment(prefix="user/project/exp", dash_url="https://api.dash.ml")
+> ```
+>
+> *With dash_url set, all data syncs automatically.*
+````
 
 Claude will provide code examples and best practices tailored to ML-Dash.
 
