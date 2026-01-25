@@ -13,37 +13,31 @@ If you have [Claude Code](https://claude.ai/download) installed, you can install
 
 Once installed, ask questions like:
 
-````{card}
-```{code-block} console
+```
 $ claude "How do I log parameters from a config class?"
-```
-> You can log parameters using `exp.params.set()`:
->
-> ```python
-> exp.params.set(
->     learning_rate=0.001,
->     batch_size=32,
->     model="resnet50"
-> )
-> ```
->
-> Or from a params-proto config: `exp.params.update(Config)`
-````
 
-````{card}
-```{code-block} console
-$ claude "Show me an example of tracking metrics"
+You can log parameters using exp.params.set():
+
+    exp.params.set(
+        learning_rate=0.001,
+        batch_size=32,
+        model="resnet50"
+    )
+
+Or from a params-proto config: exp.params.update(Config)
 ```
-> Here's a typical training loop with metrics:
->
-> ```python
-> for epoch in range(100):
->     loss = train_epoch()
->     exp.metrics("train").log(loss=loss, epoch=epoch)
-> ```
->
-> *Metrics are automatically batched and synced in the background.*
-````
+
+```
+$ claude "Show me an example of tracking metrics"
+
+Here's a typical training loop with metrics:
+
+    for epoch in range(100):
+        loss = train_epoch()
+        exp.metrics("train").log(loss=loss, epoch=epoch)
+
+Metrics are automatically batched and synced in the background.
+```
 
 ## Installation
 
