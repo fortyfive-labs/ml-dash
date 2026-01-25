@@ -12,8 +12,11 @@ If you have [Claude Code](https://claude.ai/download) installed, you can install
 ```
 
 Once installed, ask questions like:
-- "How do I log parameters from a config class?"
-- "Show me an example of tracking metrics during training"
+
+```console
+$ claude "How do I log parameters from a config class?"
+$ claude "Show me an example of tracking metrics during training"
+```
 
 ## Installation
 

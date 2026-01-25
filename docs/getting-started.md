@@ -37,9 +37,12 @@ Once installed, the following skills are available:
 ### Ask Questions
 
 With skills loaded, ask questions like:
-- "How do I log parameters from a config class?"
-- "Show me an example of tracking metrics during training"
-- "How do I upload experiments to the server?"
+
+```console
+$ claude "How do I log parameters from a config class?"
+$ claude "Show me an example of tracking metrics during training"
+$ claude "How do I upload experiments to the server?"
+```
 
 Claude will provide code examples and best practices tailored to ML-Dash.
 
