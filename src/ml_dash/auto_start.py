@@ -43,7 +43,17 @@ _user = get_jwt_user()
 _username = _user["username"] if _user else getpass.getuser()
 _now = datetime.now()
 
-dxp = Experiment()
+# Create pre-configured singleton experiment in REMOTE mode
+# - dash_url=True: Use default remote server (https://api.dash.ml)
+# - dash_root=None: Remote-only mode (no local storage)
+# - user: Uses authenticated username from token for namespace
+# - Token is auto-loaded from storage when first used
+# - If not authenticated, operations will fail with AuthenticationError
+dxp = Experiment(
+    user=_username,      # Use authenticated username for namespace
+    dash_url=True,       # Use remote API (https://api.dash.ml)
+    dash_root=None,      # Remote-only mode (no local .dash/)
+)
 
 
 # Register cleanup handler to complete experiment on Python exit (if still open)
