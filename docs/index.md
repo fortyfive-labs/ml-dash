@@ -1,17 +1,19 @@
-# ML-Dash Documentation
+# ML-Dash
 
-ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage.
+Simple, flexible ML experiment tracking.
+
+## Claude Code Plugin
+
+```bash
+/plugin marketplace add fortyfive-labs/ml-dash
+/plugin install ml-dash@ml-dash
+```
 
 ## Installation
 
 ```shell
-uv add ml-dash
-```
-
-or
-
-```shell
 pip install ml-dash
+# or: uv add ml-dash
 ```
 
 ## Quick Start
@@ -19,8 +21,7 @@ pip install ml-dash
 ```python
 from ml_dash import Experiment
 
-# Local mode (no authentication required)
-with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
+with Experiment(prefix="alice/project/exp1", dash_root=".dash").run as exp:
     exp.log("Training started")
     exp.params.set(learning_rate=0.001, batch_size=32)
 
@@ -29,119 +30,61 @@ with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
         exp.metrics("train").log(loss=loss, epoch=epoch)
 ```
 
-## Remote Mode (with dash.ml)
+## Remote Mode
 
 ```bash
-# Authenticate first
-ml-dash login
-
-# Then use remote mode
+ml-dash login  # Authenticate first
 ```
 
 ```python
-from ml_dash import Experiment
-
-with Experiment(
-    prefix="my-user/my-project/exp1",
-    dash_url="https://api.dash.ml"
-).run as exp:
+with Experiment(prefix="alice/project/exp1", dash_url="https://api.dash.ml").run as exp:
     exp.log("Training on remote")
-    exp.params.set(learning_rate=0.001)
 ```
 
-## Pre-configured Singleton
+## CLI
 
-```python
-from ml_dash.auto_start import dxp
-
-with dxp.run:
-    dxp.log("Using pre-configured experiment")
-    dxp.params.set(learning_rate=0.001)
-```
-
-## CLI Commands
-
-### Authentication
 ```bash
-ml-dash login          # Login to dash.ml
-ml-dash logout         # Logout
-ml-dash profile        # Show current user
-```
-
-### Project Management
-```bash
-# Create a project in current user's namespace
-ml-dash create -p new-project
-
-# Create a project in a specific namespace
-ml-dash create -p geyang/tutorials
-
-# Create with description
-ml-dash create -p geyang/tutorials -d "ML tutorials and examples"
-```
-
-### Data Operations
-```bash
-ml-dash upload --prefix my-user/my-project
-ml-dash download --prefix my-user/my-project
-ml-dash list --prefix my-user/my-project
+ml-dash login                          # Authenticate
+ml-dash create -p alice/my-project     # Create project
+ml-dash upload --prefix alice/project  # Upload data
+ml-dash list --prefix alice/project    # List experiments
 ```
 
 ## Documentation
 
-### New Features (v0.6.7)
-
-- **[Background Buffering](buffering.md)** - Non-blocking I/O with automatic batching
-- **[Track API](tracks.md)** - Time-series data tracking for robotics & RL
-- **[Image Saving](images.md)** - Direct numpy array to PNG/JPEG conversion
-
-### Core Documentation
-
-The documentation is being reorganized. Current documentation can be found in the [archived](archived/) folder:
-
-- [Getting Started](archived/getting-started.md)
-- [Experiments](archived/experiments.md)
-- [Parameters](archived/parameters.md)
-- [Metrics](archived/metrics.md)
-- [Tracks](tracks.md)
-- [Logging](archived/logging.md)
-- [Files](archived/files.md)
-- [API Reference](archived/api-reference.md)
-- [CLI Commands](archived/cli.md)
-- [Examples](archived/complete-examples.md)
+- [Getting Started](getting-started.md)
+- [Experiments](experiments.md) - RUN.entry, prefixes, lifecycle
+- [Parameters](parameters.md)
+- [Metrics](metrics.md)
+- [Files](files.md)
+- [Logging](logging.md)
+- [Tracks](tracks.md) - Time-series data
+- [Images](images.md) - Numpy to PNG/JPEG
+- [Buffering](buffering.md) - Background I/O
+- [CLI Reference](cli.md)
+- [API Reference](api-reference.md)
+- [Examples](complete-examples.md)
 
 ## Links
 
-- **GitHub**: https://github.com/fortyfive-labs/ml-dash
-- **PyPI**: https://pypi.org/project/ml-dash/
-- **Dashboard**: https://dash.ml
+- [GitHub](https://github.com/fortyfive-labs/ml-dash)
+- [PyPI](https://pypi.org/project/ml-dash/)
+- [Dashboard](https://dash.ml)
 
 ```{toctree}
 :maxdepth: 2
-:caption: New Features
 :hidden:
 
-buffering
+getting-started
+experiments
+parameters
+metrics
+files
+logging
 tracks
 images
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Core Documentation
-:hidden:
-
-archived/getting-started
-archived/experiments
-archived/parameters
-archived/metrics
-tracks
-archived/logging
-archived/files
-archived/api-reference
-archived/cli
-archived/basic-training
-archived/hyperparameter-search
-archived/model-comparison
-archived/complete-examples
+buffering
+cli
+api-reference
+complete-examples
 ```

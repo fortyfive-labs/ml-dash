@@ -44,20 +44,35 @@ ml-dash upload --api-key your-jwt-token
 
 ---
 
-## Create Command
+## Project Commands
 
-Create projects on the remote server.
+Manage projects on the remote server.
 
+### Create a Project
 ```bash
 # Create a project in current user's namespace
-ml-dash create -p new-project
+ml-dash project create -p new-project
 
 # Create a project in a specific namespace
-ml-dash create -p geyang/new-project
+ml-dash project create -p geyang/new-project
 
 # Create with description
-ml-dash create -p geyang/tutorials -d "ML tutorials and examples"
+ml-dash project create -p geyang/tutorials -d "ML tutorials and examples"
 ```
+
+### Remove a Project
+```bash
+# Remove a project (with confirmation prompt)
+ml-dash project remove -p my-project
+
+# Remove a project in a specific namespace
+ml-dash project remove -p geyang/old-project
+
+# Skip confirmation prompt
+ml-dash project remove -p my-project --yes
+```
+
+Note: Removal is a soft delete - the project and its contents are marked as deleted but can be recovered.
 
 ---
 
@@ -198,10 +213,19 @@ ml-dash download ./data -p "vision-models/resnet-50"
 ### Create Project Then Run Experiment
 ```bash
 # Create project first
-ml-dash create -p geyang/new-research
+ml-dash project create -p geyang/new-research
 
 # Then run experiments
 python train.py  # Uses prefix="geyang/new-research/exp-name"
+```
+
+### Remove Old Projects
+```bash
+# List projects to find old ones
+ml-dash list -p my-namespace
+
+# Remove old project
+ml-dash project remove -p my-namespace/old-experiment --yes
 ```
 
 ---
