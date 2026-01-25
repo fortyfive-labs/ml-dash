@@ -40,8 +40,17 @@ With skills loaded, ask questions like:
 
 ```console
 $ claude "How do I log parameters from a config class?"
+Use exp.params.set() or pass a params-proto config to experiment.params.update(Config)
+```
+
+```console
 $ claude "Show me an example of tracking metrics during training"
+Use exp.metrics("train").log(loss=0.5, epoch=1) inside your training loop
+```
+
+```console
 $ claude "How do I upload experiments to the server?"
+Use ml-dash upload -p prefix or set dash_url in your Experiment for auto-sync
 ```
 
 Claude will provide code examples and best practices tailored to ML-Dash.

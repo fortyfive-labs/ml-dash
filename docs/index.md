@@ -15,7 +15,12 @@ Once installed, ask questions like:
 
 ```console
 $ claude "How do I log parameters from a config class?"
+Use exp.params.set() or pass a params-proto config to experiment.params.update(Config)
+```
+
+```console
 $ claude "Show me an example of tracking metrics during training"
+Use exp.metrics("train").log(loss=0.5, epoch=1) inside your training loop
 ```
 
 ## Installation
