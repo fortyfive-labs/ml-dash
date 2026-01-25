@@ -29,3 +29,65 @@ div.highlight pre {
     user-select: none;
     padding-right: 1em;
 }
+
+/* Terminal-style code blocks */
+pre.terminal {
+    background: #0d1117;
+    color: #e6edf3;
+    padding: 16px 20px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    font-family: 'Fira Code', 'JetBrains Mono', 'Source Code Pro', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    margin: 16px 0;
+    box-shadow: none;
+}
+
+pre.terminal .prompt {
+    color: #7ee787;
+    font-weight: bold;
+}
+
+pre.terminal .response {
+    color: #79c0ff;
+    font-weight: bold;
+}
+
+pre.terminal .string {
+    color: #a5d6ff;
+}
+
+pre.terminal .keyword {
+    color: #ff7b72;
+}
+
+pre.terminal .builtin {
+    color: #d2a8ff;
+}
+
+pre.terminal .func {
+    color: #d2a8ff;
+}
+
+pre.terminal .obj {
+    color: #ffa657;
+}
+
+pre.terminal .method {
+    color: #d2a8ff;
+}
+
+pre.terminal .param {
+    color: #79c0ff;
+}
+
+pre.terminal .num {
+    color: #79c0ff;
+}
+
+pre.terminal .dim {
+    color: #8b949e;
+    font-style: italic;
+}

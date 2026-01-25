@@ -38,45 +38,45 @@ Once installed, the following skills are available:
 
 With skills loaded, ask questions like:
 
-```
-$ claude "How do I log parameters from a config class?"
+<pre class="terminal">
+<span class="prompt">$</span> claude <span class="string">"How do I log parameters from a config class?"</span>
 
-You can log parameters using exp.params.set():
+<span class="response">❯</span> You can log parameters using <span class="func">exp.params.set()</span>:
 
-    exp.params.set(
-        learning_rate=0.001,
-        batch_size=32,
-        model="resnet50"
+    <span class="obj">exp</span>.<span class="method">params</span>.<span class="method">set</span>(
+        <span class="param">learning_rate</span>=<span class="num">0.001</span>,
+        <span class="param">batch_size</span>=<span class="num">32</span>,
+        <span class="param">model</span>=<span class="string">"resnet50"</span>
     )
 
-Or from a params-proto config: exp.params.update(Config)
-```
+  Or from a params-proto config: <span class="func">exp.params.update(Config)</span>
+</pre>
 
-```
-$ claude "Show me an example of tracking metrics"
+<pre class="terminal">
+<span class="prompt">$</span> claude <span class="string">"Show me an example of tracking metrics"</span>
 
-Here's a typical training loop with metrics:
+<span class="response">❯</span> Here's a typical training loop with metrics:
 
-    for epoch in range(100):
+    <span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="builtin">range</span>(<span class="num">100</span>):
         loss = train_epoch()
-        exp.metrics("train").log(loss=loss, epoch=epoch)
+        <span class="obj">exp</span>.<span class="method">metrics</span>(<span class="string">"train"</span>).<span class="method">log</span>(<span class="param">loss</span>=loss, <span class="param">epoch</span>=epoch)
 
-Metrics are automatically batched and synced in the background.
-```
+  <span class="dim">Metrics are automatically batched and synced in the background.</span>
+</pre>
 
-```
-$ claude "How do I upload experiments to the server?"
+<pre class="terminal">
+<span class="prompt">$</span> claude <span class="string">"How do I upload experiments to the server?"</span>
 
-Two options for syncing to dash.ml:
+<span class="response">❯</span> Two options for syncing to <b>dash.ml</b>:
 
-1. CLI upload:
-    ml-dash upload -p myuser/project/exp1
+  <b>1.</b> CLI upload:
+    <span class="prompt">$</span> <span class="string">ml-dash upload -p myuser/project/exp1</span>
 
-2. Auto-sync in code:
-    Experiment(prefix="user/project/exp", dash_url="https://api.dash.ml")
+  <b>2.</b> Auto-sync in code:
+    <span class="obj">Experiment</span>(<span class="param">prefix</span>=<span class="string">"user/project/exp"</span>, <span class="param">dash_url</span>=<span class="string">"https://api.dash.ml"</span>)
 
-With dash_url set, all data syncs automatically.
-```
+  <span class="dim">With dash_url set, all data syncs automatically.</span>
+</pre>
 
 Claude will provide code examples and best practices tailored to ML-Dash.
 

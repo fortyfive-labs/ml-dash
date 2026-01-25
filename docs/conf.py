@@ -35,6 +35,7 @@ extensions = [
     'sphinx_design',
     'sphinx_tabs.tabs',
     'sphinxcontrib.mermaid',
+    'sphinxcontrib.ansi',
     'sphinxext.opengraph',
 ]
 
