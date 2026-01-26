@@ -223,7 +223,7 @@ class RUN:
         # experiments/vision/resnet/train.py
         from ml_dash import RUN
 
-        RUN.__post_init__(entry=__file__)
+        RUN(entry=__file__)
         # Result: RUN.prefix = "vision/resnet", RUN.name = "resnet"
     """
     # Use provided entry or try to auto-detect from caller

@@ -292,12 +292,3 @@ def decode_jwt_payload(token: str) -> dict:
     return {}
 
 
-def get_jwt_user():
-  # Load token
-  storage = get_token_storage()
-  token = storage.load("ml-dash-token")
-
-  if token:
-    user = decode_jwt_payload(token)
-    return user
-  return None
