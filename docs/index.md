@@ -8,39 +8,6 @@ ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage
 pip install ml-dash=={{version}}
 ```
 
-## Quick Start
-
-```python
-from ml_dash import Experiment
-
-# Local mode (no authentication required)
-with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
-    exp.log("Training started")
-    exp.params.set(learning_rate=0.001, batch_size=32)
-
-    for epoch in range(10):
-        loss = train_one_epoch()
-        exp.metrics("train").log(loss=loss, epoch=epoch)
-```
-
-## Remote Mode (with dash.ml)
-
-```bash
-# Authenticate first
-ml-dash login
-```
-
-```python
-from ml_dash import Experiment
-
-with Experiment(
-    prefix="my-user/my-project/exp1",
-    dash_url="https://api.dash.ml"
-).run as exp:
-    exp.log("Training on remote")
-    exp.params.set(learning_rate=0.001)
-```
-
 ## Claude Code Plugin
 
 If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin:
@@ -73,6 +40,39 @@ Here's a typical training loop with metrics:
         <span class="obj">exp</span>.<span class="method">metrics</span>(<span class="string">"train"</span>).<span class="method">log</span>(<span class="param">loss</span>=loss, <span class="param">epoch</span>=epoch)
 
 <span class="dim">Metrics are automatically batched and synced in the background.</span></pre>
+
+## Quick Start
+
+```python
+from ml_dash import Experiment
+
+# Local mode (no authentication required)
+with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
+    exp.log("Training started")
+    exp.params.set(learning_rate=0.001, batch_size=32)
+
+    for epoch in range(10):
+        loss = train_one_epoch()
+        exp.metrics("train").log(loss=loss, epoch=epoch)
+```
+
+## Remote Mode (with dash.ml)
+
+```bash
+# Authenticate first
+ml-dash login
+```
+
+```python
+from ml_dash import Experiment
+
+with Experiment(
+    prefix="my-user/my-project/exp1",
+    dash_url="https://api.dash.ml"
+).run as exp:
+    exp.log("Training on remote")
+    exp.params.set(learning_rate=0.001)
+```
 
 ## Documentation
 
