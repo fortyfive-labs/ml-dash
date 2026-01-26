@@ -31,22 +31,27 @@ import atexit
 # Token is auto-loaded from storage when first used
 # If not authenticated, operations will fail with AuthenticationError
 # Prefix format: {owner}/{project}/path...
-# Using getpass to get current user as owner for local convenience
 import getpass
 from datetime import datetime
 
-from .auth.token_storage import get_jwt_user
 from .experiment import Experiment
 
-_user = get_jwt_user()
-# Fallback to system username if not authenticated
-_username = _user["username"] if _user else getpass.getuser()
+# Get username for dxp namespace
+# Note: We use userinfo for fresh data (recommended approach)
+# Falls back to system username if not authenticated
+try:
+    from .client import userinfo
+    _username = userinfo.username or getpass.getuser()
+except Exception:
+    # If userinfo fails (e.g., no network), fall back to system user
+    _username = getpass.getuser()
+
 _now = datetime.now()
 
 # Create pre-configured singleton experiment in REMOTE mode
 # - dash_url=True: Use default remote server (https://api.dash.ml)
 # - dash_root=None: Remote-only mode (no local storage)
-# - user: Uses authenticated username from token for namespace
+# - user: Uses authenticated username from userinfo (fresh from server)
 # - Token is auto-loaded from storage when first used
 # - If not authenticated, operations will fail with AuthenticationError
 dxp = Experiment(

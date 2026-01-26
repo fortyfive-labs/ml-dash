@@ -6,6 +6,95 @@ from typing import Optional, Dict, Any, List
 import httpx
 
 
+class UserInfo:
+    """
+    Singleton user info object that fetches current user from API server.
+
+    Fetches user info from API server on first access (lazy loading).
+    This queries the API for fresh user data, ensuring up-to-date information.
+
+    Usage:
+        >>> from ml_dash import userinfo
+        >>> if userinfo.username:
+        ...     print(f"Namespace: {userinfo.username}")
+        ...     print(f"Email: {userinfo.email}")
+        ...     print(f"Project: {userinfo.username}/my-project")
+    """
+
+    def __init__(self):
+        self._data = None
+        self._fetched = False
+
+    def _fetch(self):
+        """Fetch user info from API server (lazy loading)."""
+        if self._fetched:
+            return
+
+        self._fetched = True
+        try:
+            client = RemoteClient("https://api.dash.ml")
+            self._data = client.get_current_user()
+        except Exception:
+            self._data = None
+
+    @property
+    def username(self) -> Optional[str]:
+        """Username (namespace) - e.g., 'tom_tao_e4c2c9'"""
+        self._fetch()
+        return self._data.get("username") if self._data else None
+
+    @property
+    def email(self) -> Optional[str]:
+        """User email"""
+        self._fetch()
+        return self._data.get("email") if self._data else None
+
+    @property
+    def name(self) -> Optional[str]:
+        """Full name"""
+        self._fetch()
+        return self._data.get("name") if self._data else None
+
+    @property
+    def given_name(self) -> Optional[str]:
+        """First/given name"""
+        self._fetch()
+        return self._data.get("given_name") if self._data else None
+
+    @property
+    def family_name(self) -> Optional[str]:
+        """Last/family name"""
+        self._fetch()
+        return self._data.get("family_name") if self._data else None
+
+    @property
+    def picture(self) -> Optional[str]:
+        """Profile picture URL"""
+        self._fetch()
+        return self._data.get("picture") if self._data else None
+
+    @property
+    def id(self) -> Optional[str]:
+        """User ID"""
+        self._fetch()
+        return self._data.get("id") if self._data else None
+
+    def __bool__(self) -> bool:
+        """Return True if user is authenticated and data was fetched successfully."""
+        self._fetch()
+        return self._data is not None
+
+    def __repr__(self) -> str:
+        self._fetch()
+        if self._data:
+            return f"UserInfo(username='{self.username}', email='{self.email}')"
+        return "UserInfo(not authenticated)"
+
+
+# Create singleton instance
+userinfo = UserInfo()
+
+
 def _serialize_value(value: Any) -> Any:
     """
     Convert value to JSON-serializable format.
@@ -137,6 +226,44 @@ class RemoteClient:
             result = self.graphql_query(query)
             username = result.get("me", {}).get("username")
             return username
+        except Exception:
+            return None
+
+    def get_current_user(self) -> Optional[Dict[str, Any]]:
+        """
+        Get current authenticated user's info from server.
+
+        This queries the API server for fresh user data, ensuring up-to-date information.
+
+        Returns:
+            User info dict with keys: username, email, name, given_name, family_name, picture
+            Returns None if not authenticated or if query fails
+
+        Example:
+            >>> client = RemoteClient("https://api.dash.ml")
+            >>> user = client.get_current_user()
+            >>> print(user["username"])  # e.g., "tom_tao_e4c2c9"
+            >>> print(user["email"])     # e.g., "user@example.com"
+        """
+        try:
+            self._ensure_authenticated()
+
+            # Query server for current user's complete profile
+            query = """
+            query GetCurrentUser {
+              me {
+                id
+                username
+                email
+                name
+                given_name
+                family_name
+                picture
+              }
+            }
+            """
+            result = self.graphql_query(query)
+            return result.get("me")
         except Exception:
             return None
 

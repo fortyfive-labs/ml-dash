@@ -24,9 +24,9 @@ def add_parser(subparsers):
     help="Output as JSON",
   )
   parser.add_argument(
-    "--refresh",
+    "--cached",
     action="store_true",
-    help="Fetch fresh profile from server (not from cached token)",
+    help="Use cached token data (default: fetch fresh from server)",
   )
 
 
@@ -45,27 +45,17 @@ def _fetch_fresh_profile(remote_url: str, token: str) -> dict:
 
     client = RemoteClient(remote_url, api_key=token)
 
-    # Query for full user profile
-    query = """
-    query GetUserProfile {
-      me {
-        id
-        username
-        name
-        email
-      }
-    }
-    """
+    # Use the new get_current_user() method
+    user_data = client.get_current_user()
 
-    result = client.graphql_query(query)
-    me = result.get("me", {})
-
-    if me:
+    if user_data:
       return {
-        "sub": me.get("id"),
-        "username": me.get("username"),
-        "name": me.get("name"),
-        "email": me.get("email"),
+        "sub": user_data.get("id"),
+        "username": user_data.get("username"),
+        "name": user_data.get("name"),
+        "email": user_data.get("email"),
+        "given_name": user_data.get("given_name"),
+        "family_name": user_data.get("family_name"),
       }
   except Exception as e:
     # If API call fails, return None to fall back to token decoding
@@ -131,8 +121,13 @@ def cmd_profile(args) -> int:
       info["authenticated"] = False
       info["error"] = "Token expired. Please run 'ml-dash login' to re-authenticate."
     else:
-      # Fetch fresh profile from server if requested, or fall back to token
-      if args.refresh:
+      # Fetch fresh profile from server by default, use cached token only if --cached flag is set
+      if args.cached:
+        # Use cached token data
+        info["user"] = token_payload
+        info["source"] = "token"
+      else:
+        # Fetch fresh data from server (default behavior)
         fresh_profile = _fetch_fresh_profile(config.remote_url, token)
         if fresh_profile:
           info["user"] = fresh_profile
@@ -141,9 +136,6 @@ def cmd_profile(args) -> int:
           info["user"] = token_payload
           info["source"] = "token"
           info["warning"] = "Could not fetch fresh profile from server, using cached token data"
-      else:
-        info["user"] = token_payload
-        info["source"] = "token"
 
       if expiry_message:
         info["token_status"] = expiry_message
@@ -199,9 +191,9 @@ def cmd_profile(args) -> int:
   if info.get("warning"):
     warning_text = f"\n[yellow]⚠ {info['warning']}[/yellow]"
 
-  # Show tip for refreshing
-  if source == "token":
-    tip_text = "\n[dim]Tip: Use --refresh to fetch fresh data from server[/dim]"
+  # Show tip for using cached data
+  if source == "server":
+    tip_text = "\n[dim]Tip: Use --cached to use cached token data (faster but may be outdated)[/dim]"
   else:
     tip_text = None
 

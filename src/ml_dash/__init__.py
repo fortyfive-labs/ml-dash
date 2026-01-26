@@ -36,14 +36,60 @@ Usage:
         exp.log("Training started")
 """
 
-from .client import RemoteClient
+from .client import RemoteClient, userinfo
 from .experiment import Experiment, OperationMode, ml_dash_experiment
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.4"
+__version__ = "0.6.10"
+
+# Minimum version required - blocks older versions
+MINIMUM_REQUIRED_VERSION = "0.6.10"
+
+
+def _check_version_compatibility():
+    """
+    Enforce minimum version requirement.
+
+    Raises ImportError if installed version is below minimum required version.
+    This ensures users have the latest features (userinfo, namespace auto-detection, etc.)
+    """
+    try:
+        from packaging import version
+    except ImportError:
+        # If packaging is not available, skip check
+        # (unlikely since it's a common dependency)
+        return
+
+    current = version.parse(__version__)
+    minimum = version.parse(MINIMUM_REQUIRED_VERSION)
+
+    if current < minimum:
+        raise ImportError(
+            f"\n"
+            f"{'=' * 80}\n"
+            f"ERROR: ml-dash version {__version__} is too old!\n"
+            f"{'=' * 80}\n"
+            f"\n"
+            f"This version of ml-dash ({__version__}) is no longer supported.\n"
+            f"Minimum required version: {MINIMUM_REQUIRED_VERSION}\n"
+            f"\n"
+            f"Please upgrade to the latest version:\n"
+            f"\n"
+            f"  pip install --upgrade ml-dash\n"
+            f"\n"
+            f"Or install specific version:\n"
+            f"\n"
+            f"  pip install ml-dash>={MINIMUM_REQUIRED_VERSION}\n"
+            f"\n"
+            f"{'=' * 80}\n"
+        )
+
+
+# Enforce version check on import
+_check_version_compatibility()
 
 __all__ = [
   "Experiment",
@@ -55,4 +101,5 @@ __all__ = [
   "LogBuilder",
   "ParametersBuilder",
   "RUN",
+  "userinfo",
 ]

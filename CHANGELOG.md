@@ -5,6 +5,109 @@ All notable changes to ML-Dash will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.10] - 2026-01-26
+
+### ⚠️ BREAKING CHANGES
+- **Removed `get_jwt_user()` function**: This function returned outdated cached data. Use `userinfo` singleton instead.
+  - **Migration**: Replace `from ml_dash.auth.token_storage import get_jwt_user` with `from ml_dash import userinfo`
+  - **Old**: `user = get_jwt_user(); username = user["username"] if user else None`
+  - **New**: `username = userinfo.username`
+- **Hard version enforcement**: ml-dash now blocks versions older than 0.6.10 on import
+  - Users with old versions will see clear error message with upgrade instructions
+  - Ensures all users have latest features (userinfo, namespace auto-detection)
+
+### Added
+- **`userinfo` Singleton**: Fresh user data from API server
+  - `from ml_dash import userinfo` - Lazy-loaded singleton
+  - `userinfo.username` - Namespace (e.g., "tom_tao_e4c2c9")
+  - `userinfo.email` - User email
+  - `userinfo.name` - Full name
+  - `userinfo.given_name`, `userinfo.family_name` - Name components
+  - Fetches fresh data from server (not outdated JWT token)
+  - Automatic lazy loading on first access
+
+- **`RemoteClient.get_current_user()` Method**: API method to fetch fresh user profile
+  - Queries GraphQL `me` endpoint for current user data
+  - Used internally by `userinfo` singleton
+
+- **Namespace Auto-Detection**: Automatic namespace resolution from authenticated user
+  - `dxp` singleton now uses `userinfo.username` for namespace
+  - Examples show namespace auto-detection in action
+  - Easy override via CLI: `--config.namespace zehuaw`
+
+- **Profile Command Enhancement**: Now fetches fresh data by default
+  - **Changed default behavior**: Fetches from server by default (was: cached token)
+  - New `--cached` flag to use cached token data (was: `--refresh` to fetch fresh)
+  - Shows data source: "Server (Fresh)" vs "Token (Cached)"
+  - Uses new `get_current_user()` method internally
+
+### Changed
+- **auto_start.py**: Now uses `userinfo.username` instead of `get_jwt_user()`
+  - `dxp` singleton has fresh namespace on every import
+  - Falls back to system username if userinfo fails
+
+- **Profile command**: Reversed flag logic
+  - **Old**: Default=cached, `--refresh` for fresh data
+  - **New**: Default=fresh data, `--cached` for cached
+  - Aligns with deprecation of cached token usage
+
+### Removed
+- **`get_jwt_user()` function** (`auth/token_storage.py`)
+  - Completely removed (no deprecation period)
+  - Replaced by `userinfo` singleton
+  - All internal code updated to use `userinfo`
+
+### Documentation
+- **NAMESPACE_EXAMPLES.md**: Comprehensive guide for running experiments with different namespaces
+  - Examples: Personal, team collaboration, shared projects, multi-user comparison
+  - Use case: Running experiments for user "zehuaw"
+  - Best practices and troubleshooting
+
+- **Updated sweep examples**:
+  - `train.py`: Shows namespace auto-detection and manual override
+  - `run_sweep.py`: Added `--namespace` and `--project` CLI arguments
+  - `README.md`: Enhanced with namespace examples
+  - `QUICK_START.md`: Practical examples with zehuaw namespace
+
+### Examples
+- **Namespace override examples**:
+  ```bash
+  # Auto-detect namespace
+  python3 train.py
+
+  # Run for another user
+  python3 train.py --config.namespace zehuaw
+
+  # Full sweep for another user
+  python3 run_sweep.py --namespace zehuaw --project research-2026
+  ```
+
+### Migration Guide
+
+**If you were using `get_jwt_user()`:**
+
+```python
+# ❌ Old (no longer works)
+from ml_dash.auth.token_storage import get_jwt_user
+user = get_jwt_user()
+username = user["username"] if user else None
+
+# ✅ New (required)
+from ml_dash import userinfo
+username = userinfo.username  # Fresh from server
+email = userinfo.email
+```
+
+**If you're on an old version:**
+
+```bash
+# You'll see this error on import:
+# ImportError: ml-dash version 0.6.4 is too old!
+
+# Solution: Upgrade immediately
+pip install --upgrade ml-dash
+```
+
 ## [0.6.9] - 2026-01-24
 
 ### Fixed
@@ -87,6 +190,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parameters, metrics, and logging
 - CLI commands
 
+[0.6.10]: https://github.com/fortyfive-labs/ml-dash/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/fortyfive-labs/ml-dash/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/fortyfive-labs/ml-dash/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/fortyfive-labs/ml-dash/compare/v0.6.6...v0.6.7
