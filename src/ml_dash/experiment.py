@@ -259,15 +259,17 @@ class Experiment:
           from rich.console import Console
 
           console = Console()
+          experiment_url = f"https://dash.ml/{self.run.prefix}"
           console.print(
             f"[dim]✓ Experiment started: [bold]{self.run.name}[/bold] (project: {self.run.project})[/dim]\n"
             f"[dim]View your data, statistics, and plots online at:[/dim] "
-            f"[link=https://dash.ml]https://dash.ml[/link]"
+            f"[link={experiment_url}]{experiment_url}[/link]"
           )
         except ImportError:
           # Fallback if rich is not available
+          experiment_url = f"https://dash.ml/{self.run.prefix}"
           print(f"✓ Experiment started: {self.run.name} (project: {self.run.project})")
-          print("View your data at: https://dash.ml")
+          print(f"View your data at: {experiment_url}")
 
       except Exception as e:
         # Check if it's an authentication error
@@ -381,18 +383,20 @@ class Experiment:
           from rich.console import Console
 
           console = Console()
+          experiment_url = f"https://dash.ml/{self.run.prefix}"
           console.print(
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
             f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
             f"[dim]View results, statistics, and plots online at:[/dim] "
-            f"[link=https://dash.ml]https://dash.ml[/link]"
+            f"[link={experiment_url}]{experiment_url}[/link]"
           )
         except ImportError:
           # Fallback if rich is not available
+          experiment_url = f"https://dash.ml/{self.run.prefix}"
           print(
             f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
-          print("View results at: https://dash.ml")
+          print(f"View results at: {experiment_url}")
 
       except Exception as e:
         # Log error but don't fail the close operation
