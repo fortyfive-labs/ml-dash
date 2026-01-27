@@ -12,7 +12,7 @@ Usage:
     python launch.py --sweep configs/lr_sweep.jsonl
 
     # Override RUN settings
-    python launch.py --RUN.owner zehuaw --RUN.project my-research
+    python launch.py --run.owner zehuaw --run.project my-research
 
     # Dry run
     python launch.py --sweep configs/optimizer_sweep.jsonl --dry-run
@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from params_proto import proto
+from ml_dash.run import RUN
 
 
 @proto.cli
@@ -34,6 +35,13 @@ def main(
     dry_run: bool = False,  # Show commands without running
 ):
     """Launch hyperparameter sweep."""
+
+    # Collect RUN arguments to forward to child processes
+    run_args = []
+    if RUN.owner:
+        run_args.extend(["--run.owner", RUN.owner])
+    if RUN.project and RUN.project != "{user}/scratch":  # Not default
+        run_args.extend(["--run.project", RUN.project])
 
     # Resolve sweep file path
     sweep_path = Path(sweep)
@@ -119,6 +127,9 @@ RUN {i+1}/{len(configs)}
         cmd.extend(["--sweep-index", str(i)])
         if sweep_path.stem != "sweep":
             cmd.extend(["--sweep-id", sweep_path.stem])
+
+        # Forward RUN arguments (--RUN.owner, --RUN.project)
+        cmd.extend(run_args)
 
         # Add config parameters (use proper prefixes)
         for key, value in config.items():

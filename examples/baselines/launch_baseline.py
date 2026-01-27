@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from params_proto import proto
+from ml_dash.run import RUN
 
 
 @proto.cli
@@ -35,6 +36,13 @@ def main(
     dry_run: bool = False,  # Show commands without running
 ):
     """Launch baseline sweep."""
+
+    # Collect RUN arguments to forward to child processes
+    run_args = []
+    if RUN.owner:
+        run_args.extend(["--run.owner", RUN.owner])
+    if RUN.project and RUN.project != "{user}/scratch":  # Not default
+        run_args.extend(["--run.project", RUN.project])
 
     # Resolve sweep file path
     sweep_path = Path(sweep)
@@ -115,6 +123,9 @@ BASELINE RUN {i+1}/{len(configs)}
         cmd.extend(["--sweep-index", str(i)])
         if sweep_path.stem != "resnet_baseline":
             cmd.extend(["--sweep-id", sweep_path.stem])
+
+        # Add RUN arguments (owner, project, etc.)
+        cmd.extend(run_args)
 
         # Add config parameters with proper prefixes
         for key, value in config.items():

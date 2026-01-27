@@ -17,7 +17,7 @@ Usage:
     python train.py --train.optimizer Adam --model.dropout 0.3 --eval.metric accuracy
 
     # Use RUN directly for ML-Dash settings
-    python train.py --RUN.owner zehuaw --RUN.project my-research
+    python train.py --run.owner zehuaw --run.project my-research
 
     # From sweep launcher
     python train.py --train.learning-rate 0.01 --train.batch-size 32 --sweep-index 0
