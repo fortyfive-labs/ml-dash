@@ -79,11 +79,22 @@ def main(
     # Override dxp.run with RUN values if they were set via CLI
     # (dxp auto-detects owner/project at import time, but CLI should take precedence)
     if RUN.owner:
+        old_owner = dxp.run.owner
         dxp.run.owner = RUN.owner
+        # Reconstruct prefix with new owner (prefix is constructed at import time)
+        if old_owner and old_owner in dxp.run.prefix:
+            dxp.run.prefix = dxp.run.prefix.replace(old_owner, RUN.owner, 1)
+        # Also update the RemoteClient's namespace (client was created at import time)
+        if hasattr(dxp.run, '_client') and dxp.run._client:
+            dxp.run._client._namespace = RUN.owner
     if RUN.project and RUN.project != "{user}/scratch":  # Not default template
         dxp.run.project = RUN.project
     if RUN.api_url and RUN.api_url != "https://api.dash.ml":  # Not default
         dxp.run.api_url = RUN.api_url
+        # Also update the RemoteClient's base_url
+        if hasattr(dxp.run, '_client') and dxp.run._client:
+            dxp.run._client.base_url = RUN.api_url
+            dxp.run._client._client.base_url = RUN.api_url
 
     # CRITICAL: For baselines, set static prefix (no datetime)
     # This ensures baselines always appear at the same path
