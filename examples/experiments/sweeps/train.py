@@ -66,9 +66,9 @@ def main(
 ):
     """Run training experiment."""
 
-    # Configure ML-Dash from RUN singleton (supports --RUN.owner, --RUN.project, etc.)
-    # Use userinfo for namespace if RUN.owner not set
-    if not hasattr(RUN, 'owner') or RUN.owner == os.environ.get('USER'):
+    # Configure ML-Dash from RUN singleton (supports --run.owner, --run.project, etc.)
+    # Use userinfo for namespace if RUN.owner not set (auto-detect)
+    if not hasattr(RUN, 'owner') or RUN.owner is None:
         owner = userinfo.username
         if owner:
             RUN.owner = owner
@@ -87,6 +87,15 @@ def main(
 
     # Import dxp to trigger auto-detection
     from ml_dash.auto_start import dxp
+
+    # Override dxp.run with RUN values if they were set via CLI
+    # (dxp auto-detects owner/project at import time, but CLI should take precedence)
+    if RUN.owner:
+        dxp.run.owner = RUN.owner
+    if RUN.project and RUN.project != "{user}/scratch":  # Not default template
+        dxp.run.project = RUN.project
+    if RUN.api_url and RUN.api_url != "https://api.dash.ml":  # Not default
+        dxp.run.api_url = RUN.api_url
 
     # Print configuration using template string (not stacked prints!)
     config_summary = f"""

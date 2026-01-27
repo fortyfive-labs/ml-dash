@@ -60,7 +60,7 @@ def main(
     """Run baseline training experiment with static path."""
 
     # Configure ML-Dash from RUN singleton
-    if not hasattr(RUN, 'owner') or RUN.owner == os.environ.get('USER'):
+    if not hasattr(RUN, 'owner') or RUN.owner is None:
         owner = userinfo.username
         if owner:
             RUN.owner = owner
@@ -75,6 +75,15 @@ def main(
 
     # Import dxp to trigger auto-detection
     from ml_dash.auto_start import dxp
+
+    # Override dxp.run with RUN values if they were set via CLI
+    # (dxp auto-detects owner/project at import time, but CLI should take precedence)
+    if RUN.owner:
+        dxp.run.owner = RUN.owner
+    if RUN.project and RUN.project != "{user}/scratch":  # Not default template
+        dxp.run.project = RUN.project
+    if RUN.api_url and RUN.api_url != "https://api.dash.ml":  # Not default
+        dxp.run.api_url = RUN.api_url
 
     # CRITICAL: For baselines, set static prefix (no datetime)
     # This ensures baselines always appear at the same path
