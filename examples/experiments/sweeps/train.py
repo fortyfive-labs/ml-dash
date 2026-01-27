@@ -59,13 +59,11 @@ class Eval:
     test_batch_size: int = 100  # Test batch size
 
 
-# Sweep metadata (not namespaced - direct access)
-sweep_index: int = 0  # Index in sweep
-sweep_id: str = "resnet_sweep"  # Sweep identifier
-
-
 @proto.cli
-def main():
+def main(
+    sweep_index: int = 0,  # Index in sweep
+    sweep_id: str = "resnet_sweep",  # Sweep identifier
+):
     """Run training experiment."""
 
     # Configure ML-Dash from RUN singleton (supports --RUN.owner, --RUN.project, etc.)

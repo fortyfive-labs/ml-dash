@@ -52,13 +52,11 @@ class Eval:
     test_batch_size: int = 100  # Test batch size
 
 
-# Sweep metadata
-sweep_index: int = 0  # Index in sweep
-sweep_id: str = "resnet_baseline"  # Sweep identifier
-
-
 @proto.cli
-def main():
+def main(
+    sweep_index: int = 0,  # Index in sweep
+    sweep_id: str = "resnet_baseline",  # Sweep identifier
+):
     """Run baseline training experiment with static path."""
 
     # Configure ML-Dash from RUN singleton
