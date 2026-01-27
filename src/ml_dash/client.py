@@ -349,6 +349,30 @@ class RemoteClient:
         # Project not found - return None to let server auto-create it
         return None
 
+    def delete_project(self, project_slug: str) -> Dict[str, Any]:
+        """
+        Delete a project and all its experiments, metrics, files, and logs.
+
+        Args:
+            project_slug: Project slug
+
+        Returns:
+            Dict with projectId, deleted count, experiments count, and message
+
+        Raises:
+            httpx.HTTPStatusError: If request fails
+            ValueError: If project not found
+        """
+        # Get project ID first
+        project_id = self._get_project_id(project_slug)
+        if not project_id:
+            raise ValueError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
+
+        # Delete using project-specific endpoint
+        response = self._client.delete(f"/projects/{project_id}")
+        response.raise_for_status()
+        return response.json()
+
     def _get_experiment_node_id(self, experiment_id: str) -> str:
         """
         Resolve node ID from experiment ID using GraphQL.
