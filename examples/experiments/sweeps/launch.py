@@ -12,7 +12,10 @@ Usage:
     python launch.py --sweep configs/lr_sweep.jsonl
 
     # Override RUN settings
-    python launch.py --run.owner zehuaw --run.project my-research
+    python launch.py --owner zehuaw --project my-research
+
+    # Use local API server
+    python launch.py --api-url http://localhost:3000
 
     # Dry run
     python launch.py --sweep configs/optimizer_sweep.jsonl --dry-run
@@ -25,7 +28,6 @@ from datetime import datetime
 from pathlib import Path
 
 from params_proto import proto
-from ml_dash.run import RUN
 
 
 @proto.cli
@@ -33,15 +35,20 @@ def main(
     sweep: str = "configs/sweep.jsonl",  # Sweep file path
     script: str = "train.py",  # Training script
     dry_run: bool = False,  # Show commands without running
+    owner: str = None,  # ML-Dash owner/namespace
+    project: str = None,  # ML-Dash project name
+    api_url: str = None,  # ML-Dash API URL
 ):
     """Launch hyperparameter sweep."""
 
     # Collect RUN arguments to forward to child processes
     run_args = []
-    if RUN.owner:
-        run_args.extend(["--run.owner", RUN.owner])
-    if RUN.project and RUN.project != "{user}/scratch":  # Not default
-        run_args.extend(["--run.project", RUN.project])
+    if owner:
+        run_args.extend(["--run.owner", owner])
+    if project:
+        run_args.extend(["--run.project", project])
+    if api_url:
+        run_args.extend(["--run.api-url", api_url])
 
     # Resolve sweep file path
     sweep_path = Path(sweep)

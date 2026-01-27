@@ -26,7 +26,6 @@ import sys
 from pathlib import Path
 
 from params_proto import proto
-from ml_dash.run import RUN
 
 
 @proto.cli
@@ -34,15 +33,20 @@ def main(
     sweep: str = "configs/resnet_baseline.jsonl",  # Sweep file path
     script: str = "train_baseline.py",  # Training script
     dry_run: bool = False,  # Show commands without running
+    owner: str = None,  # ML-Dash owner/namespace
+    project: str = None,  # ML-Dash project name
+    api_url: str = None,  # ML-Dash API URL
 ):
     """Launch baseline sweep."""
 
     # Collect RUN arguments to forward to child processes
     run_args = []
-    if RUN.owner:
-        run_args.extend(["--run.owner", RUN.owner])
-    if RUN.project and RUN.project != "{user}/scratch":  # Not default
-        run_args.extend(["--run.project", RUN.project])
+    if owner:
+        run_args.extend(["--run.owner", owner])
+    if project:
+        run_args.extend(["--run.project", project])
+    if api_url:
+        run_args.extend(["--run.api-url", api_url])
 
     # Resolve sweep file path
     sweep_path = Path(sweep)

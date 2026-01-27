@@ -95,7 +95,10 @@ uv run python launch.py --sweep configs/lr_sweep.jsonl
 uv run python train.py --train.learning-rate 0.01 --model.name ResNet-50
 
 # Override RUN settings
-uv run python launch.py --run.owner alice --run.project my-research
+uv run python launch.py --owner alice --project my-research
+
+# Use local API server
+uv run python launch.py --api-url http://localhost:3000
 
 # Dry run (preview commands)
 uv run python launch.py --sweep configs/optimizer_sweep.jsonl --dry-run
@@ -233,7 +236,7 @@ if userinfo.username:
 
 No manual configuration needed! Override if needed:
 ```bash
-uv run python train.py --run.owner alice --run.project my-research
+uv run python train.py --owner alice --project my-research
 ```
 
 ### Sweep Coordination
@@ -342,14 +345,13 @@ uv run python launch.py --sweep configs/my_custom_sweep.jsonl
 ### Override RUN Settings
 
 ```bash
-# Change owner
-uv run python train.py --run.owner alice
+# Launcher accepts clean arguments (--owner, --project, --api-url)
+uv run python launch.py --owner alice --project my-experiments
+uv run python launch.py --api-url http://localhost:3000
 
-# Change project
-uv run python train.py --run.project vision-research
-
-# Both
-uv run python launch.py --run.owner alice --run.project my-experiments
+# Training scripts use lowercase prefix (--run.owner, --run.project, --run.api-url)
+uv run python train.py --run.owner alice --run.project vision-research
+uv run python train.py --run.api-url http://localhost:3000
 ```
 
 ### Regenerate All Sweep Files
