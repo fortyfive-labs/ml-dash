@@ -1,26 +1,19 @@
 """
-ResNet Training Script with Multi-Config Setup
+Baseline Training Script with Static Paths
 
-Uses separate config classes for different components:
-- Train: Training hyperparameters (lr, batch_size, optimizer)
-- Model: Model architecture settings
-- Eval: Evaluation configuration
+This script is for systematic baseline experiments that should have
+STATIC paths (no datetime) for permanent reference and comparison.
 
 Usage:
-    # Single run with defaults
-    python train.py
+    # Single baseline run
+    python train_baseline.py --train.learning-rate 0.01
 
-    # Override specific parameters (no --config prefix!)
-    python train.py --train.learning-rate 0.01 --train.batch-size 64
+    # Run from launcher
+    python launch_baseline.py --sweep resnet_baseline.jsonl
 
-    # Override from multiple configs
-    python train.py --train.optimizer Adam --model.dropout 0.3 --eval.metric accuracy
-
-    # Use RUN directly for ML-Dash settings
-    python train.py --RUN.owner zehuaw --RUN.project my-research
-
-    # From sweep launcher
-    python train.py --train.learning-rate 0.01 --train.batch-size 32 --sweep-index 0
+Path structure (NO datetime):
+    {namespace}/ml-experiments/baselines/resnet18/001
+    {namespace}/ml-experiments/baselines/resnet18/002
 """
 import os
 import random
@@ -39,7 +32,7 @@ class Train:
     batch_size: int = 32  # Batch size
     optimizer: str = "SGD"  # Optimizer: SGD or Adam
     momentum: float = 0.9  # Momentum for SGD
-    epochs: int = 5  # Number of epochs
+    epochs: int = 10  # Number of epochs
     weight_decay: float = 5e-4  # Weight decay
 
 
@@ -59,38 +52,38 @@ class Eval:
     test_batch_size: int = 100  # Test batch size
 
 
-# Sweep metadata (not namespaced - direct access)
+# Sweep metadata
 sweep_index: int = 0  # Index in sweep
-sweep_id: str = "resnet_sweep"  # Sweep identifier
+sweep_id: str = "resnet_baseline"  # Sweep identifier
 
 
 @proto.cli
 def main():
-    """Run training experiment."""
+    """Run baseline training experiment with static path."""
 
-    # Configure ML-Dash from RUN singleton (supports --RUN.owner, --RUN.project, etc.)
-    # Use userinfo for namespace if RUN.owner not set
+    # Configure ML-Dash from RUN singleton
     if not hasattr(RUN, 'owner') or RUN.owner == os.environ.get('USER'):
         owner = userinfo.username
         if owner:
             RUN.owner = owner
 
-    # Set entry point for correct path_stem detection
+    # Set entry point for path detection
     RUN.entry = __file__
 
-    # Handle sweep coordination via environment variables
-    sweep_timestamp = os.environ.get("ML_DASH_SWEEP_TIMESTAMP")
-    sweep_job_counter = os.environ.get("ML_DASH_JOB_COUNTER")
+    # CRITICAL: For baselines, set static prefix (no datetime)
+    # This ensures baselines always appear at the same path
+    baseline_name = Model.name.lower().replace("-", "")  # "resnet-18" -> "resnet18"
+    RUN.prefix = f"{RUN.owner}/ml-experiments/baselines/{baseline_name}"
 
-    if sweep_timestamp:
-        RUN.now = datetime.fromtimestamp(float(sweep_timestamp))
+    # Handle sweep coordination if launched from sweep launcher
+    sweep_job_counter = os.environ.get("ML_DASH_JOB_COUNTER")
     if sweep_job_counter:
         RUN.job_counter = int(sweep_job_counter)
 
-    # Print configuration using template string (not stacked prints!)
+    # Print configuration
     config_summary = f"""
 {'='*80}
-TRAINING CONFIGURATION
+BASELINE TRAINING CONFIGURATION
 {'='*80}
 
 📊 Training:
@@ -114,12 +107,10 @@ TRAINING CONFIGURATION
 🔧 ML-Dash:
    Owner:         {RUN.owner}
    Project:       {RUN.project}
-   Path Stem:     {RUN.path_stem or "auto-detect"}
-   Sweep:         {sweep_index + 1} (ID: {sweep_id})
+   Prefix:        {RUN.prefix} (STATIC - no datetime)
+   Baseline:      {sweep_index + 1} (ID: {sweep_id})
 """
 
-    if sweep_timestamp:
-        config_summary += f"   Timestamp:     {RUN.now.strftime('%H.%M.%S')} (shared)\n"
     if sweep_job_counter:
         config_summary += f"   Job Counter:   {RUN.job_counter:03d}\n"
 
@@ -129,14 +120,14 @@ TRAINING CONFIGURATION
     # Import dxp after RUN configuration
     from ml_dash.auto_start import dxp
 
-    print(f"Auto-Detection: {dxp.run.path_stem} → {dxp.run.prefix}\n")
+    print(f"Baseline Path: {dxp.run.prefix}/{RUN.job_counter:03d}\n")
     print(f"{'='*80}")
     print("TRAINING")
     print(f"{'='*80}\n")
 
     # Run experiment
     with dxp.run:
-        dxp.log(f"🔄 Sweep Run {sweep_index + 1} (ID: {sweep_id})", level="info")
+        dxp.log(f"🔷 Baseline Run {sweep_index + 1} (ID: {sweep_id})", level="info")
 
         # Log all config groups
         dxp.params.set(**{
@@ -145,6 +136,7 @@ TRAINING CONFIGURATION
             **{f"eval/{k}": v for k, v in Eval._dict.items()},
             "sweep_index": sweep_index,
             "sweep_id": sweep_id,
+            "is_baseline": True,
         })
 
         # Simulate training
@@ -155,7 +147,7 @@ TRAINING CONFIGURATION
 
         best_val_acc = 0.0
 
-        dxp.log(f"Training for {Train.epochs} epochs", level="info")
+        dxp.log(f"Training baseline for {Train.epochs} epochs", level="info")
         for epoch in range(1, Train.epochs + 1):
             train_loss = (2.5 * (0.65 ** epoch) / perf_factor) + random.uniform(0, 0.1)
             train_acc = min(0.98, (0.3 + epoch * 0.13) * perf_factor + random.uniform(0, 0.03))
@@ -175,16 +167,17 @@ TRAINING CONFIGURATION
             final_val_loss=val_loss,
         )
 
-        dxp.log(f"✅ Training complete! Best {Eval.metric}: {best_val_acc:.4f}", level="info")
+        dxp.log(f"✅ Baseline training complete! Best {Eval.metric}: {best_val_acc:.4f}", level="info")
 
     result_summary = f"""
 {'='*80}
-✓ TRAINING COMPLETE
+✓ BASELINE TRAINING COMPLETE
 {'='*80}
 
 Best Validation Accuracy: {best_val_acc:.4f}
 
 View results: https://dash.ml/{RUN.owner}/{RUN.project}
+Baseline path: {RUN.prefix}/{RUN.job_counter:03d}
 {'='*80}
 """
     print(result_summary)
