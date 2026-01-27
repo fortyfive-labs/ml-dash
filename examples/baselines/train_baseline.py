@@ -68,15 +68,18 @@ def main(
     # Set entry point for path detection
     RUN.entry = __file__
 
-    # CRITICAL: For baselines, set static prefix (no datetime)
-    # This ensures baselines always appear at the same path
-    baseline_name = Model.name.lower().replace("-", "")  # "resnet-18" -> "resnet18"
-    RUN.prefix = f"{RUN.owner}/ml-experiments/baselines/{baseline_name}"
-
     # Handle sweep coordination if launched from sweep launcher
     sweep_job_counter = os.environ.get("ML_DASH_JOB_COUNTER")
     if sweep_job_counter:
         RUN.job_counter = int(sweep_job_counter)
+
+    # Import dxp to trigger auto-detection
+    from ml_dash.auto_start import dxp
+
+    # CRITICAL: For baselines, set static prefix (no datetime)
+    # This ensures baselines always appear at the same path
+    baseline_name = Model.name.lower().replace("-", "")  # "resnet-18" -> "resnet18"
+    RUN.prefix = f"{dxp.run.owner}/ml-experiments/baselines/{baseline_name}"
 
     # Print configuration
     config_summary = f"""
@@ -103,22 +106,14 @@ BASELINE TRAINING CONFIGURATION
    Test Batch:    {Eval.test_batch_size}
 
 🔧 ML-Dash:
-   Owner:         {RUN.owner}
-   Project:       {RUN.project}
-   Prefix:        {RUN.prefix} (STATIC - no datetime)
+   Owner:         {dxp.run.owner}
+   Project:       {dxp.run.project}
+   Path:          {dxp.run.prefix} (STATIC - no datetime)
    Baseline:      {sweep_index + 1} (ID: {sweep_id})
+
+{'='*80}
 """
-
-    if sweep_job_counter:
-        config_summary += f"   Job Counter:   {RUN.job_counter:03d}\n"
-
-    config_summary += f"\n{'='*80}\n"
     print(config_summary)
-
-    # Import dxp after RUN configuration
-    from ml_dash.auto_start import dxp
-
-    print(f"Baseline Path: {dxp.run.prefix}/{RUN.job_counter:03d}\n")
     print(f"{'='*80}")
     print("TRAINING")
     print(f"{'='*80}\n")
@@ -174,8 +169,8 @@ BASELINE TRAINING CONFIGURATION
 
 Best Validation Accuracy: {best_val_acc:.4f}
 
-View results: https://dash.ml/{RUN.owner}/{RUN.project}
-Baseline path: {RUN.prefix}/{RUN.job_counter:03d}
+View results: https://dash.ml/{dxp.run.owner}/{dxp.run.project}
+Direct link: https://dash.ml/{dxp.run.prefix}
 {'='*80}
 """
     print(result_summary)

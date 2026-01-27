@@ -85,6 +85,9 @@ def main(
     if sweep_job_counter:
         RUN.job_counter = int(sweep_job_counter)
 
+    # Import dxp to trigger auto-detection
+    from ml_dash.auto_start import dxp
+
     # Print configuration using template string (not stacked prints!)
     config_summary = f"""
 {'='*80}
@@ -110,24 +113,17 @@ TRAINING CONFIGURATION
    Test Batch:    {Eval.test_batch_size}
 
 🔧 ML-Dash:
-   Owner:         {RUN.owner}
-   Project:       {RUN.project}
-   Path Stem:     {RUN.path_stem or "auto-detect"}
+   Owner:         {dxp.run.owner}
+   Project:       {dxp.run.project}
+   Path:          {dxp.run.prefix}
    Sweep:         {sweep_index + 1} (ID: {sweep_id})
 """
 
     if sweep_timestamp:
         config_summary += f"   Timestamp:     {RUN.now.strftime('%H.%M.%S')} (shared)\n"
-    if sweep_job_counter:
-        config_summary += f"   Job Counter:   {RUN.job_counter:03d}\n"
 
     config_summary += f"\n{'='*80}\n"
     print(config_summary)
-
-    # Import dxp after RUN configuration
-    from ml_dash.auto_start import dxp
-
-    print(f"Auto-Detection: {dxp.run.path_stem} → {dxp.run.prefix}\n")
     print(f"{'='*80}")
     print("TRAINING")
     print(f"{'='*80}\n")
@@ -182,7 +178,8 @@ TRAINING CONFIGURATION
 
 Best Validation Accuracy: {best_val_acc:.4f}
 
-View results: https://dash.ml/{RUN.owner}/{RUN.project}
+View results: https://dash.ml/{dxp.run.owner}/{dxp.run.project}
+Direct link: https://dash.ml/{dxp.run.prefix}
 {'='*80}
 """
     print(result_summary)
