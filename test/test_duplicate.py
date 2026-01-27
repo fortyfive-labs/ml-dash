@@ -4,6 +4,12 @@ import tempfile
 from pathlib import Path
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for duplicate tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestDuplicateLocal:
     """Test duplicate() in local mode."""
 
@@ -184,7 +190,7 @@ class TestDuplicateRemote:
 
     def test_duplicate_remote_basic(self, remote_experiment):
         """Test basic duplicate in remote mode."""
-        exp = remote_experiment("57block/test_files/test_duplicate_remote")
+        exp = remote_experiment("tom_tao_34833x/test_files/test_duplicate_remote")
         exp.run.start()
 
         # Create test file

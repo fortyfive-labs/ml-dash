@@ -6,6 +6,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for file API tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestFluentFileSave:
   """Tests for the new fluent save() API."""
 

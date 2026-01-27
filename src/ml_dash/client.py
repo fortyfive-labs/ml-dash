@@ -369,7 +369,7 @@ class RemoteClient:
             raise ValueError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
 
         # Delete using project-specific endpoint
-        response = self._client.delete(f"/projects/{project_id}")
+        response = self._client.delete(f"projects/{project_id}")
         response.raise_for_status()
         return response.json()
 
@@ -463,7 +463,7 @@ class RemoteClient:
                     if not project_id:
                         # Create the project first since we need its ID for folders
                         project_response = self._client.post(
-                            f"/namespaces/{self.namespace}/nodes",
+                            f"namespaces/{self.namespace}/nodes",
                             json={
                                 "type": "PROJECT",
                                 "name": project,
@@ -483,7 +483,7 @@ class RemoteClient:
                             # Create folder (server handles upsert)
                             # NOTE: Do NOT pass experimentId for project-level folders
                             folder_response = self._client.post(
-                                f"/namespaces/{self.namespace}/nodes",
+                                f"namespaces/{self.namespace}/nodes",
                                 json={
                                     "type": "FOLDER",
                                     "projectId": project_id,
@@ -525,7 +525,7 @@ class RemoteClient:
 
         # Call unified node creation API
         response = self._client.post(
-            f"/namespaces/{self.namespace}/nodes",
+            f"namespaces/{self.namespace}/nodes",
             json=payload,
         )
         response.raise_for_status()
@@ -565,7 +565,7 @@ class RemoteClient:
         payload = {"status": status}
 
         response = self._client.patch(
-            f"/nodes/{node_id}",
+            f"nodes/{node_id}",
             json=payload,
         )
         response.raise_for_status()
@@ -602,7 +602,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         response = self._client.post(
-            f"/experiments/{experiment_id}/logs",
+            f"experiments/{experiment_id}/logs",
             json={"logs": logs}
         )
         response.raise_for_status()
@@ -638,7 +638,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         response = self._client.post(
-            f"/experiments/{experiment_id}/parameters",
+            f"experiments/{experiment_id}/parameters",
             json={"data": data}
         )
         response.raise_for_status()
@@ -658,7 +658,7 @@ class RemoteClient:
         Raises:
             httpx.HTTPStatusError: If request fails or parameters don't exist
         """
-        response = self._client.get(f"/experiments/{experiment_id}/parameters")
+        response = self._client.get(f"experiments/{experiment_id}/parameters")
         response.raise_for_status()
         result = response.json()
         return result.get("data", {})
@@ -935,7 +935,7 @@ class RemoteClient:
 
                     # Create folder (server will return existing if duplicate)
                     folder_response = self._client.post(
-                        f"/namespaces/{self.namespace}/nodes",
+                        f"namespaces/{self.namespace}/nodes",
                         json={
                             "type": "FOLDER",
                             "projectId": project_id,
@@ -974,7 +974,7 @@ class RemoteClient:
 
         # Call unified node creation API
         response = self._client.post(
-            f"/namespaces/{self.namespace}/nodes",
+            f"namespaces/{self.namespace}/nodes",
             files=files,
             data=data
         )
@@ -1092,7 +1092,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         # file_id is actually the node ID in the new system
-        response = self._client.get(f"/nodes/{file_id}")
+        response = self._client.get(f"nodes/{file_id}")
         response.raise_for_status()
         return response.json()
 
@@ -1127,7 +1127,7 @@ class RemoteClient:
             dest_path = filename
 
         # Download file using node API
-        response = self._client.get(f"/nodes/{file_id}/download")
+        response = self._client.get(f"nodes/{file_id}/download")
         response.raise_for_status()
 
         # Write to file
@@ -1159,7 +1159,7 @@ class RemoteClient:
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        response = self._client.delete(f"/nodes/{file_id}")
+        response = self._client.delete(f"nodes/{file_id}")
         response.raise_for_status()
         return response.json()
 
@@ -1196,7 +1196,7 @@ class RemoteClient:
             payload["metadata"] = metadata
 
         response = self._client.patch(
-            f"/nodes/{file_id}",
+            f"nodes/{file_id}",
             json=payload
         )
         response.raise_for_status()
@@ -1237,7 +1237,7 @@ class RemoteClient:
             payload["metadata"] = metadata
 
         response = self._client.post(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/append",
+            f"experiments/{experiment_id}/metrics/{metric_name}/append",
             json=payload
         )
         response.raise_for_status()
@@ -1278,7 +1278,7 @@ class RemoteClient:
             payload["metadata"] = metadata
 
         response = self._client.post(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/append-batch",
+            f"experiments/{experiment_id}/metrics/{metric_name}/append-batch",
             json=payload
         )
         response.raise_for_status()
@@ -1307,7 +1307,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         response = self._client.get(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/data",
+            f"experiments/{experiment_id}/metrics/{metric_name}/data",
             params={"startIndex": start_index, "limit": limit}
         )
         response.raise_for_status()
@@ -1332,7 +1332,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         response = self._client.get(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/stats"
+            f"experiments/{experiment_id}/metrics/{metric_name}/stats"
         )
         response.raise_for_status()
         return response.json()
@@ -1353,7 +1353,7 @@ class RemoteClient:
         Raises:
             httpx.HTTPStatusError: If request fails
         """
-        response = self._client.get(f"/experiments/{experiment_id}/metrics")
+        response = self._client.get(f"experiments/{experiment_id}/metrics")
         response.raise_for_status()
         return response.json()["metrics"]
 
@@ -1668,7 +1668,7 @@ class RemoteClient:
         expected_checksum = file_metadata.get("physicalFile", {}).get("checksum")
 
         # Stream download using node API
-        with self._client.stream("GET", f"/nodes/{file_id}/download") as response:
+        with self._client.stream("GET", f"nodes/{file_id}/download") as response:
             response.raise_for_status()
 
             with open(dest_path, "wb") as f:
@@ -1736,7 +1736,7 @@ class RemoteClient:
         if search is not None:
             params["search"] = search
 
-        response = self._client.get(f"/experiments/{experiment_id}/logs", params=params)
+        response = self._client.get(f"experiments/{experiment_id}/logs", params=params)
         response.raise_for_status()
         return response.json()
 
@@ -1774,7 +1774,7 @@ class RemoteClient:
             params["bufferOnly"] = "true"
 
         response = self._client.get(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/data",
+            f"experiments/{experiment_id}/metrics/{metric_name}/data",
             params=params
         )
         response.raise_for_status()
@@ -1801,7 +1801,7 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         response = self._client.get(
-            f"/experiments/{experiment_id}/metrics/{metric_name}/chunks/{chunk_number}"
+            f"experiments/{experiment_id}/metrics/{metric_name}/chunks/{chunk_number}"
         )
         response.raise_for_status()
         return response.json()
@@ -1845,7 +1845,7 @@ class RemoteClient:
             payload["metadata"] = metadata
 
         response = self._client.post(
-            f"/experiments/{experiment_id}/tracks",
+            f"experiments/{experiment_id}/tracks",
             json=payload,
         )
         response.raise_for_status()
@@ -1878,7 +1878,7 @@ class RemoteClient:
         topic_encoded = urllib.parse.quote(topic, safe='')
 
         response = self._client.post(
-            f"/experiments/{experiment_id}/tracks/{topic_encoded}/append",
+            f"experiments/{experiment_id}/tracks/{topic_encoded}/append",
             json={"timestamp": timestamp, "data": data},
         )
         response.raise_for_status()
@@ -1912,7 +1912,7 @@ class RemoteClient:
         serialized_entries = [_serialize_value(entry) for entry in entries]
 
         response = self._client.post(
-            f"/experiments/{experiment_id}/tracks/{topic_encoded}/append_batch",
+            f"experiments/{experiment_id}/tracks/{topic_encoded}/append_batch",
             json={"entries": serialized_entries},
         )
         response.raise_for_status()
@@ -1957,7 +1957,7 @@ class RemoteClient:
             params["columns"] = ",".join(columns)
 
         response = self._client.get(
-            f"/experiments/{experiment_id}/tracks/{topic_encoded}/data",
+            f"experiments/{experiment_id}/tracks/{topic_encoded}/data",
             params=params,
         )
         response.raise_for_status()
@@ -1990,7 +1990,7 @@ class RemoteClient:
             params["topic"] = topic_filter
 
         response = self._client.get(
-            f"/experiments/{experiment_id}/tracks",
+            f"experiments/{experiment_id}/tracks",
             params=params,
         )
         response.raise_for_status()

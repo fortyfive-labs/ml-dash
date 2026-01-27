@@ -43,18 +43,19 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.10"
+__version__ = "0.6.13"
 
-# Minimum version required - blocks older versions
-MINIMUM_REQUIRED_VERSION = "0.6.10"
+# Required version - MUST match exactly (blocks all older versions)
+# Update this with EVERY release to force users to upgrade
+REQUIRED_VERSION = "0.6.13"
 
 
 def _check_version_compatibility():
     """
-    Enforce minimum version requirement.
+    Enforce strict version requirement.
 
-    Raises ImportError if installed version is below minimum required version.
-    This ensures users have the latest features (userinfo, namespace auto-detection, etc.)
+    Raises ImportError if installed version doesn't match the required version.
+    This ensures all users are on the latest version with newest features and bug fixes.
     """
     try:
         from packaging import version
@@ -64,25 +65,26 @@ def _check_version_compatibility():
         return
 
     current = version.parse(__version__)
-    minimum = version.parse(MINIMUM_REQUIRED_VERSION)
+    required = version.parse(REQUIRED_VERSION)
 
-    if current < minimum:
+    if current < required:
         raise ImportError(
             f"\n"
             f"{'=' * 80}\n"
-            f"ERROR: ml-dash version {__version__} is too old!\n"
+            f"ERROR: ml-dash version {__version__} is outdated!\n"
             f"{'=' * 80}\n"
             f"\n"
-            f"This version of ml-dash ({__version__}) is no longer supported.\n"
-            f"Minimum required version: {MINIMUM_REQUIRED_VERSION}\n"
+            f"Your installed version ({__version__}) is no longer supported.\n"
+            f"Required version: {REQUIRED_VERSION}\n"
             f"\n"
             f"Please upgrade to the latest version:\n"
             f"\n"
             f"  pip install --upgrade ml-dash\n"
             f"\n"
-            f"Or install specific version:\n"
+            f"Or with uv:\n"
             f"\n"
-            f"  pip install ml-dash>={MINIMUM_REQUIRED_VERSION}\n"
+            f"  uv pip install --upgrade ml-dash\n"
+            f"  uv sync --upgrade-package ml-dash\n"
             f"\n"
             f"{'=' * 80}\n"
         )

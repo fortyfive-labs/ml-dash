@@ -103,10 +103,11 @@ def main(
         dxp.run.project = RUN.project
     if RUN.api_url and RUN.api_url != "https://api.dash.ml":  # Not default
         dxp.run.api_url = RUN.api_url
-        # Also update the RemoteClient's base_url
+        # Also update the RemoteClient's base_url (add /api prefix)
         if hasattr(dxp.run, '_client') and dxp.run._client:
-            dxp.run._client.base_url = RUN.api_url
-            dxp.run._client._client.base_url = RUN.api_url
+            dxp.run._client.graphql_base_url = RUN.api_url.rstrip("/")
+            dxp.run._client.base_url = RUN.api_url.rstrip("/") + "/api"
+            dxp.run._client._client.base_url = dxp.run._client.base_url
 
     # Print configuration using template string (not stacked prints!)
     config_summary = f"""
@@ -153,10 +154,14 @@ TRAINING CONFIGURATION
         dxp.log(f"🔄 Sweep Run {sweep_index + 1} (ID: {sweep_id})", level="info")
 
         # Log all config groups
+        train_params = {k: v for k, v in vars(Train).items() if not k.startswith('_') and not callable(v)}
+        model_params = {k: v for k, v in vars(Model).items() if not k.startswith('_') and not callable(v)}
+        eval_params = {k: v for k, v in vars(Eval).items() if not k.startswith('_') and not callable(v)}
+
         dxp.params.set(**{
-            **{f"train/{k}": v for k, v in Train._dict.items()},
-            **{f"model/{k}": v for k, v in Model._dict.items()},
-            **{f"eval/{k}": v for k, v in Eval._dict.items()},
+            **{f"train/{k}": v for k, v in train_params.items()},
+            **{f"model/{k}": v for k, v in model_params.items()},
+            **{f"eval/{k}": v for k, v in eval_params.items()},
             "sweep_index": sweep_index,
             "sweep_id": sweep_id,
         })

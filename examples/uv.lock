@@ -359,8 +359,8 @@ wheels = [
 
 [[package]]
 name = "ml-dash"
-version = "0.6.10"
-source = { registry = "https://pypi.org/simple" }
+version = "0.6.12"
+source = { editable = "../" }
 dependencies = [
     { name = "cryptography" },
     { name = "httpx" },
@@ -373,10 +373,36 @@ dependencies = [
     { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scikit-image", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/cb/97b4620bec88fc7cdf4d08d1a4b58486db1eed60c48af085136538a1712d/ml_dash-0.6.10.tar.gz", hash = "sha256:9cf03159ec30500196c37d24c8e9a673129efbbe7464554a8b80466a26e83e5e", size = 101354, upload-time = "2026-01-26T07:19:03.135Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/d2/0988af2c1fac66d648693283d04efd83410148dd3c184567461cfd8b716b/ml_dash-0.6.10-py3-none-any.whl", hash = "sha256:1ef69bee480f8faed3f42aa13a1463f450d416db1c07cc335aa5b777f4525dac", size = 115987, upload-time = "2026-01-26T07:19:01.174Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42.0.0" },
+    { name = "furo", marker = "extra == 'dev'", specifier = ">=2024.0.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "imageio", specifier = ">=2.31.0" },
+    { name = "imageio-ffmpeg", specifier = ">=0.4.9" },
+    { name = "keyring", marker = "extra == 'auth'", specifier = ">=25.0.0" },
+    { name = "linkify-it-py", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9.0" },
+    { name = "myst-parser", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "params-proto", specifier = ">=3.0.0" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "qrcode", marker = "extra == 'auth'", specifier = ">=8.0.0" },
+    { name = "rich", specifier = ">=13.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
+    { name = "scikit-image", specifier = ">=0.21.0" },
+    { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.2.0" },
+    { name = "sphinx-autobuild", marker = "extra == 'dev'", specifier = ">=2024.0.0" },
+    { name = "sphinx-autodoc-typehints", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "sphinx-copybutton", marker = "extra == 'dev'", specifier = ">=0.5.0" },
+    { name = "sphinx-design", marker = "extra == 'dev'", specifier = ">=0.5.0" },
+    { name = "sphinx-tabs", marker = "extra == 'dev'", specifier = ">=3.4.0" },
+    { name = "sphinxcontrib-mermaid", marker = "extra == 'dev'", specifier = ">=0.9.0" },
+    { name = "sphinxext-opengraph", marker = "extra == 'dev'", specifier = ">=0.9.0" },
 ]
+provides-extras = ["auth", "dev"]
 
 [[package]]
 name = "ml-experiments"
@@ -387,7 +413,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ml-dash", specifier = ">=0.6.10" }]
+requires-dist = [{ name = "ml-dash", editable = "../" }]
 
 [[package]]
 name = "networkx"

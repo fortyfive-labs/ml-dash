@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Example ML experiments demonstrating auto-detected prefix"
 requires-python = ">=3.9"
 dependencies = [
-    "ml-dash>=0.6.10",
+    "ml-dash",
 ]
 
-[tool.uv]
+[tool.uv.sources]
+ml-dash = { path = "..", editable = true }

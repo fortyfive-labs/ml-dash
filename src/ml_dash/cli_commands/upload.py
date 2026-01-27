@@ -67,7 +67,7 @@ class UploadResult:
 class UploadState:
   """Tracks upload state for resume functionality."""
 
-  local_path: str
+  dash_root: str
   remote_url: str
   completed_experiments: List[str] = field(
     default_factory=list
@@ -79,7 +79,7 @@ class UploadState:
   def to_dict(self) -> Dict[str, Any]:
     """Convert to dictionary for JSON serialization."""
     return {
-      "local_path": self.local_path,
+      "dash_root": self.dash_root,
       "remote_url": self.remote_url,
       "completed_experiments": self.completed_experiments,
       "failed_experiments": self.failed_experiments,
@@ -91,7 +91,7 @@ class UploadState:
   def from_dict(cls, data: Dict[str, Any]) -> "UploadState":
     """Create from dictionary."""
     return cls(
-      local_path=data["local_path"],
+      dash_root=data["dash_root"],
       remote_url=data["remote_url"],
       completed_experiments=data.get("completed_experiments", []),
       failed_experiments=data.get("failed_experiments", []),
@@ -265,18 +265,18 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
 
 
 def discover_experiments(
-  local_path: Path,
+  dash_root: Path,
   project_filter: Optional[str] = None,
   experiment_filter: Optional[str] = None,
 ) -> List[ExperimentInfo]:
   """
   Discover experiments in local storage directory.
 
-  Supports both flat (local_path/project/experiment) and folder-based
-  (local_path/folder/project/experiment) hierarchies.
+  Supports both flat (dash_root/project/experiment) and folder-based
+  (dash_root/folder/project/experiment) hierarchies.
 
   Args:
-      local_path: Root path of local storage
+      dash_root: Root path of local storage
       project_filter: Either a simple project name (e.g., "proj1") or a glob
                      pattern for the full path (e.g., "tom/*/exp*"). If the
                      filter contains '/', '*', or '?', it's treated as a glob
@@ -289,15 +289,15 @@ def discover_experiments(
   """
   import fnmatch
 
-  local_path = Path(local_path)
+  dash_root = Path(dash_root)
 
-  if not local_path.exists():
+  if not dash_root.exists():
     return []
 
   experiments = []
 
   # Find all experiment.json files recursively
-  for exp_json in local_path.rglob("*/experiment.json"):
+  for exp_json in dash_root.rglob("*/experiment.json"):
     exp_dir = exp_json.parent
 
     # Read prefix from experiment.json first
@@ -313,7 +313,7 @@ def discover_experiments(
     # This handles nested folders correctly
     # Prefix format: owner/project/folder.../experiment
     try:
-      relative_path = exp_dir.relative_to(local_path)
+      relative_path = exp_dir.relative_to(dash_root)
       full_relative_path = str(relative_path)
 
       if prefix:
@@ -1217,7 +1217,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
       Exit code (0 for success, 1 for error)
   """
   # Handle track upload if --tracks is specified
-  if args.tracks:
+  if getattr(args, 'tracks', False):
     return cmd_upload_track(args)
 
   # Load config
@@ -1234,9 +1234,9 @@ def cmd_upload(args: argparse.Namespace) -> int:
   api_key = args.api_key or config.api_key
 
   # Discover experiments
-  local_path = Path(args.path)
-  if not local_path.exists():
-    console.print(f"[red]Error:[/red] Local storage path does not exist: {local_path}")
+  dash_root = Path(args.path)
+  if not dash_root.exists():
+    console.print(f"[red]Error:[/red] Local storage path does not exist: {dash_root}")
     return 1
 
   # Handle state file for resume functionality
@@ -1247,7 +1247,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
     upload_state = UploadState.load(state_file)
     if upload_state:
       # Validate state matches current upload
-      if upload_state.local_path != str(local_path.absolute()):
+      if upload_state.dash_root != str(dash_root.absolute()):
         console.print(
           "[yellow]Warning:[/yellow] State file local path doesn't match. Starting fresh upload."
         )
@@ -1273,13 +1273,13 @@ def cmd_upload(args: argparse.Namespace) -> int:
   # Create new state if not resuming
   if not upload_state:
     upload_state = UploadState(
-      local_path=str(local_path.absolute()),
+      dash_root=str(dash_root.absolute()),
       remote_url=remote_url,
     )
 
-  console.print(f"[bold]Scanning local storage:[/bold] {local_path.absolute()}")
+  console.print(f"[bold]Scanning local storage:[/bold] {dash_root.absolute()}")
   experiments = discover_experiments(
-    local_path,
+    dash_root,
     project_filter=args.pref,  # Using --prefix/-p argument
     experiment_filter=None,
   )
@@ -1398,7 +1398,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
   # Initialize remote client and local storage
   remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
-  local_storage = LocalStorage(root_path=local_path)
+  local_storage = LocalStorage(root_path=dash_root)
 
   # Upload experiments with progress tracking
   console.print(f"\n[bold]Uploading to:[/bold] {remote_url}")

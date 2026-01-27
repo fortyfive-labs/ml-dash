@@ -8,14 +8,18 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def cleanup_dxp():
+def cleanup_dxp(monkeypatch):
   """Clean up .dash directory and reset dxp state before and after each test."""
   import getpass
   from ml_dash.auto_start import dxp
   from ml_dash.storage import LocalStorage
+  from ml_dash.buffer import BufferConfig
 
   ml_dash_dir = Path(".dash")
   owner = getpass.getuser()
+
+  # Disable buffering for tests (immediate writes for assertions)
+  monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
 
   # Close dxp and clean up before test
   if dxp._is_open:
@@ -28,6 +32,10 @@ def cleanup_dxp():
   dxp._storage = LocalStorage(root_path=ml_dash_dir)
   dxp._client = None  # Disable remote
   dxp._folder_path = f"{owner}/scratch/dxp"  # Set full prefix for local mode
+
+  # Disable buffering by setting config
+  dxp._buffer_config = BufferConfig(buffer_enabled=False)
+  dxp._buffer_manager = None
 
   # Reopen dxp for the test
   dxp.run.start()

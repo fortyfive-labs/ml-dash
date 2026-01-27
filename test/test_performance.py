@@ -5,6 +5,12 @@ import time
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for performance tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 @pytest.mark.skip(reason="Skipped for now")
 class TestMetricPerformance:
   """Performance tests for metric operations."""

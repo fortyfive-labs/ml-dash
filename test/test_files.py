@@ -8,6 +8,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for file operation tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestBasicFileOperations:
   """Tests for basic file upload operations."""
 

@@ -6,6 +6,12 @@ import json
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for logging tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestBasicLogging:
   """Tests for basic logging operations."""
 

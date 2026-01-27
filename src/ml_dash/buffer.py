@@ -340,18 +340,21 @@ class BackgroundBufferManager:
             if items:
                 print(f"[ML-Dash] Flushing {', '.join(items)}...", flush=True)
 
-        # Flush logs immediately
-        self._flush_logs()
+        # Flush logs immediately (loop until empty)
+        while not self._log_queue.empty():
+            self._flush_logs()
 
-        # Flush all metrics immediately
+        # Flush all metrics immediately (loop until empty for each metric)
         for metric_name in list(self._metric_queues.keys()):
-            self._flush_metric(metric_name)
+            while not self._metric_queues[metric_name].empty():
+                self._flush_metric(metric_name)
 
         # Flush all tracks immediately
         self.flush_tracks()
 
-        # Flush files immediately
-        self._flush_files()
+        # Flush files immediately (loop until empty)
+        while not self._file_queue.empty():
+            self._flush_files()
 
         if log_count > 0 or metric_count > 0 or track_count > 0 or file_count > 0:
             print("[ML-Dash] ✓ Flush complete", flush=True)

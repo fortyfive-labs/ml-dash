@@ -7,6 +7,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for tracks tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestBasicTracksLocal:
     """Tests for basic track operations in local mode."""
 
@@ -28,7 +34,7 @@ class TestBasicTracksLocal:
             )
 
         # Verify file exists
-        track_dir = tmp_proj / getpass.getuser() / "test" / "track-test-local" / "tracks" / "robot_position"
+        track_dir = tmp_proj / "test-user" / "test" / "track-test-local" / "tracks" / "robot_position"
         assert track_dir.exists()
         assert (track_dir / "data.jsonl").exists()
         assert (track_dir / "metadata.json").exists()
@@ -61,15 +67,15 @@ class TestBasicTracksLocal:
         """Test JSONL round-trip: write → read → write should be identical."""
         with local_experiment("test-user/test/track-roundtrip").run as experiment:
             # Write test data
-            test_entries = [
+            test_entries_original = [
                 {"timestamp": 0.0, "x": 1.0, "y": 2.0, "z": 3.0},
                 {"timestamp": 0.033, "x": 1.1, "y": 2.1, "z": 3.1},
                 {"timestamp": 0.066, "x": 1.2, "y": 2.2, "z": 3.2},
             ]
 
-            for entry in test_entries:
-                ts = entry.pop("timestamp")
-                experiment.tracks("robot/position").append(_ts=ts, **entry)
+            for entry in test_entries_original:
+                ts = entry["timestamp"]
+                experiment.tracks("robot/position").append(_ts=ts, x=entry["x"], y=entry["y"], z=entry["z"])
 
             experiment.flush()
 
@@ -83,13 +89,16 @@ class TestBasicTracksLocal:
         # Verify data matches
         assert len(read_entries) == 3
         for i, entry in enumerate(read_entries):
-            assert entry["timestamp"] == test_entries[i]["timestamp"]
-            assert entry["x"] == test_entries[i]["x"]
-            assert entry["y"] == test_entries[i]["y"]
-            assert entry["z"] == test_entries[i]["z"]
+            assert entry["timestamp"] == test_entries_original[i]["timestamp"]
+            assert entry["x"] == test_entries_original[i]["x"]
+            assert entry["y"] == test_entries_original[i]["y"]
+            assert entry["z"] == test_entries_original[i]["z"]
 
-    def test_track_timestamp_merge_local(self, local_experiment):
+    def test_track_timestamp_merge_local(self, local_experiment, monkeypatch):
         """Test that entries with same timestamp are merged in local mode."""
+        # Re-enable buffering for this test (timestamp merging is a buffer feature)
+        monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "true")
+
         with local_experiment("test-user/test/track-merge-local").run as experiment:
             # Log different fields at same timestamp
             experiment.tracks("camera/data").append(frame_id=0, _ts=0.0)

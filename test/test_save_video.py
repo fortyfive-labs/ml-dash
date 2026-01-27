@@ -6,6 +6,12 @@ import numpy as np
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for video tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestVideoBasics:
   """Tests for basic video save operations."""
 

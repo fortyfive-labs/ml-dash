@@ -11,7 +11,15 @@ Uses the global EXP ParamsProto object for clean template expansion.
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from ml_dash import RUN, Experiment
+
+
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for template tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
 
 
 def test_template_with_run_name():
@@ -25,7 +33,7 @@ def test_template_with_run_name():
 
     with exp.run:
       assert exp._folder_path == "iclr_2024/my-experiment"
-      assert RUN.name == "my-experiment"
+      assert exp.run.name == "my-experiment"
 
   print("✓ Template with {EXP.name} works")
 
@@ -45,8 +53,8 @@ def test_template_with_run_id():
     assert len(parts[1]) == 18  # Snowflake ID (64-bit distributed ID)
 
     with exp.run:
-      assert RUN.id is not None
-      assert isinstance(RUN.id, int)
+      assert exp.run.id is not None
+      assert isinstance(exp.run.id, int)
 
   print("✓ Template with {EXP.name}.{EXP.id} works")
 

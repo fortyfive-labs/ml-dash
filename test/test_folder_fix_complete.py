@@ -10,7 +10,15 @@ import json
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from ml_dash import Experiment
+
+
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for folder tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
 
 
 def test_all_operations_use_folder_field():

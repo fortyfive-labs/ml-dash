@@ -5,6 +5,12 @@ import hashlib
 from pathlib import Path
 
 
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for file upload/download tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
+
+
 class TestFileUploadDownload:
     """Tests for file upload and download workflow."""
 

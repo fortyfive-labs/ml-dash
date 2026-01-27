@@ -5,7 +5,15 @@ Test run.prefix setter - can only be set before initialization.
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from ml_dash import Experiment
+
+
+@pytest.fixture(autouse=True)
+def disable_buffering(monkeypatch):
+    """Disable buffering for prefix setter tests."""
+    monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
 
 
 def test_prefix_setter_before_init():

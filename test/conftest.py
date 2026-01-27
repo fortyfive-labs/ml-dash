@@ -14,7 +14,7 @@ from ml_dash import Experiment
 
 # Configuration
 REMOTE_SERVER_URL = "http://localhost:3000"
-TEST_USERNAME = "test-user"
+TEST_USERNAME = "tom_tao_34833x"
 
 
 # Generate test JWT token for remote experiments

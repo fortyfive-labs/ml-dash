@@ -25,8 +25,8 @@ class TestExperimentDiscovery:
       e.log("Test log message")
       e.params.set(**{"lr": 0.001})
 
-    local_path = Path(exp._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp._storage.root_path)
+    experiments = discover_experiments(dash_root)
 
     assert len(experiments) == 1
     assert experiments[0].project == "proj1"
@@ -48,8 +48,8 @@ class TestExperimentDiscovery:
     with exp3.run as e:
       e.log("Test")
 
-    local_path = Path(exp1._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp1._storage.root_path)
+    experiments = discover_experiments(dash_root)
 
     assert len(experiments) == 3
     project_names = [e.project for e in experiments]
@@ -66,8 +66,8 @@ class TestExperimentDiscovery:
     with exp2.run as e:
       e.log("Test")
 
-    local_path = Path(exp1._storage.root_path)
-    experiments = discover_experiments(local_path, project_filter="proj1")
+    dash_root = Path(exp1._storage.root_path)
+    experiments = discover_experiments(dash_root, project_filter="proj1")
 
     assert len(experiments) == 1
     assert experiments[0].project == "proj1"
@@ -82,9 +82,9 @@ class TestExperimentDiscovery:
     with exp2.run as e:
       e.log("Test")
 
-    local_path = Path(exp1._storage.root_path)
+    dash_root = Path(exp1._storage.root_path)
     experiments = discover_experiments(
-      local_path, project_filter="proj1", experiment_filter="exp1"
+      dash_root, project_filter="proj1", experiment_filter="exp1"
     )
 
     assert len(experiments) == 1
@@ -97,8 +97,8 @@ class TestExperimentDiscovery:
       e.metrics("train").log(loss=0.5)
       e.metrics("eval").log(loss=0.85)
 
-    local_path = Path(exp._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp._storage.root_path)
+    experiments = discover_experiments(dash_root)
 
     assert len(experiments) == 1
     assert "train" in experiments[0].metric_names
@@ -125,8 +125,8 @@ class TestExperimentValidator:
       e.log("Test message")
       e.params.set(**{"lr": 0.001})
 
-    local_path = Path(exp._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp._storage.root_path)
+    experiments = discover_experiments(dash_root)
 
     validator = ExperimentValidator(strict=False)
     result = validator.validate_experiment(experiments[0])
@@ -185,8 +185,8 @@ class TestExperimentValidator:
       e.log("Test")
 
     # Discover the experiment to get its actual path
-    local_path = Path(exp._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp._storage.root_path)
+    experiments = discover_experiments(dash_root)
     exp_info = experiments[0]
 
     # Add invalid log line using the discovered experiment path
@@ -210,8 +210,8 @@ class TestExperimentValidator:
       e.log("Test")
 
     # Discover the experiment to get its actual path
-    local_path = Path(exp._storage.root_path)
-    experiments = discover_experiments(local_path)
+    dash_root = Path(exp._storage.root_path)
+    experiments = discover_experiments(dash_root)
     exp_info = experiments[0]
 
     # Add invalid log line using the discovered experiment path
@@ -246,7 +246,7 @@ class TestUploadState:
 
     loaded_state = UploadState.load(state_file)
     assert loaded_state is not None
-    assert loaded_state.local_path == state.local_path
+    assert loaded_state.dash_root == state.dash_root
     assert loaded_state.remote_url == state.remote_url
     assert len(loaded_state.completed_experiments) == 2
     assert len(loaded_state.failed_experiments) == 1
@@ -274,14 +274,14 @@ class TestUploadState:
     )
 
     state_dict = state.to_dict()
-    assert state_dict["local_path"] == "/path/to/local"
+    assert state_dict["dash_root"] == "/path/to/local"
     assert state_dict["remote_url"] == "http://localhost:3000"
     assert "completed_experiments" in state_dict
 
   def test_state_from_dict(self):
     """Test creating state from dictionary."""
     state_dict = {
-      "local_path": "/path/to/local",
+      "dash_root": "/path/to/local",
       "remote_url": "http://localhost:3000",
       "completed_experiments": ["proj1/exp1"],
       "failed_experiments": [],
@@ -290,7 +290,7 @@ class TestUploadState:
     }
 
     state = UploadState.from_dict(state_dict)
-    assert state.local_path == "/path/to/local"
+    assert state.dash_root == "/path/to/local"
     assert state.remote_url == "http://localhost:3000"
     assert len(state.completed_experiments) == 1
 
@@ -310,11 +310,11 @@ class TestUploadIntegration:
       e.params.set(**{"lr": 0.001, "batch_size": 32})
       e.metrics("train").log(loss=0.5)
 
-    local_path = Path(exp._storage.root_path)
+    dash_root = Path(exp._storage.root_path)
 
     # Create mock arguments
     args = argparse.Namespace(
-      path=str(local_path),
+      path=str(dash_root),
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
@@ -330,7 +330,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
-      state_file=str(local_path / ".test-state.json"),
+      state_file=str(dash_root / ".test-state.json"),
     )
 
     # Run upload
@@ -344,10 +344,10 @@ class TestUploadIntegration:
     with exp.run as e:
       e.log("Test message")
 
-    local_path = Path(exp._storage.root_path)
+    dash_root = Path(exp._storage.root_path)
 
     args = argparse.Namespace(
-      path=str(local_path),
+      path=str(dash_root),
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
@@ -363,7 +363,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
-      state_file=str(local_path / ".test-state.json"),
+      state_file=str(dash_root / ".test-state.json"),
     )
 
     result = cmd_upload(args)
@@ -379,10 +379,10 @@ class TestUploadIntegration:
     with exp2.run as e:
       e.log("Test")
 
-    local_path = Path(exp1._storage.root_path)
+    dash_root = Path(exp1._storage.root_path)
 
     args = argparse.Namespace(
-      path=str(local_path),
+      path=str(dash_root),
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
@@ -397,7 +397,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
-      state_file=str(local_path / ".test-state.json"),
+      state_file=str(dash_root / ".test-state.json"),
     )
 
     result = cmd_upload(args)
@@ -411,10 +411,10 @@ class TestUploadIntegration:
       e.params.set(**{"lr": 0.001})
       e.metrics("train").log(loss=0.5)
 
-    local_path = Path(exp._storage.root_path)
+    dash_root = Path(exp._storage.root_path)
 
     args = argparse.Namespace(
-      path=str(local_path),
+      path=str(dash_root),
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
@@ -430,7 +430,7 @@ class TestUploadIntegration:
       skip_files=True,  # Skip files
       skip_params=False,  # Upload params only
       resume=False,
-      state_file=str(local_path / ".test-state.json"),
+      state_file=str(dash_root / ".test-state.json"),
     )
 
     result = cmd_upload(args)
@@ -447,12 +447,12 @@ class TestUploadIntegration:
     with exp2.run as e:
       e.log("Test")
 
-    local_path = Path(exp1._storage.root_path)
-    state_file = local_path / ".test-resume-state.json"
+    dash_root = Path(exp1._storage.root_path)
+    state_file = dash_root / ".test-resume-state.json"
 
     # Create state file simulating partial upload
     state = UploadState(
-      dash_root=str(local_path.absolute()),
+      dash_root=str(dash_root.absolute()),
       remote_url="http://localhost:3000",
       completed_experiments=["resume-proj/resume-exp1"],
       failed_experiments=[],
@@ -460,7 +460,7 @@ class TestUploadIntegration:
     state.save(state_file)
 
     args = argparse.Namespace(
-      path=str(local_path),
+      path=str(dash_root),
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
@@ -540,7 +540,7 @@ class TestCLIErrors:
     result = cmd_upload(args)
     assert result == 1  # Error
 
-  def test_nonexistent_local_path(self):
+  def test_nonexistent_dash_root(self):
     """Test error when local path doesn't exist."""
     args = argparse.Namespace(
       path="/nonexistent/path",

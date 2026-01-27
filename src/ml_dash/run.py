@@ -158,6 +158,16 @@ class RUN:
   now = datetime.now()
   """Timestamp at import time. Does not change during the session."""
 
+  @property
+  def date(self) -> str:
+    """Date string in YYYYMMDD format."""
+    return self.now.strftime("%Y%m%d")
+
+  @property
+  def datetime_str(self) -> str:
+    """DateTime string in YYYYMMDD.HHMMSS format."""
+    return self.now.strftime("%Y%m%d.%H%M%S")
+
   timestamp: str = None
   """Timestamp created at instantiation"""
 
@@ -276,6 +286,61 @@ class RUN:
         self.project = parts[1]
         # self.name is the last segment
         self.name = parts[-1] if len(parts) > 2 else parts[1]
+
+  def __setattr__(self, name: str, value):
+    """
+    Intercept attribute setting to expand {EXP.attr} templates in prefix.
+
+    When prefix is set, expands any {EXP.name}, {EXP.id}, {EXP.date}, etc. templates
+    using current instance's attributes. Also syncs back to class-level RUN attributes.
+    """
+    # Prevent prefix changes after experiment has started
+    if name == "prefix" and isinstance(value, str):
+      experiment = getattr(self, "_experiment", None)
+      if experiment is not None and getattr(experiment, "_is_open", False):
+        raise RuntimeError(
+          "Cannot change prefix after experiment has been initialized. "
+          "Set prefix before calling experiment.run.start() or entering the context manager."
+        )
+
+    # Expand templates if setting prefix
+    if name == "prefix" and isinstance(value, str):
+      # Check if value contains {EXP. templates
+      if "{EXP." in value:
+        import re
+
+        def replace_match(match):
+          attr_name = match.group(1)
+          # Special handling for id - generate if needed
+          if attr_name == "id" and not getattr(self, "id", None):
+            from ml_dash.snowflake import generate_id
+            object.__setattr__(self, "id", generate_id())
+
+          # Get attribute, raising error if not found
+          try:
+            attr_value = getattr(self, attr_name)
+            if attr_value is None:
+              raise AttributeError(f"Attribute '{attr_name}' is None")
+            return str(attr_value)
+          except AttributeError:
+            raise AttributeError(f"RUN has no attribute '{attr_name}'")
+
+        # Match {EXP.attr_name} pattern
+        pattern = r"\{EXP\.(\w+)\}"
+        value = re.sub(pattern, replace_match, value)
+
+      # Always update _folder_path when prefix changes
+      object.__setattr__(self, "_folder_path", value)
+
+      # Parse and update owner, project, name from new prefix
+      parts = value.strip("/").split("/")
+      if len(parts) >= 2:
+        object.__setattr__(self, "owner", parts[0])
+        object.__setattr__(self, "project", parts[1])
+        object.__setattr__(self, "name", parts[-1] if len(parts) > 2 else parts[1])
+
+    # Use object.__setattr__ to set the value
+    object.__setattr__(self, name, value)
 
   def start(self) -> "Experiment":
     """
