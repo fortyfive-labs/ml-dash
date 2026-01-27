@@ -236,7 +236,7 @@ if userinfo.username:
 
 No manual configuration needed! Override if needed:
 ```bash
-uv run python train.py --owner alice --project my-research
+uv run python train.py --run.owner alice --run.project my-research
 ```
 
 ### Sweep Coordination
