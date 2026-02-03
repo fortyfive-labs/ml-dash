@@ -57,6 +57,11 @@ def _serialize_value(value: Any) -> Any:
 class BufferConfig:
     """Configuration for buffering behavior."""
 
+    # Internal constants for queue management (not exposed to users)
+    _MAX_QUEUE_SIZE = 10000  # Maximum items before blocking
+    _WARNING_THRESHOLD = 8000  # Warn at 80% capacity
+    _AGGRESSIVE_FLUSH_THRESHOLD = 5000  # Trigger immediate flush at 50% capacity
+
     def __init__(
         self,
         flush_interval: float = 5.0,
@@ -114,16 +119,19 @@ class BackgroundBufferManager:
         self._experiment = experiment
         self._config = config
 
-        # Resource-specific queues
-        self._log_queue: Queue = Queue()
+        # Resource-specific queues with bounded size to prevent OOM
+        self._log_queue: Queue = Queue(maxsize=config._MAX_QUEUE_SIZE)
         self._metric_queues: Dict[Optional[str], Queue] = {}  # Per-metric queues
         self._track_buffers: Dict[str, Dict[float, Dict[str, Any]]] = {}  # Per-topic: {timestamp: merged_data}
-        self._file_queue: Queue = Queue()
+        self._file_queue: Queue = Queue(maxsize=config._MAX_QUEUE_SIZE)
 
         # Track last flush times per resource type
         self._last_log_flush = time.time()
         self._last_metric_flush: Dict[Optional[str], float] = {}
         self._last_track_flush: Dict[str, float] = {}  # Per-topic flush times
+
+        # Track warnings to avoid spamming
+        self._warned_queues: set = set()
 
         # Background thread control
         self._thread: Optional[threading.Thread] = None
@@ -184,6 +192,34 @@ class BackgroundBufferManager:
 
         self._thread = None
 
+    def _check_queue_pressure(self, queue: Queue, queue_name: str) -> None:
+        """
+        Check queue size and trigger aggressive flushing if needed.
+
+        This prevents OOM by flushing immediately when queue fills up.
+
+        Args:
+            queue: The queue to check
+            queue_name: Name for warning messages
+        """
+        qsize = queue.qsize()
+
+        # Trigger immediate flush if queue is getting full
+        if qsize >= self._config._AGGRESSIVE_FLUSH_THRESHOLD:
+            self._flush_event.set()
+
+        # Warn once if queue is filling up (80% capacity)
+        if qsize >= self._config._WARNING_THRESHOLD:
+            if queue_name not in self._warned_queues:
+                warnings.warn(
+                    f"[ML-Dash] {queue_name} queue is {qsize}/{self._config._MAX_QUEUE_SIZE} full. "
+                    f"Data is being generated faster than it can be flushed. "
+                    f"Consider reducing logging frequency or the background flush will block to prevent OOM.",
+                    RuntimeWarning,
+                    stacklevel=3
+                )
+                self._warned_queues.add(queue_name)
+
     def buffer_log(
         self,
         message: str,
@@ -192,7 +228,10 @@ class BackgroundBufferManager:
         timestamp: Optional[datetime],
     ) -> None:
         """
-        Add log to buffer (non-blocking).
+        Add log to buffer with automatic backpressure.
+
+        If queue is full, this will block until space is available.
+        This prevents OOM when logs are generated faster than they can be flushed.
 
         Args:
             message: Log message
@@ -200,6 +239,9 @@ class BackgroundBufferManager:
             metadata: Optional metadata
             timestamp: Optional timestamp
         """
+        # Check queue pressure and trigger aggressive flushing if needed
+        self._check_queue_pressure(self._log_queue, "Log")
+
         log_entry = {
             "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
             "level": level,
@@ -209,6 +251,7 @@ class BackgroundBufferManager:
         if metadata:
             log_entry["metadata"] = metadata
 
+        # Will block if queue is full (backpressure to prevent OOM)
         self._log_queue.put(log_entry)
 
     def buffer_metric(
@@ -220,7 +263,10 @@ class BackgroundBufferManager:
         metadata: Optional[Dict[str, Any]],
     ) -> None:
         """
-        Add metric datapoint to buffer (non-blocking).
+        Add metric datapoint to buffer with automatic backpressure.
+
+        If queue is full, this will block until space is available.
+        This prevents OOM when metrics are generated faster than they can be flushed.
 
         Args:
             metric_name: Metric name (can be None for unnamed metrics)
@@ -229,10 +275,17 @@ class BackgroundBufferManager:
             tags: Optional tags
             metadata: Optional metadata
         """
-        # Get or create queue for this metric
+        # Get or create queue for this metric (with bounded size)
         if metric_name not in self._metric_queues:
-            self._metric_queues[metric_name] = Queue()
+            self._metric_queues[metric_name] = Queue(maxsize=self._config._MAX_QUEUE_SIZE)
             self._last_metric_flush[metric_name] = time.time()
+
+        # Check queue pressure and trigger aggressive flushing if needed
+        metric_display = f"'{metric_name}'" if metric_name else "unnamed"
+        self._check_queue_pressure(
+            self._metric_queues[metric_name],
+            f"Metric {metric_display}"
+        )
 
         metric_entry = {
             "data": data,
@@ -241,6 +294,7 @@ class BackgroundBufferManager:
             "metadata": metadata,
         }
 
+        # Will block if queue is full (backpressure to prevent OOM)
         self._metric_queues[metric_name].put(metric_entry)
 
     def buffer_track(
@@ -286,7 +340,9 @@ class BackgroundBufferManager:
         size_bytes: int,
     ) -> None:
         """
-        Add file upload to queue (non-blocking).
+        Add file upload to queue with automatic backpressure.
+
+        If queue is full, this will block until space is available.
 
         Args:
             file_path: Local file path
@@ -299,6 +355,9 @@ class BackgroundBufferManager:
             content_type: MIME type
             size_bytes: File size in bytes
         """
+        # Check queue pressure and trigger aggressive flushing if needed
+        self._check_queue_pressure(self._file_queue, "File")
+
         file_entry = {
             "file_path": file_path,
             "prefix": prefix,
@@ -311,6 +370,7 @@ class BackgroundBufferManager:
             "size_bytes": size_bytes,
         }
 
+        # Will block if queue is full (backpressure to prevent OOM)
         self._file_queue.put(file_entry)
 
     def flush_all(self) -> None:
