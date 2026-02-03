@@ -58,9 +58,9 @@ class BufferConfig:
     """Configuration for buffering behavior."""
 
     # Internal constants for queue management (not exposed to users)
-    _MAX_QUEUE_SIZE = 10000  # Maximum items before blocking
-    _WARNING_THRESHOLD = 8000  # Warn at 80% capacity
-    _AGGRESSIVE_FLUSH_THRESHOLD = 5000  # Trigger immediate flush at 50% capacity
+    _MAX_QUEUE_SIZE = 100000  # Maximum items before blocking
+    _WARNING_THRESHOLD = 80000  # Warn at 80% capacity
+    _AGGRESSIVE_FLUSH_THRESHOLD = 50000  # Trigger immediate flush at 50% capacity
 
     def __init__(
         self,
