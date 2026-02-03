@@ -487,18 +487,71 @@ class BackgroundBufferManager:
 
         # Final flush on shutdown - loop until all queues are empty
         # This ensures no data is lost when shutting down with large queues
-        while not self._log_queue.empty():
-            self._flush_logs()
+        # Show progress bar for large flushes
+        initial_counts = {
+            'logs': self._log_queue.qsize(),
+            'metrics': {name: q.qsize() for name, q in self._metric_queues.items()},
+            'tracks': {topic: len(entries) for topic, entries in self._track_buffers.items()},
+            'files': self._file_queue.qsize(),
+        }
 
+        total_items = (
+            initial_counts['logs'] +
+            sum(initial_counts['metrics'].values()) +
+            sum(initial_counts['tracks'].values()) +
+            initial_counts['files']
+        )
+
+        # Show progress bar if there are many items to flush
+        show_progress = total_items > 200
+        items_flushed = 0
+
+        def update_progress():
+            nonlocal items_flushed
+            if show_progress:
+                progress = items_flushed / total_items
+                bar_length = 40
+                filled = int(bar_length * progress)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                percent = progress * 100
+                print(f'\r[ML-Dash] Flushing: |{bar}| {percent:.1f}% ({items_flushed}/{total_items})', end='', flush=True)
+
+        # Flush logs
+        log_batch_size = self._config.log_batch_size
+        while not self._log_queue.empty():
+            before = self._log_queue.qsize()
+            self._flush_logs()
+            after = self._log_queue.qsize()
+            items_flushed += before - after
+            update_progress()
+
+        # Flush metrics
+        metric_batch_size = self._config.metric_batch_size
         for metric_name in list(self._metric_queues.keys()):
             while not self._metric_queues[metric_name].empty():
+                before = self._metric_queues[metric_name].qsize()
                 self._flush_metric(metric_name)
+                after = self._metric_queues[metric_name].qsize()
+                items_flushed += before - after
+                update_progress()
 
+        # Flush tracks
         for topic in list(self._track_buffers.keys()):
+            track_count = len(self._track_buffers.get(topic, {}))
             self._flush_track(topic)
+            items_flushed += track_count
+            update_progress()
 
+        # Flush files
         while not self._file_queue.empty():
+            before = self._file_queue.qsize()
             self._flush_files()
+            after = self._file_queue.qsize()
+            items_flushed += before - after
+            update_progress()
+
+        if show_progress:
+            print()  # New line after progress bar
 
     def _flush_logs(self) -> None:
         """Batch flush logs using client.create_log_entries()."""
