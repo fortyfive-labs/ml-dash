@@ -80,11 +80,11 @@ def train_simple_model():
     #     loss=train_loss, accuracy=train_accuracy, epoch=epoch
     #   )
 
-      experiment.metrics("validation").log(
+      experiment.metrics("validation").buffer(
         epoch=epoch, loss=val_loss, accuracy=val_accuracy, perplexity=perplexity
       )
-    #   experiment.metrics.buffer.log_summary()
-    #   experiment.metrics.flush()  
+      experiment.metrics.buffer.log_summary()
+      experiment.metrics.flush()  
 
      
 

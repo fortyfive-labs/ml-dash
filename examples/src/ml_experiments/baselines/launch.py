@@ -6,13 +6,13 @@ All baselines appear at consistent paths for permanent reference.
 
 Usage:
     # Run default baseline sweep
-    python launch_baseline.py
+    python launch.py
 
     # Run specific baseline sweep
-    python launch_baseline.py --sweep configs/resnet_baseline.jsonl
+    python launch.py --sweep configs/resnet_baseline.jsonl
 
     # Preview commands without running
-    python launch_baseline.py --dry-run
+    python launch.py --dry-run
 
 Path structure (NO datetime):
     {namespace}/ml-experiments/baselines/resnet18/001
@@ -31,7 +31,7 @@ from params_proto import proto
 @proto.cli
 def main(
     sweep: str = "configs/resnet_baseline.jsonl",  # Sweep file path
-    script: str = "train_baseline.py",  # Training script
+    script: str = "train.py",  # Training script
     dry_run: bool = False,  # Show commands without running
     owner: str = None,  # ML-Dash owner/namespace
     project: str = None,  # ML-Dash project name

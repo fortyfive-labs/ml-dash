@@ -6,6 +6,22 @@ Uses separate config classes for different components:
 - Model: Model architecture settings
 - Eval: Evaluation configuration
 
+Demonstrates two logging patterns:
+1. Regular logging - Use for low-frequency metrics (per epoch)
+   dxp.metrics("val").log(epoch=epoch, loss=val_loss, accuracy=val_acc)
+
+2. Buffered logging with summary - Use for high-frequency metrics (per step/batch)
+   for batch in batches:
+       dxp.metrics("train_steps").buffer(loss=loss, accuracy=acc)
+   dxp.metrics.buffer.log_summary("mean", "std", "min", "max")
+   dxp.metrics.flush()
+
+   Benefits of log_summary():
+   - Avoids blocking training loop with HTTP requests per step
+   - Automatically computes statistics (mean, std, min, max, percentiles)
+   - Reduces network overhead by batching data
+   - Provides statistical aggregation without manual calculation
+
 Usage:
     # Single run with defaults
     python train.py
@@ -173,25 +189,54 @@ TRAINING CONFIGURATION
         perf_factor = lr_factor * batch_factor * opt_factor
 
         best_val_acc = 0.0
+        final_train_loss = 0.0
+        final_val_loss = 0.0
+        num_batches = 50  # Simulate batches per epoch
 
-        dxp.log(f"Training for {Train.epochs} epochs", level="info")
+        dxp.log(f"Training for {Train.epochs} epochs ({num_batches} batches each)", level="info")
         for epoch in range(1, Train.epochs + 1):
-            train_loss = (2.5 * (0.65 ** epoch) / perf_factor) + random.uniform(0, 0.1)
-            train_acc = min(0.98, (0.3 + epoch * 0.13) * perf_factor + random.uniform(0, 0.03))
+            # --- Step-level training with buffered metrics ---
+            # Use buffer() + log_summary() for high-frequency step-level metrics
+            # This avoids blocking the training loop with HTTP requests per step
+            for batch in range(num_batches):
+                # Simulate step-level training metrics
+                step_loss = (2.5 * (0.65 ** epoch) / perf_factor) + random.uniform(-0.2, 0.2)
+                step_acc = min(0.98, (0.3 + epoch * 0.13) * perf_factor + random.uniform(-0.05, 0.05))
+
+                # Buffer metrics (non-blocking, accumulated in memory)
+                dxp.metrics("train_steps").buffer(
+                    epoch=epoch,
+                    batch=batch,
+                    loss=step_loss,
+                    accuracy=step_acc
+                )
+
+                # Track final loss for summary
+                if batch == num_batches - 1:
+                    final_train_loss = step_loss
+
+            # Aggregate and log summary statistics for the epoch
+            # This creates a single log entry with mean, std, min, max for all buffered values
+            dxp.metrics.buffer.log_summary("mean", "std", "min", "max", "count")
+            dxp.metrics.flush()  # Ensure all buffered data is written
+
+            # --- Epoch-level validation with regular logging ---
+            # Use regular log() for low-frequency metrics (once per epoch)
             val_loss = (2.3 * (0.65 ** epoch) / perf_factor) + random.uniform(0, 0.15)
             val_acc = min(0.95, (0.25 + epoch * 0.13) * perf_factor + random.uniform(0, 0.03))
             best_val_acc = max(best_val_acc, val_acc)
+            final_val_loss = val_loss
 
-            dxp.metrics("train").log(epoch=epoch, loss=train_loss, accuracy=train_acc)
+            # Regular logging for epoch-level validation metrics
             dxp.metrics("val").log(epoch=epoch, loss=val_loss, accuracy=val_acc)
 
-            print(f"  Epoch {epoch:2d}: train_acc={train_acc:.4f}, val_acc={val_acc:.4f}, best={best_val_acc:.4f}")
-            time.sleep(0.2)
+            print(f"  Epoch {epoch:2d}: val_acc={val_acc:.4f}, best={best_val_acc:.4f}")
+            time.sleep(0.1)
 
         dxp.metrics("summary").log(
             best_val_accuracy=best_val_acc,
-            final_train_loss=train_loss,
-            final_val_loss=val_loss,
+            final_train_loss=final_train_loss,
+            final_val_loss=final_val_loss,
         )
 
         dxp.log(f"✅ Training complete! Best {Eval.metric}: {best_val_acc:.4f}", level="info")

@@ -6,20 +6,27 @@ Examples demonstrating ML-Dash experiment tracking with params-proto configurati
 
 ```
 examples/
-├── experiments/sweeps/   ← Ad hoc experiments (WITH datetime)
-│   ├── train.py
-│   ├── launch.py
-│   └── configs/
-│       ├── sweep.jsonl & sweep_gen.py
-│       ├── lr_sweep.jsonl & lr_sweep_gen.py
-│       ├── optimizer_sweep.jsonl & optimizer_sweep_gen.py
-│       └── batch_sweep.jsonl & batch_sweep_gen.py
+├── src/
+│   └── ml_experiments/
+│       ├── sweeps/           ← Ad hoc experiments (WITH datetime)
+│       │   ├── train.py
+│       │   ├── launch.py
+│       │   └── configs/
+│       │       ├── sweep.jsonl & sweep_gen.py
+│       │       ├── lr_sweep.jsonl & lr_sweep_gen.py
+│       │       ├── optimizer_sweep.jsonl & optimizer_sweep_gen.py
+│       │       └── batch_sweep.jsonl & batch_sweep_gen.py
+│       │
+│       └── baselines/        ← Systematic baselines (STATIC paths)
+│           ├── train.py
+│           ├── launch.py
+│           └── configs/
+│               └── resnet_baseline.jsonl & resnet_baseline_gen.py
 │
-└── baselines/            ← Systematic baselines (STATIC paths)
-    ├── train_baseline.py
-    ├── launch_baseline.py
-    └── configs/
-        └── resnet_baseline.jsonl & resnet_baseline_gen.py
+├── tests/
+├── pyproject.toml
+├── README.md
+└── uv.lock
 ```
 
 ## 🚀 Quick Start
@@ -40,7 +47,7 @@ ml-dash login
 ### 3. Run Your First Sweep
 
 ```bash
-cd experiments/sweeps
+cd src/ml_experiments/sweeps
 uv run python launch.py
 ```
 
@@ -55,13 +62,13 @@ uv run python train.py --train.learning-rate 0.01 --train.batch-size 64
 ### 5. Run Baseline Experiment
 
 ```bash
-cd ../../baselines
-uv run python launch_baseline.py
+cd ../baselines
+uv run python launch.py
 ```
 
 ## 🔷 Two Types of Experiments
 
-### Ad Hoc Experiments (`experiments/sweeps/`)
+### Ad Hoc Experiments (`src/ml_experiments/sweeps/`)
 
 **Purpose**: Exploratory experiments and quick hyperparameter tests
 
@@ -83,7 +90,7 @@ uv run python launch_baseline.py
 
 **Usage:**
 ```bash
-cd experiments/sweeps
+cd src/ml_experiments/sweeps
 
 # Run default sweep
 uv run python launch.py
@@ -126,7 +133,7 @@ uv run python configs/sweep_gen.py
     └── ...
 ```
 
-### Baseline Experiments (`baselines/`)
+### Baseline Experiments (`src/ml_experiments/baselines/`)
 
 **Purpose**: Permanent reference baselines for benchmarks and papers
 
@@ -138,22 +145,22 @@ uv run python configs/sweep_gen.py
 ```
 
 **Files:**
-- **`train_baseline.py`** - Baseline training with static paths
-- **`launch_baseline.py`** - Baseline sweep launcher
+- **`train.py`** - Baseline training with static paths
+- **`launch.py`** - Baseline sweep launcher
 - **`configs/resnet_baseline.jsonl`** - Standard ResNet configurations
 
 **Usage:**
 ```bash
-cd baselines
+cd src/ml_experiments/baselines
 
 # Run single baseline
-uv run python train_baseline.py --train.learning-rate 0.01
+uv run python train.py --train.learning-rate 0.01
 
 # Run baseline sweep
-uv run python launch_baseline.py
+uv run python launch.py
 
 # Different model (changes path)
-uv run python train_baseline.py --model.name ResNet-50
+uv run python train.py --model.name ResNet-50
 # Path: .../baselines/resnet50/001
 
 # Regenerate configs
@@ -286,7 +293,7 @@ Parameters are automatically mapped to the correct config namespace:
 
 ## 🆚 Ad Hoc vs Baselines
 
-| Aspect | Ad Hoc (`experiments/`) | Baselines (`baselines/`) |
+| Aspect | Ad Hoc (`sweeps/`) | Baselines (`baselines/`) |
 |--------|------------------------|-------------------------|
 | **Path** | Dynamic (WITH datetime) | STATIC (NO datetime) |
 | **Purpose** | Exploratory, testing | Permanent reference |
@@ -310,8 +317,11 @@ Parameters are automatically mapped to the correct config namespace:
 ### Dry Run (Preview Commands)
 
 ```bash
+cd src/ml_experiments/sweeps
 uv run python launch.py --dry-run
-uv run python launch_baseline.py --dry-run
+
+cd ../baselines
+uv run python launch.py --dry-run
 ```
 
 Shows all commands that would be executed without actually running them.
@@ -357,13 +367,13 @@ uv run python train.py --run.api-url http://localhost:3000
 ### Regenerate All Sweep Files
 
 ```bash
-cd experiments/sweeps
+cd src/ml_experiments/sweeps
 uv run python configs/sweep_gen.py
 uv run python configs/lr_sweep_gen.py
 uv run python configs/optimizer_sweep_gen.py
 uv run python configs/batch_sweep_gen.py
 
-cd ../../baselines
+cd ../baselines
 uv run python configs/resnet_baseline_gen.py
 ```
 
@@ -375,9 +385,9 @@ uv run python configs/resnet_baseline_gen.py
 
 **Modify configs**: Edit `.jsonl` files directly or regenerate using `*_gen.py` scripts
 
-**Static baselines**: Use `baselines/` for experiments you want to reference permanently (papers, benchmarks)
+**Static baselines**: Use `src/ml_experiments/baselines/` for experiments you want to reference permanently (papers, benchmarks)
 
-**Quick iterations**: Use `experiments/sweeps/` for exploratory work and hyperparameter tuning
+**Quick iterations**: Use `src/ml_experiments/sweeps/` for exploratory work and hyperparameter tuning
 
 **Dry runs**: Always test with `--dry-run` first to preview what will be executed
 
@@ -439,6 +449,6 @@ Parameters with underscores become kebab-case: `dry_run` → `--dry-run`
 
 - [ML-Dash Documentation](https://dash.ml/docs)
 - [params-proto Documentation](https://github.com/geyang/params-proto)
-- `experiments/sweeps/train.py` - Multi-config training implementation
-- `experiments/sweeps/launch.py` - Sweep launcher implementation
-- `baselines/train_baseline.py` - Baseline training with static paths
+- `src/ml_experiments/sweeps/train.py` - Multi-config training implementation
+- `src/ml_experiments/sweeps/launch.py` - Sweep launcher implementation
+- `src/ml_experiments/baselines/train.py` - Baseline training with static paths
