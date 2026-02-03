@@ -425,13 +425,20 @@ class BackgroundBufferManager:
             if triggered:
                 self._flush_event.clear()
 
-        # Final flush on shutdown
-        self._flush_logs()
+        # Final flush on shutdown - loop until all queues are empty
+        # This ensures no data is lost when shutting down with large queues
+        while not self._log_queue.empty():
+            self._flush_logs()
+
         for metric_name in list(self._metric_queues.keys()):
-            self._flush_metric(metric_name)
+            while not self._metric_queues[metric_name].empty():
+                self._flush_metric(metric_name)
+
         for topic in list(self._track_buffers.keys()):
             self._flush_track(topic)
-        self._flush_files()
+
+        while not self._file_queue.empty():
+            self._flush_files()
 
     def _flush_logs(self) -> None:
         """Batch flush logs using client.create_log_entries()."""
