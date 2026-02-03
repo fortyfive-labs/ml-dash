@@ -1,4 +1,5 @@
 import getpass
+from math import exp
 import random
 import time
 
@@ -12,11 +13,11 @@ def train_simple_model():
   owner = getpass.getuser()
 
   with Experiment(
-    prefix=f"tom_tao_e4c2c9/massive/massive-test-0",
+    prefix=f"tom/summary-project-3/f/s-test-0",
     readme="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
     tags=["sweep", "best"],
-    # dash_url='http://localhost:3000',  # Use for local server testing
-    dash_url="https://api.dash.ml",  # Use for remote mode
+    dash_url='http://localhost:3000',  # Use for local server testing
+    # dash_url="https://api.dash.ml",  # Use for remote mode
     # dash_root=".dash",  # Local storage directory
   ).run as experiment:
     # Metric hyperparameters
@@ -35,7 +36,7 @@ def train_simple_model():
     experiment.log("Starting training", level="info")
 
     # Training loop
-    for epoch in range(23456789):
+    for epoch in range(100000):
       epoch_start = time.time()
 
       # Learning rate decay
@@ -75,48 +76,17 @@ def train_simple_model():
 
       # Log all metrics (18 metrics total, grouped by category)
       # Training metrics
-      experiment.metrics("train").log(
-        loss=train_loss, accuracy=train_accuracy, epoch=epoch
-      )
+    #   experiment.metrics("train").log(
+    #     loss=train_loss, accuracy=train_accuracy, epoch=epoch
+    #   )
 
-      # Validation metrics
       experiment.metrics("validation").log(
-        hyperparameter_schema_loss=val_loss, 
-        hyperparameter_schema_accuracy=val_accuracy, 
-        hyperparameter_schema_perplexity=perplexity, epoch=epoch
+        epoch=epoch, loss=val_loss, accuracy=val_accuracy, perplexity=perplexity
       )
+    #   experiment.metrics.buffer.log_summary()
+    #   experiment.metrics.flush()  
 
-      # Classification metrics
-      experiment.metrics("classification").log(
-        hyperparameter_schema_precision=precision,
-        hyperparameter_schema_recall=recall,
-        hyperparameter_schema_f1_score=f1_score,
-        hyperparameter_schema_true_positives=true_positives,
-        hyperparameter_schema_false_positives=false_positives,
-        epoch=epoch,
-      )
-
-      # Per-class accuracy
-      experiment.metrics("per_class").log(
-        hyperparameter_schema_class_0_accuracy=class_0_acc,
-        hyperparameter_schema_hyperparameter_schema_class_1_accuracy=class_1_acc,
-        hyperparameter_schema_hyperparameter_schema_class_2_accuracy=class_2_acc,
-        epoch=epoch,
-      )
-
-      # Optimization metrics
-      experiment.metrics("optimization").log(
-        hyperparameter_schema_learning_rate=current_lr, 
-        hyperparameter_schema_gradient_norm=gradient_norm, epoch=epoch
-      )
-
-      # Resource metrics
-      experiment.metrics("resources").log(
-        hyperparameter_schema_gpu_memory_mb=gpu_memory_mb,
-        hyperparameter_schema_batch_time_ms=batch_time_ms,
-        hyperparameter_schema_epoch_time_sec=epoch_time,
-        epoch=epoch,
-      )
+     
 
       # Log progress every 10 epochs
       if (epoch + 1) % 10 == 0:

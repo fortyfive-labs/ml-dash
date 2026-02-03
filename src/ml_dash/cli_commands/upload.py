@@ -306,7 +306,8 @@ def discover_experiments(
       with open(exp_json, "r") as f:
         metadata = json.load(f)
         prefix = metadata.get("prefix")
-    except:
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+      # Metadata file missing or invalid - will use path-based prefix
       pass
 
     # Extract project and experiment names from PREFIX (not path)

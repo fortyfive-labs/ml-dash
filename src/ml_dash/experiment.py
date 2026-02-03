@@ -399,8 +399,11 @@ class Experiment:
           print(f"View results at: {experiment_url}")
 
       except Exception as e:
-        # Log error but don't fail the close operation
-        print(f"Warning: Failed to update experiment status: {e}")
+        # Raise on status update failure
+        raise RuntimeError(
+          f"Failed to update experiment status to COMPLETED: {e}\n"
+          f"Experiment may not be marked as completed on the server."
+        ) from e
 
     self._is_open = False
 
@@ -554,15 +557,10 @@ class Experiment:
             logs=[log_entry],  # Single log in array
           )
         except Exception as e:
-          # Log warning but don't crash training
-          import warnings
-
-          warnings.warn(
-            f"Failed to write log to remote server: {e}. Training will continue.",
-            RuntimeWarning,
-            stacklevel=4,
-          )
-          # Fall through to local storage if available
+          raise RuntimeError(
+            f"Failed to write log to remote server: {e}\n"
+            f"Data loss occurred. Check your network connection and server status."
+          ) from e
 
       if self.run._storage:
         # Local mode: write to file immediately
@@ -577,11 +575,10 @@ class Experiment:
             timestamp=log_entry["timestamp"],
           )
         except Exception as e:
-          import warnings
-
-          warnings.warn(
-            f"Failed to write log to local storage: {e}", RuntimeWarning, stacklevel=4
-          )
+          raise RuntimeError(
+            f"Failed to write log to local storage: {e}\n"
+            f"Check disk space and file permissions."
+          ) from e
 
   def _print_log(
     self, message: str, level: str, metadata: Optional[Dict[str, Any]]
@@ -1072,17 +1069,11 @@ class Experiment:
             metadata=metadata,
           )
         except Exception as e:
-          # Log warning but don't crash training
-          import warnings
-
           metric_display = f"'{name}'" if name else "unnamed metric"
-          warnings.warn(
-            f"Failed to log {metric_display} to remote server: {e}. "
-            f"Training will continue.",
-            RuntimeWarning,
-            stacklevel=3,
-          )
-          # Fall through to local storage if available
+          raise RuntimeError(
+            f"Failed to log {metric_display} to remote server: {e}\n"
+            f"Data loss occurred. Check your network connection and server status."
+          ) from e
 
       if self.run._storage:
         # Local mode: append to local storage
@@ -1098,14 +1089,11 @@ class Experiment:
             metadata=metadata,
           )
         except Exception as e:
-          import warnings
-
           metric_display = f"'{name}'" if name else "unnamed metric"
-          warnings.warn(
-            f"Failed to log {metric_display} to local storage: {e}",
-            RuntimeWarning,
-            stacklevel=3,
-          )
+          raise RuntimeError(
+            f"Failed to log {metric_display} to local storage: {e}\n"
+            f"Check disk space and file permissions."
+          ) from e
 
       return result
 
@@ -1141,15 +1129,10 @@ class Experiment:
             entries=[{"timestamp": timestamp, **data}],
           )
         except Exception as e:
-          # Log warning but don't crash training
-          import warnings
-
-          warnings.warn(
-            f"Failed to log track '{topic}' to remote server: {e}. "
-            f"Training will continue.",
-            RuntimeWarning,
-            stacklevel=3,
-          )
+          raise RuntimeError(
+            f"Failed to log track '{topic}' to remote server: {e}\n"
+            f"Data loss occurred. Check your network connection and server status."
+          ) from e
 
       if self.run._storage:
         # Local mode: append to local storage
@@ -1162,13 +1145,10 @@ class Experiment:
             entries=[{"timestamp": timestamp, **data}],
           )
         except Exception as e:
-          import warnings
-
-          warnings.warn(
-            f"Failed to log track '{topic}' to local storage: {e}",
-            RuntimeWarning,
-            stacklevel=3,
-          )
+          raise RuntimeError(
+            f"Failed to log track '{topic}' to local storage: {e}\n"
+            f"Check disk space and file permissions."
+          ) from e
 
   def _append_batch_to_metric(
     self,
@@ -1205,17 +1185,11 @@ class Experiment:
           metadata=metadata,
         )
       except Exception as e:
-        # Log warning but don't crash training
-        import warnings
-
         metric_display = f"'{name}'" if name else "unnamed metric"
-        warnings.warn(
-          f"Failed to log batch to {metric_display} on remote server: {e}. "
-          f"Training will continue.",
-          RuntimeWarning,
-          stacklevel=3,
-        )
-        # Fall through to local storage if available
+        raise RuntimeError(
+          f"Failed to log batch to {metric_display} on remote server: {e}\n"
+          f"Data loss occurred. Check your network connection and server status."
+        ) from e
 
     if self.run._storage:
       # Local mode: append batch to local storage
@@ -1231,14 +1205,11 @@ class Experiment:
           metadata=metadata,
         )
       except Exception as e:
-        import warnings
-
         metric_display = f"'{name}'" if name else "unnamed metric"
-        warnings.warn(
-          f"Failed to log batch to {metric_display} in local storage: {e}",
-          RuntimeWarning,
-          stacklevel=3,
-        )
+        raise RuntimeError(
+          f"Failed to log batch to {metric_display} in local storage: {e}\n"
+          f"Check disk space and file permissions."
+        ) from e
 
     return result
 

@@ -69,9 +69,11 @@ class BufferManager:
                 value = float('nan')
             try:
                 self._buffers[prefix][key].append(float(value))
-            except (TypeError, ValueError):
-                # Skip non-numeric values silently
-                continue
+            except (TypeError, ValueError) as e:
+                raise ValueError(
+                    f"Cannot buffer non-numeric value for '{key}': {value!r} (type: {type(value).__name__})\n"
+                    f"Metrics must be numeric (int, float). Use exp.log() for non-numeric values."
+                ) from e
 
     def _compute_stats(self, values: List[float], aggs: tuple) -> Dict[str, float]:
         """
@@ -248,9 +250,11 @@ class SummaryCache:
                 value = float('nan')
             try:
                 self._buffer[key].append(float(value))
-            except (TypeError, ValueError):
-                # Skip non-numeric values silently
-                continue
+            except (TypeError, ValueError) as e:
+                raise ValueError(
+                    f"Cannot store non-numeric value for '{key}': {value!r} (type: {type(value).__name__})\n"
+                    f"SummaryCache only accepts numeric values. Use exp.log() for non-numeric data."
+                ) from e
 
     def set(self, **kwargs) -> None:
         """

@@ -458,12 +458,10 @@ class BackgroundBufferManager:
                     logs=batch,
                 )
             except Exception as e:
-                warnings.warn(
-                    f"Failed to flush {len(batch)} logs to remote server: {e}. "
-                    f"Training will continue.",
-                    RuntimeWarning,
-                    stacklevel=3,
-                )
+                raise RuntimeError(
+                    f"Failed to flush {len(batch)} logs to remote server: {e}\n"
+                    f"Data loss occurred. Check your network connection and server status."
+                ) from e
 
         if self._experiment.run._storage:
             # Local storage writes one at a time (no batch API)
@@ -479,11 +477,10 @@ class BackgroundBufferManager:
                         timestamp=log_entry["timestamp"],
                     )
                 except Exception as e:
-                    warnings.warn(
-                        f"Failed to write log to local storage: {e}",
-                        RuntimeWarning,
-                        stacklevel=3,
-                    )
+                    raise RuntimeError(
+                        f"Failed to write log to local storage: {e}\n"
+                        f"Check disk space and file permissions."
+                    ) from e
 
         self._last_log_flush = time.time()
 
@@ -535,12 +532,10 @@ class BackgroundBufferManager:
                 )
             except Exception as e:
                 metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
-                warnings.warn(
-                    f"Failed to flush {len(batch)} points to {metric_display} on remote server: {e}. "
-                    f"Training will continue.",
-                    RuntimeWarning,
-                    stacklevel=3,
-                )
+                raise RuntimeError(
+                    f"Failed to flush {len(batch)} points to {metric_display} on remote server: {e}\n"
+                    f"Data loss occurred. Check your network connection and server status."
+                ) from e
 
         if self._experiment.run._storage:
             try:
@@ -556,11 +551,10 @@ class BackgroundBufferManager:
                 )
             except Exception as e:
                 metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
-                warnings.warn(
-                    f"Failed to flush {len(batch)} points to {metric_display} in local storage: {e}",
-                    RuntimeWarning,
-                    stacklevel=3,
-                )
+                raise RuntimeError(
+                    f"Failed to flush {len(batch)} points to {metric_display} in local storage: {e}\n"
+                    f"Check disk space and file permissions."
+                ) from e
 
         self._last_metric_flush[metric_name] = time.time()
 
@@ -597,12 +591,10 @@ class BackgroundBufferManager:
                     entries=batch,
                 )
             except Exception as e:
-                warnings.warn(
-                    f"Failed to flush {len(batch)} entries to track '{topic}' on remote server: {e}. "
-                    f"Training will continue.",
-                    RuntimeWarning,
-                    stacklevel=3,
-                )
+                raise RuntimeError(
+                    f"Failed to flush {len(batch)} entries to track '{topic}' on remote server: {e}\n"
+                    f"Data loss occurred. Check your network connection and server status."
+                ) from e
 
         # Write to local storage
         if self._experiment.run._storage:
@@ -615,11 +607,10 @@ class BackgroundBufferManager:
                     entries=batch,
                 )
             except Exception as e:
-                warnings.warn(
-                    f"Failed to flush {len(batch)} entries to track '{topic}' in local storage: {e}",
-                    RuntimeWarning,
-                    stacklevel=3,
-                )
+                raise RuntimeError(
+                    f"Failed to flush {len(batch)} entries to track '{topic}' in local storage: {e}\n"
+                    f"Check disk space and file permissions."
+                ) from e
 
         self._last_track_flush[topic] = time.time()
 
@@ -663,12 +654,10 @@ class BackgroundBufferManager:
                     if total_files > 1:
                         print(f"[ML-Dash]   [{completed}/{total_files}] Uploaded {file_entry['filename']}", flush=True)
                 except Exception as e:
-                    completed += 1
-                    warnings.warn(
-                        f"Failed to upload file {file_entry['filename']}: {e}",
-                        RuntimeWarning,
-                        stacklevel=3,
-                    )
+                    raise RuntimeError(
+                        f"Failed to upload file {file_entry['filename']}: {e}\n"
+                        f"File upload failed. Check network connection and file permissions."
+                    ) from e
 
     def _upload_single_file(self, file_entry: Dict[str, Any]) -> None:
         """

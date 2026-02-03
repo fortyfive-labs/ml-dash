@@ -43,11 +43,11 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.13"
+__version__ = "0.6.14"
 
 # Required version - MUST match exactly (blocks all older versions)
 # Update this with EVERY release to force users to upgrade
-REQUIRED_VERSION = "0.6.13"
+REQUIRED_VERSION = "0.6.14"
 
 
 def _check_version_compatibility():

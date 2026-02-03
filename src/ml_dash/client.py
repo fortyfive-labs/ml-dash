@@ -226,8 +226,13 @@ class RemoteClient:
             result = self.graphql_query(query)
             username = result.get("me", {}).get("username")
             return username
-        except Exception:
-            return None
+        except Exception as e:
+            # Re-raise authentication errors
+            from .auth.exceptions import AuthenticationError
+            if isinstance(e, AuthenticationError):
+                raise
+            # For other errors, raise a clear exception
+            raise RuntimeError(f"Failed to fetch namespace from server: {e}") from e
 
     def get_current_user(self) -> Optional[Dict[str, Any]]:
         """
@@ -264,8 +269,13 @@ class RemoteClient:
             """
             result = self.graphql_query(query)
             return result.get("me")
-        except Exception:
-            return None
+        except Exception as e:
+            # Re-raise authentication errors
+            from .auth.exceptions import AuthenticationError
+            if isinstance(e, AuthenticationError):
+                raise
+            # For other errors, raise a clear exception
+            raise RuntimeError(f"Failed to fetch current user from server: {e}") from e
 
     def _ensure_authenticated(self):
         """Check if authenticated, raise error if not."""

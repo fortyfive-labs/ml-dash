@@ -850,7 +850,7 @@ wheels = [
 
 [[package]]
 name = "ml-dash"
-version = "0.6.12"
+version = "0.6.13"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

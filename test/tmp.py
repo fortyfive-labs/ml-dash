@@ -12,11 +12,11 @@ def train_simple_model():
   owner = getpass.getuser()
 
   with Experiment(
-    prefix=f"tom_tao_e4c2c9/massive/massive-test-0",
+    prefix=f"tom/prefix-test-project3/f/p-test-0",
     readme="Comprehensive hyperparameter search across learning rate, batch size, and architecture",
     tags=["sweep", "best"],
-    # dash_url='http://localhost:3000',  # Use for local server testing
-    dash_url="https://api.dash.ml",  # Use for remote mode
+    dash_url='http://localhost:3000',  # Use for local server testing
+    # dash_url="https://api.dash.ml",  # Use for remote mode
     # dash_root=".dash",  # Local storage directory
   ).run as experiment:
     # Metric hyperparameters
@@ -35,7 +35,7 @@ def train_simple_model():
     experiment.log("Starting training", level="info")
 
     # Training loop
-    for epoch in range(23456789):
+    for epoch in range(5):
       epoch_start = time.time()
 
       # Learning rate decay
