@@ -661,6 +661,7 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   # Experiments can have folder structures like "folder/experiment"
   # So we need to try combining multiple parts as the experiment name
   experiment_name = None
+  experiment_data = None
   topic = None
 
   # Initialize client early to test experiment existence
@@ -686,11 +687,25 @@ def cmd_download_track(args: argparse.Namespace) -> int:
     tried_names.append(potential_exp_name)
 
     # Try to fetch this experiment from server
+    # First try by path (supports folder hierarchies)
+    try:
+      exp_data = remote_client.get_experiment_by_path_graphql(project, potential_exp_name, namespace)
+      if exp_data:
+        # Found the experiment!
+        experiment_name = potential_exp_name
+        experiment_data = exp_data
+        topic = potential_topic
+        break
+    except Exception:
+      pass
+
+    # Fallback: try by name only (for experiments without folders)
     try:
       exp_data = remote_client.get_experiment_graphql(project, potential_exp_name, namespace)
       if exp_data:
         # Found the experiment!
         experiment_name = potential_exp_name
+        experiment_data = exp_data
         topic = potential_topic
         break
     except Exception:
@@ -715,9 +730,8 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   console.print(f"  Format: {args.format}")
 
   try:
-    # Get experiment ID (we already validated it exists during path parsing)
-    exp_data = remote_client.get_experiment_graphql(project, experiment_name, namespace)
-    experiment_id = exp_data["id"]
+    # Use the experiment data we already fetched during path parsing
+    experiment_id = experiment_data["id"]
 
     # Download track data
     console.print(f"\n[cyan]Fetching track data from server...[/cyan]")

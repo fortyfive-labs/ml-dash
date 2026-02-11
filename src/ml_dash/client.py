@@ -1584,6 +1584,121 @@ class RemoteClient:
         result = self.graphql_query(query, variables)
         return result.get("experiment")
 
+    def get_experiment_by_path_graphql(
+        self, project_slug: str, experiment_path: str, namespace_slug: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get experiment by traversing the project hierarchy path.
+
+        Args:
+            project_slug: Project slug
+            experiment_path: Full path to experiment (e.g., "folder/subfolder/experiment")
+            namespace_slug: Namespace slug (optional - defaults to client's namespace)
+
+        Returns:
+            Experiment dict if found, None otherwise
+        """
+        namespace_slug = namespace_slug or self.namespace
+
+        # Query project hierarchy
+        query = """
+        query GetProjectHierarchy($namespaceSlug: String!, $projectSlug: String!) {
+          project(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
+            nodes(parentId: null, maxDepth: 20) {
+              ...NodeFields
+              children {
+                ...NodeFields
+                children {
+                  ...NodeFields
+                  children {
+                    ...NodeFields
+                    children {
+                      ...NodeFields
+                      children {
+                        ...NodeFields
+                        children {
+                          ...NodeFields
+                          children {
+                            ...NodeFields
+                            children {
+                              ...NodeFields
+                              children {
+                                ...NodeFields
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        fragment NodeFields on Node {
+          id
+          name
+          type
+          pPath
+          experimentId
+        }
+        """
+
+        result = self.graphql_query(query, {"namespaceSlug": namespace_slug, "projectSlug": project_slug})
+        nodes = result.get("project", {}).get("nodes", [])
+
+        # Traverse hierarchy to find experiment by path
+        def find_experiment_by_path(nodes, path_parts, depth=0):
+            if not path_parts:
+                return None
+
+            current_part = path_parts[0]
+            remaining_parts = path_parts[1:]
+
+            for node in nodes:
+                # Match current path part with node name
+                if node.get("name") == current_part:
+                    # If this is the last part and it's an experiment, return it
+                    if not remaining_parts and node.get("type") == "EXPERIMENT":
+                        # Get full experiment details
+                        experiment_id = node.get("experimentId")
+                        if experiment_id:
+                            # Query full experiment details
+                            exp_query = """
+                            query GetExperiment($id: ID!) {
+                              experimentById(id: $id) {
+                                id
+                                name
+                                description
+                                tags
+                                status
+                                metadata
+                                project {
+                                  slug
+                                  namespace {
+                                    slug
+                                  }
+                                }
+                              }
+                            }
+                            """
+                            exp_result = self.graphql_query(exp_query, {"id": experiment_id})
+                            return exp_result.get("experimentById")
+                        return None
+
+                    # If there are more parts, traverse children
+                    if remaining_parts and node.get("children"):
+                        found = find_experiment_by_path(node["children"], remaining_parts, depth + 1)
+                        if found:
+                            return found
+
+            return None
+
+        path_parts = experiment_path.strip("/").split("/")
+        return find_experiment_by_path(nodes, path_parts)
+
     def search_experiments_graphql(self, pattern: str) -> List[Dict[str, Any]]:
         """
         Search experiments using glob pattern via GraphQL.
