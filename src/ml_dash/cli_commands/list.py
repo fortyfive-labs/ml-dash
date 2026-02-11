@@ -255,6 +255,59 @@ def list_experiments(
                 if any(tag in exp.get('tags', []) for tag in tags_filter)
             ]
 
+        # Fetch project hierarchy to get experiment paths
+        experiment_paths = {}
+        try:
+            # Get project info from first experiment
+            if experiments:
+                namespace_slug = experiments[0].get('project', {}).get('namespace', {}).get('slug')
+                if namespace_slug:
+                    # Query hierarchy
+                    hierarchy_query = """
+                    query GetProjectHierarchy($namespaceSlug: String!, $projectSlug: String!) {
+                      project(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
+                        nodes(parentId: null, maxDepth: 10) {
+                          ...NodeFields
+                          children { ...NodeFields children { ...NodeFields children { ...NodeFields children { ...NodeFields } } } }
+                        }
+                      }
+                    }
+                    fragment NodeFields on Node { id name type pPath experimentId }
+                    """
+                    hierarchy_result = remote_client.graphql_query(
+                        hierarchy_query,
+                        {"namespaceSlug": namespace_slug, "projectSlug": project}
+                    )
+
+                    # Build map of experimentId -> path by traversing hierarchy
+                    def extract_experiment_paths(nodes, path_prefix=''):
+                        for node in nodes:
+                            node_name = node.get('name', '')
+                            node_type = node.get('type')
+
+                            # Build current path
+                            if path_prefix:
+                                current_path = f"{path_prefix}/{node_name}"
+                            else:
+                                current_path = node_name
+
+                            # If this is an experiment, save its path
+                            if node_type == 'EXPERIMENT' and node.get('experimentId'):
+                                exp_id = node.get('experimentId')
+                                experiment_paths[exp_id] = current_path
+
+                            # Recurse into children
+                            if node.get('children'):
+                                # Only pass path prefix for folders, not experiments
+                                next_prefix = current_path if node_type == 'FOLDER' else path_prefix
+                                extract_experiment_paths(node['children'], next_prefix)
+
+                    nodes = hierarchy_result.get('project', {}).get('nodes', [])
+                    extract_experiment_paths(nodes)
+        except Exception:
+            # If hierarchy fetch fails, just use experiment names
+            pass
+
         if output_json:
             # JSON output
             output = {
@@ -298,8 +351,12 @@ def list_experiments(
             # Count files
             files_count = len(exp.get('files', []))
 
+            # Get experiment path (with folder prefix if available)
+            exp_id = exp.get('id')
+            exp_display_name = experiment_paths.get(exp_id, exp['name'])
+
             row = [
-                exp['name'],
+                exp_display_name,
                 f"[{status_style}]{status}[/{status_style}]",
                 str(metrics_count),
                 str(logs_count),
