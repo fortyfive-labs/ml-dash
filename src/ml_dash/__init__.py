@@ -43,51 +43,65 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.14"
-
-# Required version - MUST match exactly (blocks all older versions)
-# Update this with EVERY release to force users to upgrade
-REQUIRED_VERSION = "0.6.14"
+__version__ = "0.6.17"
 
 
 def _check_version_compatibility():
     """
-    Enforce strict version requirement.
+    Enforce strict version requirement by checking against PyPI.
 
-    Raises ImportError if installed version doesn't match the required version.
+    Raises ImportError if installed version is older than the latest on PyPI.
     This ensures all users are on the latest version with newest features and bug fixes.
     """
     try:
         from packaging import version
+        import httpx
     except ImportError:
-        # If packaging is not available, skip check
-        # (unlikely since it's a common dependency)
+        # If packaging or httpx not available, skip check
         return
 
-    current = version.parse(__version__)
-    required = version.parse(REQUIRED_VERSION)
-
-    if current < required:
-        raise ImportError(
-            f"\n"
-            f"{'=' * 80}\n"
-            f"ERROR: ml-dash version {__version__} is outdated!\n"
-            f"{'=' * 80}\n"
-            f"\n"
-            f"Your installed version ({__version__}) is no longer supported.\n"
-            f"Required version: {REQUIRED_VERSION}\n"
-            f"\n"
-            f"Please upgrade to the latest version:\n"
-            f"\n"
-            f"  pip install --upgrade ml-dash\n"
-            f"\n"
-            f"Or with uv:\n"
-            f"\n"
-            f"  uv pip install --upgrade ml-dash\n"
-            f"  uv sync --upgrade-package ml-dash\n"
-            f"\n"
-            f"{'=' * 80}\n"
+    try:
+        # Check PyPI for latest version (with short timeout)
+        response = httpx.get(
+            "https://pypi.org/pypi/ml-dash/json",
+            timeout=2.0,
+            follow_redirects=True
         )
+
+        if response.status_code == 200:
+            latest_version = response.json()["info"]["version"]
+            current = version.parse(__version__)
+            latest = version.parse(latest_version)
+
+            if current < latest:
+                raise ImportError(
+                    f"\n"
+                    f"{'=' * 80}\n"
+                    f"ERROR: ml-dash version {__version__} is outdated!\n"
+                    f"{'=' * 80}\n"
+                    f"\n"
+                    f"Your installed version ({__version__}) is no longer supported.\n"
+                    f"Latest version on PyPI: {latest_version}\n"
+                    f"\n"
+                    f"Please upgrade to the latest version:\n"
+                    f"\n"
+                    f"  pip install --upgrade ml-dash\n"
+                    f"\n"
+                    f"Or with uv:\n"
+                    f"\n"
+                    f"  uv pip install --upgrade ml-dash\n"
+                    f"  uv sync --upgrade-package ml-dash\n"
+                    f"\n"
+                    f"{'=' * 80}\n"
+                )
+    except (httpx.TimeoutException, httpx.ConnectError, KeyError):
+        # Silently skip check if PyPI is unreachable or response is malformed
+        # Don't block users due to network issues
+        pass
+    except Exception:
+        # Catch any other errors and silently continue
+        # Better to let users work than block on unexpected errors
+        pass
 
 
 # Enforce version check on import

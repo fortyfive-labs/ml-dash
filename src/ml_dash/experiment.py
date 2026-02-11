@@ -381,6 +381,7 @@ class Experiment:
 
         try:
           from rich.console import Console
+          from ml_dash import __version__
 
           console = Console()
           experiment_url = f"https://dash.ml/{self.run.prefix}"
@@ -388,15 +389,19 @@ class Experiment:
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
             f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
             f"[dim]View results, statistics, and plots online at:[/dim] "
-            f"[link={experiment_url}]{experiment_url}[/link]"
+            f"[link={experiment_url}]{experiment_url}[/link]\n"
+            f"[dim]ml-dash version: {__version__}[/dim]"
           )
         except ImportError:
           # Fallback if rich is not available
+          from ml_dash import __version__
+
           experiment_url = f"https://dash.ml/{self.run.prefix}"
           print(
             f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
           print(f"View results at: {experiment_url}")
+          print(f"ml-dash version: {__version__}")
 
       except Exception as e:
         # Raise on status update failure
