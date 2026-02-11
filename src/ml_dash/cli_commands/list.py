@@ -394,14 +394,16 @@ def cmd_list(args: argparse.Namespace) -> int:
     # Get API key (command line > config > auto-loaded from storage)
     api_key = args.api_key or config.api_key
 
-    # Extract namespace from project argument
+    # Extract namespace and project slug from project argument
     namespace = None
+    project_slug = None
     if args.project:
         # Parse namespace from project filter (format: "namespace/project")
         project_parts = args.project.strip("/").split("/")
         # For simple patterns without '/', treat as project-only pattern
         if '/' in args.project and len(project_parts) >= 2:
             namespace = project_parts[0]
+            project_slug = project_parts[1]
 
     if not namespace:
         console.print(
@@ -547,7 +549,7 @@ def cmd_list(args: argparse.Namespace) -> int:
             # No wildcards, use existing list method for exact project match
             return list_experiments(
                 remote_client=remote_client,
-                project=args.project,
+                project=project_slug,
                 status_filter=args.status,
                 tags_filter=tags_filter,
                 output_json=args.json,
