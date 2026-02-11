@@ -331,6 +331,7 @@ def list_experiments(
         table.add_column("Status", justify="center")
         table.add_column("Metrics", justify="right")
         table.add_column("Logs", justify="right")
+        table.add_column("Tracks", justify="right")
         table.add_column("Files", justify="right")
 
         if detailed:
@@ -348,11 +349,20 @@ def list_experiments(
             log_metadata = exp.get('logMetadata') or {}
             logs_count = log_metadata.get('totalLogs', 0)
 
+            # Count tracks
+            exp_id = exp.get('id')
+            tracks_count = 0
+            try:
+                tracks = remote_client.list_tracks(exp_id)
+                tracks_count = len(tracks)
+            except Exception:
+                # If track listing fails, just show 0
+                tracks_count = 0
+
             # Count files
             files_count = len(exp.get('files', []))
 
             # Get experiment path (with folder prefix if available)
-            exp_id = exp.get('id')
             exp_display_name = experiment_paths.get(exp_id, exp['name'])
 
             row = [
@@ -360,6 +370,7 @@ def list_experiments(
                 f"[{status_style}]{status}[/{status_style}]",
                 str(metrics_count),
                 str(logs_count),
+                str(tracks_count),
                 str(files_count),
             ]
 
@@ -548,6 +559,7 @@ def cmd_list(args: argparse.Namespace) -> int:
                     table.add_column("Status", justify="center")
                     table.add_column("Metrics", justify="right")
                     table.add_column("Logs", justify="right")
+                    table.add_column("Tracks", justify="right")
                     table.add_column("Files", justify="right")
 
                     if args.detailed:
@@ -565,6 +577,15 @@ def cmd_list(args: argparse.Namespace) -> int:
                         log_metadata = exp.get('logMetadata') or {}
                         logs_count = log_metadata.get('totalLogs', 0)
 
+                        # Count tracks
+                        exp_id = exp.get('id')
+                        tracks_count = 0
+                        try:
+                            tracks = remote_client.list_tracks(exp_id)
+                            tracks_count = len(tracks)
+                        except Exception:
+                            tracks_count = 0
+
                         # Count files
                         files_count = len(exp.get('files', []))
 
@@ -573,6 +594,7 @@ def cmd_list(args: argparse.Namespace) -> int:
                             f"[{status_style}]{status}[/{status_style}]",
                             str(metrics_count),
                             str(logs_count),
+                            str(tracks_count),
                             str(files_count),
                         ]
 
