@@ -657,8 +657,9 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   namespace = parts[0]
   project = parts[1]
 
-  # Try to find the experiment by iterating backwards
-  # We assume experiment is a single name (not a path), and topic comes after it
+  # Try to find the experiment by trying different split points
+  # Experiments can have folder structures like "folder/experiment"
+  # So we need to try combining multiple parts as the experiment name
   experiment_name = None
   topic = None
 
@@ -669,11 +670,20 @@ def cmd_download_track(args: argparse.Namespace) -> int:
     console.print(f"[red]Error:[/red] Failed to connect to server: {e}")
     return 1
 
-  # Try different split points: experiment could be at index 2, 3, 4, etc.
-  # Topic is everything after the experiment
-  for exp_idx in range(2, len(parts) - 1):  # Experiment must leave at least 1 part for topic
-    potential_exp_name = parts[exp_idx]
-    potential_topic = "/".join(parts[exp_idx + 1:])
+  # Try different split points: experiment path could be parts[2], parts[2:3], parts[2:4], etc.
+  # Topic is everything after the experiment (must have at least 1 part for topic)
+  tried_names = []
+  for split_idx in range(3, len(parts) + 1):  # Split at 3, 4, 5, ... (experiment ends at split_idx-1)
+    # Experiment is everything from index 2 to split_idx-1
+    potential_exp_name = "/".join(parts[2:split_idx])
+    # Topic is everything from split_idx onwards
+    potential_topic = "/".join(parts[split_idx:]) if split_idx < len(parts) else ""
+
+    # Skip if no topic (topic is required for --tracks)
+    if not potential_topic:
+      continue
+
+    tried_names.append(potential_exp_name)
 
     # Try to fetch this experiment from server
     try:
@@ -684,7 +694,7 @@ def cmd_download_track(args: argparse.Namespace) -> int:
         topic = potential_topic
         break
     except Exception:
-      # This experiment doesn't exist, try next index
+      # This experiment doesn't exist, try next split point
       continue
 
   if not experiment_name or not topic:
@@ -692,8 +702,8 @@ def cmd_download_track(args: argparse.Namespace) -> int:
       f"[red]Error:[/red] Could not find valid experiment in path: {track_path}"
     )
     console.print("\nTried the following experiment names:")
-    for exp_idx in range(2, len(parts) - 1):
-      console.print(f"  - {parts[exp_idx]}")
+    for name in tried_names:
+      console.print(f"  - {name}")
     console.print(f"\nMake sure the experiment exists in project '{project}'")
     return 1
 
