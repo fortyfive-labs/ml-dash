@@ -1,22 +1,3 @@
-.dash
-
-# MacOS files
-.DS_Store
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# Log and experiment artifacts
-logs/
-*.log
-ml-runs
-.ml-dash
-.ml-logger
-
 # Python
 __pycache__/
 *.py[cod]
@@ -38,87 +19,38 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-.env
-.venv
-env/
+
+# Virtual environments
+.venv/
 venv/
 ENV/
-env.bak/
-venv.bak/
+env/
+
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.ruff_cache/
+.hypothesis/
 
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-.pnpm-store/
-.npm
-.yarn-integrity
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-
-# Build outputs
-dist/
-dist-ssr/
-*.local
-
-# Environment
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Testing
-coverage/
-.nyc_output
-
-# Temporary files
-*.tmp
-.temp/
-tmp/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # OS
+.DS_Store
 Thumbs.db
 
-# Claude (ignore local settings)
-.claude/
-
-.ml-logger-test
-.ml-loggertest/test_save_pkl.py
+# Project specific
+.dash/
 .download/
-
-# Test files and temporary scripts
-TODO.MD
-*.pth
-*.ckpt
-test/.dashrc
-
-# MuJoCo and robotics artifacts
-MUJOCO_LOG.TXT
+.archive/
 *.mcap
-robot.mcap
-
-# Demo and scratch files
-demo.py
 scratch/
+MUJOCO_LOG.TXT
+
+# Build artifacts
+dist/
