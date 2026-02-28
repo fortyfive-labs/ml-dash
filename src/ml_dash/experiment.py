@@ -219,6 +219,10 @@ class Experiment:
     self._buffer_config = BufferConfig.from_env()
     self._buffer_manager: Optional[BackgroundBufferManager] = None
 
+    # Track timestamp inheritance for _ts=-1 support
+    self._last_timestamp: Optional[float] = None  # Global last timestamp (for _ts=-1)
+    self._track_last_auto_timestamp: float = 0.0  # Ensure unique auto-generated timestamps
+
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL

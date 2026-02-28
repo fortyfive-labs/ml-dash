@@ -28,7 +28,23 @@ with Experiment("robotics/training").run as experiment:
 
 ## Timestamp-Based Tracking
 
-Tracks automatically handle timestamps:
+Tracks support three timestamp modes:
+
+### 1. Auto-Generated Timestamps (Recommended)
+
+When `_ts` is not provided, timestamps are automatically generated:
+
+```python
+with Experiment("my-project/exp").run as experiment:
+    for i in range(100):
+        # Auto-generate unique timestamps
+        experiment.tracks("sensors/temperature").append(value=temperature)
+        experiment.tracks("sensors/pressure").append(value=pressure)
+```
+
+### 2. Explicit Timestamps
+
+Provide explicit timestamps when you need precise control:
 
 ```python
 import time
@@ -38,17 +54,36 @@ with Experiment("my-project/exp").run as experiment:
         timestamp = time.time()
 
         # Track with explicit timestamp
-        experiment.track("sensors/temperature").append(
-            timestamp=timestamp,
-            data={"value": temperature}
-        )
+        experiment.tracks("sensors/temperature").append(value=temperature, _ts=timestamp)
 
         # Track with same timestamp (entries are merged)
-        experiment.track("sensors/pressure").append(
-            timestamp=timestamp,
-            data={"value": pressure}
-        )
+        experiment.tracks("sensors/pressure").append(value=pressure, _ts=timestamp)
 ```
+
+### 3. Timestamp Inheritance with `_ts=-1`
+
+Use `_ts=-1` to inherit the last timestamp across ALL tracks. This is perfect for synchronizing multi-modal data:
+
+```python
+with Experiment("robotics/multi-modal").run as experiment:
+    for step in range(1000):
+        # First append - auto-generates timestamp
+        experiment.tracks("robot/pose").append(position=[1.0, 2.0, 3.0])
+
+        # Following appends - inherit the same timestamp
+        experiment.tracks("camera/left").append(width=640, height=480, _ts=-1)
+        experiment.tracks("camera/right").append(width=640, height=480, _ts=-1)
+        experiment.tracks("robot/velocity").append(linear=[0.1, 0.0, 0.0], _ts=-1)
+        experiment.tracks("sensors/lidar").append(ranges=[1.5, 2.0, 2.5], _ts=-1)
+
+        # All 5 tracks now share the exact same timestamp!
+```
+
+**Benefits of `_ts=-1`:**
+- Cleaner code - no need to manually pass timestamps around
+- Less error-prone - can't accidentally use wrong timestamp
+- Perfect for robotics/ML multi-modal data (poses, images, sensors at same instant)
+- Works across ALL tracks globally (not per-track)
 
 ## Multiple Tracks
 
@@ -251,22 +286,25 @@ export ML_DASH_FLUSH_INTERVAL=5.0    # Flush every 5 seconds
 Entries with the same timestamp are automatically merged:
 
 ```python
-timestamp = 12345.67
-
-# First append
-experiment.track("multi-sensor").append(
-    timestamp=timestamp,
-    data={"temperature": 25.0}
-)
-
-# Second append with same timestamp - merged!
-experiment.track("multi-sensor").append(
-    timestamp=timestamp,
-    data={"pressure": 1013.0}
-)
+# Using explicit timestamps
+experiment.tracks("multi-sensor").append(temperature=25.0, _ts=12345.67)
+experiment.tracks("multi-sensor").append(pressure=1013.0, _ts=12345.67)
 
 # Result: Single entry with both fields
 # {"timestamp": 12345.67, "temperature": 25.0, "pressure": 1013.0}
+```
+
+You can also use `_ts=-1` for merging:
+
+```python
+# First append sets the timestamp
+experiment.tracks("multi-sensor").append(temperature=25.0, _ts=12345.67)
+
+# Following appends inherit and merge
+experiment.tracks("multi-sensor").append(pressure=1013.0, _ts=-1)
+experiment.tracks("multi-sensor").append(humidity=60.0, _ts=-1)
+
+# Result: Single entry with all three fields at timestamp 12345.67
 ```
 
 ## Best Practices
@@ -345,6 +383,139 @@ for step in range(1000):
     })
 ```
 
+## Track Slicing and Iteration
+
+The `slice()` method returns an iterable view of track data with timestamp-based indexing using floor matching.
+
+### Basic Iteration
+
+```python
+with Experiment("robotics/analysis").run as experiment:
+    # ... append data to tracks ...
+    experiment.tracks.flush()
+
+    # Create slice
+    track_slice = experiment.tracks("robot/pose").slice()
+
+    # Iterate through all entries
+    for entry in track_slice:
+        timestamp = entry["timestamp"]
+        position = entry["position"]
+        print(f"t={timestamp}: pos={position}")
+```
+
+### Timestamp Range Filtering
+
+```python
+# Slice specific time range
+track_slice = experiment.tracks("robot/pose").slice(
+    start_timestamp=10.0,
+    end_timestamp=20.0
+)
+
+# Iterate through entries in range [10.0, 20.0]
+for entry in track_slice:
+    process(entry)
+```
+
+### Floor-Match Timestamp Queries
+
+The slice object supports `findByTime()` with **floor matching**: returns the entry with the largest timestamp ≤ queried timestamp.
+
+```python
+# Create slice
+track_slice = experiment.tracks("robot/pose").slice()
+
+# If timestamps are [1.0, 3.0, 5.0, 7.0, 9.0]:
+
+# Single timestamp queries
+entry = track_slice.findByTime(5.5)  # Returns entry at timestamp 5.0 (floor match)
+entry = track_slice.findByTime(5.0)  # Returns entry at timestamp 5.0 (exact match)
+entry = track_slice.findByTime(6.9)  # Returns entry at timestamp 5.0 (floor match)
+entry = track_slice.findByTime(7.0)  # Returns entry at timestamp 7.0 (exact match)
+
+# Batch queries with list of timestamps
+entries = track_slice.findByTime([1.0, 3.5, 7.0])  # Returns list of 3 entries
+# entries[0] -> timestamp 1.0
+# entries[1] -> timestamp 3.0 (floor match for 3.5)
+# entries[2] -> timestamp 7.0
+
+# Query before first timestamp raises KeyError
+# track_slice.findByTime(0.5)  # KeyError: No entry found with timestamp <= 0.5
+
+# Query after last timestamp returns last entry
+entry = track_slice.findByTime(100.0)  # Returns entry at timestamp 9.0
+```
+
+### Practical Example: Robot Trajectory Analysis
+
+```python
+with Experiment("robotics/analysis").run as experiment:
+    # ... data already logged ...
+
+    # Analyze trajectory in specific time window
+    trajectory = experiment.tracks("robot/pose").slice(0.0, 30.0)
+
+    # Iterate through trajectory
+    positions = []
+    for entry in trajectory:
+        positions.append(entry["position"])
+
+    # Get robot state at specific times (single queries)
+    state_at_5s = trajectory.findByTime(5.0)
+    state_at_10s = trajectory.findByTime(10.0)
+    state_at_15_5s = trajectory.findByTime(15.5)  # Floor match to closest ≤ 15.5
+
+    # Or batch query multiple times at once
+    states = trajectory.findByTime([5.0, 10.0, 15.5, 20.0, 25.0])
+    for state in states:
+        print(f"t={state['timestamp']}: pos={state['position']}")
+
+    # Calculate metrics
+    total_distance = calculate_distance(positions)
+    print(f"Total distance: {total_distance:.2f}m")
+    print(f"Number of waypoints: {len(trajectory)}")
+```
+
+### Synchronizing Multi-Modal Data
+
+Combine slicing with timestamp inheritance for synchronized queries:
+
+```python
+with Experiment("robotics/sync").run as experiment:
+    # Read multiple synchronized tracks
+    pose_slice = experiment.tracks("robot/pose").slice(0.0, 10.0)
+    camera_slice = experiment.tracks("camera/left").slice(0.0, 10.0)
+    lidar_slice = experiment.tracks("sensors/lidar").slice(0.0, 10.0)
+
+    # Query all tracks at same timestamp (floor match ensures sync)
+    for pose_entry in pose_slice:
+        t = pose_entry["timestamp"]
+        camera_entry = camera_slice.findByTime(t)
+        lidar_entry = lidar_slice.findByTime(t)
+
+        # All entries at same timestamp (or floor-matched)
+        process_multimodal(pose_entry, camera_entry, lidar_entry)
+```
+
+### Slice Features
+
+**Iterator Protocol:**
+- `for entry in slice: ...` - Iterate through entries
+- `iter(slice)` - Get iterator
+- Can iterate multiple times (data is cached)
+
+**Timestamp Queries:**
+- `slice.findByTime(timestamp)` - Get entry by timestamp (floor match)
+- Optimized for sequential queries using internal index
+- Raises `KeyError` if query timestamp is before first entry
+
+**Length:**
+- `len(slice)` - Get number of entries in slice
+
+**Representation:**
+- `repr(slice)` - Shows topic, start, and end timestamps
+
 ## API Reference
 
 ### `experiment.track(topic: str) -> TrackBuilder`
@@ -382,6 +553,40 @@ experiment.track("sensor/temp").append({
     "step": 100,
     "value": 25.0
 })
+```
+
+### `TrackBuilder.slice(start_timestamp: float = None, end_timestamp: float = None) -> TrackSlice`
+
+Create an iterable slice of track data with timestamp-based indexing.
+
+**Parameters:**
+- `start_timestamp` (float, optional): Start timestamp (inclusive)
+- `end_timestamp` (float, optional): End timestamp (inclusive)
+
+**Returns:**
+- `TrackSlice` object supporting iteration and timestamp indexing
+
+**Examples:**
+
+```python
+# Full track slice
+track_slice = experiment.tracks("robot/pose").slice()
+
+# Time range slice
+track_slice = experiment.tracks("robot/pose").slice(
+    start_timestamp=0.0,
+    end_timestamp=10.0
+)
+
+# Iterate
+for entry in track_slice:
+    print(entry["timestamp"], entry["position"])
+
+# Floor-match timestamp query
+entry = track_slice.findByTime(5.5)  # Returns entry with largest timestamp <= 5.5
+
+# Get length
+count = len(track_slice)
 ```
 
 ## Comparison with Metrics
