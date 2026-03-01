@@ -125,26 +125,41 @@ export ML_DASH_LOG_BATCH_SIZE=100
 
 ### 📊 Track API (Time-Series Data)
 
-Perfect for robotics, RL, and sequential experiments:
+Perfect for robotics, RL, and sequential experiments. Supports **timestamp inheritance** for synchronized multi-modal data and **track slicing** for efficient querying.
 
 ```python
 with Experiment("robotics/training").run as experiment:
     for step in range(1000):
-        # Track robot position over time
-        experiment.track("robot/position").append({
-            "step": step,
-            "x": position[0],
-            "y": position[1],
-            "z": position[2]
-        })
+        # First track auto-generates timestamp
+        experiment.tracks("robot/position").append(
+            step=step,
+            x=position[0],
+            y=position[1],
+            z=position[2]
+        )
 
-        # Track control signals
-        experiment.track("robot/control").append({
-            "step": step,
-            "motor1": ctrl[0],
-            "motor2": ctrl[1]
-        })
+        # Other tracks inherit same timestamp with _ts=-1 (synchronized!)
+        experiment.tracks("camera/left").append(width=640, height=480, _ts=-1)
+        experiment.tracks("robot/velocity").append(vx=0.1, vy=0.0, _ts=-1)
+        experiment.tracks("sensors/lidar").append(ranges=[1.5, 2.0], _ts=-1)
+
+    experiment.tracks.flush()
+
+    # Query synchronized data with floor-match timestamp queries
+    pose_slice = experiment.tracks("robot/position").slice(0.0, 10.0)
+
+    # Single timestamp query
+    entry = pose_slice.findByTime(5.5)  # Returns entry at timestamp 5.0
+
+    # Batch queries
+    entries = pose_slice.findByTime([1.0, 3.5, 7.0])  # Returns list of 3 entries
+
+    # Iterate through time range
+    for entry in pose_slice:
+        print(entry["timestamp"], entry["x"], entry["y"])
 ```
+
+See [docs/tracks.md](docs/tracks.md) for complete documentation.
 
 ### 🖼️ Numpy Image Support
 
