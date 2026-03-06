@@ -53,7 +53,7 @@ class DeviceFlowClient:
             httpx.HTTPError: If request fails
         """
         response = httpx.post(
-            f"{VUER_AUTH_URL}/api/device-flow/start",
+            f"{VUER_AUTH_URL}/api/device/start",
             json={
                 "client_id": CLIENT_ID,
                 "scope": scope,
@@ -105,7 +105,7 @@ class DeviceFlowClient:
 
             try:
                 response = httpx.post(
-                    f"{VUER_AUTH_URL}/api/device-flow/poll",
+                    f"{VUER_AUTH_URL}/api/device/poll",
                     json={
                         "client_id": CLIENT_ID,
                         "device_secret_hash": device_secret_hash,
