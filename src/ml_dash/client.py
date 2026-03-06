@@ -1400,6 +1400,8 @@ class RemoteClient:
         List all projects via GraphQL.
 
         Namespace is automatically inferred from JWT token on the server.
+        Paginates through all pages to return the complete list.
+        Experiment count is fetched inline (no N+1 queries).
 
         Returns:
             List of project dicts with experimentCount
@@ -1408,33 +1410,41 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Projects {
-          projects {
-            id
-            name
-            slug
-            description
-            tags
-          }
-        }
-        """
-        result = self.graphql_query(query, {})
-        projects = result.get("projects", [])
-
-        # For each project, count experiments
-        for project in projects:
-            exp_query = """
-            query ExperimentsCount($projectSlug: String!) {
-              experiments(projectSlug: $projectSlug) {
+        query ProjectsPaginated($limit: Int!, $offset: Int!) {
+          projectsPaginated(limit: $limit, offset: $offset) {
+            projects {
+              id
+              name
+              slug
+              description
+              tags
+              experiments {
                 id
               }
             }
-            """
-            exp_result = self.graphql_query(exp_query, {"projectSlug": project['slug']})
-            experiments = exp_result.get("experiments", [])
-            project['experimentCount'] = len(experiments)
+            hasMore
+          }
+        }
+        """
+        page_size = 100
+        offset = 0
+        all_projects: List[Dict[str, Any]] = []
 
-        return projects
+        while True:
+            result = self.graphql_query(query, {"limit": page_size, "offset": offset})
+            page = result.get("projectsPaginated", {})
+            projects = page.get("projects", [])
+
+            for project in projects:
+                project["experimentCount"] = len(project.pop("experiments", []))
+
+            all_projects.extend(projects)
+
+            if not page.get("hasMore", False):
+                break
+            offset += page_size
+
+        return all_projects
 
     def list_experiments_graphql(
         self, project_slug: str, status: Optional[str] = None
@@ -1443,6 +1453,7 @@ class RemoteClient:
         List experiments in a project via GraphQL.
 
         Namespace is automatically inferred from JWT token on the server.
+        Paginates through all pages to return the complete list.
 
         Args:
             project_slug: Project slug
@@ -1455,59 +1466,80 @@ class RemoteClient:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query Experiments($projectSlug: String!, $status: ExperimentStatus) {
-          experiments(projectSlug: $projectSlug, status: $status) {
-            id
-            name
-            description
-            tags
-            status
-            startedAt
-            endedAt
-            metadata
-            project {
-              slug
-              namespace {
-                slug
-              }
-            }
-            logMetadata {
-              totalLogs
-            }
-            metrics {
-              name
-              metricMetadata {
-                totalDataPoints
-              }
-            }
-            files {
+        query ExperimentsPaginated($projectSlug: String!, $status: ExperimentStatus, $limit: Int!, $offset: Int!) {
+          experimentsPaginated(projectSlug: $projectSlug, status: $status, limit: $limit, offset: $offset) {
+            experiments {
               id
               name
-              pPath
               description
               tags
+              status
+              startedAt
+              endedAt
               metadata
-              physicalFile {
-                filename
-                contentType
-                sizeBytes
-                checksum
-                s3Url
+              project {
+                slug
+                namespace {
+                  slug
+                }
+              }
+              logMetadata {
+                totalLogs
+              }
+              metrics {
+                name
+                metricMetadata {
+                  totalDataPoints
+                }
+              }
+              files {
+                id
+                name
+                pPath
+                description
+                tags
+                metadata
+                physicalFile {
+                  filename
+                  contentType
+                  sizeBytes
+                  checksum
+                  s3Url
+                }
+              }
+              parameters {
+                id
+                data
               }
             }
-            parameters {
-              id
-              data
-            }
+            hasMore
           }
         }
         """
-        variables = {"projectSlug": project_slug}
-        if status is not None:
-            variables["status"] = status
+        page_size = 100
+        offset = 0
+        all_experiments: List[Dict[str, Any]] = []
 
-        result = self.graphql_query(query, variables)
-        return result.get("experiments", [])
+        while True:
+            variables: Dict[str, Any] = {
+                "projectSlug": project_slug,
+                "limit": page_size,
+                "offset": offset,
+            }
+            if status is not None:
+                variables["status"] = status
+
+            result = self.graphql_query(query, variables)
+            page = result.get("experimentsPaginated", {})
+            experiments = page.get("experiments", [])
+
+            all_experiments.extend(experiments)
+
+            if not page.get("hasMore", False):
+                break
+            offset += page_size
+
+        return all_experiments
 
     def get_experiment_graphql(
         self, project_slug: str, experiment_name: str, namespace_slug: Optional[str] = None

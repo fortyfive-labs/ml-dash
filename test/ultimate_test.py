@@ -3,7 +3,7 @@ import numpy as np
 
 # Configure RUN BEFORE importing dxp
 from ml_dash import RUN
-RUN.prefix = "tom_tao_e4c2c9/robot9/examples/tracking-data-collection1"
+RUN.prefix = "tom_tao_e4c2c9/robot11/examples/tracking-data-collection1"
 
 # Now import dxp - it will use the RUN.prefix we just set
 from ml_dash.auto_start import dxp
@@ -76,8 +76,8 @@ def main():
         target_pos = np.array([0.3, 0.2, 0.5])  # 目标位置
         cumulative_reward = 0.0
 
-        steps = 400
-        record_interval = 4  # 采样间隔
+        steps = 50
+
 
         dxp.log(f"正在后台采集数据 (Headless 模式)...")
 
@@ -93,37 +93,37 @@ def main():
             mujoco.mj_step(model, data)
 
             # 5. 定期采集数据
-            if i % record_interval == 0:
+            # if i % record_interval == 0:
                 # 渲染当前帧
-                renderer.update_scene(data)
-                pixels = renderer.render()
-                dxp.files("robot/position").save_image(pixels, to=f"frame_{i}.jpg")
-                # 获取末端 site 的世界坐标 (Tracks)
-                ee_pos = data.site_xpos[model.site('end_effector').id].copy()
-                dxp.tracks("robot/position").append(e=ee_pos, _ts=i)
+            renderer.update_scene(data)
+            pixels = renderer.render()
+            dxp.files("robot/render").save_image(pixels, to=f"frame_{i:05d}.jpg")
+            # 获取末端 site 的世界坐标 (Tracks)
+            ee_pos = data.site_xpos[model.site('end_effector').id].copy()
+            dxp.tracks("robot/ee_pos").append(e=ee_pos, _ts=i)
 
-                # 计算训练指标
-                # Reward: 负的距离误差 (越接近目标奖励越高)
-                distance_to_target = np.linalg.norm(ee_pos - target_pos)
-                reward = -distance_to_target
-                cumulative_reward += reward
+            # 计算训练指标
+            # Reward: 负的距离误差 (越接近目标奖励越高)
+            distance_to_target = np.linalg.norm(ee_pos - target_pos)
+            reward = -distance_to_target
+            cumulative_reward += reward
 
-                # Loss: 模拟策略损失 (随训练进度减小)
-                policy_loss = 1.0 * np.exp(-i / 200.0) + 0.1 * np.random.random()
-                value_loss = 0.5 * np.exp(-i / 150.0) + 0.05 * np.random.random()
+            # Loss: 模拟策略损失 (随训练进度减小)
+            policy_loss = 1.0 * np.exp(-i / 200.0) + 0.1 * np.random.random()
+            value_loss = 0.5 * np.exp(-i / 150.0) + 0.05 * np.random.random()
 
-                # 记录训练指标
-                dxp.metrics("train").log(
-                    step=i,
-                    reward=reward,
-                    cumulative_reward=cumulative_reward,
-                    policy_loss=policy_loss,
-                    value_loss=value_loss,
-                    distance_to_target=distance_to_target,
-                )
+            # 记录训练指标
+            dxp.metrics("train").log(
+                step=i,
+                reward=reward,
+                cumulative_reward=cumulative_reward,
+                policy_loss=policy_loss,
+                value_loss=value_loss,
+                distance_to_target=distance_to_target,
+            )
 
-                # 实时打印轨迹数据
-                dxp.log(f"Frame {i:3d}: x={ee_pos[0]:7.4f}, y={ee_pos[1]:7.4f}, z={ee_pos[2]:7.4f}")
+            # 实时打印轨迹数据
+            dxp.log(f"Frame {i:3d}: x={ee_pos[0]:7.4f}, y={ee_pos[1]:7.4f}, z={ee_pos[2]:7.4f}")
 
         dxp.log("-" * 40)
         dxp.log(f"数据采集成功！")
