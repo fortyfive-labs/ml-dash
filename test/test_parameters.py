@@ -14,7 +14,7 @@ class TestBasicParameters:
     with local_experiment("tom/test/params-test").run as experiment:
       experiment.params.set(**sample_data["simple_params"])
 
-    params_file = tmp_proj / getpass.getuser() / "test/params-test/parameters.json"
+    params_file = tmp_proj / "tom" / "test/params-test/parameters.json"
     assert params_file.exists()
 
     with open(params_file) as f:
@@ -45,7 +45,7 @@ class TestBasicParameters:
         dict_param={"nested": "value"},
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/param-types/parameters.json"
+    params_file = tmp_proj / "tom" / "test/param-types/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -76,7 +76,7 @@ class TestNestedParameters:
     with local_experiment("tom/test/nested-params").run as experiment:
       experiment.params.set(**sample_data["nested_params"])
 
-    params_file = tmp_proj / getpass.getuser() / "test/nested-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/nested-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -115,7 +115,7 @@ class TestNestedParameters:
         }
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/deep-nested/parameters.json"
+    params_file = tmp_proj / "tom" / "test/deep-nested/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -135,7 +135,7 @@ class TestNestedParameters:
         },
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/mixed-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/mixed-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -160,7 +160,7 @@ class TestParameterUpdates:
       # Add new parameter
       experiment.params.set(epochs=100)
 
-    params_file = tmp_proj / getpass.getuser() / "test/param-update/parameters.json"
+    params_file = tmp_proj / "tom" / "test/param-update/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -185,7 +185,7 @@ class TestParameterUpdates:
       experiment.params.set(lr=0.01, ent_coef=0.01)
       experiment.params.set(lr=0.001, ent_coef=0.001)
 
-    params_file = tmp_proj / getpass.getuser() / "test/multi-update/parameters.json"
+    params_file = tmp_proj / "tom" / "test/multi-update/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -198,7 +198,7 @@ class TestParameterUpdates:
       experiment.params.set(**{"model": {"name": "vgg", "layers": 16}})
       experiment.params.set(**{"model": {"name": "resnet", "layers": 50}})
 
-    params_file = tmp_proj / getpass.getuser() / "test/overwrite-nested/parameters.json"
+    params_file = tmp_proj / "tom" / "test/overwrite-nested/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -214,7 +214,7 @@ class TestParameterEdgeCases:
     with local_experiment("tom/test/no-params").run as experiment:
       experiment.log("No parameters")
 
-    params_file = tmp_proj / getpass.getuser() / "test/no-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/no-params/parameters.json"
     if params_file.exists():
       with open(params_file) as f:
         params_data = json.load(f)
@@ -232,7 +232,7 @@ class TestParameterEdgeCases:
         }
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/special-keys/parameters.json"
+    params_file = tmp_proj / "tom" / "test/special-keys/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -246,7 +246,7 @@ class TestParameterEdgeCases:
     with local_experiment("tom/test/large-params").run as experiment:
       experiment.params.set(**large_params)
 
-    params_file = tmp_proj / getpass.getuser() / "test/large-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/large-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -261,7 +261,7 @@ class TestParameterEdgeCases:
     with local_experiment("tom/test/long-value").run as experiment:
       experiment.params.set(long_param=long_value)
 
-    params_file = tmp_proj / getpass.getuser() / "test/long-value/parameters.json"
+    params_file = tmp_proj / "tom" / "test/long-value/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -274,7 +274,7 @@ class TestParameterEdgeCases:
         japanese="こんにちは", chinese="你好", emoji="🚀 🎉 💯", arabic="مرحبا"
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/unicode-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/unicode-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -293,7 +293,7 @@ class TestParameterEdgeCases:
         scientific=1.23e-10,
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/numeric-edge/parameters.json"
+    params_file = tmp_proj / "tom" / "test/numeric-edge/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -343,7 +343,7 @@ class TestParameterCombinations:
         }
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/ml-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/ml-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 
@@ -370,7 +370,7 @@ class TestParameterCombinations:
         }
       )
 
-    params_file = tmp_proj / getpass.getuser() / "test/config-params/parameters.json"
+    params_file = tmp_proj / "tom" / "test/config-params/parameters.json"
     with open(params_file) as f:
       params = json.load(f)["data"]
 

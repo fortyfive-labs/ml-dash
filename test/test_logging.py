@@ -20,7 +20,7 @@ class TestBasicLogging:
     with local_experiment("tom/test/log-test").run as experiment:
       experiment.log("Test message")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/log-test/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/log-test/logs/logs.jsonl"
     assert logs_file.exists()
 
     with open(logs_file) as f:
@@ -45,7 +45,7 @@ class TestBasicLogging:
       experiment.log("Message 4")
       experiment.log("Message 5")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/multi-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/multi-log/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -73,7 +73,7 @@ class TestLogLevels:
       experiment.log("Error message", level="error")
       experiment.log("Fatal message", level="fatal")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/log-levels/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/log-levels/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -99,7 +99,7 @@ class TestLogLevels:
     with local_experiment("tom/test/default-level").run as experiment:
       experiment.log("Default level message")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/default-level/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/default-level/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert log_entry["level"] == "info"
@@ -109,7 +109,7 @@ class TestLogLevels:
     with local_experiment("tom/test/debug-test").run as experiment:
       experiment.log("Debug info: Variable x = 42", level="debug")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/debug-test/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/debug-test/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert log_entry["level"] == "debug"
@@ -120,7 +120,7 @@ class TestLogLevels:
     with local_experiment("tom/test/error-test").run as experiment:
       experiment.log("An error occurred during processing", level="error")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/error-test/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/error-test/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert log_entry["level"] == "error"
@@ -138,7 +138,7 @@ class TestLogMetadata:
         metadata={"epoch": 5, "loss": 0.234, "accuracy": 0.89},
       )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/meta-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/meta-log/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
 
@@ -169,7 +169,7 @@ class TestLogMetadata:
         },
       )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/nested-meta/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/nested-meta/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
 
@@ -193,7 +193,7 @@ class TestLogMetadata:
         },
       )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/types-meta/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/types-meta/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
 
@@ -216,7 +216,7 @@ class TestLogSequencing:
       for i in range(10):
         experiment.log(f"Message {i}")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/sequence/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/sequence/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -237,7 +237,7 @@ class TestLogSequencing:
       for i in range(5):
         experiment.log(f"Message {i}")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/timestamps/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/timestamps/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -260,7 +260,7 @@ class TestProgressLogging:
           metadata={"epoch": epoch, "progress": (epoch + 1) / total_epochs * 100},
         )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/progress/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/progress/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -288,7 +288,7 @@ class TestProgressLogging:
           metadata={"batch": batch, "total": total_batches},
         )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/batch-progress/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/batch-progress/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -310,7 +310,7 @@ class TestErrorLogging:
           metadata={"error_type": type(e).__name__, "error_message": str(e)},
         )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/exception-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/exception-log/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
 
@@ -345,7 +345,7 @@ class TestErrorLogging:
           metadata={"error_number": i + 1, "error_type": type(error).__name__},
         )
 
-    logs_file = tmp_proj / getpass.getuser() / "test/multi-error/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/multi-error/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -359,7 +359,7 @@ class TestErrorLogging:
       experiment.log("Gradient clipping applied", level="warn")
       experiment.log("Memory usage above threshold", level="warn")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/warning-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/warning-log/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 
@@ -375,7 +375,7 @@ class TestLogEdgeCases:
     with local_experiment("tom/test/empty-log").run as experiment:
       experiment.log("")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/empty-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/empty-log/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert log_entry["message"] == ""
@@ -386,7 +386,7 @@ class TestLogEdgeCases:
     with local_experiment("tom/test/long-log").run as experiment:
       experiment.log(long_message)
 
-    logs_file = tmp_proj / getpass.getuser() / "test/long-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/long-log/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert len(log_entry["message"]) == 10000
@@ -397,7 +397,7 @@ class TestLogEdgeCases:
     with local_experiment("tom/test/special-log").run as experiment:
       experiment.log(special_message)
 
-    logs_file = tmp_proj / getpass.getuser() / "test/special-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/special-log/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert "emoji 🚀" in log_entry["message"]
@@ -407,7 +407,7 @@ class TestLogEdgeCases:
     with local_experiment("tom/test/empty-meta").run as experiment:
       experiment.log("Message with empty metadata", metadata={})
 
-    logs_file = tmp_proj / getpass.getuser() / "test/empty-meta/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/empty-meta/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       # Empty metadata may or may not be included depending on implementation
@@ -422,7 +422,7 @@ class TestLogEdgeCases:
     with local_experiment("tom/test/large-meta").run as experiment:
       experiment.log("Message with large metadata", metadata=large_metadata)
 
-    logs_file = tmp_proj / getpass.getuser() / "test/large-meta/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/large-meta/logs/logs.jsonl"
     with open(logs_file) as f:
       log_entry = json.loads(f.readline())
       assert len(log_entry["metadata"]) == 100
@@ -433,7 +433,7 @@ class TestLogEdgeCases:
       for i in range(1000):
         experiment.log(f"Rapid message {i}")
 
-    logs_file = tmp_proj / getpass.getuser() / "test/rapid-log/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "test/rapid-log/logs/logs.jsonl"
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
 

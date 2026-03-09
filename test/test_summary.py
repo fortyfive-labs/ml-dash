@@ -10,7 +10,7 @@ def train_simple_model():
   """Train a simple model and metric everything with ML-Dash."""
 
   # Get current user for prefix
-  owner = getpass.getuser()
+  owner = "tom"
 
   with Experiment(
     prefix=f"tom/summary-project-3/f/s-test-0",

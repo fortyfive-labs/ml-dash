@@ -28,7 +28,7 @@ class TestBasicFileOperations:
       assert result["sizeBytes"] > 0
       assert "checksum" in result
 
-    files_dir = tmp_proj / getpass.getuser() / "test/file-test/files"
+    files_dir = tmp_proj / "tom" / "test/file-test/files"
     assert files_dir.exists()
     saved_files = list(files_dir.glob("*/*/model.txt"))
     assert len(saved_files) == 1
@@ -50,7 +50,7 @@ class TestBasicFileOperations:
       experiment.files("config").upload(sample_files["config"])
       experiment.files("results").upload(sample_files["results"])
 
-    files_dir = tmp_proj / getpass.getuser() / "test/multi-file/files"
+    files_dir = tmp_proj / "tom" / "test/multi-file/files"
     file_dirs = [d for d in files_dir.iterdir() if d.is_dir()]
     assert len(file_dirs) == 3
 
@@ -79,7 +79,7 @@ class TestFileMetadata:
       assert result["tags"] == ["results", "metrics"]
 
     metadata_file = (
-      tmp_proj / getpass.getuser() / "test/file-meta/files/.files_metadata.json"
+      tmp_proj / "tom" / "test/file-meta/files/.files_metadata.json"
     )
     assert metadata_file.exists()
 
@@ -223,7 +223,7 @@ class TestFileTypes:
     with local_experiment("tom/test/text-file").run as experiment:
       experiment.files("text").upload(sample_files["model"])
 
-    files_dir = tmp_proj / getpass.getuser() / "test/text-file/files"
+    files_dir = tmp_proj / "tom" / "test/text-file/files"
     saved_files = list(files_dir.glob("*/*/model.txt"))
     assert len(saved_files) == 1
 

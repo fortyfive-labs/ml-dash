@@ -18,7 +18,7 @@ class TestOptionalMetricName:
 
     # Should create a "None" metric
     metric_file = (
-      tmp_proj / getpass.getuser() / "test/no-name-metric/metrics/None/data.jsonl"
+      tmp_proj / "tom" / "test/no-name-metric/metrics/None/data.jsonl"
     )
     assert metric_file.exists()
 
@@ -37,7 +37,7 @@ class TestOptionalMetricName:
       experiment.metrics("train").log(loss=0.4, step=2)
 
     metric_file = (
-      tmp_proj / getpass.getuser() / "test/explicit-name/metrics/train/data.jsonl"
+      tmp_proj / "tom" / "test/explicit-name/metrics/train/data.jsonl"
     )
     assert metric_file.exists()
 
@@ -54,7 +54,7 @@ class TestOptionalMetricName:
       experiment.metrics.log(loss=0.3, step=3)
 
     metric_file = (
-      tmp_proj / getpass.getuser() / "test/multi-no-name/metrics/None/data.jsonl"
+      tmp_proj / "tom" / "test/multi-no-name/metrics/None/data.jsonl"
     )
     assert metric_file.exists()
 
@@ -76,8 +76,8 @@ class TestOptionalMetricName:
       experiment.metrics.log(loss=0.9, step=1)
 
     # Check both metrics exist
-    none_file = tmp_proj / getpass.getuser() / "test/mixed/metrics/None/data.jsonl"
-    loss_file = tmp_proj / getpass.getuser() / "test/mixed/metrics/train/data.jsonl"
+    none_file = tmp_proj / "tom" / "test/mixed/metrics/None/data.jsonl"
+    loss_file = tmp_proj / "tom" / "test/mixed/metrics/train/data.jsonl"
 
     assert none_file.exists()
     assert loss_file.exists()
@@ -125,7 +125,7 @@ class TestLogAndFlushMethods:
       experiment.metrics("train").log(loss=0.4, accuracy=0.85)
 
     metric_file = (
-      tmp_proj / getpass.getuser() / "test/log-method/metrics/train/data.jsonl"
+      tmp_proj / "tom" / "test/log-method/metrics/train/data.jsonl"
     )
     assert metric_file.exists()
 
@@ -147,7 +147,7 @@ class TestLogAndFlushMethods:
 
     # Check train metrics
     train_file = (
-      tmp_proj / getpass.getuser() / "test/log-flush-chain/metrics/train/data.jsonl"
+      tmp_proj / "tom" / "test/log-flush-chain/metrics/train/data.jsonl"
     )
     assert train_file.exists()
 
@@ -157,7 +157,7 @@ class TestLogAndFlushMethods:
 
     # Check None metrics (epoch logging)
     none_file = (
-      tmp_proj / getpass.getuser() / "test/log-flush-chain/metrics/None/data.jsonl"
+      tmp_proj / "tom" / "test/log-flush-chain/metrics/None/data.jsonl"
     )
     assert none_file.exists()
 
@@ -178,7 +178,7 @@ class TestLogAndFlushMethods:
 
     # Check train metrics
     train_file = (
-      tmp_proj / getpass.getuser() / "test/log-nested/metrics/train/data.jsonl"
+      tmp_proj / "tom" / "test/log-nested/metrics/train/data.jsonl"
     )
     assert train_file.exists()
 
@@ -190,7 +190,7 @@ class TestLogAndFlushMethods:
     assert train_points[0]["data"]["epoch"] == 100  # epoch included
 
     # Check eval metrics
-    eval_file = tmp_proj / getpass.getuser() / "test/log-nested/metrics/eval/data.jsonl"
+    eval_file = tmp_proj / "tom" / "test/log-nested/metrics/eval/data.jsonl"
     assert eval_file.exists()
 
     with open(eval_file) as f:
@@ -208,7 +208,7 @@ class TestLogAndFlushMethods:
 
     # Check None metrics
     none_file = (
-      tmp_proj / getpass.getuser() / "test/log-flush-param/metrics/None/data.jsonl"
+      tmp_proj / "tom" / "test/log-flush-param/metrics/None/data.jsonl"
     )
     assert none_file.exists()
 
@@ -252,7 +252,7 @@ class TestLogAndFlushMethods:
 
     # Check train metrics
     train_file = (
-      tmp_proj / getpass.getuser() / "test/complete-pattern/metrics/train/data.jsonl"
+      tmp_proj / "tom" / "test/complete-pattern/metrics/train/data.jsonl"
     )
     with open(train_file) as f:
       train_points = [json.loads(line) for line in f]
@@ -260,7 +260,7 @@ class TestLogAndFlushMethods:
 
     # Check eval metrics
     eval_file = (
-      tmp_proj / getpass.getuser() / "test/complete-pattern/metrics/eval/data.jsonl"
+      tmp_proj / "tom" / "test/complete-pattern/metrics/eval/data.jsonl"
     )
     with open(eval_file) as f:
       eval_points = [json.loads(line) for line in f]
@@ -268,7 +268,7 @@ class TestLogAndFlushMethods:
 
     # Check epoch context
     none_file = (
-      tmp_proj / getpass.getuser() / "test/complete-pattern/metrics/None/data.jsonl"
+      tmp_proj / "tom" / "test/complete-pattern/metrics/None/data.jsonl"
     )
     with open(none_file) as f:
       none_points = [json.loads(line) for line in f]

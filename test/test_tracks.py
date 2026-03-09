@@ -23,7 +23,7 @@ class TestBasicMetrics:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "metric-test"
       / "metrics"
@@ -54,7 +54,7 @@ class TestBasicMetrics:
         experiment.metrics("eval").log(loss=0.6 - epoch * 0.1, epoch=epoch)
         experiment.metrics("eval").log(loss=0.7 + epoch * 0.05, epoch=epoch)
 
-    metrics_dir = tmp_proj / getpass.getuser() / "test/multi-metric/metrics"
+    metrics_dir = tmp_proj / "tom" / "test/multi-metric/metrics"
     assert (metrics_dir / "train/data.jsonl").exists()
     assert (metrics_dir / "eval/data.jsonl").exists()
     assert (metrics_dir / "eval/data.jsonl").exists()
@@ -81,7 +81,7 @@ class TestMultipleLogCalls:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "multi-metric"
       / "metrics"
@@ -112,7 +112,7 @@ class TestMultipleLogCalls:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "many-logs"
       / "metrics"
@@ -142,7 +142,7 @@ class TestFlexibleSchema:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "multi-field"
       / "metrics"
@@ -172,7 +172,7 @@ class TestFlexibleSchema:
       experiment.metrics("flexible").log(field_a=5, field_b=6, field_c=7)
 
     metric_file = (
-      tmp_proj / getpass.getuser() / "test/varying-schema/metrics/flexible/data.jsonl"
+      tmp_proj / "tom" / "test/varying-schema/metrics/flexible/data.jsonl"
     )
     with open(metric_file) as f:
       data_points = [json.loads(line) for line in f]
@@ -193,7 +193,7 @@ class TestMetricMetadata:
         experiment.metrics("metric").log(loss=i * 0.1, step=i)
 
     metadata_file = (
-      tmp_proj / getpass.getuser() / "test/metric-meta/metrics/metric/metadata.json"
+      tmp_proj / "tom" / "test/metric-meta/metrics/metric/metadata.json"
     )
 
     assert metadata_file.exists()
@@ -311,7 +311,7 @@ class TestMetricIndexing:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "metric-index"
       / "metrics"
@@ -334,7 +334,7 @@ class TestMetricIndexing:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "multi-index"
       / "metrics"
@@ -357,7 +357,7 @@ class TestMetricEdgeCases:
     with local_experiment("tom/test/no-metrics").run as experiment:
       experiment.log("No metrics created")
 
-    metrics_dir = tmp_proj / getpass.getuser() / "test/no-metrics/metrics"
+    metrics_dir = tmp_proj / "tom" / "test/no-metrics/metrics"
     assert metrics_dir.exists()
     subdirs = [d for d in metrics_dir.iterdir() if d.is_dir()]
     assert len(subdirs) == 0
@@ -370,7 +370,7 @@ class TestMetricEdgeCases:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "null-metric"
       / "metrics"
@@ -390,7 +390,7 @@ class TestMetricEdgeCases:
       experiment.metrics("metric-2").log(loss=2.0)
       experiment.metrics("metric.3").log(loss=3.0)
 
-    metrics_dir = tmp_proj / getpass.getuser() / "test/special-metric/metrics"
+    metrics_dir = tmp_proj / "tom" / "test/special-metric/metrics"
     # Check that metrics were created (names may be sanitized)
     assert metrics_dir.exists()
 
@@ -402,7 +402,7 @@ class TestMetricEdgeCases:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "frequent-metric"
       / "metrics"
@@ -432,7 +432,7 @@ class TestMetricEdgeCases:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "large-values"
       / "metrics"
@@ -454,7 +454,7 @@ class TestMetricEdgeCases:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "nested-metric"
       / "metrics"
@@ -476,7 +476,7 @@ class TestMetricEdgeCases:
 
     metric_file = (
       tmp_proj
-      / getpass.getuser()
+      / "tom"
       / "test"
       / "collision"
       / "metrics"

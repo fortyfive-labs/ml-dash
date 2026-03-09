@@ -6,7 +6,7 @@ from ml_dash import Experiment
 def test_oom_protection():
     """Test that queue backpressure prevents OOM."""
 
-    owner = getpass.getuser()
+    owner = "tom"
 
     print("Testing OOM protection with rapid metric generation...")
     print("This test generates 15,000 points rapidly (more than queue capacity)")

@@ -138,7 +138,7 @@ class TestExperimentValidator:
   def test_validate_missing_metadata(self, tmp_proj):
     """Test validating experiment with missing metadata."""
     # Create experiment directory without experiment.json
-    exp_dir = tmp_proj / getpass.getuser() / "proj1/exp1"
+    exp_dir = tmp_proj / "tom" / "proj1/exp1"
     exp_dir.mkdir(parents=True)
 
     from ml_dash.cli_commands.upload import ExperimentInfo
@@ -157,7 +157,7 @@ class TestExperimentValidator:
 
   def test_validate_invalid_json(self, tmp_proj):
     """Test validating experiment with invalid JSON."""
-    exp_dir = tmp_proj / getpass.getuser() / "proj1/exp1"
+    exp_dir = tmp_proj / "tom" / "proj1/exp1"
     exp_dir.mkdir(parents=True)
 
     # Write invalid JSON

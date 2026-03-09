@@ -13,7 +13,7 @@ class TestCompleteWorkflows:
   def test_complete_ml_workflow_local(self, local_experiment, tmp_proj, sample_files):
     """Test complete ML experiment workflow in local mode."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/experiments/experiments/2024/ml-experiment",
       description="Complete ML training experiment",
@@ -63,7 +63,7 @@ class TestCompleteWorkflows:
 
     # Verify everything was created
     # Storage structure: root_path / owner / project / prefix
-    owner = getpass.getuser()
+    owner = "tom"
     experiment_dir = tmp_proj / owner / "experiments/experiments/2024/ml-experiment"
     assert (experiment_dir / "experiment.json").exists()
     assert (experiment_dir / "parameters.json").exists()
@@ -101,7 +101,7 @@ class TestHyperparameterSearch:
   def test_grid_search_local(self, local_experiment, tmp_proj):
     """Test grid search hyperparameter optimization."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     learning_rates = [0.1, 0.01, 0.001]
     batch_sizes = [16, 32, 64]
 
@@ -127,7 +127,7 @@ class TestHyperparameterSearch:
           experiment.log(f"Grid search run complete: acc={final_acc:.4f}")
 
     # Verify all experiments were created
-    project_dir = tmp_proj / getpass.getuser() / "hyperparam-search"
+    project_dir = tmp_proj / "tom" / "hyperparam-search"
     experiments = [d for d in project_dir.iterdir() if d.is_dir()]
     assert len(experiments) == 9  # 3 LRs × 3 batch sizes
 
@@ -153,7 +153,7 @@ class TestIterativeExperimentation:
   def test_iterative_improvements_local(self, local_experiment, tmp_proj):
     """Test iterative model improvements."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     experiments = [
       {
         "name": "baseline",
@@ -192,7 +192,7 @@ class TestIterativeExperimentation:
         experiment.log(f"{exp['name']} experiment complete", level="info")
 
     # Verify progression
-    project_dir = tmp_proj / getpass.getuser() / "iterative"
+    project_dir = tmp_proj / "tom" / "iterative"
     assert (project_dir / "exp-baseline").exists()
     assert (project_dir / "exp-deeper").exists()
     assert (project_dir / "exp-lower-lr").exists()
@@ -205,7 +205,7 @@ class TestMultiExperimentPipeline:
   def test_ml_pipeline_local(self, local_experiment, tmp_proj, sample_files):
     """Test complete ML pipeline with multiple stages."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     # Stage 1: Data preprocessing
     with local_experiment(
       f"{owner}/pipeline/pipeline/stage-1/01-preprocessing",
@@ -245,7 +245,7 @@ class TestMultiExperimentPipeline:
 
     # Verify all stages
     # Storage structure: root_path / owner / project / prefix
-    owner = getpass.getuser()
+    owner = "tom"
     assert (tmp_proj / owner / "pipeline/pipeline/stage-1/01-preprocessing").exists()
     assert (tmp_proj / owner / "pipeline/pipeline/stage-2/02-training").exists()
     assert (tmp_proj / owner / "pipeline/pipeline/stage-3/03-evaluation").exists()
@@ -272,7 +272,7 @@ class TestDebuggingWorkflow:
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test comprehensive debugging workflow."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/debugging/debug-training",
       description="Training with debug logging",
@@ -311,7 +311,7 @@ class TestDebuggingWorkflow:
 
     # Verify comprehensive logs
     logs_file = (
-      tmp_proj / getpass.getuser() / "debugging/debug-training/logs/logs.jsonl"
+      tmp_proj / "tom" / "debugging/debug-training/logs/logs.jsonl"
     )
     with open(logs_file) as f:
       logs = [json.loads(line) for line in f]
@@ -325,7 +325,7 @@ class TestAllFeaturesCombined:
   def test_kitchen_sink_local(self, local_experiment, tmp_proj, sample_files):
     """Test experiment using every available feature."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/full-test/tests/comprehensive/kitchen-sink",
       description="Test of all features combined",
@@ -368,7 +368,7 @@ class TestAllFeaturesCombined:
 
     # Verify everything exists
     # Storage structure: root_path / owner / project / prefix
-    owner = getpass.getuser()
+    owner = "tom"
     experiment_dir = tmp_proj / owner / "full-test/tests/comprehensive/kitchen-sink"
     assert (experiment_dir / "experiment.json").exists()
     assert (experiment_dir / "parameters.json").exists()
@@ -421,7 +421,7 @@ class TestRealWorldScenarios:
   def test_failed_experiment_recovery_local(self, local_experiment, tmp_proj):
     """Test recovering from failed experiment."""
     # First attempt (fails)
-    owner = getpass.getuser()
+    owner = "tom"
     try:
       with local_experiment(f"{owner}/recovery/recovery-test").run as experiment:
         experiment.params.set(attempt=1)
@@ -440,13 +440,13 @@ class TestRealWorldScenarios:
       experiment.log("Recovery successful")
 
     # Verify both attempts are recorded
-    experiment_dir = tmp_proj / getpass.getuser() / "recovery/recovery-test"
+    experiment_dir = tmp_proj / "tom" / "recovery/recovery-test"
     assert experiment_dir.exists()
 
   def test_comparison_experiments_local(self, local_experiment, tmp_proj):
     """Test running comparison experiments."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     models = ["resnet18", "resnet50", "vit-base"]
 
     for model_name in models:
@@ -466,14 +466,14 @@ class TestRealWorldScenarios:
         )
 
     # Verify all comparison runs
-    project_dir = tmp_proj / getpass.getuser() / "comparisons"
+    project_dir = tmp_proj / "tom" / "comparisons"
     assert len([d for d in project_dir.iterdir() if d.is_dir()]) == 3
 
   @pytest.mark.slow
   def test_long_running_experiment_local(self, local_experiment):
     """Test long-running experiment with many data points."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(f"{owner}/longtest/long-run").run as experiment:
       experiment.params.set(total_steps=1000)
 

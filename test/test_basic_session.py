@@ -14,7 +14,7 @@ def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
 
   # Verify experiment directory was created
   # Local storage uses owner/project/prefix structure
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = tmp_proj / owner / "tutorials/hello-ml-dash"
   assert experiment_dir.exists()
   assert (experiment_dir / "experiment.json").exists()
@@ -22,7 +22,7 @@ def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
 
 def test_experiment_with_metadata(local_experiment, tmp_proj):
   """Test experiment creation with readme, tags, and prefix."""
-  owner = getpass.getuser()
+  owner = "tom"
 
   with local_experiment(
     f"{owner}/computer-vision/mnist-baseline",
@@ -67,7 +67,7 @@ def test_experiment_manual_open_close(local_experiment, tmp_proj):
   assert not experiment._is_open
 
   # Verify data was saved
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = tmp_proj / owner / "test/manual-experiment"
   assert experiment_dir.exists()
 
@@ -93,7 +93,7 @@ def test_experiments_same_project(local_experiment, tmp_proj):
     experiment.log("Experiment 2")
 
   # Verify both experiments exist
-  owner = getpass.getuser()
+  owner = "tom"
   project_dir = tmp_proj / owner / "shared"
   assert (project_dir / "experiment-1").exists()
   assert (project_dir / "experiment-2").exists()
@@ -117,7 +117,7 @@ def test_experiment_error_handling(local_experiment, tmp_proj):
     pass
 
   # Experiment directory should be created even if error occurs
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = tmp_proj / owner / "test/error-test"
   assert experiment_dir.exists(), "Experiment directory should exist even after error"
 

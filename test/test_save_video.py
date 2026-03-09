@@ -37,7 +37,7 @@ class TestVideoBasics:
       assert "checksum" in result
 
     # Verify file was saved
-    files_dir = tmp_proj / getpass.getuser() / "test/video-test/files"
+    files_dir = tmp_proj / "tom" / "test/video-test/files"
     assert files_dir.exists()
     saved_videos = list(files_dir.glob("**/test_video.mp4"))
     assert len(saved_videos) == 1

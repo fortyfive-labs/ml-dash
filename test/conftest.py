@@ -14,7 +14,7 @@ from ml_dash import Experiment
 
 # Configuration
 REMOTE_SERVER_URL = "http://localhost:3000"
-TEST_USERNAME = "tom_tao_34833x"
+TEST_USERNAME = "tom"
 
 
 # Generate test JWT token for remote experiments
@@ -28,7 +28,7 @@ def _generate_test_api_key():
     "sub": "4bhvoR725vyRx2lla91uUnNIWAYWKYWR",
     "email": "tom.tao@57blocks.com",
     "name": "Tom Tao",
-    "username": "tom_tao_34833x",
+    "username": "tom",
     "given_name": "Tom",
     "family_name": "Tao",
   }
@@ -67,7 +67,7 @@ def local_experiment(tmp_proj):
   import getpass
 
   # Use current username for test isolation
-  owner = getpass.getuser()
+  owner = "tom"
   DEFAULT_PREFIX = f"{owner}/test-project/test-experiment"
 
   def _create_experiment(prefix=DEFAULT_PREFIX, **kwargs):

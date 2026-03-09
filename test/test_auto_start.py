@@ -16,7 +16,7 @@ def cleanup_dxp(monkeypatch):
   from ml_dash.buffer import BufferConfig
 
   ml_dash_dir = Path(".dash")
-  owner = getpass.getuser()
+  owner = "tom"
 
   # Disable buffering for tests (immediate writes for assertions)
   monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "false")
@@ -70,7 +70,7 @@ def test_dxp_logging():
 
   # Verify logs exist in .dash directory
   # New structure: root / owner / project / prefix
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = Path(".dash") / owner / "scratch/dxp"
   logs_file = experiment_dir / "logs/logs.jsonl"
 
@@ -106,7 +106,7 @@ def test_dxp_parameters():
 
   # Verify parameters file exists
   # New structure: root / owner / project / prefix
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = Path(".dash") / owner / "scratch/dxp"
   params_file = experiment_dir / "parameters.json"
   assert params_file.exists()
@@ -129,7 +129,7 @@ def test_dxp_metrics():
 
   # Verify metrics exist (stored as metrics/<name>/data.jsonl)
   # New structure: root / owner / project / prefix
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = Path(".dash") / owner / "scratch/dxp"
   metrics_dir = experiment_dir / "metrics"
 
@@ -165,7 +165,7 @@ def test_dxp_files(tmp_path):
 
   # Verify file exists in experiment (files are stored as files/<prefix>/<file_id>/<filename>)
   # New structure: root / owner / project / prefix
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = Path(".dash") / owner / "scratch/dxp"
   uploaded_file = experiment_dir / "files/tests" / file_id / "test.txt"
   assert uploaded_file.exists()
@@ -203,7 +203,7 @@ def test_dxp_works_like_normal_experiment():
 
   # Verify data was saved
   # New structure: root / owner / project / prefix
-  owner = getpass.getuser()
+  owner = "tom"
   experiment_dir = Path(".dash") / owner / "scratch/dxp"
   assert experiment_dir.exists()
   assert (experiment_dir / "experiment.json").exists()

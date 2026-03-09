@@ -23,7 +23,7 @@ class TestExperimentCreation:
 
     assert not experiment._is_open
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "test-ws/test-ctx"
+    experiment_dir = tmp_proj / "tom" / "test-ws/test-ctx"
     assert experiment_dir.exists()
     assert (experiment_dir / "experiment.json").exists()
 
@@ -57,7 +57,7 @@ class TestExperimentCreation:
 
     # Verify data was saved
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "test-ws/manual-test"
+    experiment_dir = tmp_proj / "tom" / "test-ws/manual-test"
     assert experiment_dir.exists()
     assert (experiment_dir / "logs/logs.jsonl").exists()
 
@@ -78,7 +78,7 @@ class TestExperimentCreation:
 
   def test_experiment_with_metadata_local(self, local_experiment, tmp_proj):
     """Test experiment with readme, tags, and prefix in local mode."""
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/meta-ws/experiments/meta/meta-experiment",
       readme="Test experiment with metadata",
@@ -162,7 +162,7 @@ class TestMultipleExperiments:
 
     # Verify all experiments exist
     # New structure: root / owner / project / prefix
-    project_dir = tmp_proj / getpass.getuser() / "shared-ws"
+    project_dir = tmp_proj / "tom" / "shared-ws"
     assert (project_dir / "experiment-1").exists()
     assert (project_dir / "experiment-2").exists()
     assert (project_dir / "experiment-3").exists()
@@ -195,14 +195,14 @@ class TestMultipleExperiments:
 
     # Verify all projects and experiments exist
     # New structure: root / owner / project / prefix
-    assert (tmp_proj / getpass.getuser() / "project-1/experiment-a").exists()
-    assert (tmp_proj / getpass.getuser() / "project-2/experiment-b").exists()
-    assert (tmp_proj / getpass.getuser() / "project-3/experiment-c").exists()
+    assert (tmp_proj / "tom" / "project-1/experiment-a").exists()
+    assert (tmp_proj / "tom" / "project-2/experiment-b").exists()
+    assert (tmp_proj / "tom" / "project-3/experiment-c").exists()
 
   def test_experiments_local(self, local_experiment):
     """Test experiments sequentially."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     experiments = []
     for i in range(5):
       with local_experiment(
@@ -233,7 +233,7 @@ class TestExperimentErrorHandling:
 
     # Data should still be saved
     # New structure: root / owner / project / prefix
-    experiment_dir = tmp_proj / getpass.getuser() / "error-ws/error-test"
+    experiment_dir = tmp_proj / "tom" / "error-ws/error-test"
     assert experiment_dir.exists()
     assert (experiment_dir / "logs/logs.jsonl").exists()
     assert (experiment_dir / "parameters.json").exists()
@@ -271,7 +271,7 @@ class TestExperimentErrorHandling:
 
     # Experiment should have all logs
     # New structure: root / owner / project / prefix
-    logs_file = tmp_proj / getpass.getuser() / "error-ws/multi-error/logs/logs.jsonl"
+    logs_file = tmp_proj / "tom" / "error-ws/multi-error/logs/logs.jsonl"
     assert logs_file.exists()
 
     with open(logs_file) as f:
@@ -285,7 +285,7 @@ class TestExperimentReuse:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test reopening an existing experiment (upsert behavior)."""
-    owner = getpass.getuser()
+    owner = "tom"
     # Create initial experiment
     with local_experiment(
       f"{owner}/reuse-ws/reuse-experiment"
@@ -333,7 +333,7 @@ class TestExperimentEdgeCases:
 
   def test_experiment_local(self, local_experiment, tmp_proj):
     """Test experiment with no operations."""
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/empty-ws/empty-experiment"
     ).run as experiment:
@@ -346,7 +346,7 @@ class TestExperimentEdgeCases:
 
   def test_experiment_with_special_characters_local(self, local_experiment, tmp_proj):
     """Test experiment names with special characters."""
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/special-ws/test-experiment_v1.0"
     ).run as experiment:
@@ -359,14 +359,14 @@ class TestExperimentEdgeCases:
   def test_experiment_with_long_name_local(self, local_experiment):
     """Test experiment with very long name."""
     import getpass
-    owner = getpass.getuser()
+    owner = "tom"
     long_name = "a" * 200
     with local_experiment(f"{owner}/long-ws/{long_name}").run as experiment:
       experiment.log("Experiment with long name")
 
   def test_deeply_nested_prefix_local(self, local_experiment, tmp_proj):
     """Test experiment with deeply nested prefix structure."""
-    owner = getpass.getuser()
+    owner = "tom"
     with local_experiment(
       f"{owner}/nested-ws/a/b/c/d/e/f/g/h/nested-experiment",
     ).run as experiment:
@@ -397,7 +397,7 @@ class TestExperimentEdgeCases:
 
   def test_experiment_with_many_tags_local(self, local_experiment, tmp_proj):
     """Test experiment with many tags."""
-    owner = getpass.getuser()
+    owner = "tom"
     tags = [f"tag-{i}" for i in range(50)]
     with local_experiment(
       f"{owner}/tags-ws/many-tags",
