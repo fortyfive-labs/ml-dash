@@ -54,3 +54,4 @@ MUJOCO_LOG.TXT
 
 # Build artifacts
 dist/
+local-test/
