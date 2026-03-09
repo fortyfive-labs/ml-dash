@@ -34,7 +34,7 @@ def buffered_experiment(local_experiment, buffer_config, monkeypatch):
 
     Returns a function that creates experiments with buffering.
     """
-    def _create_experiment(prefix="test-user/test-project/buffer-test", **kwargs):
+    def _create_experiment(prefix="tom/test-project/buffer-test", **kwargs):
         # Patch BufferConfig.from_env to return our test config
         monkeypatch.setattr(
             "ml_dash.experiment.BufferConfig.from_env",
@@ -50,7 +50,7 @@ def unbuffered_experiment(local_experiment, monkeypatch):
     """
     Create a test experiment with buffering disabled.
     """
-    def _create_experiment(prefix="test-user/test-project/unbuffered-test", **kwargs):
+    def _create_experiment(prefix="tom/test-project/unbuffered-test", **kwargs):
         # Patch BufferConfig.from_env to disable buffering
         disabled_config = BufferConfig(buffer_enabled=False)
         monkeypatch.setattr(

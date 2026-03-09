@@ -114,21 +114,21 @@ def train_simple_model():
 
     # # Upload example image
     # experiment.files("plots").upload(
-    #   "/Users/57block/fortyfive/ml-dash/test/selfie.jpeg",
+    #   "/Users/tom/fortyfive/ml-dash/test/selfie.jpeg",
     #   description="Training visualization",
     #   tags=["plot", "final"],
     # )
 
     # # Upload configuration file
     # experiment.files().upload(
-    #   "/Users/57block/fortyfive/ml-dash/test/.dashrc",
+    #   "/Users/tom/fortyfive/ml-dash/test/.dashrc",
     #   description="Configuration file",
     #   tags=["config"],
     # )
 
     # # Upload example video
     # experiment.files("videos").upload(
-    #   "/Users/57block/fortyfive/ml-dash/test/video.mp4",
+    #   "/Users/tom/fortyfive/ml-dash/test/video.mp4",
     #   description="Training progress video",
     #   tags=["video", "final"],
     # )

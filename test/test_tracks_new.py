@@ -18,7 +18,7 @@ class TestBasicTracksLocal:
 
     def test_track_append_single_entry_local(self, local_experiment, tmp_proj):
         """Test appending single entry to a track in local mode."""
-        with local_experiment("test-user/test/track-test-local").run as experiment:
+        with local_experiment("tom/test/track-test-local").run as experiment:
             # Log robot position at timestamp 0.0
             experiment.tracks("robot/position").append(
                 q=[0.1, -0.22, 0.45],
@@ -34,14 +34,14 @@ class TestBasicTracksLocal:
             )
 
         # Verify file exists
-        track_dir = tmp_proj / "test-user" / "test" / "track-test-local" / "tracks" / "robot_position"
+        track_dir = tmp_proj / "tom" / "test" / "track-test-local" / "tracks" / "robot_position"
         assert track_dir.exists()
         assert (track_dir / "data.jsonl").exists()
         assert (track_dir / "metadata.json").exists()
 
     def test_track_read_local(self, local_experiment, tmp_proj):
         """Test reading track data in local mode."""
-        with local_experiment("test-user/test/track-read-local").run as experiment:
+        with local_experiment("tom/test/track-read-local").run as experiment:
             # Write data
             for i in range(5):
                 experiment.tracks("robot/position").append(
@@ -65,7 +65,7 @@ class TestBasicTracksLocal:
 
     def test_track_jsonl_roundtrip_local(self, local_experiment, tmp_proj):
         """Test JSONL round-trip: write → read → write should be identical."""
-        with local_experiment("test-user/test/track-roundtrip").run as experiment:
+        with local_experiment("tom/test/track-roundtrip").run as experiment:
             # Write test data
             test_entries_original = [
                 {"timestamp": 0.0, "x": 1.0, "y": 2.0, "z": 3.0},
@@ -99,7 +99,7 @@ class TestBasicTracksLocal:
         # Re-enable buffering for this test (timestamp merging is a buffer feature)
         monkeypatch.setenv("ML_DASH_BUFFER_ENABLED", "true")
 
-        with local_experiment("test-user/test/track-merge-local").run as experiment:
+        with local_experiment("tom/test/track-merge-local").run as experiment:
             # Log different fields at same timestamp
             experiment.tracks("camera/data").append(frame_id=0, _ts=0.0)
             experiment.tracks("camera/data").append(path="frame_0.png", _ts=0.0)
@@ -125,7 +125,7 @@ class TestBasicTracks:
     @pytest.mark.remote
     def test_track_append_single_entry_remote(self, remote_experiment):
         """Test appending single entry to a track."""
-        with remote_experiment("test-user/test/track-test-basic").run as experiment:
+        with remote_experiment("tom/test/track-test-basic").run as experiment:
             # Log robot position at timestamp 0.0
             experiment.tracks("robot/position").append(
                 q=[0.1, -0.22, 0.45],
@@ -143,7 +143,7 @@ class TestBasicTracks:
     @pytest.mark.remote
     def test_track_append_multiple_topics_remote(self, remote_experiment):
         """Test logging to multiple topics."""
-        with remote_experiment("test-user/test/track-multi-topic").run as experiment:
+        with remote_experiment("tom/test/track-multi-topic").run as experiment:
             # Log to robot/position
             experiment.tracks("robot/position").append(x=1.0, y=2.0, z=3.0, _ts=0.0)
 
@@ -156,7 +156,7 @@ class TestBasicTracks:
     @pytest.mark.remote
     def test_track_timestamp_validation_remote(self, remote_experiment):
         """Test that timestamp validation works."""
-        with remote_experiment("test-user/test/track-validation").run as experiment:
+        with remote_experiment("tom/test/track-validation").run as experiment:
             # Valid numeric timestamp
             experiment.tracks("robot/position").append(x=1.0, _ts=0.0)
             experiment.tracks("robot/position").append(x=2.0, _ts=1.5)
@@ -176,7 +176,7 @@ class TestTimestampMerging:
     @pytest.mark.remote
     def test_timestamp_merge_remote(self, remote_experiment):
         """Test that entries with same timestamp are merged."""
-        with remote_experiment("test-user/test/track-merge").run as experiment:
+        with remote_experiment("tom/test/track-merge").run as experiment:
             # Log different fields at same timestamp
             experiment.tracks("camera/data").append(frame_id=0, _ts=0.0)
             experiment.tracks("camera/data").append(path="frame_0.png", _ts=0.0)
@@ -203,7 +203,7 @@ class TestTrackFlushing:
     @pytest.mark.remote
     def test_global_flush_remote(self, remote_experiment):
         """Test flushing all topics."""
-        with remote_experiment("test-user/test/track-global-flush").run as experiment:
+        with remote_experiment("tom/test/track-global-flush").run as experiment:
             # Log to multiple topics
             experiment.tracks("robot/position").append(x=1.0, _ts=0.0)
             experiment.tracks("camera/rgb").append(frame_id=0, _ts=0.0)
@@ -214,7 +214,7 @@ class TestTrackFlushing:
     @pytest.mark.remote
     def test_topic_specific_flush_remote(self, remote_experiment):
         """Test flushing specific topic."""
-        with remote_experiment("test-user/test/track-topic-flush").run as experiment:
+        with remote_experiment("tom/test/track-topic-flush").run as experiment:
             # Log to multiple topics
             experiment.tracks("robot/position").append(x=1.0, _ts=0.0)
             experiment.tracks("camera/rgb").append(frame_id=0, _ts=0.0)
@@ -229,7 +229,7 @@ class TestTrackRead:
     @pytest.mark.remote
     def test_read_track_json_remote(self, remote_experiment):
         """Test reading track data in JSON format."""
-        with remote_experiment("test-user/test/track-read-json").run as experiment:
+        with remote_experiment("tom/test/track-read-json").run as experiment:
             # Write data
             for i in range(5):
                 experiment.tracks("robot/position").append(
@@ -254,7 +254,7 @@ class TestTrackRead:
     @pytest.mark.remote
     def test_read_track_jsonl_remote(self, remote_experiment):
         """Test reading track data in JSONL format."""
-        with remote_experiment("test-user/test/track-read-jsonl").run as experiment:
+        with remote_experiment("tom/test/track-read-jsonl").run as experiment:
             # Write data
             for i in range(3):
                 experiment.tracks("robot/position").append(x=float(i), _ts=float(i))
@@ -279,7 +279,7 @@ class TestTrackRead:
     @pytest.mark.remote
     def test_read_track_parquet_remote(self, remote_experiment):
         """Test reading track data in Parquet format."""
-        with remote_experiment("test-user/test/track-read-parquet").run as experiment:
+        with remote_experiment("tom/test/track-read-parquet").run as experiment:
             # Write data
             for i in range(3):
                 experiment.tracks("robot/position").append(x=float(i), _ts=float(i))
@@ -296,7 +296,7 @@ class TestTrackRead:
     @pytest.mark.remote
     def test_read_track_mocap_remote(self, remote_experiment):
         """Test reading track data in Mocap format."""
-        with remote_experiment("test-user/test/track-read-mocap").run as experiment:
+        with remote_experiment("tom/test/track-read-mocap").run as experiment:
             # Write data with metadata
             for i in range(3):
                 experiment.tracks("robot/position").append(
@@ -332,7 +332,7 @@ class TestTrackFiltering:
     @pytest.mark.remote
     def test_read_with_timestamp_filter_remote(self, remote_experiment):
         """Test reading track data with timestamp filter."""
-        with remote_experiment("test-user/test/track-filter-time").run as experiment:
+        with remote_experiment("tom/test/track-filter-time").run as experiment:
             # Write data across time range
             for i in range(10):
                 experiment.tracks("robot/position").append(x=float(i), _ts=float(i) * 0.1)
@@ -354,7 +354,7 @@ class TestTrackFiltering:
     @pytest.mark.remote
     def test_read_with_column_filter_remote(self, remote_experiment):
         """Test reading track data with column filter."""
-        with remote_experiment("test-user/test/track-filter-cols").run as experiment:
+        with remote_experiment("tom/test/track-filter-cols").run as experiment:
             # Write data with multiple columns
             for i in range(3):
                 experiment.tracks("robot/position").append(
@@ -386,7 +386,7 @@ class TestNestedData:
     @pytest.mark.remote
     def test_nested_dict_flattening_remote(self, remote_experiment):
         """Test that nested dicts are flattened with dot notation."""
-        with remote_experiment("test-user/test/track-nested").run as experiment:
+        with remote_experiment("tom/test/track-nested").run as experiment:
             # Log nested structure
             experiment.tracks("robot/state").append(
                 camera={"pos": [0, 0, 1], "rot": [0, 0, 0, 1]},
@@ -413,7 +413,7 @@ class TestSparseData:
     @pytest.mark.remote
     def test_sparse_columns_remote(self, remote_experiment):
         """Test that sparse columns (appearing at different timestamps) work."""
-        with remote_experiment("test-user/test/track-sparse").run as experiment:
+        with remote_experiment("tom/test/track-sparse").run as experiment:
             # Entry 1: only x, y
             experiment.tracks("robot/position").append(x=1.0, y=2.0, _ts=0.0)
 
@@ -453,7 +453,7 @@ class TestEdgeCases:
     @pytest.mark.remote
     def test_empty_track_remote(self, remote_experiment):
         """Test reading from non-existent track."""
-        with remote_experiment("test-user/test/track-empty").run as experiment:
+        with remote_experiment("tom/test/track-empty").run as experiment:
             # Try to read from track that doesn't exist
             with pytest.raises(Exception):  # Should raise error
                 experiment.tracks("nonexistent/topic").read(format="json")
@@ -461,7 +461,7 @@ class TestEdgeCases:
     @pytest.mark.remote
     def test_track_with_special_characters_remote(self, remote_experiment):
         """Test tracks with special characters in data."""
-        with remote_experiment("test-user/test/track-special").run as experiment:
+        with remote_experiment("tom/test/track-special").run as experiment:
             # Log data with special characters
             experiment.tracks("robot/position").append(
                 status="running✓",
@@ -480,7 +480,7 @@ class TestEdgeCases:
     @pytest.mark.remote
     def test_track_with_null_values_remote(self, remote_experiment):
         """Test tracks with None/null values."""
-        with remote_experiment("test-user/test/track-null").run as experiment:
+        with remote_experiment("tom/test/track-null").run as experiment:
             experiment.tracks("robot/position").append(x=1.0, y=None, z=3.0, _ts=0.0)
 
             experiment.tracks.flush()
@@ -498,14 +498,14 @@ class TestBuffering:
     @pytest.mark.remote
     def test_auto_buffering_remote(self, remote_experiment):
         """Test that buffering happens automatically."""
-        with remote_experiment("test-user/test/track-buffer").run as experiment:
+        with remote_experiment("tom/test/track-buffer").run as experiment:
             # Log many entries without manual flush
             for i in range(50):
                 experiment.tracks("robot/position").append(x=float(i), _ts=float(i) * 0.01)
 
         # Auto-flush should happen on context exit
         # Verify by reading (requires new session)
-        with remote_experiment("test-user/test/track-buffer").run as experiment:
+        with remote_experiment("tom/test/track-buffer").run as experiment:
             # Note: This will create a new experiment, so this test is more conceptual
             pass
 

@@ -76,7 +76,7 @@ class TestCompleteWorkflows:
   def test_complete_ml_workflow_remote(self, remote_experiment, sample_files):
     """Test complete ML workflow in remote mode."""
     with remote_experiment(
-      "test-user/experiments/ml-experiment-remote",
+      "tom/experiments/ml-experiment-remote",
       description="Remote ML training experiment",
       tags=["ml", "remote"],
     ).run as experiment:
@@ -139,7 +139,7 @@ class TestHyperparameterSearch:
       bs = random.choice([16, 32, 64])
 
       with remote_experiment(
-      f"test-user/random-search/random-search-run-{run}", tags=["random-search"]
+      f"tom/random-search/random-search-run-{run}", tags=["random-search"]
       ).run as experiment:
         experiment.params.set(learning_rate=lr, batch_size=bs)
         acc = 0.6 + random.random() * 0.3
@@ -257,7 +257,7 @@ class TestMultiExperimentPipeline:
 
     for i, stage in enumerate(stages):
       with remote_experiment(
-      f"test-user/pipeline-remote/stage-{i + 1}-{stage}",
+      f"tom/pipeline-remote/stage-{i + 1}-{stage}",
         tags=["pipeline", stage],
       ).run as experiment:
         experiment.log(f"Starting {stage}")
@@ -389,7 +389,7 @@ class TestAllFeaturesCombined:
   def test_kitchen_sink_remote(self, remote_experiment, sample_files):
     """Test all features combined in remote mode."""
     with remote_experiment(
-      "test-user/full-test-remote/kitchen-sink-remote",
+      "tom/full-test-remote/kitchen-sink-remote",
       description="Remote test of all features",
       tags=["test", "remote", "comprehensive"],
     ).run as experiment:

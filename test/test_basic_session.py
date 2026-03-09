@@ -8,7 +8,7 @@ import pytest
 
 def test_experiment_creation_with_context_manager(local_experiment, tmp_proj):
   """Test basic experiment creation using context manager."""
-  with local_experiment("57block/tutorials/hello-ml-dash").run as experiment:
+  with local_experiment("tom/tutorials/hello-ml-dash").run as experiment:
     experiment.log("Hello from ML-Dash!", level="info")
     experiment.params.set(message="Hello World")
 
@@ -50,7 +50,7 @@ def test_experiment_with_metadata(local_experiment, tmp_proj):
 
 def test_experiment_manual_open_close(local_experiment, tmp_proj):
   """Test manual experiment lifecycle management."""
-  experiment = local_experiment("57block/test/manual-experiment")
+  experiment = local_experiment("tom/test/manual-experiment")
 
   # The experiment is not initially open
   assert not experiment._is_open
@@ -74,7 +74,7 @@ def test_experiment_manual_open_close(local_experiment, tmp_proj):
 
 def test_experiment_auto_close_on_context_exit(local_experiment):
   """Test that experiment is automatically closed when exiting context manager."""
-  with local_experiment("57block/test/auto-close").run as experiment:
+  with local_experiment("tom/test/auto-close").run as experiment:
     assert experiment._is_open
     experiment.log("Working...")
 
@@ -85,11 +85,11 @@ def test_experiment_auto_close_on_context_exit(local_experiment):
 def test_experiments_same_project(local_experiment, tmp_proj):
   """Test experiments in the same project."""
   # Create first experiment
-  with local_experiment("57block/shared/experiment-1").run as experiment:
+  with local_experiment("tom/shared/experiment-1").run as experiment:
     experiment.log("Experiment 1")
 
   # Create second experiment
-  with local_experiment("57block/shared/experiment-2").run as experiment:
+  with local_experiment("tom/shared/experiment-2").run as experiment:
     experiment.log("Experiment 2")
 
   # Verify both experiments exist
@@ -101,7 +101,7 @@ def test_experiments_same_project(local_experiment, tmp_proj):
 
 def test_experiment_name_and_project_properties(local_experiment):
   """Test that experiment properties are accessible."""
-  with local_experiment("57block/my-project/my-experiment").run as experiment:
+  with local_experiment("tom/my-project/my-experiment").run as experiment:
     assert experiment.name == "my-experiment"
     assert experiment.project == "my-project"
 
@@ -109,7 +109,7 @@ def test_experiment_name_and_project_properties(local_experiment):
 def test_experiment_error_handling(local_experiment, tmp_proj):
   """Test that experiment handles errors gracefully."""
   try:
-    with local_experiment("57block/test/error-test").run as experiment:
+    with local_experiment("tom/test/error-test").run as experiment:
       experiment.log("Starting work")
       experiment.params.set(param="value")
       raise ValueError("Simulated error")

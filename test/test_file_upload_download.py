@@ -16,7 +16,7 @@ class TestFileUploadDownload:
 
     def test_upload_and_download_text_file_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading and downloading a text file in local mode."""
-        with local_experiment("57block/test/upload-download").run as experiment:
+        with local_experiment("tom/test/upload-download").run as experiment:
             # Upload file
             upload_result = experiment.files("models").upload(
                 sample_files["model"],
@@ -45,7 +45,7 @@ class TestFileUploadDownload:
     @pytest.mark.remote
     def test_upload_and_download_text_file_remote(self, remote_experiment, sample_files, tmp_path):
         """Test uploading and downloading a text file in remote mode."""
-        with remote_experiment("57block/test/upload-download-remote").run as experiment:
+        with remote_experiment("tom/test/upload-download-remote").run as experiment:
             # Upload file
             upload_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -67,7 +67,7 @@ class TestFileUploadDownload:
 
     def test_upload_and_download_json_file_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading and downloading a JSON file."""
-        with local_experiment("57block/test/json-upload-download").run as experiment:
+        with local_experiment("tom/test/json-upload-download").run as experiment:
             # Upload JSON file
             upload_result = experiment.files("configs").upload(
                 sample_files["config"],
@@ -88,7 +88,7 @@ class TestFileUploadDownload:
 
     def test_upload_and_download_binary_file_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading and downloading a binary file."""
-        with local_experiment("57block/test/binary-upload-download").run as experiment:
+        with local_experiment("tom/test/binary-upload-download").run as experiment:
             # Upload binary image file
             upload_result = experiment.files("images").upload(
                 sample_files["image"],
@@ -112,7 +112,7 @@ class TestFileUploadDownload:
 
     def test_upload_and_download_large_file_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading and downloading a large file."""
-        with local_experiment("57block/test/large-upload-download").run as experiment:
+        with local_experiment("tom/test/large-upload-download").run as experiment:
             # Upload large file (100 KB)
             upload_result = experiment.files("large").upload(
                 sample_files["large"],
@@ -140,7 +140,7 @@ class TestFileUploadDownload:
         # Change to tmp directory
         monkeypatch.chdir(tmp_path)
 
-        with local_experiment("57block/test/download-current-dir").run as experiment:
+        with local_experiment("tom/test/download-current-dir").run as experiment:
             # Upload file
             upload_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -157,7 +157,7 @@ class TestFileUploadDownload:
 
     def test_upload_download_multiple_files_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading and downloading multiple files."""
-        with local_experiment("57block/test/multi-upload-download").run as experiment:
+        with local_experiment("tom/test/multi-upload-download").run as experiment:
             # Upload multiple files
             model_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -199,7 +199,7 @@ class TestFileUploadDownload:
 
     def test_upload_download_with_metadata_local(self, local_experiment, sample_files, tmp_path):
         """Test that metadata is preserved after download."""
-        with local_experiment("57block/test/metadata-upload-download").run as experiment:
+        with local_experiment("tom/test/metadata-upload-download").run as experiment:
             # Upload with metadata
             upload_result = experiment.files("models").upload(
                 sample_files["model"],
@@ -229,7 +229,7 @@ class TestFileUploadDownload:
 
     def test_upload_download_checksum_verification_local(self, local_experiment, sample_files, tmp_path):
         """Test that checksum is verified during download."""
-        with local_experiment("57block/test/checksum-verify").run as experiment:
+        with local_experiment("tom/test/checksum-verify").run as experiment:
             # Upload file
             upload_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -254,7 +254,7 @@ class TestFileUploadDownload:
     @pytest.mark.remote
     def test_upload_download_multiple_files_remote(self, remote_experiment, sample_files, tmp_path):
         """Test uploading and downloading multiple files in remote mode."""
-        with remote_experiment("57block/test/multi-remote-download").run as experiment:
+        with remote_experiment("tom/test/multi-remote-download").run as experiment:
             # Upload files
             model_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -281,7 +281,7 @@ class TestFileUploadDownload:
 
     def test_upload_same_file_to_different_prefixes_and_download_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading same file to different locations and downloading each."""
-        with local_experiment("57block/test/same-file-diff-locations").run as experiment:
+        with local_experiment("tom/test/same-file-diff-locations").run as experiment:
             # Upload same file to different prefixes
             v1_result = experiment.files("models/v1").upload(
                 sample_files["model"]
@@ -319,14 +319,14 @@ class TestFileUploadDownload:
 
     def test_download_nonexistent_file_local(self, local_experiment):
         """Test downloading a file that doesn't exist."""
-        with local_experiment("57block/test/download-nonexistent").run as experiment:
+        with local_experiment("tom/test/download-nonexistent").run as experiment:
             # Try to download file with fake ID
             with pytest.raises((ValueError, FileNotFoundError, RuntimeError)):
                 experiment.files(file_id="nonexistent-id-12345").download()
 
     def test_upload_and_re_download_local(self, local_experiment, sample_files, tmp_path):
         """Test uploading, downloading, and re-downloading the same file."""
-        with local_experiment("57block/test/re-download").run as experiment:
+        with local_experiment("tom/test/re-download").run as experiment:
             # Upload
             upload_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -359,7 +359,7 @@ class TestFileUploadDownloadEdgeCases:
         download_path = tmp_path / "existing_file.txt"
         download_path.write_text("This will be overwritten")
 
-        with local_experiment("57block/test/overwrite-download").run as experiment:
+        with local_experiment("tom/test/overwrite-download").run as experiment:
             # Upload file
             upload_result = experiment.files("models").upload(
                 sample_files["model"]
@@ -380,7 +380,7 @@ class TestFileUploadDownloadEdgeCases:
         empty_file = tmp_path / "empty.txt"
         empty_file.write_text("")
 
-        with local_experiment("57block/test/empty-file-download").run as experiment:
+        with local_experiment("tom/test/empty-file-download").run as experiment:
             # Upload empty file
             upload_result = experiment.files("files").upload(
                 str(empty_file)
@@ -404,7 +404,7 @@ class TestFileUploadDownloadEdgeCases:
         special_file = tmp_path / "file-with_special.chars@123.txt"
         special_file.write_text("Special content")
 
-        with local_experiment("57block/test/special-chars-download").run as experiment:
+        with local_experiment("tom/test/special-chars-download").run as experiment:
             # Upload
             upload_result = experiment.files("files").upload(
                 str(special_file)
@@ -423,7 +423,7 @@ class TestFileUploadDownloadEdgeCases:
     @pytest.mark.remote
     def test_upload_download_large_file_remote(self, remote_experiment, sample_files, tmp_path):
         """Test uploading and downloading large file in remote mode."""
-        with remote_experiment("57block/test/large-remote-download").run as experiment:
+        with remote_experiment("tom/test/large-remote-download").run as experiment:
             # Upload large file
             upload_result = experiment.files("large").upload(
                 sample_files["large"]

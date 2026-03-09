@@ -26,12 +26,12 @@ def test_all_operations_use_folder_field():
   with tempfile.TemporaryDirectory() as tmpdir:
     # Create experiment with prefix (new format: owner/project/path/name)
     exp = Experiment(
-      prefix="test-user/test_project/iclr_2024/test_exp", dash_root=tmpdir
+      prefix="tom/test_project/iclr_2024/test_exp", dash_root=tmpdir
     )
 
     with exp.run:
       # Expected base path: root / prefix
-      expected_base = Path(tmpdir) / "test-user/test_project/iclr_2024/test_exp"
+      expected_base = Path(tmpdir) / "tom/test_project/iclr_2024/test_exp"
 
       # 1. Test parameters
       exp.params.set(batch_size=128, lr=0.001)
@@ -98,11 +98,11 @@ def test_all_operations_use_folder_field():
 def test_folder_consistency_with_static_path():
   """Test folder consistency with a static path."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test-user/proj/custom/path/static_exp", dash_root=tmpdir)
+    exp = Experiment(prefix="tom/proj/custom/path/static_exp", dash_root=tmpdir)
 
     with exp.run:
       # Expected: root / prefix
-      expected_base = Path(tmpdir) / "test-user/proj/custom/path/static_exp"
+      expected_base = Path(tmpdir) / "tom/proj/custom/path/static_exp"
 
       # Add all types of data
       exp.params.set(test_param=123)
@@ -126,11 +126,11 @@ def test_folder_consistency_with_static_path():
 def test_no_folder_field_still_works():
   """Test when prefix is just owner/project/name (minimal path)."""
   with tempfile.TemporaryDirectory() as tmpdir:
-    exp = Experiment(prefix="test-user/proj/no_folder_exp", dash_root=tmpdir)
+    exp = Experiment(prefix="tom/proj/no_folder_exp", dash_root=tmpdir)
 
     with exp.run:
       # Should use path: root / prefix
-      expected_base = Path(tmpdir) / "test-user/proj/no_folder_exp"
+      expected_base = Path(tmpdir) / "tom/proj/no_folder_exp"
 
       exp.params.set(test=1)
       exp.log("Test")

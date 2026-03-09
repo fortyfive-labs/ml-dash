@@ -15,7 +15,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_with_file_id(self, local_experiment):
         """Test duplicating a file using file ID."""
-        exp = local_experiment("57block/test/test_duplicate_id")
+        exp = local_experiment("tom/test/test_duplicate_id")
         exp.run.start()
 
         # Create a test file and upload it
@@ -52,7 +52,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_with_metadata_dict(self, local_experiment):
         """Test duplicating a file using metadata dict from save()."""
-        exp = local_experiment("57block/test/test_duplicate_dict")
+        exp = local_experiment("tom/test/test_duplicate_dict")
         exp.run.start()
 
         # Create a test file
@@ -81,7 +81,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_various_path_formats(self, local_experiment):
         """Test duplicate() with various path formats."""
-        exp = local_experiment("57block/test/test_duplicate_paths")
+        exp = local_experiment("tom/test/test_duplicate_paths")
         exp.run.start()
 
         # Create test file
@@ -113,7 +113,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_source_not_found(self, local_experiment):
         """Test that duplicate() raises error for non-existent source."""
-        exp = local_experiment("57block/test/test_duplicate_error")
+        exp = local_experiment("tom/test/test_duplicate_error")
         exp.run.start()
 
         with pytest.raises(Exception):  # Should raise an error when file not found
@@ -123,7 +123,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_invalid_source(self, local_experiment):
         """Test that duplicate() raises ValueError for invalid source."""
-        exp = local_experiment("57block/test/test_duplicate_invalid")
+        exp = local_experiment("tom/test/test_duplicate_invalid")
         exp.run.start()
 
         # Test with invalid types
@@ -140,7 +140,7 @@ class TestDuplicateLocal:
 
     def test_duplicate_overwrites_existing(self, local_experiment):
         """Test that duplicate() overwrites existing file at target location."""
-        exp = local_experiment("57block/test/test_duplicate_overwrite")
+        exp = local_experiment("tom/test/test_duplicate_overwrite")
         exp.run.start()
 
         # Create two different files

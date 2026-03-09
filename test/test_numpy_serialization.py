@@ -15,7 +15,7 @@ def test_numpy_arrays_local():
     """Test that numpy arrays are properly serialized in local mode."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         with Experiment(
-            prefix="test-user/test-project/numpy-test",
+            prefix="tom/test-project/numpy-test",
             dash_root=tmp_dir
         ).run as exp:
             # Test with numpy arrays
@@ -71,7 +71,7 @@ def test_numpy_scalars():
     """Test that numpy scalar types are properly serialized."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         with Experiment(
-            prefix="test-user/test-project/numpy-scalar",
+            prefix="tom/test-project/numpy-scalar",
             dash_root=tmp_dir
         ).run as exp:
             # Test with numpy scalars

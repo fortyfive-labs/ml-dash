@@ -61,8 +61,8 @@ def local_experiment(tmp_proj):
   Prefix format: {owner}/{project}/path.../[name]
 
   Usage:
-    local_experiment("test-user/test-project/exp-1")
-    local_experiment("test-user/my-proj/experiments/baseline")
+    local_experiment("tom/test-project/exp-1")
+    local_experiment("tom/my-proj/experiments/baseline")
   """
   import getpass
 
@@ -132,12 +132,12 @@ def remote_experiment(mock_remote_token):
   Prefix format: {owner}/{project}/path.../[name]
 
   Usage:
-    remote_experiment("test-user/test-project/exp-1")
-    remote_experiment("test-user/my-proj/experiments/baseline")
+    remote_experiment("tom/test-project/exp-1")
+    remote_experiment("tom/my-proj/experiments/baseline")
   """
   import time
 
-  def _create_experiment(prefix="test-user/test-project/test-experiment", **kwargs):
+  def _create_experiment(prefix="tom/test-project/test-experiment", **kwargs):
     # Add timestamp suffix to make it unique
     timestamp_suffix = str(int(time.time() * 1000000))  # microsecond precision
 
