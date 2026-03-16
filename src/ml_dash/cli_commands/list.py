@@ -458,8 +458,8 @@ def cmd_list(args: argparse.Namespace) -> int:
             try:
                 # Expand patterns to full namespace/project/experiment format
                 if '/' not in args.project:
-                    # "tes*" → "*/tes*/*"
-                    search_pattern = f"*/{args.project}/*"
+                    # "tes*" → "{current_namespace}/tes*/*"
+                    search_pattern = f"{remote_client.namespace}/{args.project}/*"
                 elif args.project.count('/') == 1:
                     # "tom/tes*" → "tom/tes*/*"
                     search_pattern = f"{args.project}/*"
