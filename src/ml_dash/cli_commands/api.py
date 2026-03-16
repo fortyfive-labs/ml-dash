@@ -6,7 +6,7 @@ import json
 from rich.console import Console
 
 from ml_dash.client import RemoteClient
-from ml_dash.config import config
+from ml_dash.config import DEFAULT_API_URL, config
 
 
 def add_parser(subparsers):
@@ -24,7 +24,7 @@ Examples:
   ml-dash api --query "user(title: 'hello') { id title }"
 
   # Extract specific field with jq-like syntax
-  ml-dash api --query "me { username }" --jq ".data.me.username"
+  ml-dash api --query "me { username }" --jq ".me.username"
 
   # Mutation to update username
   ml-dash api --mutation "updateUser(username: 'newname') { username }"
@@ -49,18 +49,13 @@ Notes:
   parser.add_argument(
     "--jq",
     metavar="PATH",
-    help="Extract value using dot-path (e.g., .data.me.username)",
+    help="Extract value using dot-path (e.g., .me.username)",
   )
   parser.add_argument(
-    "--dash-url",
+    "--dash-url", "--api-url",
+    dest="dash_url",
     type=str,
     help="ML-Dash server URL (default: https://api.dash.ml)",
-  )
-  parser.add_argument(
-    "--namespace",
-    type=str,
-    required=True,
-    help="Namespace to use for queries (required)",
   )
 
 
@@ -135,14 +130,11 @@ def cmd_api(args) -> int:
   console = Console()
 
   # Get remote URL
-  remote_url = args.dash_url or config.remote_url or "https://api.dash.ml"
-
-  # Get namespace
-  namespace = args.namespace
+  remote_url = args.dash_url or config.remote_url or DEFAULT_API_URL
 
   try:
     # Initialize client
-    client = RemoteClient(base_url=remote_url, namespace=namespace)
+    client = RemoteClient(base_url=remote_url)
 
     # Determine query type and build query
     if args.mutation:
