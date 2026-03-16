@@ -5,7 +5,9 @@ Allows users to discover projects and experiments on the remote server.
 """
 
 import argparse
-import json
+import sys
+import tty
+import termios
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from rich.console import Console
@@ -17,12 +19,37 @@ from ..config import Config
 
 console = Console()
 
+PAGE_SIZE = 50
+
+
+def _read_key() -> str:
+    """Read a single keypress without requiring Enter. Returns 'next', 'prev', or 'quit'."""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if ch == '\x1b':
+            ch2 = sys.stdin.read(1)
+            if ch2 == '[':
+                ch3 = sys.stdin.read(1)
+                if ch3 == 'C':   # right arrow
+                    return 'next'
+                if ch3 == 'D':   # left arrow
+                    return 'prev'
+        if ch in ('n', '\r', '\n', ' '):
+            return 'next'
+        if ch in ('p', 'b'):
+            return 'prev'
+        return 'quit'  # q, ctrl-c, esc, anything else
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
 
 def list_tracks(
     remote_client: RemoteClient,
     experiment_path: str,
     topic_filter: Optional[str] = None,
-    output_json: bool = False,
     verbose: bool = False
 ) -> int:
     """
@@ -32,7 +59,6 @@ def list_tracks(
         remote_client: Remote API client
         experiment_path: Experiment path (namespace/project/experiment)
         topic_filter: Optional topic filter (e.g., "robot/*")
-        output_json: Output as JSON
         verbose: Show verbose output
 
     Returns:
@@ -60,17 +86,6 @@ def list_tracks(
         # List tracks
         tracks = remote_client.list_tracks(experiment_id, topic_filter)
 
-        if output_json:
-            # JSON output
-            output = {
-                "tracks": tracks,
-                "count": len(tracks),
-                "experiment": experiment_path
-            }
-            console.print(json.dumps(output, indent=2))
-            return 0
-
-        # Human-readable output
         if not tracks:
             console.print(f"[yellow]No tracks found[/yellow]")
             return 0
@@ -100,8 +115,8 @@ def list_tracks(
 
             table.add_row(topic, entries, columns, time_range)
 
-        console.print(table)
-        console.print(f"\n[dim]Total tracks: {len(tracks)}[/dim]\n")
+        with console.pager(styles=True):
+            console.print(table)
 
         return 0
 
@@ -153,60 +168,69 @@ def _get_status_style(status: str) -> str:
 
 def list_projects(
     remote_client: RemoteClient,
-    output_json: bool = False,
+    namespace_slug: Optional[str] = None,
     verbose: bool = False
 ) -> int:
-    """
-    List all projects for the user.
-
-    Args:
-        remote_client: Remote API client
-        output_json: Output as JSON
-        verbose: Show verbose output
-
-    Returns:
-        Exit code (0 for success, 1 for error)
-    """
     try:
-        # Get projects via GraphQL
-        projects = remote_client.list_projects_graphql()
-
-        if output_json:
-            # JSON output
-            output = {
-                "projects": projects,
-                "count": len(projects)
-            }
-            console.print(json.dumps(output, indent=2))
-            return 0
-
-        # Human-readable output
-        if not projects:
-            console.print(f"[yellow]No projects found[/yellow]")
-            return 0
-
-        console.print(f"\n[bold]Projects[/bold]\n")
-
-        # Create table
-        table = Table(box=box.ROUNDED)
-        table.add_column("Project", style="cyan", no_wrap=True)
-        table.add_column("Experiments", justify="right")
-        table.add_column("Description", style="dim")
-
-        for project in projects:
-            exp_count = project.get('experimentCount', 0)
-            description = project.get('description', '') or ''
-            if len(description) > 50:
-                description = description[:47] + "..."
-
-            table.add_row(
-                project['slug'],
-                str(exp_count),
-                description
+        offset = 0
+        while True:
+            result = remote_client.list_projects_graphql(
+                namespace_slug=namespace_slug,
+                limit=PAGE_SIZE,
+                offset=offset,
             )
+            projects = result["projects"]
+            total_count = result["totalCount"]
 
-        console.print(table)
-        console.print(f"\n[dim]Total: {len(projects)} project(s)[/dim]\n")
+            if not projects and offset == 0:
+                console.print("[yellow]No projects found[/yellow]")
+                return 0
+
+            total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            current_page = offset // PAGE_SIZE + 1
+
+            table = Table(
+                title="\nProjects",
+                box=box.ROUNDED,
+                caption=f"Page {current_page}/{total_pages}  ·  {total_count} project{'s' if total_count != 1 else ''} total",
+            )
+            table.add_column("Project", style="cyan", no_wrap=True)
+            table.add_column("Experiments", justify="right")
+            table.add_column("Description", style="dim")
+
+            for project in projects:
+                exp_count = project.get('experimentCount', 0)
+                description = project.get('description', '') or ''
+                if len(description) > 50:
+                    description = description[:47] + "..."
+                table.add_row(project['slug'], str(exp_count), description)
+
+            console.print(table)
+
+            has_next = offset + PAGE_SIZE < total_count
+            has_prev = offset > 0
+
+            if not has_next and not has_prev:
+                break
+
+            nav = []
+            if has_prev:
+                nav.append("[b/←] prev")
+            if has_next:
+                nav.append("[n/→] next")
+            nav.append("[q] quit")
+            console.print(f"[dim]{'  '.join(nav)}[/dim]", end="  ")
+
+            key = _read_key()
+            console.print()
+            if key == 'next' and has_next:
+                offset += PAGE_SIZE
+                console.clear()
+            elif key == 'prev' and has_prev:
+                offset -= PAGE_SIZE
+                console.clear()
+            else:
+                break
 
         return 0
 
@@ -221,175 +245,111 @@ def list_projects(
 def list_experiments(
     remote_client: RemoteClient,
     project: str,
+    namespace_slug: Optional[str] = None,
     status_filter: Optional[str] = None,
     tags_filter: Optional[List[str]] = None,
-    output_json: bool = False,
     detailed: bool = False,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> int:
-    """
-    List experiments in a project.
-
-    Args:
-        remote_client: Remote API client
-        project: Project slug
-        status_filter: Filter by status (COMPLETED, RUNNING, FAILED, ARCHIVED)
-        tags_filter: Filter by tags
-        output_json: Output as JSON
-        detailed: Show detailed information
-        verbose: Show verbose output
-
-    Returns:
-        Exit code (0 for success, 1 for error)
-    """
     try:
-        # Get experiments via GraphQL
-        experiments = remote_client.list_experiments_graphql(
-            project, status=status_filter
-        )
+        offset = 0
+        while True:
+            result = remote_client.list_experiments_graphql(
+                project,
+                status=status_filter,
+                namespace_slug=namespace_slug,
+                limit=PAGE_SIZE,
+                offset=offset,
+            )
+            experiments = result["experiments"]
+            total_count = result["totalCount"]
 
-        # Filter by tags if specified
-        if tags_filter:
-            experiments = [
-                exp for exp in experiments
-                if any(tag in exp.get('tags', []) for tag in tags_filter)
-            ]
+            # Client-side tags filter (applies within fetched page)
+            if tags_filter:
+                experiments = [
+                    exp for exp in experiments
+                    if any(tag in exp.get('tags', []) for tag in tags_filter)
+                ]
 
-        # Fetch project hierarchy to get experiment paths
-        experiment_paths = {}
-        try:
-            # Get project info from first experiment
-            if experiments:
-                namespace_slug = experiments[0].get('project', {}).get('namespace', {}).get('slug')
-                if namespace_slug:
-                    # Query hierarchy
-                    hierarchy_query = """
-                    query GetProjectHierarchy($namespaceSlug: String!, $projectSlug: String!) {
-                      project(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug) {
-                        nodes(parentId: null, maxDepth: 10) {
-                          ...NodeFields
-                          children { ...NodeFields children { ...NodeFields children { ...NodeFields children { ...NodeFields } } } }
-                        }
-                      }
-                    }
-                    fragment NodeFields on Node { id name type pPath experimentId }
-                    """
-                    hierarchy_result = remote_client.graphql_query(
-                        hierarchy_query,
-                        {"namespaceSlug": namespace_slug, "projectSlug": project}
-                    )
+            if not experiments and offset == 0:
+                console.print(f"[yellow]No experiments found in project: {project}[/yellow]")
+                return 0
 
-                    # Build map of experimentId -> path by traversing hierarchy
-                    def extract_experiment_paths(nodes, path_prefix=''):
-                        for node in nodes:
-                            node_name = node.get('name', '')
-                            node_type = node.get('type')
+            total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            current_page = offset // PAGE_SIZE + 1
 
-                            # Build current path
-                            if path_prefix:
-                                current_path = f"{path_prefix}/{node_name}"
-                            else:
-                                current_path = node_name
-
-                            # If this is an experiment, save its path
-                            if node_type == 'EXPERIMENT' and node.get('experimentId'):
-                                exp_id = node.get('experimentId')
-                                experiment_paths[exp_id] = current_path
-
-                            # Recurse into children
-                            if node.get('children'):
-                                # Only pass path prefix for folders, not experiments
-                                next_prefix = current_path if node_type == 'FOLDER' else path_prefix
-                                extract_experiment_paths(node['children'], next_prefix)
-
-                    nodes = hierarchy_result.get('project', {}).get('nodes', [])
-                    extract_experiment_paths(nodes)
-        except Exception:
-            # If hierarchy fetch fails, just use experiment names
-            pass
-
-        if output_json:
-            # JSON output
-            output = {
-                "project": project,
-                "experiments": experiments,
-                "count": len(experiments)
-            }
-            console.print(json.dumps(output, indent=2))
-            return 0
-
-        # Human-readable output
-        if not experiments:
-            console.print(f"[yellow]No experiments found in project: {project}[/yellow]")
-            return 0
-
-        console.print(f"\n[bold]Experiments in project: {project}[/bold]\n")
-
-        # Create table
-        table = Table(box=box.ROUNDED)
-        table.add_column("Experiment", style="cyan", no_wrap=True)
-        table.add_column("Status", justify="center")
-        table.add_column("Metrics", justify="right")
-        table.add_column("Logs", justify="right")
-        table.add_column("Tracks", justify="right")
-        table.add_column("Files", justify="right")
-
-        if detailed:
-            table.add_column("Tags", style="dim")
-            table.add_column("Created", style="dim")
-
-        for exp in experiments:
-            status = exp.get('status', 'UNKNOWN')
-            status_style = _get_status_style(status)
-
-            # Count metrics
-            metrics_count = len(exp.get('metrics', []))
-
-            # Count logs
-            log_metadata = exp.get('logMetadata') or {}
-            logs_count = log_metadata.get('totalLogs', 0)
-
-            # Count tracks
-            exp_id = exp.get('id')
-            tracks_count = 0
-            try:
-                tracks = remote_client.list_tracks(exp_id)
-                tracks_count = len(tracks)
-            except Exception:
-                # If track listing fails, just show 0
-                tracks_count = 0
-
-            # Count files
-            files_count = len(exp.get('files', []))
-
-            # Get experiment path (with folder prefix if available)
-            exp_display_name = experiment_paths.get(exp_id, exp['name'])
-
-            row = [
-                exp_display_name,
-                f"[{status_style}]{status}[/{status_style}]",
-                str(metrics_count),
-                str(logs_count),
-                str(tracks_count),
-                str(files_count),
-            ]
+            table = Table(
+                title=f"\nExperiments in project: {project}",
+                box=box.ROUNDED,
+                caption=f"Page {current_page}/{total_pages}  ·  {total_count} experiment{'s' if total_count != 1 else ''} total",
+            )
+            table.add_column("Experiment", style="cyan", no_wrap=True)
+            table.add_column("Status", justify="center")
+            table.add_column("Metrics", justify="right")
+            table.add_column("Logs", justify="right")
+            table.add_column("Tracks", justify="right")
+            table.add_column("Files", justify="right")
 
             if detailed:
-                # Add tags
-                tags = exp.get('tags', [])
-                tags_str = ', '.join(tags[:3])
-                if len(tags) > 3:
-                    tags_str += f" +{len(tags) - 3}"
-                row.append(tags_str or '-')
+                table.add_column("Tags", style="dim")
+                table.add_column("Created", style="dim")
 
-                # Add created time
-                created_at = exp.get('createdAt', '')
-                row.append(_format_timestamp(created_at) if created_at else '-')
+            for exp in experiments:
+                status = exp.get('status', 'UNKNOWN')
+                status_style = _get_status_style(status)
+                metrics_count = len(exp.get('metrics', []))
+                log_metadata = exp.get('logMetadata') or {}
+                logs_count = log_metadata.get('totalLogs', 0)
+                tracks_count = exp.get('trackCount', 0)
+                files_count = len(exp.get('files', []))
+                exp_display_name = exp.get('displayPath') or exp['name']
 
-            table.add_row(*row)
+                row = [
+                    exp_display_name,
+                    f"[{status_style}]{status}[/{status_style}]",
+                    str(metrics_count),
+                    str(logs_count),
+                    str(tracks_count),
+                    str(files_count),
+                ]
 
-        console.print(table)
-        console.print(f"\n[dim]Total: {len(experiments)} experiment(s)[/dim]\n")
+                if detailed:
+                    tags = exp.get('tags', [])
+                    tags_str = ', '.join(tags[:3])
+                    if len(tags) > 3:
+                        tags_str += f" +{len(tags) - 3}"
+                    row.append(tags_str or '-')
+                    created_at = exp.get('createdAt', '')
+                    row.append(_format_timestamp(created_at) if created_at else '-')
+
+                table.add_row(*row)
+
+            console.print(table)
+
+            has_next = offset + PAGE_SIZE < total_count
+            has_prev = offset > 0
+
+            if not has_next and not has_prev:
+                break
+
+            nav = []
+            if has_prev:
+                nav.append("[b/←] prev")
+            if has_next:
+                nav.append("[n/→] next")
+            nav.append("[q] quit")
+            console.print(f"[dim]{'  '.join(nav)}[/dim]", end="  ")
+
+            key = _read_key()
+            console.print()
+            if key == 'next' and has_next:
+                offset += PAGE_SIZE
+                console.clear()
+            elif key == 'prev' and has_prev:
+                offset -= PAGE_SIZE
+                console.clear()
+            else:
+                break
 
         return 0
 
@@ -446,7 +406,6 @@ def cmd_list(args: argparse.Namespace) -> int:
             remote_client=remote_client,
             experiment_path=args.project,
             topic_filter=args.topic_filter,
-            output_json=args.json,
             verbose=args.verbose
         )
 
@@ -473,15 +432,14 @@ def cmd_list(args: argparse.Namespace) -> int:
             namespace = project_parts[0]
             project_slug = project_parts[1]
 
-    if not namespace:
-        console.print(
-            "[red]Error:[/red] --project must be in format 'namespace/project'"
-        )
-        console.print("Example: ml-dash list --project alice/my-project")
-        console.print("Or use glob patterns: ml-dash list --project alice/proj-*")
-        return 1
+    # If --project has no '/' and no wildcards, treat as plain project slug
+    # and auto-resolve namespace from the stored token
+    if args.project and not namespace:
+        has_wildcards = any(c in args.project for c in ['*', '?', '['])
+        if not has_wildcards:
+            project_slug = args.project
 
-    # Create remote client
+    # Create remote client (namespace=None: RemoteClient auto-detects from token)
     try:
         remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
     except Exception as e:
@@ -499,62 +457,46 @@ def cmd_list(args: argparse.Namespace) -> int:
         has_wildcards = any(c in args.project for c in ['*', '?', '['])
 
         if has_wildcards:
-            # Use searchExperiments GraphQL query for glob patterns
+            # Use searchExperimentsPaginated GraphQL query for glob patterns
             try:
                 # Expand simple project patterns to full namespace/project/experiment format
-                # If pattern has no slashes, assume it's just a project pattern
                 if '/' not in args.project:
-                    # Simple project pattern: "tut*" -> "*/tut*/*"
                     search_pattern = f"*/{args.project}/*"
                 else:
-                    # Full or partial pattern: use as-is
                     search_pattern = args.project
 
-                experiments = remote_client.search_experiments_graphql(search_pattern)
+                search_offset = 0
+                while True:
+                    result = remote_client.search_experiments_graphql(
+                        search_pattern,
+                        limit=PAGE_SIZE,
+                        offset=search_offset,
+                    )
+                    experiments = result["experiments"]
+                    total_count = result["totalCount"]
 
-                # Apply status filter if specified (server doesn't support it in searchExperiments yet)
-                if args.status:
-                    experiments = [
-                        exp for exp in experiments
-                        if exp.get('status') == args.status
-                    ]
+                    # Client-side filters (server doesn't support these in search yet)
+                    if args.status:
+                        experiments = [e for e in experiments if e.get('status') == args.status]
+                    if tags_filter:
+                        experiments = [
+                            e for e in experiments
+                            if any(tag in e.get('tags', []) for tag in tags_filter)
+                        ]
 
-                # Apply tags filter if specified
-                if tags_filter:
-                    experiments = [
-                        exp for exp in experiments
-                        if any(tag in exp.get('tags', []) for tag in tags_filter)
-                    ]
+                    if not experiments and search_offset == 0:
+                        console.print(f"[yellow]No experiments match pattern: {search_pattern}[/yellow]")
+                        return 0
 
-                if args.json:
-                    # JSON output
-                    output = {
-                        "pattern": search_pattern,
-                        "experiments": experiments,
-                        "count": len(experiments)
-                    }
-                    console.print(json.dumps(output, indent=2))
-                    return 0
+                    total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+                    current_page = search_offset // PAGE_SIZE + 1
 
-                # Human-readable output
-                if not experiments:
-                    console.print(f"[yellow]No experiments match pattern: {search_pattern}[/yellow]")
-                    return 0
-
-                # Group experiments by project for better display
-                from collections import defaultdict
-                projects_map = defaultdict(list)
-                for exp in experiments:
-                    project_slug = exp.get('project', {}).get('slug', 'unknown')
-                    projects_map[project_slug].append(exp)
-
-                # Display each project's experiments
-                for project_slug in sorted(projects_map.keys()):
-                    project_experiments = projects_map[project_slug]
-                    console.print(f"\n[bold]Experiments in project: {project_slug}[/bold]\n")
-
-                    # Create table
-                    table = Table(box=box.ROUNDED)
+                    table = Table(
+                        title=f"\nSearch results for: {search_pattern}",
+                        box=box.ROUNDED,
+                        caption=f"Page {current_page}/{total_pages}  ·  {total_count} experiment{'s' if total_count != 1 else ''} total",
+                    )
+                    table.add_column("Project", style="dim", no_wrap=True)
                     table.add_column("Experiment", style="cyan", no_wrap=True)
                     table.add_column("Status", justify="center")
                     table.add_column("Metrics", justify="right")
@@ -566,31 +508,20 @@ def cmd_list(args: argparse.Namespace) -> int:
                         table.add_column("Tags", style="dim")
                         table.add_column("Started", style="dim")
 
-                    for exp in project_experiments:
+                    for exp in experiments:
                         status = exp.get('status', 'UNKNOWN')
                         status_style = _get_status_style(status)
-
-                        # Count metrics
                         metrics_count = len(exp.get('metrics', []))
-
-                        # Count logs
                         log_metadata = exp.get('logMetadata') or {}
                         logs_count = log_metadata.get('totalLogs', 0)
-
-                        # Count tracks
-                        exp_id = exp.get('id')
-                        tracks_count = 0
-                        try:
-                            tracks = remote_client.list_tracks(exp_id)
-                            tracks_count = len(tracks)
-                        except Exception:
-                            tracks_count = 0
-
-                        # Count files
+                        tracks_count = exp.get('trackCount', 0)
                         files_count = len(exp.get('files', []))
+                        exp_display_name = exp.get('displayPath') or exp['name']
+                        proj_slug = exp.get('project', {}).get('slug', '')
 
                         row = [
-                            exp['name'],
+                            proj_slug,
+                            exp_display_name,
                             f"[{status_style}]{status}[/{status_style}]",
                             str(metrics_count),
                             str(logs_count),
@@ -599,23 +530,43 @@ def cmd_list(args: argparse.Namespace) -> int:
                         ]
 
                         if args.detailed:
-                            # Add tags
                             tags = exp.get('tags', [])
                             tags_str = ', '.join(tags[:3])
                             if len(tags) > 3:
                                 tags_str += f" +{len(tags) - 3}"
                             row.append(tags_str or '-')
-
-                            # Add started time (createdAt doesn't exist, use startedAt)
                             started_at = exp.get('startedAt', '')
                             row.append(_format_timestamp(started_at) if started_at else '-')
 
                         table.add_row(*row)
 
                     console.print(table)
-                    console.print(f"[dim]Total: {len(project_experiments)} experiment(s)[/dim]")
 
-                console.print(f"\n[dim]Grand total: {len(experiments)} experiment(s) across {len(projects_map)} project(s)[/dim]\n")
+                    has_next = search_offset + PAGE_SIZE < total_count
+                    has_prev = search_offset > 0
+
+                    if not has_next and not has_prev:
+                        break
+
+                    nav = []
+                    if has_prev:
+                        nav.append("[b/←] prev")
+                    if has_next:
+                        nav.append("[n/→] next")
+                    nav.append("[q] quit")
+                    console.print(f"[dim]{'  '.join(nav)}[/dim]", end="  ")
+
+                    key = _read_key()
+                    console.print()
+                    if key == 'next' and has_next:
+                        search_offset += PAGE_SIZE
+                        console.clear()
+                    elif key == 'prev' and has_prev:
+                        search_offset -= PAGE_SIZE
+                        console.clear()
+                    else:
+                        break
+
                 return 0
 
             except Exception as e:
@@ -626,19 +577,24 @@ def cmd_list(args: argparse.Namespace) -> int:
                 return 1
         else:
             # No wildcards, use existing list method for exact project match
+            # Show the effective namespace for clarity
+            try:
+                console.print(f"[dim]Using namespace: {remote_client.namespace}[/dim]")
+            except Exception:
+                pass
             return list_experiments(
                 remote_client=remote_client,
                 project=project_slug,
+                namespace_slug=namespace,
                 status_filter=args.status,
                 tags_filter=tags_filter,
-                output_json=args.json,
                 detailed=args.detailed,
                 verbose=args.verbose
             )
     else:
         return list_projects(
             remote_client=remote_client,
-            output_json=args.json,
+            namespace_slug=getattr(args, 'namespace', None),
             verbose=args.verbose
         )
 
@@ -653,7 +609,8 @@ def add_parser(subparsers) -> None:
 
     # Remote configuration
     parser.add_argument(
-        "--dash-url",
+        "--dash-url", "--api-url",
+        dest="dash_url",
         type=str,
         help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
     )
@@ -662,7 +619,13 @@ def add_parser(subparsers) -> None:
         type=str,
         help="JWT authentication token (auto-loaded from storage if not provided)"
     )
-    # Filtering options
+    # Namespace / filtering options
+    parser.add_argument(
+        "-n", "--namespace",
+        type=str,
+        dest="namespace",
+        help="Namespace slug to list projects for (defaults to authenticated user's namespace)",
+    )
     parser.add_argument(
         "-p",
         "--pref",
@@ -671,7 +634,7 @@ def add_parser(subparsers) -> None:
         "--project",
         dest="project",
         type=str,
-        help="List experiments in this project (supports glob: 'tutorial*', 'test-?', 'proj-[0-9]*')"
+        help="List experiments in this project. Supports glob patterns — always quote them to prevent shell expansion: -p 'tom/tut*', -p 'alice/test-?'"
     )
     parser.add_argument("--status", type=str,
                        choices=["COMPLETED", "RUNNING", "FAILED", "ARCHIVED"],
@@ -691,6 +654,5 @@ def add_parser(subparsers) -> None:
     )
 
     # Output options
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--detailed", action="store_true", help="Show detailed information")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")

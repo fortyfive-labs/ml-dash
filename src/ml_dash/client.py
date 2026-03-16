@@ -2,8 +2,12 @@
 Remote API client for ML-Dash server.
 """
 
+import time
 from typing import Optional, Dict, Any, List
 import httpx
+
+from .config import DEFAULT_API_URL
+from .exceptions import ConfigurationError, NetworkError, StorageError
 
 
 class UserInfo:
@@ -32,7 +36,7 @@ class UserInfo:
 
         self._fetched = True
         try:
-            client = RemoteClient("https://api.dash.ml")
+            client = RemoteClient(DEFAULT_API_URL)
             self._data = client.get_current_user()
         except Exception:
             self._data = None
@@ -95,43 +99,7 @@ class UserInfo:
 userinfo = UserInfo()
 
 
-def _serialize_value(value: Any) -> Any:
-    """
-    Convert value to JSON-serializable format.
-
-    Handles numpy arrays, nested dicts/lists, etc.
-
-    Args:
-        value: Value to serialize
-
-    Returns:
-        JSON-serializable value
-    """
-    # Check for numpy array
-    if hasattr(value, '__array__') or (hasattr(value, 'tolist') and hasattr(value, 'dtype')):
-        # It's a numpy array
-        try:
-            return value.tolist()
-        except AttributeError:
-            pass
-
-    # Check for numpy scalar types
-    if hasattr(value, 'item'):
-        try:
-            return value.item()
-        except (AttributeError, ValueError):
-            pass
-
-    # Recursively handle dicts
-    if isinstance(value, dict):
-        return {k: _serialize_value(v) for k, v in value.items()}
-
-    # Recursively handle lists
-    if isinstance(value, (list, tuple)):
-        return [_serialize_value(v) for v in value]
-
-    # Return as-is for other types (int, float, str, bool, None)
-    return value
+from .utils import _serialize_value
 
 
 class RemoteClient:
@@ -195,7 +163,7 @@ class RemoteClient:
             self._namespace_fetched = True
 
         if not self._namespace:
-            raise ValueError("Could not determine namespace. Please provide --namespace explicitly.")
+            raise ConfigurationError("Could not determine namespace. Please provide --namespace explicitly.")
 
         return self._namespace
 
@@ -232,7 +200,7 @@ class RemoteClient:
             if isinstance(e, AuthenticationError):
                 raise
             # For other errors, raise a clear exception
-            raise RuntimeError(f"Failed to fetch namespace from server: {e}") from e
+            raise NetworkError(f"Failed to fetch namespace from server: {e}") from e
 
     def get_current_user(self) -> Optional[Dict[str, Any]]:
         """
@@ -275,7 +243,7 @@ class RemoteClient:
             if isinstance(e, AuthenticationError):
                 raise
             # For other errors, raise a clear exception
-            raise RuntimeError(f"Failed to fetch current user from server: {e}") from e
+            raise NetworkError(f"Failed to fetch current user from server: {e}") from e
 
     def _ensure_authenticated(self):
         """Check if authenticated, raise error if not."""
@@ -347,7 +315,7 @@ class RemoteClient:
 
         namespace_data = result.get("namespace")
         if namespace_data is None:
-            raise ValueError(f"Namespace '{self.namespace}' not found. Please check the namespace exists on the server.")
+            raise ConfigurationError(f"Namespace '{self.namespace}' not found. Please check the namespace exists on the server.")
 
         projects = namespace_data.get("projects", [])
         for project in projects:
@@ -376,7 +344,7 @@ class RemoteClient:
         # Get project ID first
         project_id = self._get_project_id(project_slug)
         if not project_id:
-            raise ValueError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
+            raise ConfigurationError(f"Project '{project_slug}' not found in namespace '{self.namespace}'")
 
         # Delete using project-specific endpoint
         response = self._client.delete(f"projects/{project_id}")
@@ -411,7 +379,7 @@ class RemoteClient:
 
         node = result.get("experimentNode")
         if not node:
-            raise ValueError(f"No node found for experiment ID '{experiment_id}'")
+            raise ConfigurationError(f"No node found for experiment ID '{experiment_id}'")
 
         node_id = node["id"]
         self._id_cache[cache_key] = node_id
@@ -673,6 +641,36 @@ class RemoteClient:
         result = response.json()
         return result.get("data", {})
 
+    def _post_with_409_retry(self, url: str, max_retries: int = 3, **kwargs) -> httpx.Response:
+        """POST request that retries on 409 Conflict with exponential backoff.
+
+        The server uses a pre-check + create pattern for node upserts. Under concurrent
+        load, two requests can both pass the existence check before either creates the
+        node, causing one to get a P2002 unique constraint violation (409). Retrying is
+        safe — the second attempt will find the existing node and return 200.
+
+        Args:
+            url: URL path relative to base URL
+            max_retries: Maximum number of attempts (default 3)
+            **kwargs: Passed directly to httpx Client.post()
+
+        Returns:
+            Successful httpx.Response (2xx)
+
+        Raises:
+            httpx.HTTPStatusError: If all retries exhausted or non-409 error
+        """
+        backoff = [0.1, 0.5, 2.0]
+        for attempt in range(max_retries):
+            response = self._client.post(url, **kwargs)
+            if response.status_code != 409:
+                response.raise_for_status()
+                return response
+            if attempt < max_retries - 1:
+                time.sleep(backoff[attempt])
+        response.raise_for_status()
+        return response  # unreachable, raise_for_status raises on 409
+
     def upload_file(
         self,
         experiment_id: str,
@@ -729,7 +727,7 @@ class RemoteClient:
             result = self.graphql_query(query, {"experimentId": experiment_id})
             project_id = result.get("experimentById", {}).get("projectId")
             if not project_id:
-                raise ValueError(f"Could not resolve project ID for experiment {experiment_id}")
+                raise ConfigurationError(f"Could not resolve project ID for experiment {experiment_id}")
 
         # Resolve experiment node ID (files should be children of the experiment node, not ROOT)
         # Check cache first, otherwise query
@@ -943,8 +941,8 @@ class RemoteClient:
                     if not folder_name:  # Skip empty parts
                         continue
 
-                    # Create folder (server will return existing if duplicate)
-                    folder_response = self._client.post(
+                    # Create folder (retry on 409 — server race between pre-check and create)
+                    folder_response = self._post_with_409_retry(
                         f"namespaces/{self.namespace}/nodes",
                         json={
                             "type": "FOLDER",
@@ -954,7 +952,6 @@ class RemoteClient:
                             "name": folder_name
                         }
                     )
-                    folder_response.raise_for_status()
                     folder_data = folder_response.json()
                     current_parent_id = folder_data.get("node", {}).get("id")
 
@@ -982,14 +979,12 @@ class RemoteClient:
             import json
             data["metadata"] = json.dumps(metadata)
 
-        # Call unified node creation API
-        response = self._client.post(
+        # Call unified node creation API (retry on 409 — server race between pre-check and create)
+        response = self._post_with_409_retry(
             f"namespaces/{self.namespace}/nodes",
             files=files,
             data=data
         )
-
-        response.raise_for_status()
         result = response.json()
 
         # Transform unified node response to expected file metadata format
@@ -1151,7 +1146,7 @@ class RemoteClient:
                 # Delete corrupted file
                 import os
                 os.remove(dest_path)
-                raise ValueError(f"Checksum verification failed for file {file_id}")
+                raise StorageError(f"Checksum verification failed for file {file_id}")
 
         return dest_path
 
@@ -1390,84 +1385,86 @@ class RemoteClient:
         result = response.json()
 
         if "errors" in result:
-            raise Exception(f"GraphQL errors: {result['errors']}")
+            messages = "; ".join(e.get("message", str(e)) for e in result["errors"])
+            raise NetworkError(messages)
 
         # Handle case where data is explicitly null in response
         return result.get("data") or {}
 
-    def list_projects_graphql(self) -> List[Dict[str, Any]]:
+    def list_projects_graphql(
+        self,
+        namespace_slug: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
         """
-        List all projects via GraphQL.
+        List projects via GraphQL (single page).
 
-        Namespace is automatically inferred from JWT token on the server.
-        Paginates through all pages to return the complete list.
-        Experiment count is fetched inline (no N+1 queries).
+        Args:
+            namespace_slug: Namespace to list projects for (defaults to authenticated user's namespace)
+            limit: Page size
+            offset: Starting offset
 
         Returns:
-            List of project dicts with experimentCount
+            Dict with 'projects' list and 'totalCount' int
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query ProjectsPaginated($limit: Int!, $offset: Int!) {
-          projectsPaginated(limit: $limit, offset: $offset) {
+        query ProjectsPaginated($namespaceSlug: String, $limit: Int!, $offset: Int!) {
+          projectsPaginated(namespaceSlug: $namespaceSlug, limit: $limit, offset: $offset) {
             projects {
               id
               name
               slug
               description
               tags
-              experiments {
-                id
-              }
+              experimentCount
             }
+            totalCount
             hasMore
           }
         }
         """
-        page_size = 100
-        offset = 0
-        all_projects: List[Dict[str, Any]] = []
-
-        while True:
-            result = self.graphql_query(query, {"limit": page_size, "offset": offset})
-            page = result.get("projectsPaginated", {})
-            projects = page.get("projects", [])
-
-            for project in projects:
-                project["experimentCount"] = len(project.pop("experiments", []))
-
-            all_projects.extend(projects)
-
-            if not page.get("hasMore", False):
-                break
-            offset += page_size
-
-        return all_projects
+        result = self.graphql_query(query, {
+            "namespaceSlug": namespace_slug,
+            "limit": limit,
+            "offset": offset,
+        })
+        page = result.get("projectsPaginated", {})
+        return {
+            "projects": page.get("projects", []),
+            "totalCount": page.get("totalCount", 0),
+        }
 
     def list_experiments_graphql(
-        self, project_slug: str, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self,
+        project_slug: str,
+        status: Optional[str] = None,
+        namespace_slug: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
         """
-        List experiments in a project via GraphQL.
-
-        Namespace is automatically inferred from JWT token on the server.
-        Paginates through all pages to return the complete list.
+        List experiments in a project via GraphQL (single page).
 
         Args:
             project_slug: Project slug
             status: Optional experiment status filter (RUNNING, COMPLETED, FAILED, CANCELLED)
+            namespace_slug: Namespace slug (defaults to authenticated user's namespace)
+            limit: Page size
+            offset: Starting offset
 
         Returns:
-            List of experiment dicts with metadata
+            Dict with 'experiments' list and 'totalCount' int
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query ExperimentsPaginated($projectSlug: String!, $status: ExperimentStatus, $limit: Int!, $offset: Int!) {
-          experimentsPaginated(projectSlug: $projectSlug, status: $status, limit: $limit, offset: $offset) {
+        query ExperimentsPaginated($namespaceSlug: String, $projectSlug: String!, $status: ExperimentStatus, $limit: Int!, $offset: Int!) {
+          experimentsPaginated(namespaceSlug: $namespaceSlug, projectSlug: $projectSlug, status: $status, limit: $limit, offset: $offset) {
             experiments {
               id
               name
@@ -1511,35 +1508,29 @@ class RemoteClient:
                 id
                 data
               }
+              trackCount
+              displayPath
             }
+            totalCount
             hasMore
           }
         }
         """
-        page_size = 100
-        offset = 0
-        all_experiments: List[Dict[str, Any]] = []
+        variables: Dict[str, Any] = {
+            "namespaceSlug": namespace_slug,
+            "projectSlug": project_slug,
+            "limit": limit,
+            "offset": offset,
+        }
+        if status is not None:
+            variables["status"] = status
 
-        while True:
-            variables: Dict[str, Any] = {
-                "projectSlug": project_slug,
-                "limit": page_size,
-                "offset": offset,
-            }
-            if status is not None:
-                variables["status"] = status
-
-            result = self.graphql_query(query, variables)
-            page = result.get("experimentsPaginated", {})
-            experiments = page.get("experiments", [])
-
-            all_experiments.extend(experiments)
-
-            if not page.get("hasMore", False):
-                break
-            offset += page_size
-
-        return all_experiments
+        result = self.graphql_query(query, variables)
+        page = result.get("experimentsPaginated", {})
+        return {
+            "experiments": page.get("experiments", []),
+            "totalCount": page.get("totalCount", 0),
+        }
 
     def get_experiment_graphql(
         self, project_slug: str, experiment_name: str, namespace_slug: Optional[str] = None
@@ -1731,18 +1722,25 @@ class RemoteClient:
         path_parts = experiment_path.strip("/").split("/")
         return find_experiment_by_path(nodes, path_parts)
 
-    def search_experiments_graphql(self, pattern: str) -> List[Dict[str, Any]]:
+    def search_experiments_graphql(
+        self,
+        pattern: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
         """
-        Search experiments using glob pattern via GraphQL.
+        Search experiments using glob pattern via GraphQL (single page).
 
         Pattern format: namespace/project/experiment
         Supports wildcards: *, ?, [0-9], [a-z], etc.
 
         Args:
             pattern: Glob pattern (e.g., "tom*/tutorials/*", "*/project-?/exp*")
+            limit: Page size
+            offset: Starting offset
 
         Returns:
-            List of experiment dicts matching the pattern
+            Dict with 'experiments' list and 'totalCount' int
 
         Raises:
             httpx.HTTPStatusError: If request fails
@@ -1752,55 +1750,53 @@ class RemoteClient:
             >>> client.search_experiments_graphql("*/my-project/baseline*")
         """
         query = """
-        query SearchExperiments($pattern: String!) {
-          searchExperiments(pattern: $pattern) {
-            id
-            name
-            description
-            tags
-            status
-            startedAt
-            endedAt
-            metadata
-            project {
-              id
-              slug
-              name
-              namespace {
-                id
-                slug
-              }
-            }
-            logMetadata {
-              totalLogs
-            }
-            metrics {
-              name
-              metricMetadata {
-                totalDataPoints
-              }
-            }
-            files {
+        query SearchExperimentsPaginated($pattern: String!, $limit: Int!, $offset: Int!) {
+          searchExperimentsPaginated(pattern: $pattern, limit: $limit, offset: $offset) {
+            experiments {
               id
               name
-              pPath
               description
               tags
+              status
+              startedAt
+              endedAt
               metadata
-              physicalFile {
-                filename
-                contentType
-                sizeBytes
-                checksum
-                s3Url
+              project {
+                id
+                slug
+                name
+                namespace {
+                  id
+                  slug
+                }
               }
+              logMetadata {
+                totalLogs
+              }
+              metrics {
+                name
+                metricMetadata {
+                  totalDataPoints
+                }
+              }
+              files {
+                id
+                name
+              }
+              trackCount
+              displayPath
             }
+            totalCount
+            hasMore
           }
         }
         """
-        variables = {"pattern": pattern}
-        result = self.graphql_query(query, variables)
-        return result.get("searchExperiments", [])
+        result = self.graphql_query(query, {"pattern": pattern, "limit": limit, "offset": offset})
+        page = result.get("searchExperimentsPaginated", {})
+        return {
+            "experiments": page.get("experiments", []),
+            "totalCount": page.get("totalCount", 0),
+        }
 
     def download_file_streaming(
         self, experiment_id: str, file_id: str, dest_path: str
@@ -1838,7 +1834,7 @@ class RemoteClient:
             if not verify_checksum(dest_path, expected_checksum):
                 import os
                 os.remove(dest_path)
-                raise ValueError(f"Checksum verification failed for file {file_id}")
+                raise StorageError(f"Checksum verification failed for file {file_id}")
 
         return dest_path
 
