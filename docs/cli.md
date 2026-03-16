@@ -169,6 +169,39 @@ ml-dash api --mutation "updateUser(username: 'newname') { username }" --api-url 
 
 ---
 
+## `ml-dash create`
+
+Create a new project on the remote server.
+
+```bash
+ml-dash create -p PROJECT [-d DESCRIPTION] [--dash-url URL]
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `-p`, `--project` | Project name — `project` or `namespace/project` (required) |
+| `-d`, `--description` | Project description (optional) |
+| `--dash-url`, `--api-url` | Server URL |
+
+If no namespace is provided, it is auto-resolved from the authenticated user's account.
+
+If the project already exists, a warning is shown and the command exits successfully.
+
+```bash
+# Create in your own namespace (auto-resolved)
+ml-dash create -p my-project --api-url https://api.dash.ml
+
+# Create with explicit namespace
+ml-dash create -p tom/my-project --api-url https://api.dash.ml
+
+# Create with description
+ml-dash create -p tom/my-project -d "Baseline experiments" --api-url https://api.dash.ml
+```
+
+---
+
 ## `ml-dash list`
 
 List projects and experiments on the remote server with real server-side pagination.
