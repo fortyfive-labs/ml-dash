@@ -6,7 +6,7 @@ from typing import Optional
 from rich.console import Console
 
 from ml_dash.client import RemoteClient
-from ml_dash.config import config
+from ml_dash.config import DEFAULT_API_URL, config
 
 
 def add_parser(subparsers):
@@ -29,10 +29,10 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "-p", "--prefix",
+        "-p", "--project",
         type=str,
         required=True,
-        help="Project name or namespace/project",
+        help="Project name or namespace/project (e.g. 'my-project' or 'tom/my-project')",
     )
     parser.add_argument(
         "-d", "--description",
@@ -40,7 +40,8 @@ Examples:
         help="Project description (optional)",
     )
     parser.add_argument(
-        "--dash-url",
+        "--dash-url", "--api-url",
+        dest="dash_url",
         type=str,
         help="ML-Dash server URL (default: https://api.dash.ml)",
     )
@@ -51,16 +52,16 @@ def cmd_create(args) -> int:
     console = Console()
 
     # Get remote URL
-    remote_url = args.dash_url or config.remote_url or "https://api.dash.ml"
+    remote_url = args.dash_url or config.remote_url or DEFAULT_API_URL
 
-    # Parse the prefix
-    prefix = args.prefix.strip("/")
+    # Parse the project argument
+    prefix = args.project.strip("/")
     parts = prefix.split("/")
 
     if len(parts) > 2:
         console.print(
-            f"[red]Error:[/red] Prefix can have at most 2 parts (namespace/project).\n"
-            f"Got: {args.prefix}\n\n"
+            f"[red]Error:[/red] Project can have at most 2 parts (namespace/project).\n"
+            f"Got: {args.project}\n\n"
             f"Examples:\n"
             f"  ml-dash create -p new-project\n"
             f"  ml-dash create -p geyang/new-project"
@@ -120,15 +121,16 @@ def _create_project(
         result = response.json()
 
         # Extract project info
-        project = result.get("project", {})
+        project = result.get("project") or result
+        project_slug = project.get("slug") or project_name
         project_id = project.get("id")
-        project_slug = project.get("slug")
 
         # Success message
         console.print(f"[green]✓[/green] Project created successfully!")
         console.print(f"  Name: [bold]{project_slug}[/bold]")
         console.print(f"  Namespace: [bold]{namespace}[/bold]")
-        console.print(f"  ID: {project_id}")
+        if project_id:
+            console.print(f"  ID: {project_id}")
         if description:
             console.print(f"  Description: {description}")
         console.print(f"\n  View at: https://dash.ml/@{namespace}/{project_slug}")
