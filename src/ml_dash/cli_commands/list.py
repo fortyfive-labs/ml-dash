@@ -456,10 +456,15 @@ def cmd_list(args: argparse.Namespace) -> int:
         if has_wildcards:
             # Use searchExperimentsPaginated GraphQL query for glob patterns
             try:
-                # Expand simple project patterns to full namespace/project/experiment format
+                # Expand patterns to full namespace/project/experiment format
                 if '/' not in args.project:
+                    # "tes*" → "*/tes*/*"
                     search_pattern = f"*/{args.project}/*"
+                elif args.project.count('/') == 1:
+                    # "tom/tes*" → "tom/tes*/*"
+                    search_pattern = f"{args.project}/*"
                 else:
+                    # "tom/test/exp*" — already fully qualified
                     search_pattern = args.project
 
                 search_offset = 0
