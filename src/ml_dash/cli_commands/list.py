@@ -376,7 +376,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         # Load config
         config = Config()
         remote_url = args.dash_url or config.remote_url
-        api_key = args.api_key or config.api_key
+        api_key = config.api_key
 
         if not remote_url:
             console.print("[red]Error:[/red] --dash-url is required (or set in config)")
@@ -419,7 +419,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         return 1
 
     # Get API key (command line > config > auto-loaded from storage)
-    api_key = args.api_key or config.api_key
+    api_key = config.api_key
 
     # Extract namespace and project slug from project argument
     namespace = None
@@ -614,11 +614,6 @@ def add_parser(subparsers) -> None:
         dest="dash_url",
         type=str,
         help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
-    )
-    parser.add_argument(
-        "--api-key",
-        type=str,
-        help="JWT authentication token (auto-loaded from storage if not provided)"
     )
     # Namespace / filtering options
     parser.add_argument(

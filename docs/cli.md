@@ -191,7 +191,6 @@ ml-dash list [-p PROJECT] [-n NAMESPACE] [--status STATUS] [--tags TAGS]
 | `--tracks` | List tracks inside an experiment (requires full `namespace/project/experiment` path) |
 | `--topic-filter` | Filter tracks by topic pattern (e.g. `robot/*`) |
 | `--dash-url`, `--api-url` | ML-Dash server URL |
-| `--api-key` | JWT token (auto-loaded from storage if not provided) |
 | `-v`, `--verbose` | Show full error tracebacks |
 
 **Pagination:**
@@ -274,13 +273,7 @@ ml-dash list
 ml-dash logout
 ```
 
-For CI/CD or scripting, pass the token directly:
-
-```bash
-ml-dash list --api-key your-jwt-token
-```
-
-Or set it in `~/.dash/config.json`:
+For CI/CD or scripting, set the token in `~/.dash/config.json`:
 
 ```json
 {

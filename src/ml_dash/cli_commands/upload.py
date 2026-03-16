@@ -20,6 +20,7 @@ from rich.table import Table
 
 from ..client import RemoteClient
 from ..config import Config
+from ..log import LogLevel
 from ..storage import LocalStorage
 
 # Initialize rich console
@@ -138,15 +139,12 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
 
   # Remote configuration
   parser.add_argument(
-    "--dash-url",
+    "--dash-url", "--api-url",
+    dest="dash_url",
     type=str,
     help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
   )
-  parser.add_argument(
-    "--api-key",
-    type=str,
-    help="JWT token for authentication (optional - auto-loads from 'ml-dash login' if not provided)",
-  )
+
 
   # Track upload mode
   parser.add_argument(
@@ -180,7 +178,7 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
   """
 
   # Scope control
-  # Ge: project should be {owner}/{proj_name}
+  # project format: {owner}/{proj_name}
   parser.add_argument(
     "-p",
     "--pref",
@@ -571,7 +569,7 @@ class ExperimentValidator:
     if not files_dir.exists():
       return
 
-    metadata_file = files_dir / ".files_metadata.json"
+    metadata_file = files_dir / LocalStorage._FILES_METADATA_FILENAME
     if not metadata_file.exists():
       return
 
@@ -725,8 +723,10 @@ class ExperimentUploader:
         else:
           target_project = exp_info.project  # Fallback to original
       elif exp_info.prefix:
-        # No target specified, preserve local prefix structure
-        full_prefix = f"{exp_info.prefix}/{exp_info.experiment}"
+        # No target specified, preserve local prefix structure.
+        # exp_info.prefix already contains the full path including experiment name
+        # (e.g., "owner/project/folder/expname"), so use it directly.
+        full_prefix = exp_info.prefix
         target_project = exp_info.project
       else:
         full_prefix = exp_info.experiment
@@ -827,7 +827,7 @@ class ExperimentUploader:
             # Prepare log entry for API
             api_log = {
               "timestamp": log_entry.get("timestamp"),
-              "level": log_entry.get("level", "info"),
+              "level": log_entry.get("level", LogLevel.INFO.value),
               "message": log_entry["message"],
             }
             if "metadata" in log_entry:
@@ -1028,10 +1028,8 @@ class ExperimentUploader:
     try:
       files_list = self.local.list_files(owner, project, full_prefix)
 
-      # Debug: print file count
       if self.verbose:
-        print(f"[DEBUG] Found {len(files_list)} files to upload")
-        print(f"[DEBUG] Full prefix: {full_prefix}")
+        console.print(f"  [dim]Found {len(files_list)} files to upload from prefix: {full_prefix}[/dim]")
 
       for file_info in files_list:
         # Skip deleted files
@@ -1099,7 +1097,7 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
   # Load config
   config = Config()
   remote_url = args.dash_url or config.remote_url
-  api_key = args.api_key or config.api_key
+  api_key = config.api_key
 
   if not remote_url:
     console.print("[red]Error:[/red] --dash-url is required (or set in config)")
@@ -1232,7 +1230,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
   # Get API key (command line > config > auto-load from storage)
   # RemoteClient will auto-load from storage if api_key is None
-  api_key = args.api_key or config.api_key
+  api_key = config.api_key
 
   # Discover experiments
   dash_root = Path(args.path)

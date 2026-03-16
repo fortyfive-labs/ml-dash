@@ -625,7 +625,7 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   # Load configuration
   config = Config()
   remote_url = args.dash_url or config.remote_url
-  api_key = args.api_key or config.api_key
+  api_key = config.api_key
 
   # Validate inputs
   if not remote_url:
@@ -805,7 +805,7 @@ def cmd_download(args: argparse.Namespace) -> int:
   # Load configuration
   config = Config()
   remote_url = args.dash_url or config.remote_url
-  api_key = args.api_key or config.api_key  # RemoteClient will auto-load if None
+  api_key = config.api_key  # RemoteClient will auto-load if None
 
   # Validate inputs
   if not remote_url:
@@ -1003,13 +1003,11 @@ def add_parser(subparsers):
 
   # Remote configuration
   parser.add_argument(
-    "--dash-url",
+    "--dash-url", "--api-url",
+    dest="dash_url",
     help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
   )
-  parser.add_argument(
-    "--api-key",
-    help="JWT authentication token (optional - auto-loads from 'ml-dash login')",
-  )
+
 
   # Scope control
   parser.add_argument(

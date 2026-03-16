@@ -36,9 +36,15 @@ def add_parser(subparsers):
   )
 
   parser.add_argument(
-    "--dash-url",
+    "--dash-url", "--api-url",
+    dest="dash_url",
     type=str,
     help="ML-Dash server URL (e.g., https://api.dash.ml)",
+  )
+  parser.add_argument(
+    "--auth-url",
+    type=str,
+    help="OAuth authorization server URL (e.g., https://auth.vuer.ai)",
   )
 
   parser.add_argument(
@@ -104,9 +110,14 @@ def cmd_login(args) -> int:
     # Initialize device flow
     console.print("[bold]Initializing device authorization...[/bold]\n")
 
+    from ml_dash.auth.constants import VUER_AUTH_URL
+    auth_url = args.auth_url or config.auth_url or VUER_AUTH_URL
+
     device_secret = get_or_create_device_secret(config)
     device_client = DeviceFlowClient(
-      device_secret=device_secret, ml_dash_server_url=remote_url
+      device_secret=device_secret,
+      ml_dash_server_url=remote_url,
+      auth_server_url=auth_url,
     )
 
     # Start device flow with vuer-auth
@@ -208,8 +219,7 @@ def cmd_login(args) -> int:
     # Success message
     console.print(
       "[bold green]✓ Logged in successfully![/bold green]\n\n"
-      "Your authentication token has been securely stored.\n"
-      "You can now use ml-dash commands without --api-key.\n\n"
+      "Your authentication token has been securely stored.\n\n"
       "[bold cyan]View your data online:[/bold cyan]\n"
       "  [link=https://dash.ml]https://dash.ml[/link]\n\n"
       "Access your projects, experiments, statistics, and interactive plots.\n\n"
