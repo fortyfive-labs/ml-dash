@@ -432,12 +432,12 @@ def cmd_list(args: argparse.Namespace) -> int:
             namespace = project_parts[0]
             project_slug = project_parts[1]
 
+    has_wildcards = args.project and any(c in args.project for c in ['*', '?', '['])
+
     # If --project has no '/' and no wildcards, treat as plain project slug
     # and auto-resolve namespace from the stored token
-    if args.project and not namespace:
-        has_wildcards = any(c in args.project for c in ['*', '?', '['])
-        if not has_wildcards:
-            project_slug = args.project
+    if args.project and not namespace and not has_wildcards:
+        project_slug = args.project
 
     # Create remote client (namespace=None: RemoteClient auto-detects from token)
     try:
@@ -452,9 +452,6 @@ def cmd_list(args: argparse.Namespace) -> int:
         tags_filter = None
         if args.tags:
             tags_filter = [tag.strip() for tag in args.tags.split(',')]
-
-        # Check if pattern contains wildcards
-        has_wildcards = any(c in args.project for c in ['*', '?', '['])
 
         if has_wildcards:
             # Use searchExperimentsPaginated GraphQL query for glob patterns
@@ -594,7 +591,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     else:
         return list_projects(
             remote_client=remote_client,
-            namespace_slug=getattr(args, 'namespace', None),
+            namespace_slug=args.namespace,
             verbose=args.verbose
         )
 

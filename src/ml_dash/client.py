@@ -1485,28 +1485,9 @@ class RemoteClient:
               }
               metrics {
                 name
-                metricMetadata {
-                  totalDataPoints
-                }
               }
               files {
                 id
-                name
-                pPath
-                description
-                tags
-                metadata
-                physicalFile {
-                  filename
-                  contentType
-                  sizeBytes
-                  checksum
-                  s3Url
-                }
-              }
-              parameters {
-                id
-                data
               }
               trackCount
               displayPath
