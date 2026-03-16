@@ -439,12 +439,14 @@ def cmd_list(args: argparse.Namespace) -> int:
     if args.project and not namespace and not has_wildcards:
         project_slug = args.project
 
-    # Create remote client (namespace=None: RemoteClient auto-detects from token)
+    # Create remote client; resolve effective namespace (explicit arg > project prefix > token)
     try:
         remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
     except Exception as e:
         console.print(f"[red]Error connecting to remote:[/red] {e}")
         return 1
+
+    effective_namespace = args.namespace or namespace or remote_client.namespace
 
     # List projects or experiments
     if args.project:
@@ -580,14 +582,11 @@ def cmd_list(args: argparse.Namespace) -> int:
         else:
             # No wildcards, use existing list method for exact project match
             # Show the effective namespace for clarity
-            try:
-                console.print(f"[dim]Using namespace: {remote_client.namespace}[/dim]")
-            except Exception:
-                pass
+            console.print(f"[dim]Using namespace: {effective_namespace}[/dim]")
             return list_experiments(
                 remote_client=remote_client,
                 project=project_slug,
-                namespace_slug=namespace,
+                namespace_slug=effective_namespace,
                 status_filter=args.status,
                 tags_filter=tags_filter,
                 detailed=args.detailed,
@@ -596,7 +595,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     else:
         return list_projects(
             remote_client=remote_client,
-            namespace_slug=args.namespace,
+            namespace_slug=effective_namespace,
             verbose=args.verbose
         )
 
@@ -626,7 +625,7 @@ def add_parser(subparsers) -> None:
         "-n", "--namespace",
         type=str,
         dest="namespace",
-        help="Namespace slug to list projects for (defaults to authenticated user's namespace)",
+        help="Namespace slug for all queries (defaults to authenticated user's namespace)",
     )
     parser.add_argument(
         "-p",
