@@ -6,7 +6,7 @@ from typing import Optional
 from rich.console import Console
 
 from ml_dash.client import RemoteClient
-from ml_dash.config import config
+from ml_dash.config import DEFAULT_API_URL, config
 
 
 def add_parser(subparsers):
@@ -32,10 +32,10 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "-p", "--prefix",
+        "-p", "--project",
         type=str,
         required=True,
-        help="Project name or namespace/project",
+        help="Project name or namespace/project (e.g. 'my-project' or 'tom/my-project')",
     )
     parser.add_argument(
         "-y", "--yes",
@@ -43,7 +43,8 @@ Examples:
         help="Skip confirmation prompt",
     )
     parser.add_argument(
-        "--dash-url",
+        "--dash-url", "--api-url",
+        dest="dash_url",
         type=str,
         help="ML-Dash server URL (default: https://api.dash.ml)",
     )
@@ -54,16 +55,16 @@ def cmd_remove(args) -> int:
     console = Console()
 
     # Get remote URL
-    remote_url = args.dash_url or config.remote_url or "https://api.dash.ml"
+    remote_url = args.dash_url or config.remote_url or DEFAULT_API_URL
 
-    # Parse the prefix
-    prefix = args.prefix.strip("/")
+    # Parse the project argument
+    prefix = args.project.strip("/")
     parts = prefix.split("/")
 
     if len(parts) > 2:
         console.print(
-            f"[red]Error:[/red] Prefix can have at most 2 parts (namespace/project).\n"
-            f"Got: {args.prefix}\n\n"
+            f"[red]Error:[/red] Project can have at most 2 parts (namespace/project).\n"
+            f"Got: {args.project}\n\n"
             f"Examples:\n"
             f"  ml-dash remove -p my-project\n"
             f"  ml-dash remove -p geyang/old-project"
@@ -113,7 +114,7 @@ def _remove_project(
         project_id = client._get_project_id(project_name)
         if not project_id:
             console.print(f"[yellow]⚠[/yellow] Project '[bold]{full_path}[/bold]' not found.")
-            return 1
+            return 0
 
         # Confirmation prompt (unless -y flag is used)
         if not skip_confirm:
@@ -137,25 +138,23 @@ def _remove_project(
         result = client.delete_project(project_name)
 
         # Success message
-        console.print(f"[green]✓[/green] {result.get('message', 'Project deleted successfully!')}")
-        console.print(f"  Name: [bold]{project_name}[/bold]")
-        console.print(f"  Namespace: [bold]{namespace}[/bold]")
-        console.print(f"  Project ID: {project_id}")
-        console.print(f"  Deleted nodes: {result.get('deleted', 0)}")
-        console.print(f"  Deleted experiments: {result.get('experiments', 0)}")
+        console.print(f"[green]✓[/green] Project '[bold]{project_name}[/bold]' deleted from namespace '[bold]{namespace}[/bold]'")
+        deleted = result.get('deleted')
+        experiments = result.get('experiments')
+        if deleted is not None:
+            console.print(f"  Deleted nodes: {deleted}")
+        if experiments is not None:
+            console.print(f"  Deleted experiments: {experiments}")
 
         return 0
 
     except Exception as e:
-        # Check if it's a 404 not found
-        if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 404:
-            console.print(f"[yellow]⚠[/yellow] Project '[bold]{project_name}[/bold]' not found in namespace '[bold]{namespace}[/bold]'")
-            return 1
-
-        # Check if it's a 403 forbidden
-        if hasattr(e, 'response') and hasattr(e.response, 'status_code') and e.response.status_code == 403:
-            console.print(f"[red]Error:[/red] Permission denied. You don't have permission to delete this project.")
-            return 1
-
+        if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+            if e.response.status_code == 404:
+                console.print(f"[yellow]⚠[/yellow] Project '[bold]{project_name}[/bold]' not found.")
+                return 0
+            if e.response.status_code == 403:
+                console.print(f"[red]Error:[/red] Permission denied.")
+                return 1
         console.print(f"[red]Error deleting project:[/red] {e}")
         return 1
