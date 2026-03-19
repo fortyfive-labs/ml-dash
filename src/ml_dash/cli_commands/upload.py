@@ -597,25 +597,8 @@ class ExperimentUploader:
     skip_params: bool = False,
     verbose: bool = False,
     progress: Optional[Progress] = None,
-    max_concurrent_metrics: int = 5,
     target_prefix: Optional[str] = None,
   ):
-    """
-    Initialize uploader.
-
-    Args:
-        local_storage: Local storage instance
-        remote_client: Remote client instance
-        batch_size: Batch size for logs/metrics
-        skip_logs: Skip uploading logs
-        skip_metrics: Skip uploading metrics
-        skip_files: Skip uploading files
-        skip_params: Skip uploading parameters
-        verbose: Show verbose output
-        progress: Optional rich Progress instance for tracking
-        max_concurrent_metrics: Maximum concurrent metric uploads (default: 5)
-        target_prefix: Target prefix on server (overrides local prefix)
-    """
     self.local = local_storage
     self.remote = remote_client
     self.batch_size = batch_size
@@ -625,7 +608,6 @@ class ExperimentUploader:
     self.skip_params = skip_params
     self.verbose = verbose
     self.progress = progress
-    self.max_concurrent_metrics = max_concurrent_metrics
     self.target_prefix = target_prefix
     # Thread-safe lock for shared state updates
     self._lock = threading.Lock()
@@ -926,7 +908,7 @@ class ExperimentUploader:
     total_metrics = 0
 
     # Use ThreadPoolExecutor for parallel uploads
-    with ThreadPoolExecutor(max_workers=self.max_concurrent_metrics) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
       # Submit all metric upload tasks
       future_to_metric = {}
       for metric_name in exp_info.metric_names:
