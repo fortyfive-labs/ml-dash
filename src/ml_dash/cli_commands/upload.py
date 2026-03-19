@@ -158,25 +158,6 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     help="Remote path for track (e.g., 'namespace/project/exp/robot/position')",
   )
 
-  """
-  
-  cd .dash/geyang
-  cd iclr_2026
-  
-  ml-dash upload -p geyang/new-run *  # this uploads all of the folders to geyang/new-run.
-  
-  or
-  
-  ml-dash upload --prefix geyang/new-run/local-results ./*  # uploads under the local-results prefix.
-  
-  ml-dash download --prefix geyang/new-run/zehua-results --filter *.mp4 --dryrun --verbose
-  
-  mo-dash list --prefix geyang/new-run/zehua-results --filter xxx-xxx --verbose
-  
-  mo-dash list-exp --prefix geyang/new-run/zehua-results --filter xxx-xxx --verbose
-  
-  """
-
   # Scope control
   # project format: {owner}/{proj_name}
   parser.add_argument(
@@ -185,6 +166,7 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     "--prefix",
     "--proj",
     "--project",
+    dest="project",
     type=str,
     help="Filter experiments by prefix pattern (supports glob: 'tom/*/exp*', 'alice/project-?/baseline')",
   )
@@ -1216,7 +1198,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
       Exit code (0 for success, 1 for error)
   """
   # Handle track upload if --tracks is specified
-  if getattr(args, 'tracks', False):
+  if args.tracks:
     return cmd_upload_track(args)
 
   # Load config
@@ -1279,13 +1261,13 @@ def cmd_upload(args: argparse.Namespace) -> int:
   console.print(f"[bold]Scanning local storage:[/bold] {dash_root.absolute()}")
   experiments = discover_experiments(
     dash_root,
-    project_filter=args.pref,  # Using --prefix/-p argument
+    project_filter=args.project,  # Using --prefix/-p argument
     experiment_filter=None,
   )
 
   if not experiments:
-    if args.pref:
-      console.print(f"[yellow]No experiments found matching pattern:[/yellow] {args.pref}")
+    if args.project:
+      console.print(f"[yellow]No experiments found matching pattern:[/yellow] {args.project}")
     else:
       console.print("[yellow]No experiments found in local storage[/yellow]")
     return 1
@@ -1391,12 +1373,10 @@ def cmd_upload(args: argparse.Namespace) -> int:
       if len(prefix_parts) >= 1:
         namespace = prefix_parts[0]
 
-  if not namespace:
-    console.print("[red]Error:[/red] Could not determine namespace from experiments or target")
-    return 1
-
   # Initialize remote client and local storage
   remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
+  if not namespace:
+    namespace = remote_client.namespace
   local_storage = LocalStorage(root_path=dash_root)
 
   # Upload experiments with progress tracking
