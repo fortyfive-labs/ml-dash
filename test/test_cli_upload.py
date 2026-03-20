@@ -318,7 +318,7 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -330,6 +330,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=str(dash_root / ".test-state.json"),
     )
 
@@ -351,7 +352,7 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=True,
@@ -363,6 +364,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=str(dash_root / ".test-state.json"),
     )
 
@@ -386,7 +388,7 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="test-cli-user",
-      pref="proj1",
+      project="proj1",
       target=None,
       experiment=None,
       dry_run=True,
@@ -398,6 +400,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=str(dash_root / ".test-state.json"),
     )
 
@@ -419,7 +422,7 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -431,6 +434,7 @@ class TestUploadIntegration:
       skip_files=True,  # Skip files
       skip_params=False,  # Upload params only
       resume=False,
+      tracks=None,
       state_file=str(dash_root / ".test-state.json"),
     )
 
@@ -465,7 +469,7 @@ class TestUploadIntegration:
       dash_url="http://localhost:3000",
       api_key=TEST_API_KEY,  # Use test API key for authentication
       user_name="test-cli-user",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -477,6 +481,7 @@ class TestUploadIntegration:
       skip_files=False,
       skip_params=False,
       resume=True,
+      tracks=None,
       state_file=str(state_file),
     )
 
@@ -498,7 +503,7 @@ class TestCLIErrors:
       dash_url=None,
       api_key=None,
       user_name=None,
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -510,6 +515,7 @@ class TestCLIErrors:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=".state.json",
     )
 
@@ -523,7 +529,7 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name=None,  # No auth provided
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -535,6 +541,7 @@ class TestCLIErrors:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=".state.json",
     )
 
@@ -548,7 +555,7 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -560,6 +567,7 @@ class TestCLIErrors:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=".state.json",
     )
 
@@ -573,7 +581,7 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment=None,
       dry_run=False,
@@ -585,6 +593,7 @@ class TestCLIErrors:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=".state.json",
     )
 
@@ -598,7 +607,7 @@ class TestCLIErrors:
       dash_url="http://localhost:3000",
       api_key=None,
       user_name="testuser",
-      pref=None,  # Changed from project to pref (matches argparse --pref option)
+      project=None,
       target=None,  # Added for namespace extraction
       experiment="exp1",  # Experiment without project
       dry_run=False,
@@ -610,6 +619,7 @@ class TestCLIErrors:
       skip_files=False,
       skip_params=False,
       resume=False,
+      tracks=None,
       state_file=".state.json",
     )
 
