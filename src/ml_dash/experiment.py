@@ -8,13 +8,20 @@ Supports three usage styles:
 """
 
 import functools
-from datetime import datetime
+import re
+import sys
+import threading
+import time
+import warnings
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from .auth.exceptions import AuthenticationError
 from .buffer import BackgroundBufferManager, BufferConfig
 from .client import RemoteClient
+from .exceptions import ConfigurationError, ExperimentError, NetworkError, StorageError
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
@@ -34,9 +41,7 @@ def _expand_exp_template(template: str) -> str:
   Returns:
       String with placeholders expanded to actual values
   """
-  import re
-
-  def replace_match(match):
+  def replace_match(match: re.Match) -> str:
     attr_name = match.group(1)
     # Get the attribute from the class __dict__, handling properties correctly
     # EXP is a params_proto class where properties are stored in EXP.__dict__
@@ -125,11 +130,11 @@ class Experiment:
     prefix: Optional[str] = None,
     *,
     readme: Optional[str] = None,
-    # Ge: this is an instance only property
+    # Instance-only: not propagated to the RUN namespace
     tags: Optional[List[str]] = None,
-    # Ge: Bindrs is an instance-only property, it is not set inside the RUN namespace.
+    # Instance-only: not propagated to the RUN namespace
     bindrs: Optional[List[str]] = None,
-    # Ge: This is also instance-only
+    # Instance-only: not propagated to the RUN namespace
     metadata: Optional[Dict[str, Any]] = None,
     # Mode configuration
     dash_url: Optional[Union[str, bool]] = None,
@@ -167,8 +172,6 @@ class Experiment:
         - dash_url + dash_root: Hybrid mode (local + remote)
         - dash_url + dash_root=None: Remote-only mode
     """
-    import warnings
-
     # Handle backward compatibility
     if remote is not None:
       warnings.warn(
@@ -191,7 +194,14 @@ class Experiment:
     if prefix:
       run_params["prefix"] = prefix
 
-    self.run = RUN(_experiment=self, **run_params)
+    # Must be set before RUN() so the _is_open_fn lambda resolves on construction.
+    self._is_open = False
+    self.run = RUN(
+      _open_fn=self._open,
+      _close_fn=self._close,
+      _is_open_fn=lambda: self._is_open,
+      **run_params,
+    )
 
     self.readme = readme
     self.tags = tags
@@ -211,30 +221,40 @@ class Experiment:
     # Initialize backend
     self._experiment_id: Optional[str] = None
     self._experiment_data: Optional[Dict[str, Any]] = None
-    self._is_open = False
     self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
     self._tracks_manager: Optional["TracksManager"] = None  # Cached tracks manager
+    self._client: Optional["RemoteClient"] = None
+    self._storage: Optional["LocalStorage"] = None
 
     # Initialize buffer manager
     self._buffer_config = BufferConfig.from_env()
     self._buffer_manager: Optional[BackgroundBufferManager] = None
 
-    # Track timestamp inheritance for _ts=-1 support
-    self._last_timestamp: Optional[float] = None  # Global last timestamp (for _ts=-1)
+    # Track timestamp inheritance for _ts=-1 support (thread-local for safety)
+    self._ts_local = threading.local()
     self._track_last_auto_timestamp: float = 0.0  # Ensure unique auto-generated timestamps
+    self._track_timestamp_lock = threading.Lock()
 
     if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
-      self.run._client = RemoteClient(base_url=api_url, namespace=self.run.owner)
+      self._client = RemoteClient(base_url=api_url, namespace=self.run.owner)
 
     if self.mode in (OperationMode.LOCAL, OperationMode.HYBRID):
-      self.run._storage = LocalStorage(root_path=Path(dash_root))
+      self._storage = LocalStorage(root_path=Path(dash_root))
+
+  @property
+  def _last_timestamp(self) -> Optional[float]:
+    return getattr(self._ts_local, 'last_timestamp', None)
+
+  @_last_timestamp.setter
+  def _last_timestamp(self, value: Optional[float]) -> None:
+    self._ts_local.last_timestamp = value
 
   def _open(self) -> "Experiment":
     """
-    Internal method to open the experiment (create or update on server/filesystem).
+    Open the experiment (create or update on server/filesystem).
 
     Returns:
         self for chaining
@@ -242,107 +262,110 @@ class Experiment:
     if self._is_open:
       return self
 
-    if self.run._client:
-      # Remote mode: create/update experiment via API
-      try:
-        response = self.run._client.create_or_update_experiment(
-          project=self.run.project,
-          name=self.run.name,
-          description=self.readme,
-          tags=self.tags,
-          bindrs=self._bindrs_list,
-          prefix=self.run._folder_path,
-          write_protected=self._write_protected,
-          metadata=self.metadata,
-        )
-        self._experiment_data = response
-        self._experiment_id = response["experiment"]["id"]
+    self._open_remote()
+    self._open_local()
+    self._start_buffer()
 
-        # Display message about viewing data online
-        try:
-          from rich.console import Console
+    self._is_open = True
+    return self
 
-          console = Console()
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
-          console.print(
-            f"[dim]✓ Experiment started: [bold]{self.run.name}[/bold] (project: {self.run.project})[/dim]\n"
-            f"[dim]View your data, statistics, and plots online at:[/dim] "
-            f"[link={experiment_url}]{experiment_url}[/link]"
-          )
-        except ImportError:
-          # Fallback if rich is not available
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
-          print(f"✓ Experiment started: {self.run.name} (project: {self.run.project})")
-          print(f"View your data at: {experiment_url}")
+  def _open_remote(self) -> None:
+    """Create or update experiment on the remote server."""
+    if not self._client:
+      return
 
-      except Exception as e:
-        # Check if it's an authentication error
-        from .auth.exceptions import AuthenticationError
-
-        if isinstance(e, AuthenticationError):
-          try:
-            from rich.console import Console
-            from rich.panel import Panel
-
-            console = Console()
-
-            message = (
-              "[bold red]Authentication Required[/bold red]\n\n"
-              "You need to authenticate before using remote experiments.\n\n"
-              "[bold]To authenticate:[/bold]\n"
-              "  [cyan]ml-dash login[/cyan]\n\n"
-              "[dim]This will open your browser for secure OAuth2 authentication.\n"
-              "Your token will be stored securely in your system keychain.[/dim]\n\n"
-              "[bold]Alternative:[/bold]\n"
-              "  Use [cyan]local_path[/cyan] instead of [cyan]remote[/cyan] for offline experiments"
-            )
-
-            panel = Panel(
-              message,
-              title="[bold yellow]⚠ Not Authenticated[/bold yellow]",
-              border_style="yellow",
-              expand=False,
-            )
-            console.print("\n")
-            console.print(panel)
-            console.print("\n")
-          except ImportError:
-            # Fallback if rich is not available
-            print("\n" + "=" * 60)
-            print("⚠ Authentication Required")
-            print("=" * 60)
-            print("\nYou need to authenticate before using remote experiments.\n")
-            print("To authenticate:")
-            print("  ml-dash login\n")
-            print("Alternative:")
-            print("  Use local_path instead of remote for offline experiments\n")
-            print("=" * 60 + "\n")
-
-          import sys
-
-          sys.exit(1)
-        else:
-          # Re-raise other exceptions
-          raise
-
-    if self.run._storage:
-      # Local mode: create experiment directory structure
-      self.run._storage.create_experiment(
+    try:
+      response = self._client.create_or_update_experiment(
         project=self.run.project,
-        prefix=self.run._folder_path,
+        name=self.run.name,
         description=self.readme,
         tags=self.tags,
         bindrs=self._bindrs_list,
+        prefix=self.run._folder_path,
+        write_protected=self._write_protected,
         metadata=self.metadata,
       )
+      self._experiment_data = response
+      self._experiment_id = response["experiment"]["id"]
+      self._print_startup_banner()
 
-    # Start background buffer
+    except Exception as e:
+      if isinstance(e, AuthenticationError):
+        self._print_auth_error()
+      raise
+
+  def _open_local(self) -> None:
+    """Create experiment directory structure in local storage."""
+    if not self._storage:
+      return
+
+    self._storage.create_experiment(
+      project=self.run.project,
+      prefix=self.run._folder_path,
+      description=self.readme,
+      tags=self.tags,
+      bindrs=self._bindrs_list,
+      metadata=self.metadata,
+    )
+
+  def _start_buffer(self) -> None:
+    """Start the background buffer manager if buffering is enabled."""
     if self._buffer_config.buffer_enabled:
       self._buffer_manager = BackgroundBufferManager(self, self._buffer_config)
       self._buffer_manager.start()
 
-    self._is_open = True
-    return self
+  def _print_startup_banner(self) -> None:
+    """Print experiment started message with URL after successful remote open."""
+    experiment_url = f"https://dash.ml/{self.run.prefix}"
+    try:
+      from rich.console import Console
+
+      console = Console()
+      console.print(
+        f"[dim]✓ Experiment started: [bold]{self.run.name}[/bold] (project: {self.run.project})[/dim]\n"
+        f"[dim]View your data, statistics, and plots online at:[/dim] "
+        f"[link={experiment_url}]{experiment_url}[/link]"
+      )
+    except ImportError:
+      print(f"✓ Experiment started: {self.run.name} (project: {self.run.project})")
+      print(f"View your data at: {experiment_url}")
+
+  def _print_auth_error(self) -> None:
+    """Print authentication error message and instructions."""
+    try:
+      from rich.console import Console
+      from rich.panel import Panel
+
+      console = Console()
+      message = (
+        "[bold red]Authentication Required[/bold red]\n\n"
+        "You need to authenticate before using remote experiments.\n\n"
+        "[bold]To authenticate:[/bold]\n"
+        "  [cyan]ml-dash login[/cyan]\n\n"
+        "[dim]This will open your browser for secure OAuth2 authentication.\n"
+        "Your token will be stored securely in your system keychain.[/dim]\n\n"
+        "[bold]Alternative:[/bold]\n"
+        "  Use [cyan]local_path[/cyan] instead of [cyan]remote[/cyan] for offline experiments"
+      )
+      panel = Panel(
+        message,
+        title="[bold yellow]⚠ Not Authenticated[/bold yellow]",
+        border_style="yellow",
+        expand=False,
+      )
+      console.print("\n")
+      console.print(panel)
+      console.print("\n")
+    except ImportError:
+      print("\n" + "=" * 60)
+      print("⚠ Authentication Required")
+      print("=" * 60)
+      print("\nYou need to authenticate before using remote experiments.\n")
+      print("To authenticate:")
+      print("  ml-dash login\n")
+      print("Alternative:")
+      print("  Use local_path instead of remote for offline experiments\n")
+      print("=" * 60 + "\n")
 
   def _close(self, status: str = "COMPLETED"):
     """
@@ -351,24 +374,15 @@ class Experiment:
     Args:
         status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
     """
-    # if not self._is_open:
-    #   return
-    #
-    # note-ge: do NOT flush because the upload will be async. we will NEVER reuse
-    # experiment objects.
-    # # Flush any pending writes
-    # if self.run._storage:
-    #   self.run._storage.flush()
-
     # Flush and stop buffer BEFORE status update
     # Waits indefinitely for all data to be flushed (important for large files)
     if self._buffer_manager:
       self._buffer_manager.stop()
 
     # Update experiment status in remote mode
-    if self.run._client and self._experiment_id:
+    if self._client and self._experiment_id:
       try:
-        self.run._client.update_experiment_status(
+        self._client.update_experiment_status(
           experiment_id=self._experiment_id, status=status
         )
 
@@ -409,7 +423,7 @@ class Experiment:
 
       except Exception as e:
         # Raise on status update failure
-        raise RuntimeError(
+        raise NetworkError(
           f"Failed to update experiment status to COMPLETED: {e}\n"
           f"Experiment may not be marked as completed on the server."
         ) from e
@@ -494,14 +508,12 @@ class Experiment:
         LogBuilder when used in deprecated fluent style (message=None)
 
     Raises:
-        RuntimeError: If experiment is not open
-        ValueError: If log level is invalid
+        ExperimentError: If experiment is not open
+        ConfigurationError: If log level is invalid
     """
 
     # Fluent mode: return LogBuilder (deprecated)
     if message is None:
-      import warnings
-
       warnings.warn(
         "Using exp.log() without a message is deprecated. "
         "Use exp.logs.info('message') instead.",
@@ -550,7 +562,7 @@ class Experiment:
     else:
       # Immediate write (backward compatibility)
       log_entry = {
-        "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
+        "timestamp": (timestamp or datetime.now(timezone.utc).replace(tzinfo=None)).isoformat() + "Z",
         "level": level,
         "message": message,
       }
@@ -558,23 +570,23 @@ class Experiment:
       if metadata:
         log_entry["metadata"] = metadata
 
-      if self.run._client:
+      if self._client:
         # Remote mode: send to API (wrapped in array for batch API)
         try:
-          self.run._client.create_log_entries(
+          self._client.create_log_entries(
             experiment_id=self._experiment_id,
             logs=[log_entry],  # Single log in array
           )
         except Exception as e:
-          raise RuntimeError(
+          raise NetworkError(
             f"Failed to write log to remote server: {e}\n"
             f"Data loss occurred. Check your network connection and server status."
           ) from e
 
-      if self.run._storage:
+      if self._storage:
         # Local mode: write to file immediately
         try:
-          self.run._storage.write_log(
+          self._storage.write_log(
             owner=self.run.owner,
             project=self.run.project,
             prefix=self.run._folder_path,
@@ -584,7 +596,7 @@ class Experiment:
             timestamp=log_entry["timestamp"],
           )
         except Exception as e:
-          raise RuntimeError(
+          raise StorageError(
             f"Failed to write log to local storage: {e}\n"
             f"Check disk space and file permissions."
           ) from e
@@ -602,8 +614,6 @@ class Experiment:
         level: Log level
         metadata: Optional metadata dict
     """
-    import sys
-
     # Format the log message
     level_upper = level.upper()
 
@@ -618,7 +628,7 @@ class Experiment:
     formatted_message = f"[{level_upper}] {message}{metadata_str}"
 
     # Route to stdout or stderr based on level
-    if level in ("error", "fatal"):
+    if level in (LogLevel.ERROR.value, LogLevel.FATAL.value):
       print(formatted_message, file=sys.stderr)
     else:
       print(formatted_message, file=sys.stdout)
@@ -703,6 +713,7 @@ class Experiment:
     checksum: str,
     content_type: str,
     size_bytes: int,
+    bindrs: Optional[List[str]] = None,
   ) -> Dict[str, Any]:
     """
     Internal method to upload a file.
@@ -718,6 +729,7 @@ class Experiment:
         checksum: SHA256 checksum
         content_type: MIME type
         size_bytes: File size in bytes
+        bindrs: Optional list of bindr names this file belongs to
 
     Returns:
         File metadata dict (or pending status if buffering)
@@ -726,16 +738,16 @@ class Experiment:
     if self._buffer_manager and self._buffer_config.buffer_enabled:
       self._buffer_manager.buffer_file(
         file_path, prefix, filename, description, tags, metadata,
-        checksum, content_type, size_bytes
+        checksum, content_type, size_bytes, bindrs
       )
       return {"id": "pending", "status": "queued"}
     else:
       # Immediate upload (backward compatibility)
       result = None
 
-      if self.run._client:
+      if self._client:
         # Remote mode: upload to API
-        result = self.run._client.upload_file(
+        result = self._client.upload_file(
           experiment_id=self._experiment_id,
           file_path=file_path,
           prefix=prefix,
@@ -748,9 +760,9 @@ class Experiment:
           size_bytes=size_bytes,
         )
 
-      if self.run._storage:
+      if self._storage:
         # Local mode: copy to local storage
-        result = self.run._storage.write_file(
+        result = self._storage.write_file(
           owner=self.run.owner,
           project=self.run.project,
           prefix=self.run._folder_path,
@@ -759,6 +771,7 @@ class Experiment:
           filename=filename,
           description=description,
           tags=tags,
+          bindrs=bindrs,
           metadata=metadata,
           checksum=checksum,
           content_type=content_type,
@@ -771,26 +784,36 @@ class Experiment:
     self, prefix: Optional[str] = None, tags: Optional[List[str]] = None
   ) -> List[Dict[str, Any]]:
     """
-    Internal method to list files.
+    Internal method to list files. Paginates through all pages automatically.
 
     Args:
-        prefix: Optional prefix filter
+        prefix: Optional prefix filter (local mode only)
         tags: Optional tags filter
 
     Returns:
         List of file metadata dicts
     """
-    files = []
+    if self._client:
+      # Remote mode: paginate through all pages
+      files: List[Dict[str, Any]] = []
+      offset = 0
+      limit = 500
+      while True:
+        result = self._client.list_files(
+          experiment_id=self._experiment_id, limit=limit, offset=offset
+        )
+        files.extend(result["files"])
+        if not result["hasMore"]:
+          break
+        offset += limit
 
-    if self.run._client:
-      # Remote mode: fetch from API
-      files = self.run._client.list_files(
-        experiment_id=self._experiment_id, prefix=prefix, tags=tags
-      )
+      if tags:
+        files = [f for f in files if any(tag in f.get("tags", []) for tag in tags)]
+      return files
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: read from metadata file
-      files = self.run._storage.list_files(
+      return self._storage.list_files(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -798,7 +821,44 @@ class Experiment:
         tags=tags,
       )
 
-    return files
+    return []
+
+  def _find_file_by_path(self, path: str) -> Optional[Dict[str, Any]]:
+    """
+    Find a single file by its path using the server-side search endpoint.
+    Uses the filename as the search pattern and matches the full path locally.
+
+    Args:
+        path: File path relative to experiment root (e.g. "images/photo.jpg")
+
+    Returns:
+        File search result dict, or None if not found
+    """
+    search_path = path.lstrip('/')
+
+    if not self._client:
+      # Local mode: search through listed files by filename or prefix/filename
+      all_files = self._list_files()
+      for f in all_files:
+        file_prefix = f.get('path', '').lstrip('/')
+        filename = f.get('filename', '')
+        full_path = f"{file_prefix}/{filename}" if file_prefix else filename
+        if full_path == search_path or filename == search_path:
+          return f
+      return None
+
+    filename = search_path.split('/')[-1]
+    # Use **/ prefix so the search matches the filename at any directory depth
+    results = self._client.search_files(
+      pattern=f'**/{filename}',
+      experiment_id=self._experiment_id,
+      limit=50,
+    )
+    for f in results:
+      file_path = f.get('path', '').lstrip('/')
+      if file_path == search_path or f.get('name', '') == search_path:
+        return f
+    return None
 
   def _download_file(self, file_id: str, dest_path: Optional[str] = None) -> str:
     """
@@ -811,15 +871,15 @@ class Experiment:
     Returns:
         Path to downloaded file
     """
-    if self.run._client:
+    if self._client:
       # Remote mode: download from API
-      return self.run._client.download_file(
+      return self._client.download_file(
         experiment_id=self._experiment_id, file_id=file_id, dest_path=dest_path
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: copy from local storage
-      return self.run._storage.read_file(
+      return self._storage.read_file(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -827,7 +887,7 @@ class Experiment:
         dest_path=dest_path,
       )
 
-    raise RuntimeError("No client or storage configured")
+    raise ExperimentError("No client or storage configured")
 
   def _delete_file(self, file_id: str) -> Dict[str, Any]:
     """
@@ -841,15 +901,15 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: delete via API
-      result = self.run._client.delete_file(
+      result = self._client.delete_file(
         experiment_id=self._experiment_id, file_id=file_id
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: soft delete in metadata
-      result = self.run._storage.delete_file(
+      result = self._storage.delete_file(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -879,9 +939,9 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: update via API
-      result = self.run._client.update_file(
+      result = self._client.update_file(
         experiment_id=self._experiment_id,
         file_id=file_id,
         description=description,
@@ -889,9 +949,9 @@ class Experiment:
         metadata=metadata,
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: update in metadata file
-      result = self.run._storage.update_file_metadata(
+      result = self._storage.update_file_metadata(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -910,15 +970,15 @@ class Experiment:
     Args:
         flattened_params: Already-flattened parameter dict with dot notation
     """
-    if self.run._client:
+    if self._client:
       # Remote mode: send to API
-      self.run._client.set_parameters(
+      self._client.set_parameters(
         experiment_id=self._experiment_id, data=flattened_params
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: write to file
-      self.run._storage.write_parameters(
+      self._storage.write_parameters(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -934,17 +994,17 @@ class Experiment:
     """
     params = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: fetch from API
       try:
-        params = self.run._client.get_parameters(experiment_id=self._experiment_id)
+        params = self._client.get_parameters(experiment_id=self._experiment_id)
       except Exception:
         # Parameters don't exist yet
         params = None
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: read from file
-      params = self.run._storage.read_parameters(
+      params = self._storage.read_parameters(
         owner=self.run.owner, project=self.run.project, prefix=self.run._folder_path
       )
 
@@ -1043,6 +1103,7 @@ class Experiment:
     description: Optional[str],
     tags: Optional[List[str]],
     metadata: Optional[Dict[str, Any]],
+    timestamp: Optional[float] = None,
   ) -> Optional[Dict[str, Any]]:
     """
     Internal method to append a single data point to a metric.
@@ -1054,10 +1115,26 @@ class Experiment:
         description: Optional metric description
         tags: Optional tags
         metadata: Optional metadata
+        timestamp: Optional explicit timestamp (seconds since epoch).
+                   Use -1 to inherit from the previous append call (same thread).
 
     Returns:
         Dict with metricId, index, bufferedDataPoints, chunkSize or None if buffering enabled/all backends fail
     """
+    # Resolve timestamp
+    if timestamp == -1:
+      if self._last_timestamp is None:
+        raise ConfigurationError(
+          "Cannot use _ts=-1: no previous timestamp to inherit from in this thread."
+        )
+      timestamp = self._last_timestamp
+    elif timestamp is not None:
+      timestamp = float(timestamp)
+    else:
+      timestamp = time.time()
+    self._last_timestamp = timestamp
+    data = {**data, "_ts": timestamp}
+
     # Buffer or write immediately
     if self._buffer_manager and self._buffer_config.buffer_enabled:
       self._buffer_manager.buffer_metric(name, data, description, tags, metadata)
@@ -1066,10 +1143,10 @@ class Experiment:
       # Immediate write (backward compatibility)
       result = None
 
-      if self.run._client:
+      if self._client:
         # Remote mode: append via API
         try:
-          result = self.run._client.append_to_metric(
+          result = self._client.append_to_metric(
             experiment_id=self._experiment_id,
             metric_name=name,
             data=data,
@@ -1079,15 +1156,15 @@ class Experiment:
           )
         except Exception as e:
           metric_display = f"'{name}'" if name else "unnamed metric"
-          raise RuntimeError(
+          raise NetworkError(
             f"Failed to log {metric_display} to remote server: {e}\n"
             f"Data loss occurred. Check your network connection and server status."
           ) from e
 
-      if self.run._storage:
+      if self._storage:
         # Local mode: append to local storage
         try:
-          result = self.run._storage.append_to_metric(
+          result = self._storage.append_to_metric(
             owner=self.run.owner,
             project=self.run.project,
             prefix=self.run._folder_path,
@@ -1099,7 +1176,7 @@ class Experiment:
           )
         except Exception as e:
           metric_display = f"'{name}'" if name else "unnamed metric"
-          raise RuntimeError(
+          raise StorageError(
             f"Failed to log {metric_display} to local storage: {e}\n"
             f"Check disk space and file permissions."
           ) from e
@@ -1129,10 +1206,10 @@ class Experiment:
       self._buffer_manager.buffer_track(topic, timestamp, data)
     else:
       # Immediate write (no buffering)
-      if self.run._client:
+      if self._client:
         # Remote mode: append via API
         try:
-          self.run._client.append_batch_to_track(
+          self._client.append_batch_to_track(
             experiment_id=self._experiment_id,
             topic=topic,
             entries=[{"timestamp": timestamp, **data}],
@@ -1143,10 +1220,10 @@ class Experiment:
             f"Data loss occurred. Check your network connection and server status."
           ) from e
 
-      if self.run._storage:
+      if self._storage:
         # Local mode: append to local storage
         try:
-          self.run._storage.append_batch_to_track(
+          self._storage.append_batch_to_track(
             owner=self.run.owner,
             project=self.run.project,
             prefix=self.run._folder_path,
@@ -1182,10 +1259,10 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: append batch via API
       try:
-        result = self.run._client.append_batch_to_metric(
+        result = self._client.append_batch_to_metric(
           experiment_id=self._experiment_id,
           metric_name=name,
           data_points=data_points,
@@ -1195,15 +1272,15 @@ class Experiment:
         )
       except Exception as e:
         metric_display = f"'{name}'" if name else "unnamed metric"
-        raise RuntimeError(
+        raise NetworkError(
           f"Failed to log batch to {metric_display} on remote server: {e}\n"
           f"Data loss occurred. Check your network connection and server status."
         ) from e
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: append batch to local storage
       try:
-        result = self.run._storage.append_batch_to_metric(
+        result = self._storage.append_batch_to_metric(
           owner=self.run.owner,
           project=self.run.project,
           prefix=self.run._folder_path,
@@ -1215,7 +1292,7 @@ class Experiment:
         )
       except Exception as e:
         metric_display = f"'{name}'" if name else "unnamed metric"
-        raise RuntimeError(
+        raise StorageError(
           f"Failed to log batch to {metric_display} in local storage: {e}\n"
           f"Check disk space and file permissions."
         ) from e
@@ -1238,18 +1315,18 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: read via API
-      result = self.run._client.read_metric_data(
+      result = self._client.read_metric_data(
         experiment_id=self._experiment_id,
         metric_name=name,
         start_index=start_index,
         limit=limit,
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: read from local storage
-      result = self.run._storage.read_metric_data(
+      result = self._storage.read_metric_data(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -1272,15 +1349,15 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: get stats via API
-      result = self.run._client.get_metric_stats(
+      result = self._client.get_metric_stats(
         experiment_id=self._experiment_id, metric_name=name
       )
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: get stats from local storage
-      result = self.run._storage.get_metric_stats(
+      result = self._storage.get_metric_stats(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -1298,13 +1375,13 @@ class Experiment:
     """
     result = None
 
-    if self.run._client:
+    if self._client:
       # Remote mode: list via API
-      result = self.run._client.list_metrics(experiment_id=self._experiment_id)
+      result = self._client.list_metrics(experiment_id=self._experiment_id)
 
-    if self.run._storage:
+    if self._storage:
       # Local mode: list from local storage
-      result = self.run._storage.list_metrics(
+      result = self._storage.list_metrics(
         owner=self.run.owner, project=self.run.project, prefix=self.run._folder_path
       )
 
@@ -1357,26 +1434,6 @@ class Experiment:
         self.run.owner = parts[0]
         self.run.project = parts[1]
         self.run.name = parts[-1] if len(parts) > 2 else parts[1]
-
-  @property
-  def _client(self):
-    """Get the remote client."""
-    return self.run._client
-
-  @_client.setter
-  def _client(self, value) -> None:
-    """Set the remote client."""
-    self.run._client = value
-
-  @property
-  def _storage(self):
-    """Get the local storage."""
-    return self.run._storage
-
-  @_storage.setter
-  def _storage(self, value) -> None:
-    """Set the local storage."""
-    self.run._storage = value
 
   def flush(self) -> None:
     """
