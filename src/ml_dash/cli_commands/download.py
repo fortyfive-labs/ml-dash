@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -21,11 +22,6 @@ from ..config import Config
 from ..storage import LocalStorage
 
 console = Console()
-
-
-# ============================================================================
-# Data Classes
-# ============================================================================
 
 
 @dataclass
@@ -61,21 +57,17 @@ class DownloadState:
   timestamp: Optional[str] = None
 
   def to_dict(self) -> Dict[str, Any]:
-    """Convert to dictionary."""
     return asdict(self)
 
   @classmethod
   def from_dict(cls, data: Dict[str, Any]) -> "DownloadState":
-    """Create from dictionary."""
     return cls(**data)
 
   def save(self, path: Path):
-    """Save state to JSON file."""
     path.write_text(json.dumps(self.to_dict(), indent=2))
 
   @classmethod
   def load(cls, path: Path) -> Optional["DownloadState"]:
-    """Load state from JSON file."""
     if not path.exists():
       return None
     try:
@@ -99,13 +91,7 @@ class DownloadResult:
   skipped: bool = False
 
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-
 def _format_bytes(bytes_count: int) -> str:
-  """Format bytes as human-readable string."""
   for unit in ["B", "KB", "MB", "GB"]:
     if bytes_count < 1024:
       return f"{bytes_count:.2f} {unit}"
@@ -114,22 +100,18 @@ def _format_bytes(bytes_count: int) -> str:
 
 
 def _format_bytes_per_sec(bytes_per_sec: float) -> str:
-  """Format bytes per second as human-readable string."""
   return f"{_format_bytes(bytes_per_sec)}/s"
 
 
 def _experiment_from_graphql(graphql_data: Dict[str, Any]) -> ExperimentInfo:
-  """Convert GraphQL experiment data to ExperimentInfo."""
   log_metadata = graphql_data.get("logMetadata") or {}
 
-  # Extract prefix from metadata if it exists
   metadata = graphql_data.get("metadata") or {}
-  prefix = metadata.get("prefix") if isinstance(metadata, dict) else None
+  prefix = metadata.get("prefix")
 
-  # Extract owner/namespace from project data
   project_data = graphql_data.get("project", {})
   namespace_data = project_data.get("namespace", {})
-  owner = namespace_data.get("slug") if namespace_data else None
+  owner = namespace_data.get("slug")
 
   return ExperimentInfo(
     project=project_data.get("slug", "unknown"),
@@ -153,58 +135,36 @@ def discover_experiments(
   project_filter: Optional[str] = None,
   experiment_filter: Optional[str] = None,
 ) -> List[ExperimentInfo]:
-  """
-  Discover experiments on remote server using GraphQL.
-
-  Args:
-      remote_client: Remote API client
-      project_filter: Optional project slug or glob pattern
-      experiment_filter: Optional experiment name filter
-
-  Returns:
-      List of ExperimentInfo objects
-  """
-  # Specific experiment requested
+  """Discover experiments on remote server using GraphQL."""
   if project_filter and experiment_filter:
     exp_data = remote_client.get_experiment_graphql(project_filter, experiment_filter)
     if exp_data:
       return [_experiment_from_graphql(exp_data)]
     return []
 
-  # Check if project_filter contains glob wildcards
   has_wildcards = project_filter and any(c in project_filter for c in ['*', '?', '['])
 
   if has_wildcards:
-    # Use searchExperiments for glob patterns
-    # Expand simple project patterns to full namespace/project/experiment format
     if '/' not in project_filter:
-      # Simple project pattern: "tut*" -> "*/tut*/*"
+      # "tut*" -> "*/tut*/*"
       search_pattern = f"*/{project_filter}/*"
     else:
-      # Full or partial pattern: use as-is
       search_pattern = project_filter
 
-    experiments_data = remote_client.search_experiments_graphql(search_pattern)
-    return [_experiment_from_graphql(exp) for exp in experiments_data]
+    result = remote_client.search_experiments_graphql(search_pattern)
+    return [_experiment_from_graphql(exp) for exp in result["experiments"]]
 
-  # Project filter - get all experiments in project (exact match)
   if project_filter:
-    experiments_data = remote_client.list_experiments_graphql(project_filter)
-    return [_experiment_from_graphql(exp) for exp in experiments_data]
+    result = remote_client.list_experiments_graphql(project_filter)
+    return [_experiment_from_graphql(exp) for exp in result["experiments"]]
 
-  # No filter - get all projects and their experiments
-  projects = remote_client.list_projects_graphql()
+  projects = remote_client.list_projects_graphql()["projects"]
   all_experiments = []
   for project in projects:
-    experiments_data = remote_client.list_experiments_graphql(project["slug"])
-    all_experiments.extend([_experiment_from_graphql(exp) for exp in experiments_data])
+    result = remote_client.list_experiments_graphql(project["slug"])
+    all_experiments.extend([_experiment_from_graphql(exp) for exp in result["experiments"]])
 
   return all_experiments
-
-
-# ============================================================================
-# Experiment Downloader
-# ============================================================================
 
 
 class ExperimentDownloader:
@@ -247,7 +207,6 @@ class ExperimentDownloader:
     return self._thread_local.client
 
   def download_experiment(self, exp_info: ExperimentInfo) -> DownloadResult:
-    """Download a complete experiment."""
     result = DownloadResult(experiment=f"{exp_info.project}/{exp_info.experiment}")
 
     try:
@@ -256,22 +215,17 @@ class ExperimentDownloader:
           f"  [dim]Downloading {exp_info.project}/{exp_info.experiment}[/dim]"
         )
 
-      # Step 1: Download metadata and create experiment
       self._download_metadata(exp_info, result)
 
-      # Step 2: Download parameters
       if not self.skip_params and exp_info.has_params:
         self._download_parameters(exp_info, result)
 
-      # Step 3: Download logs
       if not self.skip_logs and exp_info.has_logs:
         self._download_logs(exp_info, result)
 
-      # Step 4: Download metrics (parallel)
       if not self.skip_metrics and exp_info.metric_names:
         self._download_metrics(exp_info, result)
 
-      # Step 5: Download files (parallel)
       if not self.skip_files and exp_info.file_count > 0:
         self._download_files(exp_info, result)
 
@@ -286,19 +240,14 @@ class ExperimentDownloader:
     return result
 
   def _download_metadata(self, exp_info: ExperimentInfo, result: DownloadResult):
-    """Download and create experiment metadata."""
-    # Create experiment directory structure with prefix
-    # The prefix from server already includes the full path (owner/project/.../ experiment_name)
     if exp_info.prefix:
       full_prefix = exp_info.prefix
     else:
-      # Build prefix from owner/project/experiment
       if exp_info.owner:
         full_prefix = f"{exp_info.owner}/{exp_info.project}/{exp_info.experiment}"
       else:
         full_prefix = f"{exp_info.project}/{exp_info.experiment}"
 
-    # Extract owner from prefix or use from exp_info
     owner = exp_info.owner if exp_info.owner else full_prefix.split('/')[0]
 
     self.local.create_experiment(
@@ -312,7 +261,6 @@ class ExperimentDownloader:
     )
 
   def _download_parameters(self, exp_info: ExperimentInfo, result: DownloadResult):
-    """Download parameters."""
     try:
       params_data = self.remote.get_parameters(exp_info.experiment_id)
       if params_data:
@@ -343,7 +291,6 @@ class ExperimentDownloader:
         if not logs:
           break
 
-        # Write logs
         for log in logs:
           self.local.write_log(
             project=exp_info.project,
@@ -408,8 +355,6 @@ class ExperimentDownloader:
         "success": True,
         "chunk_number": chunk_number,
         "data": chunk_data.get("data", []),
-        "start_index": int(chunk_data.get("startIndex", 0)),
-        "end_index": int(chunk_data.get("endIndex", 0)),
         "error": None,
       }
     except Exception as e:
@@ -430,18 +375,13 @@ class ExperimentDownloader:
     bytes_downloaded = 0
 
     try:
-      # Get metric metadata to determine download strategy
       metadata = remote.get_metric_stats(experiment_id, metric_name)
       total_chunks = metadata.get("totalChunks", 0)
       buffered_points = int(metadata.get("bufferedDataPoints", 0))
 
       all_data = []
 
-      # Download chunks in parallel if they exist
       if total_chunks > 0:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        # Download all chunks in parallel (max 10 workers)
         with ThreadPoolExecutor(max_workers=min(10, total_chunks)) as executor:
           chunk_futures = {
             executor.submit(
@@ -460,16 +400,12 @@ class ExperimentDownloader:
                 f"Chunk {result['chunk_number']} download failed: {result['error']}"
               )
 
-      # Download buffer data if exists
       if buffered_points > 0:
         response = remote.get_metric_data(experiment_id, metric_name, buffer_only=True)
-        buffer_data = response.get("data", [])
-        all_data.extend(buffer_data)
+        all_data.extend(response.get("data", []))
 
-      # Sort all data by index
       all_data.sort(key=lambda x: int(x.get("index", 0)))
 
-      # Write to local storage in batches
       batch_size = 10000
       for i in range(0, len(all_data), batch_size):
         batch = all_data[i : i + batch_size]
@@ -515,7 +451,6 @@ class ExperimentDownloader:
         if not data_points:
           break
 
-        # Write to local storage
         self.local.append_batch_to_metric(
           project, experiment, metric_name, data_points=[d["data"] for d in data_points]
         )
@@ -540,7 +475,6 @@ class ExperimentDownloader:
 
   def _download_files(self, exp_info: ExperimentInfo, result: DownloadResult):
     """Download files in parallel."""
-    # Get file list
     try:
       files_data = self.remote.list_files(exp_info.experiment_id)
     except Exception as e:
@@ -583,31 +517,29 @@ class ExperimentDownloader:
     remote = self._get_remote_client()
 
     try:
-      # Stream download to temp file
       temp_fd, temp_path = tempfile.mkstemp(prefix="ml_dash_download_")
       os.close(temp_fd)
 
-      remote.download_file_streaming(
-        experiment_id, file_info["id"], dest_path=temp_path
-      )
+      try:
+        remote.download_file_streaming(
+          experiment_id, file_info["id"], dest_path=temp_path
+        )
 
-      # Write to local storage
-      self.local.write_file(
-        project=project,
-        experiment=experiment,
-        file_path=temp_path,
-        prefix=file_info["path"],
-        filename=file_info["filename"],
-        description=file_info.get("description"),
-        tags=file_info.get("tags", []),
-        metadata=file_info.get("metadata"),
-        checksum=file_info["checksum"],
-        content_type=file_info["contentType"],
-        size_bytes=file_info["sizeBytes"],
-      )
-
-      # Clean up temp file
-      os.remove(temp_path)
+        self.local.write_file(
+          project=project,
+          experiment=experiment,
+          file_path=temp_path,
+          prefix=file_info["path"],
+          filename=file_info["filename"],
+          description=file_info.get("description"),
+          tags=file_info.get("tags", []),
+          metadata=file_info.get("metadata"),
+          checksum=file_info["checksum"],
+          content_type=file_info["contentType"],
+          size_bytes=file_info["sizeBytes"],
+        )
+      finally:
+        os.remove(temp_path)
 
       return {"success": True, "bytes": file_info["sizeBytes"], "error": None}
 
@@ -615,30 +547,18 @@ class ExperimentDownloader:
       return {"success": False, "error": str(e), "bytes": 0}
 
 
-# ============================================================================
-# Track Download Command
-# ============================================================================
-
-
 def cmd_download_track(args: argparse.Namespace) -> int:
   """Download track data from remote server."""
-  # Load configuration
   config = Config()
   remote_url = args.dash_url or config.remote_url
   api_key = config.api_key
 
-  # Validate inputs
   if not remote_url:
     console.print("[red]Error:[/red] --dash-url is required (or set in config)")
     return 1
 
-  if not args.tracks:
-    console.print("[red]Error:[/red] Track path is required")
-    return 1
-
-  # Parse track path: namespace/project/experiment/topic...
-  # The challenge is determining where experiment ends and topic begins
-  # Strategy: Try to find the experiment by checking server, working backwards from the end
+  # Parse track path: finding where experiment ends and topic begins requires
+  # trying different split points, since experiments can have folder structures.
   track_path = args.tracks.strip("/")
   parts = track_path.split("/")
 
@@ -653,45 +573,34 @@ def cmd_download_track(args: argparse.Namespace) -> int:
     console.print("  geyang/project/folder/experiment/robot/camera/position")
     return 1
 
-  # Extract namespace and project (always first 2 parts)
   namespace = parts[0]
   project = parts[1]
 
-  # Try to find the experiment by trying different split points
-  # Experiments can have folder structures like "folder/experiment"
-  # So we need to try combining multiple parts as the experiment name
   experiment_name = None
   experiment_data = None
   topic = None
 
-  # Initialize client early to test experiment existence
   try:
     remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
   except Exception as e:
     console.print(f"[red]Error:[/red] Failed to connect to server: {e}")
     return 1
 
-  # Try different split points: experiment path could be parts[2], parts[2:3], parts[2:4], etc.
-  # Topic is everything after the experiment (must have at least 1 part for topic)
+  # Try each possible split point: experiment name is parts[2:split_idx],
+  # topic is parts[split_idx:]. Experiments can have folder structures.
   tried_names = []
-  for split_idx in range(3, len(parts) + 1):  # Split at 3, 4, 5, ... (experiment ends at split_idx-1)
-    # Experiment is everything from index 2 to split_idx-1
+  for split_idx in range(3, len(parts) + 1):
     potential_exp_name = "/".join(parts[2:split_idx])
-    # Topic is everything from split_idx onwards
-    potential_topic = "/".join(parts[split_idx:]) if split_idx < len(parts) else ""
+    potential_topic = "/".join(parts[split_idx:])
 
-    # Skip if no topic (topic is required for --tracks)
     if not potential_topic:
       continue
 
     tried_names.append(potential_exp_name)
 
-    # Try to fetch this experiment from server
-    # First try by path (supports folder hierarchies)
     try:
       exp_data = remote_client.get_experiment_by_path_graphql(project, potential_exp_name, namespace)
       if exp_data:
-        # Found the experiment!
         experiment_name = potential_exp_name
         experiment_data = exp_data
         topic = potential_topic
@@ -699,17 +608,14 @@ def cmd_download_track(args: argparse.Namespace) -> int:
     except Exception:
       pass
 
-    # Fallback: try by name only (for experiments without folders)
     try:
       exp_data = remote_client.get_experiment_graphql(project, potential_exp_name, namespace)
       if exp_data:
-        # Found the experiment!
         experiment_name = potential_exp_name
         experiment_data = exp_data
         topic = potential_topic
         break
     except Exception:
-      # This experiment doesn't exist, try next split point
       continue
 
   if not experiment_name or not topic:
@@ -722,7 +628,7 @@ def cmd_download_track(args: argparse.Namespace) -> int:
     console.print(f"\nMake sure the experiment exists in project '{project}'")
     return 1
 
-  console.print(f"[bold]Downloading track data...[/bold]")
+  console.print("[bold]Downloading track data...[/bold]")
   console.print(f"  Namespace: {namespace}")
   console.print(f"  Project: {project}")
   console.print(f"  Experiment: {experiment_name}")
@@ -730,52 +636,35 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   console.print(f"  Format: {args.format}")
 
   try:
-    # Use the experiment data we already fetched during path parsing
     experiment_id = experiment_data["id"]
 
-    # Download track data
-    console.print(f"\n[cyan]Fetching track data from server...[/cyan]")
+    console.print("\n[cyan]Fetching track data from server...[/cyan]")
     track_data = remote_client.get_track_data(
       experiment_id=experiment_id,
       topic=topic,
       format=args.format,
     )
 
-    # Determine output filename
     if args.output:
       output_path = Path(args.output)
     else:
-      # Generate filename from topic and format
       safe_topic = topic.replace("/", "_")
-      extension = {
-        "json": "json",
-        "jsonl": "jsonl",
-        "parquet": "parquet",
-        "mcap": "mcap",
-      }.get(args.format, args.format)
-      output_path = Path(f"{safe_topic}.{extension}")
+      output_path = Path(f"{safe_topic}.{args.format}")
 
-    # Write to file
     if args.format in ("jsonl", "parquet", "mcap"):
-      # Binary data
       output_path.write_bytes(track_data)
     else:
-      # JSON data
       if isinstance(track_data, dict):
         output_path.write_text(json.dumps(track_data, indent=2))
       else:
         output_path.write_text(str(track_data))
 
-    # Show success message
     file_size = output_path.stat().st_size
-    console.print(
-      f"\n[green]✓ Track data downloaded successfully[/green]"
-    )
+    console.print("\n[green]✓ Track data downloaded successfully[/green]")
     console.print(f"  Output: {output_path}")
     console.print(f"  Size: {_format_bytes(file_size)}")
     console.print(f"  Format: {args.format}")
 
-    # Show entry count if available
     if args.format == "json" and isinstance(track_data, dict):
       entry_count = track_data.get("count", len(track_data.get("entries", [])))
       if entry_count:
@@ -786,38 +675,27 @@ def cmd_download_track(args: argparse.Namespace) -> int:
   except Exception as e:
     console.print(f"[red]Error downloading track data:[/red] {e}")
     if args.verbose:
-      import traceback
       console.print(traceback.format_exc())
     return 1
 
 
-# ============================================================================
-# Main Command
-# ============================================================================
-
-
 def cmd_download(args: argparse.Namespace) -> int:
   """Execute download command."""
-  # Handle track download if --tracks is specified
   if args.tracks:
     return cmd_download_track(args)
 
-  # Load configuration
   config = Config()
   remote_url = args.dash_url or config.remote_url
-  api_key = config.api_key  # RemoteClient will auto-load if None
+  api_key = config.api_key  # auto-loaded from token storage if None
 
-  # Validate inputs
   if not remote_url:
     console.print("[red]Error:[/red] --dash-url is required (or set in config)")
     return 1
 
-  # Extract namespace from project argument
   namespace = None
   if args.project:
-    # Parse namespace from project filter (format: "owner/project" or "owner/project/exp")
     project_parts = args.project.strip("/").split("/")
-    if len(project_parts) >= 2:  # Has at least "owner/project"
+    if len(project_parts) >= 2:
       namespace = project_parts[0]
 
   if not namespace:
@@ -827,11 +705,9 @@ def cmd_download(args: argparse.Namespace) -> int:
     console.print("Example: ml-dash download --project alice/my-project")
     return 1
 
-  # Initialize clients (RemoteClient will auto-load token if api_key is None)
   remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
   local_storage = LocalStorage(root_path=Path(args.path))
 
-  # Load or create state
   state_file = Path(args.state_file)
   if args.resume:
     state = DownloadState.load(state_file)
@@ -845,7 +721,6 @@ def cmd_download(args: argparse.Namespace) -> int:
   else:
     state = DownloadState(remote_url=remote_url, local_path=str(args.path))
 
-  # Discover experiments
   console.print("[bold]Discovering experiments on remote server...[/bold]")
   try:
     experiments = discover_experiments(remote_client, args.project, args.experiment)
@@ -859,17 +734,14 @@ def cmd_download(args: argparse.Namespace) -> int:
 
   console.print(f"Found {len(experiments)} experiment(s)")
 
-  # Filter out completed experiments
   experiments_to_download = []
   for exp in experiments:
     exp_key = f"{exp.project}/{exp.experiment}"
 
-    # Skip if already completed
     if exp_key in state.completed_experiments and not args.overwrite:
       console.print(f"  [dim]Skipping {exp_key} (already completed)[/dim]")
       continue
 
-    # Check if exists locally
     exp_json = (
       local_storage.root_path / exp.project / exp.experiment / "experiment.json"
     )
@@ -883,7 +755,6 @@ def cmd_download(args: argparse.Namespace) -> int:
     console.print("[green]All experiments already downloaded[/green]")
     return 0
 
-  # Dry run mode
   if args.dry_run:
     console.print("\n[bold]Dry run - would download:[/bold]")
     for exp in experiments_to_download:
@@ -893,7 +764,6 @@ def cmd_download(args: argparse.Namespace) -> int:
       )
     return 0
 
-  # Download experiments
   console.print(
     f"\n[bold]Downloading {len(experiments_to_download)} experiment(s)...[/bold]"
   )
@@ -904,11 +774,9 @@ def cmd_download(args: argparse.Namespace) -> int:
     exp_key = f"{exp.project}/{exp.experiment}"
     console.print(f"\n[cyan][{i}/{len(experiments_to_download)}] {exp_key}[/cyan]")
 
-    # Mark as in-progress
     state.in_progress_experiment = exp_key
     state.save(state_file)
 
-    # Download
     downloader = ExperimentDownloader(
       local_storage=local_storage,
       remote_client=remote_client,
@@ -925,7 +793,6 @@ def cmd_download(args: argparse.Namespace) -> int:
     result = downloader.download_experiment(exp)
     results.append(result)
 
-    # Update state
     if result.success:
       state.completed_experiments.append(exp_key)
       console.print("  [green]✓ Downloaded successfully[/green]")
@@ -936,7 +803,6 @@ def cmd_download(args: argparse.Namespace) -> int:
     state.in_progress_experiment = None
     state.save(state_file)
 
-  # Show summary
   end_time = time.time()
   elapsed_time = end_time - start_time
   total_bytes = sum(r.bytes_downloaded for r in results)
@@ -959,7 +825,6 @@ def cmd_download(args: argparse.Namespace) -> int:
 
   console.print(summary_table)
 
-  # Clean up state file if all successful
   if all(r.success for r in results):
     state_file.unlink(missing_ok=True)
 
@@ -972,7 +837,6 @@ def add_parser(subparsers):
     "download", help="Download experiments from remote server to local storage"
   )
 
-  # Positional arguments
   parser.add_argument(
     "path",
     nargs="?",
@@ -980,7 +844,6 @@ def add_parser(subparsers):
     help="Local storage directory (default: ./.dash)",
   )
 
-  # Track download mode
   parser.add_argument(
     "--tracks",
     type=str,
@@ -1001,15 +864,12 @@ def add_parser(subparsers):
     help="Output file path (default: auto-generated from topic)",
   )
 
-  # Remote configuration
   parser.add_argument(
     "--dash-url", "--api-url",
     dest="dash_url",
     help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
   )
 
-
-  # Scope control
   parser.add_argument(
     "-p",
     "--pref",
@@ -1025,7 +885,6 @@ def add_parser(subparsers):
     help="Download specific experiment (requires --project)"
   )
 
-  # Data filtering
   parser.add_argument("--skip-logs", action="store_true", help="Don't download logs")
   parser.add_argument(
     "--skip-metrics", action="store_true", help="Don't download metrics"
@@ -1035,7 +894,6 @@ def add_parser(subparsers):
     "--skip-params", action="store_true", help="Don't download parameters"
   )
 
-  # Behavior control
   parser.add_argument(
     "--dry-run", action="store_true", help="Preview without downloading"
   )

@@ -6,9 +6,10 @@ Allows users to discover projects and experiments on the remote server.
 
 import argparse
 import sys
+import traceback
 import tty
 import termios
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
@@ -52,30 +53,16 @@ def list_tracks(
     topic_filter: Optional[str] = None,
     verbose: bool = False
 ) -> int:
-    """
-    List tracks in an experiment.
-
-    Args:
-        remote_client: Remote API client
-        experiment_path: Experiment path (namespace/project/experiment)
-        topic_filter: Optional topic filter (e.g., "robot/*")
-        verbose: Show verbose output
-
-    Returns:
-        Exit code (0 for success, 1 for error)
-    """
-    # Parse experiment path
+    """List tracks in an experiment."""
     parts = experiment_path.strip("/").split("/")
     if len(parts) < 3:
         console.print("[red]Error:[/red] Experiment path must be 'namespace/project/experiment'")
         return 1
 
-    namespace = parts[0]
     project = parts[1]
     experiment = parts[2]
 
     try:
-        # Get experiment ID
         exp_data = remote_client.get_experiment_graphql(project, experiment)
         if not exp_data:
             console.print(f"[red]Error:[/red] Experiment '{experiment}' not found in project '{project}'")
@@ -83,16 +70,14 @@ def list_tracks(
 
         experiment_id = exp_data["id"]
 
-        # List tracks
         tracks = remote_client.list_tracks(experiment_id, topic_filter)
 
         if not tracks:
-            console.print(f"[yellow]No tracks found[/yellow]")
+            console.print("[yellow]No tracks found[/yellow]")
             return 0
 
         console.print(f"\n[bold]Tracks in {experiment_path}[/bold]\n")
 
-        # Create table
         table = Table(box=box.ROUNDED)
         table.add_column("Topic", style="cyan", no_wrap=True)
         table.add_column("Entries", justify="right")
@@ -102,9 +87,10 @@ def list_tracks(
         for track in tracks:
             topic = track["topic"]
             entries = str(track.get("totalEntries", 0))
-            columns = ", ".join(track.get("columns", [])[:5])
-            if len(track.get("columns", [])) > 5:
-                columns += f", ... (+{len(track['columns']) - 5})"
+            cols = track.get("columns", [])
+            columns = ", ".join(cols[:5])
+            if len(cols) > 5:
+                columns += f", ... (+{len(cols) - 5})"
 
             first_ts = track.get("firstTimestamp")
             last_ts = track.get("lastTimestamp")
@@ -123,7 +109,6 @@ def list_tracks(
     except Exception as e:
         console.print(f"[red]Error listing tracks:[/red] {e}")
         if verbose:
-            import traceback
             console.print(traceback.format_exc())
         return 1
 
@@ -151,12 +136,11 @@ def _format_timestamp(iso_timestamp: str) -> str:
             return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
         else:
             return "just now"
-    except:
+    except Exception:
         return iso_timestamp
 
 
 def _get_status_style(status: str) -> str:
-    """Get rich style for status."""
     status_styles = {
         "COMPLETED": "green",
         "RUNNING": "yellow",
@@ -237,7 +221,6 @@ def list_projects(
     except Exception as e:
         console.print(f"[red]Error listing projects:[/red] {e}")
         if verbose:
-            import traceback
             console.print(traceback.format_exc())
         return 1
 
@@ -264,7 +247,6 @@ def list_experiments(
             experiments = result["experiments"]
             total_count = result["totalCount"]
 
-            # Client-side tags filter (applies within fetched page)
             if tags_filter:
                 experiments = [
                     exp for exp in experiments
@@ -356,38 +338,26 @@ def list_experiments(
     except Exception as e:
         console.print(f"[red]Error listing experiments:[/red] {e}")
         if verbose:
-            import traceback
             console.print(traceback.format_exc())
         return 1
 
 
 def cmd_list(args: argparse.Namespace) -> int:
-    """
-    Execute list command.
+    """Execute list command."""
+    config = Config()
+    remote_url = args.dash_url or config.remote_url
+    api_key = config.api_key
 
-    Args:
-        args: Parsed command-line arguments
+    if not remote_url:
+        console.print("[red]Error:[/red] --dash-url is required (or set in config)")
+        return 1
 
-    Returns:
-        Exit code (0 for success, 1 for error)
-    """
-    # Handle track listing if --tracks is specified
     if args.tracks:
-        # Load config
-        config = Config()
-        remote_url = args.dash_url or config.remote_url
-        api_key = config.api_key
-
-        if not remote_url:
-            console.print("[red]Error:[/red] --dash-url is required (or set in config)")
-            return 1
-
         if not args.project:
             console.print("[red]Error:[/red] --project is required for listing tracks")
             console.print("Example: ml-dash list --tracks --project namespace/project/experiment")
             return 1
 
-        # Extract namespace from project path
         parts = args.project.strip("/").split("/")
         if len(parts) < 3:
             console.print("[red]Error:[/red] For tracks, --project must be 'namespace/project/experiment'")
@@ -395,7 +365,6 @@ def cmd_list(args: argparse.Namespace) -> int:
 
         namespace = parts[0]
 
-        # Create remote client
         try:
             remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
         except Exception as e:
@@ -409,37 +378,19 @@ def cmd_list(args: argparse.Namespace) -> int:
             verbose=args.verbose
         )
 
-    # Load config
-    config = Config()
-
-    # Get remote URL (command line > config)
-    remote_url = args.dash_url or config.remote_url
-    if not remote_url:
-        console.print("[red]Error:[/red] --dash-url is required (or set in config)")
-        return 1
-
-    # Get API key (command line > config > auto-loaded from storage)
-    api_key = config.api_key
-
-    # Extract namespace and project slug from project argument
     namespace = None
     project_slug = None
     if args.project:
-        # Parse namespace from project filter (format: "namespace/project")
         project_parts = args.project.strip("/").split("/")
-        # For simple patterns without '/', treat as project-only pattern
-        if '/' in args.project and len(project_parts) >= 2:
+        if '/' in args.project:
             namespace = project_parts[0]
             project_slug = project_parts[1]
 
     has_wildcards = args.project and any(c in args.project for c in ['*', '?', '['])
 
-    # If --project has no '/' and no wildcards, treat as plain project slug
-    # and auto-resolve namespace from the stored token
     if args.project and not namespace and not has_wildcards:
         project_slug = args.project
 
-    # Create remote client; resolve effective namespace (explicit arg > project prefix > token)
     try:
         remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
     except Exception as e:
@@ -448,17 +399,13 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     effective_namespace = args.namespace or namespace or remote_client.namespace
 
-    # List projects or experiments
     if args.project:
-        # Parse tags if provided
         tags_filter = None
         if args.tags:
             tags_filter = [tag.strip() for tag in args.tags.split(',')]
 
         if has_wildcards:
-            # Use searchExperimentsPaginated GraphQL query for glob patterns
             try:
-                # Expand patterns to full namespace/project/experiment format
                 if '/' not in args.project:
                     # "tes*" → "{current_namespace}/tes*/*"
                     search_pattern = f"{remote_client.namespace}/{args.project}/*"
@@ -576,12 +523,9 @@ def cmd_list(args: argparse.Namespace) -> int:
             except Exception as e:
                 console.print(f"[red]Error searching experiments:[/red] {e}")
                 if args.verbose:
-                    import traceback
                     console.print(traceback.format_exc())
                 return 1
         else:
-            # No wildcards, use existing list method for exact project match
-            # Show the effective namespace for clarity
             console.print(f"[dim]Using namespace: {effective_namespace}[/dim]")
             return list_experiments(
                 remote_client=remote_client,
@@ -608,14 +552,12 @@ def add_parser(subparsers) -> None:
         description="Discover projects and experiments available on the remote ML-Dash server."
     )
 
-    # Remote configuration
     parser.add_argument(
         "--dash-url", "--api-url",
         dest="dash_url",
         type=str,
         help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
     )
-    # Namespace / filtering options
     parser.add_argument(
         "-n", "--namespace",
         type=str,
@@ -637,7 +579,6 @@ def add_parser(subparsers) -> None:
                        help="Filter experiments by status")
     parser.add_argument("--tags", type=str, help="Filter experiments by tags (comma-separated)")
 
-    # Track listing mode
     parser.add_argument(
         "--tracks",
         action="store_true",
@@ -649,6 +590,5 @@ def add_parser(subparsers) -> None:
         help="Filter tracks by topic (e.g., 'robot/*')"
     )
 
-    # Output options
     parser.add_argument("--detailed", action="store_true", help="Show detailed information")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
