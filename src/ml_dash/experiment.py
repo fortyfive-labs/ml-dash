@@ -852,7 +852,7 @@ class Experiment:
     results = self._client.search_files(
       pattern=f'**/{filename}',
       experiment_id=self._experiment_id,
-      limit=50,
+      limit=1,
     )
     for f in results:
       file_path = f.get('path', '').lstrip('/')

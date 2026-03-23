@@ -1028,59 +1028,87 @@ class RemoteClient:
     def list_files(
         self,
         experiment_id: str,
-        prefix: Optional[str] = None,
-        tags: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+        limit: int = 500,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
         """
-        List files in an experiment using GraphQL.
+        List files in an experiment using GraphQL (paginated).
 
         Args:
             experiment_id: Experiment ID (Snowflake ID)
-            prefix: Optional prefix filter (DEPRECATED - filtering not supported in new API)
-            tags: Optional tags filter
+            limit: Max files to return per page
+            offset: Pagination offset
 
         Returns:
-            List of file node dicts
+            Dict with keys: files (list), totalCount (int), hasMore (bool)
 
         Raises:
             httpx.HTTPStatusError: If request fails
         """
         query = """
-        query ListExperimentFiles($experimentId: ID!) {
+        query ListExperimentFilesPaginated($experimentId: ID!, $limit: Int!, $offset: Int!) {
           experimentById(id: $experimentId) {
-            files {
-              id
-              name
-              description
-              tags
-              metadata
-              createdAt
-              pPath
-              physicalFile {
+            filesPaginated(limit: $limit, offset: $offset) {
+              files {
                 id
-                filename
-                contentType
-                sizeBytes
-                checksum
-                s3Url
+                name
+                description
+                tags
+                metadata
+                createdAt
+                pPath
+                physicalFile {
+                  id
+                  filename
+                  contentType
+                  sizeBytes
+                  checksum
+                  s3Url
+                }
               }
+              totalCount
+              hasMore
             }
           }
         }
         """
-        result = self.graphql_query(query, {"experimentId": experiment_id})
-        files = result.get("experimentById", {}).get("files", [])
+        result = self.graphql_query(query, {
+            "experimentId": experiment_id,
+            "limit": limit,
+            "offset": offset,
+        })
+        paginated = result.get("experimentById", {}).get("filesPaginated", {})
+        return {
+            "files": paginated.get("files", []),
+            "totalCount": paginated.get("totalCount", 0),
+            "hasMore": paginated.get("hasMore", False),
+        }
 
-        # Apply client-side filtering if tags specified
-        if tags:
-            filtered_files = []
-            for file in files:
-                file_tags = file.get("tags", [])
-                if any(tag in file_tags for tag in tags):
-                    filtered_files.append(file)
-            return filtered_files
+    def search_files(
+        self,
+        pattern: str,
+        experiment_id: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search files by glob pattern using the REST search endpoint.
 
-        return files
+        Args:
+            pattern: Glob pattern to match against file names
+            experiment_id: Optional experiment ID to scope the search
+            limit: Max results to return
+            offset: Number of results to skip (for pagination)
+
+        Returns:
+            List of file search result dicts (id, name, path, ...)
+        """
+        params: Dict[str, Any] = {"pattern": pattern, "limit": limit, "offset": offset}
+        if experiment_id:
+            params["experimentId"] = experiment_id
+        response = self._client.get("/search/files", params=params)
+        response.raise_for_status()
+        return response.json().get("files", [])
 
     def get_file(self, experiment_id: str, file_id: str) -> Dict[str, Any]:
         """
