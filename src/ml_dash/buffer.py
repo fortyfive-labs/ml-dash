@@ -5,6 +5,8 @@ Provides non-blocking writes for logs, metrics, and files by batching
 operations in a background thread.
 """
 
+import errno
+import logging
 import os
 import threading
 import time
@@ -12,11 +14,13 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from queue import Empty, Queue
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 from .exceptions import NetworkError, StorageError
 from .utils import _serialize_value
+
+_logger = logging.getLogger("ml_dash.buffer")
 
 
 class BufferConfig:
@@ -35,6 +39,9 @@ class BufferConfig:
         track_batch_size: int = 100,
         file_upload_workers: int = 4,
         buffer_enabled: bool = True,
+        max_retries: int = 3,
+        retry_base_delay: float = 1.0,
+        retry_max_delay: float = 30.0,
     ):
         """
         Initialize buffer configuration.
@@ -46,6 +53,9 @@ class BufferConfig:
             track_batch_size: Max track entries per batch (default: 100)
             file_upload_workers: Number of parallel file upload threads (default: 4)
             buffer_enabled: Enable/disable buffering (default: True)
+            max_retries: Max retry attempts on transient network errors (default: 3)
+            retry_base_delay: Initial retry delay in seconds; doubles each attempt (default: 1.0)
+            retry_max_delay: Cap on retry delay in seconds (default: 30.0)
         """
         self.flush_interval = flush_interval
         self.log_batch_size = log_batch_size
@@ -53,6 +63,9 @@ class BufferConfig:
         self.track_batch_size = track_batch_size
         self.file_upload_workers = file_upload_workers
         self.buffer_enabled = buffer_enabled
+        self.max_retries = max_retries
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = retry_max_delay
 
     @classmethod
     def from_env(cls) -> "BufferConfig":
@@ -67,6 +80,9 @@ class BufferConfig:
             ),
             buffer_enabled=os.environ.get("ML_DASH_BUFFER_ENABLED", "true").lower()
             in ("true", "1", "yes"),
+            max_retries=int(os.environ.get("ML_DASH_MAX_RETRIES", "3")),
+            retry_base_delay=float(os.environ.get("ML_DASH_RETRY_BASE_DELAY", "1.0")),
+            retry_max_delay=float(os.environ.get("ML_DASH_RETRY_MAX_DELAY", "30.0")),
         )
 
 
@@ -102,6 +118,73 @@ class BackgroundBufferManager:
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._flush_event = threading.Event()  # Manual flush trigger
+
+    @staticmethod
+    def _is_transient_error(e: Exception) -> bool:
+        """Return True if the exception looks like a transient network failure worth retrying."""
+        # OSError / IOError — check errno
+        if isinstance(e, OSError):
+            transient_errnos = {
+                errno.ENETUNREACH,   # 101 — Network unreachable
+                errno.ECONNREFUSED,  # 111 — Connection refused
+                errno.ETIMEDOUT,     # 110 — Connection timed out
+                errno.ECONNRESET,    # 104 — Connection reset by peer
+                -3,                  # EAI_AGAIN — Temporary failure in name resolution
+            }
+            if e.errno in transient_errnos:
+                return True
+        # httpx transport errors
+        try:
+            import httpx
+            if isinstance(e, (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError)):
+                return True
+        except ImportError:
+            pass
+        # Recurse into chained cause (e.g. NetworkError wrapping OSError)
+        if e.__cause__ is not None and e.__cause__ is not e:
+            return BackgroundBufferManager._is_transient_error(e.__cause__)
+        return False
+
+    def _retry_remote_call(self, fn: Callable, description: str) -> None:
+        """
+        Call fn() retrying on transient network errors with exponential backoff.
+
+        Logs each retry attempt at WARNING and raises on permanent failure.
+
+        Args:
+            fn: Zero-argument callable to attempt
+            description: Human-readable description for log messages
+        """
+        max_retries = self._config.max_retries
+        base_delay = self._config.retry_base_delay
+        max_delay = self._config.retry_max_delay
+
+        for attempt in range(max_retries + 1):
+            try:
+                fn()
+                if attempt > 0:
+                    _logger.info(
+                        "[ML-Dash] %s succeeded on attempt %d/%d",
+                        description, attempt + 1, max_retries + 1,
+                    )
+                return
+            except Exception as e:
+                is_last = attempt >= max_retries
+                is_transient = self._is_transient_error(e)
+
+                if not is_last and is_transient:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    _logger.warning(
+                        "[ML-Dash] %s failed (attempt %d/%d) — %s: %s "
+                        "(errno=%s) — retrying in %.1fs",
+                        description, attempt + 1, max_retries + 1,
+                        type(e).__name__, e,
+                        getattr(e.__cause__ or e, "errno", "n/a"),
+                        delay,
+                    )
+                    time.sleep(delay)
+                else:
+                    raise
 
     def start(self) -> None:
         """Start background flushing thread."""
@@ -469,6 +552,8 @@ class BackgroundBufferManager:
                 try:
                     self._flush_logs()
                 except Exception as e:
+                    _logger.error("[ML-Dash] Background log flush failed: %s: %s",
+                                  type(e).__name__, e, exc_info=True)
                     warnings.warn(f"[ML-Dash] Background log flush failed: {e}")
 
             # Flush metrics (check each metric queue)
@@ -482,6 +567,8 @@ class BackgroundBufferManager:
                     try:
                         self._flush_metric(metric_name)
                     except Exception as e:
+                        _logger.error("[ML-Dash] Background metric flush failed for '%s': %s: %s",
+                                      metric_name, type(e).__name__, e, exc_info=True)
                         warnings.warn(f"[ML-Dash] Background metric flush failed: {e}")
 
             # Flush tracks (check each topic)
@@ -495,6 +582,8 @@ class BackgroundBufferManager:
                     try:
                         self._flush_track(topic)
                     except Exception as e:
+                        _logger.error("[ML-Dash] Background track flush failed for topic '%s': %s: %s",
+                                      topic, type(e).__name__, e, exc_info=True)
                         warnings.warn(f"[ML-Dash] Background track flush failed: {e}")
 
             # Flush files (always process file queue)
@@ -502,6 +591,8 @@ class BackgroundBufferManager:
                 try:
                     self._flush_files()
                 except Exception as e:
+                    _logger.error("[ML-Dash] Background file flush failed: %s: %s",
+                                  type(e).__name__, e, exc_info=True)
                     warnings.warn(f"[ML-Dash] Background file flush failed: {e}")
 
             # Clear the flush event after processing
@@ -533,9 +624,12 @@ class BackgroundBufferManager:
         # Write to backends
         if self._experiment._client:
             try:
-                self._experiment._client.create_log_entries(
-                    experiment_id=self._experiment._experiment_id,
-                    logs=batch,
+                self._retry_remote_call(
+                    lambda: self._experiment._client.create_log_entries(
+                        experiment_id=self._experiment._experiment_id,
+                        logs=batch,
+                    ),
+                    f"flush {len(batch)} log(s)",
                 )
             except Exception as e:
                 raise NetworkError(
@@ -601,17 +695,20 @@ class BackgroundBufferManager:
 
         # Write to backends
         if self._experiment._client:
+            metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
             try:
-                self._experiment._client.append_batch_to_metric(
-                    experiment_id=self._experiment._experiment_id,
-                    metric_name=metric_name,
-                    data_points=batch,
-                    description=description,
-                    tags=tags,
-                    metadata=metadata,
+                self._retry_remote_call(
+                    lambda: self._experiment._client.append_batch_to_metric(
+                        experiment_id=self._experiment._experiment_id,
+                        metric_name=metric_name,
+                        data_points=batch,
+                        description=description,
+                        tags=tags,
+                        metadata=metadata,
+                    ),
+                    f"flush {len(batch)} point(s) to metric {metric_display}",
                 )
             except Exception as e:
-                metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
                 raise NetworkError(
                     f"Failed to flush {len(batch)} points to {metric_display} on remote server: {e}\n"
                     f"Data loss occurred. Check your network connection and server status."
@@ -665,10 +762,13 @@ class BackgroundBufferManager:
         # Write to remote backend
         if self._experiment._client:
             try:
-                self._experiment._client.append_batch_to_track(
-                    experiment_id=self._experiment._experiment_id,
-                    topic=topic,
-                    entries=batch,
+                self._retry_remote_call(
+                    lambda: self._experiment._client.append_batch_to_track(
+                        experiment_id=self._experiment._experiment_id,
+                        topic=topic,
+                        entries=batch,
+                    ),
+                    f"flush {len(batch)} entry/entries to track '{topic}'",
                 )
             except Exception as e:
                 raise NetworkError(
