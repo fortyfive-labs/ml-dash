@@ -51,7 +51,7 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.21"
+__version__ = "0.6.22"
 
 
 def _check_version_compatibility():
