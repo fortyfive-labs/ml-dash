@@ -10,57 +10,22 @@ import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional
 
 
-def _serialize_value(value: Any) -> Any:
-    """
-    Convert value to JSON-serializable format.
-
-    Handles numpy arrays, nested dicts/lists, etc.
-
-    Args:
-        value: Value to serialize
-
-    Returns:
-        JSON-serializable value
-    """
-    # Check for numpy array
-    if hasattr(value, '__array__') or (hasattr(value, 'tolist') and hasattr(value, 'dtype')):
-        # It's a numpy array
-        try:
-            return value.tolist()
-        except AttributeError:
-            pass
-
-    # Check for numpy scalar types
-    if hasattr(value, 'item'):
-        try:
-            return value.item()
-        except (AttributeError, ValueError):
-            pass
-
-    # Recursively handle dicts
-    if isinstance(value, dict):
-        return {k: _serialize_value(v) for k, v in value.items()}
-
-    # Recursively handle lists
-    if isinstance(value, (list, tuple)):
-        return [_serialize_value(v) for v in value]
-
-    # Return as-is for other types (int, float, str, bool, None)
-    return value
+from .exceptions import NetworkError, StorageError
+from .utils import _serialize_value
 
 
 class BufferConfig:
     """Configuration for buffering behavior."""
 
     # Internal constants for queue management (not exposed to users)
-    _MAX_QUEUE_SIZE = 100000  # Maximum items before blocking
-    _WARNING_THRESHOLD = 80000  # Warn at 80% capacity
-    _AGGRESSIVE_FLUSH_THRESHOLD = 50000  # Trigger immediate flush at 50% capacity
+    _MAX_QUEUE_SIZE = 100_000  # Maximum items before blocking
+    _WARNING_THRESHOLD = int(_MAX_QUEUE_SIZE * 0.80)  # Warn at 80% capacity
+    _AGGRESSIVE_FLUSH_THRESHOLD = int(_MAX_QUEUE_SIZE * 0.50)  # Trigger immediate flush at 50% capacity
 
     def __init__(
         self,
@@ -158,27 +123,14 @@ class BackgroundBufferManager:
         if self._thread is None:
             return  # Not started
 
-        # Check what needs to be flushed and inform user
-        log_count = self._log_queue.qsize()
-        metric_count = sum(q.qsize() for q in self._metric_queues.values())
-        track_count = sum(len(entries) for entries in self._track_buffers.values())
-        file_count = self._file_queue.qsize()
+        # Snapshot counts before signalling stop (for the user-facing message)
+        log_count, metric_count, track_count, file_count = self._pending_counts()
+        total = log_count + metric_count + track_count + file_count
 
-        if log_count > 0 or metric_count > 0 or track_count > 0 or file_count > 0:
-            print("\n[ML-Dash] Flushing buffered data...", flush=True)
-
-            items = []
-            if log_count > 0:
-                items.append(f"{log_count} log(s)")
-            if metric_count > 0:
-                items.append(f"{metric_count} metric point(s)")
-            if track_count > 0:
-                items.append(f"{track_count} track entry(ies)")
-            if file_count > 0:
-                items.append(f"{file_count} file(s)")
-
-            if items:
-                print(f"[ML-Dash]   - {', '.join(items)}", flush=True)
+        if total > 0:
+            desc = self._describe_pending(log_count, metric_count, track_count, file_count)
+            print(f"\n[ML-Dash] Flushing buffered data...", flush=True)
+            print(f"[ML-Dash]   - {desc}", flush=True)
 
         # Signal stop and trigger flush
         self._stop_event.set()
@@ -187,7 +139,7 @@ class BackgroundBufferManager:
         # Wait for thread to finish (no timeout - ensure all data is flushed)
         self._thread.join()
 
-        if log_count > 0 or metric_count > 0 or track_count > 0 or file_count > 0:
+        if total > 0:
             print("[ML-Dash] ✓ All data flushed successfully", flush=True)
 
         self._thread = None
@@ -220,6 +172,89 @@ class BackgroundBufferManager:
                 )
                 self._warned_queues.add(queue_name)
 
+    def _pending_counts(self) -> tuple:
+        """Return (log_count, metric_count, track_count, file_count) snapshot."""
+        return (
+            self._log_queue.qsize(),
+            sum(q.qsize() for q in self._metric_queues.values()),
+            sum(len(e) for e in self._track_buffers.values()),
+            self._file_queue.qsize(),
+        )
+
+    def _describe_pending(
+        self,
+        log_count: int,
+        metric_count: int,
+        track_count: int,
+        file_count: int,
+    ) -> str:
+        """Build a human-readable summary of pending item counts."""
+        items = []
+        if log_count > 0:
+            items.append(f"{log_count} log(s)")
+        if metric_count > 0:
+            items.append(f"{metric_count} metric point(s)")
+        if track_count > 0:
+            items.append(f"{track_count} track entry(ies)")
+        if file_count > 0:
+            items.append(f"{file_count} file(s)")
+        return ", ".join(items)
+
+    def _drain_all_with_progress(self, total_items: int) -> None:
+        """
+        Drain all queues to their respective backends.
+
+        Shows an ASCII progress bar when total_items > 200.
+
+        Args:
+            total_items: Pre-computed total used to size the progress bar.
+        """
+        show_progress = total_items > 200
+        items_flushed = 0
+
+        def update_progress() -> None:
+            nonlocal items_flushed
+            if show_progress:
+                progress = items_flushed / total_items
+                bar_length = 40
+                filled = int(bar_length * progress)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                percent = progress * 100
+                print(
+                    f'\r[ML-Dash] Flushing: |{bar}| {percent:.1f}%'
+                    f' ({items_flushed}/{total_items})',
+                    end='',
+                    flush=True,
+                )
+
+        while not self._log_queue.empty():
+            before = self._log_queue.qsize()
+            self._flush_logs()
+            items_flushed += before - self._log_queue.qsize()
+            update_progress()
+
+        for metric_name in list(self._metric_queues.keys()):
+            while not self._metric_queues[metric_name].empty():
+                before = self._metric_queues[metric_name].qsize()
+                self._flush_metric(metric_name)
+                items_flushed += before - self._metric_queues[metric_name].qsize()
+                update_progress()
+
+        for topic in list(self._track_buffers.keys()):
+            track_count = len(self._track_buffers.get(topic, {}))
+            self._flush_track(topic)
+            items_flushed += track_count
+            update_progress()
+
+        while not self._file_queue.empty():
+            before = self._file_queue.qsize()
+            self._flush_files()
+            items_flushed += before - self._file_queue.qsize()
+            update_progress()
+
+        if show_progress:
+            print()  # newline after progress bar
+
     def buffer_log(
         self,
         message: str,
@@ -243,7 +278,7 @@ class BackgroundBufferManager:
         self._check_queue_pressure(self._log_queue, "Log")
 
         log_entry = {
-            "timestamp": (timestamp or datetime.utcnow()).isoformat() + "Z",
+            "timestamp": (timestamp or datetime.now(timezone.utc).replace(tzinfo=None)).isoformat() + "Z",
             "level": level,
             "message": message,
         }
@@ -338,6 +373,7 @@ class BackgroundBufferManager:
         checksum: str,
         content_type: str,
         size_bytes: int,
+        bindrs: Optional[List[str]] = None,
     ) -> None:
         """
         Add file upload to queue with automatic backpressure.
@@ -354,6 +390,7 @@ class BackgroundBufferManager:
             checksum: SHA256 checksum
             content_type: MIME type
             size_bytes: File size in bytes
+            bindrs: Optional list of bindr names this file belongs to
         """
         # Check queue pressure and trigger aggressive flushing if needed
         self._check_queue_pressure(self._file_queue, "File")
@@ -364,6 +401,7 @@ class BackgroundBufferManager:
             "filename": filename,
             "description": description,
             "tags": tags,
+            "bindrs": bindrs,
             "metadata": metadata,
             "checksum": checksum,
             "content_type": content_type,
@@ -380,43 +418,16 @@ class BackgroundBufferManager:
         This forces an immediate flush of all queued logs, metrics, tracks, and files
         without waiting for time or size triggers.
         """
-        # Check what needs to be flushed
-        log_count = self._log_queue.qsize()
-        metric_count = sum(q.qsize() for q in self._metric_queues.values())
-        track_count = sum(len(entries) for entries in self._track_buffers.values())
-        file_count = self._file_queue.qsize()
+        log_count, metric_count, track_count, file_count = self._pending_counts()
+        total = log_count + metric_count + track_count + file_count
 
-        if log_count > 0 or metric_count > 0 or track_count > 0 or file_count > 0:
-            items = []
-            if log_count > 0:
-                items.append(f"{log_count} log(s)")
-            if metric_count > 0:
-                items.append(f"{metric_count} metric point(s)")
-            if track_count > 0:
-                items.append(f"{track_count} track entry(ies)")
-            if file_count > 0:
-                items.append(f"{file_count} file(s)")
+        if total > 0:
+            desc = self._describe_pending(log_count, metric_count, track_count, file_count)
+            print(f"[ML-Dash] Flushing {desc}...", flush=True)
 
-            if items:
-                print(f"[ML-Dash] Flushing {', '.join(items)}...", flush=True)
+        self._drain_all_with_progress(total)
 
-        # Flush logs immediately (loop until empty)
-        while not self._log_queue.empty():
-            self._flush_logs()
-
-        # Flush all metrics immediately (loop until empty for each metric)
-        for metric_name in list(self._metric_queues.keys()):
-            while not self._metric_queues[metric_name].empty():
-                self._flush_metric(metric_name)
-
-        # Flush all tracks immediately
-        self.flush_tracks()
-
-        # Flush files immediately (loop until empty)
-        while not self._file_queue.empty():
-            self._flush_files()
-
-        if log_count > 0 or metric_count > 0 or track_count > 0 or file_count > 0:
+        if total > 0:
             print("[ML-Dash] ✓ Flush complete", flush=True)
 
     def flush_tracks(self) -> None:
@@ -455,7 +466,10 @@ class BackgroundBufferManager:
                 or current_time - self._last_log_flush >= self._config.flush_interval
                 or self._log_queue.qsize() >= self._config.log_batch_size
             ):
-                self._flush_logs()
+                try:
+                    self._flush_logs()
+                except Exception as e:
+                    warnings.warn(f"[ML-Dash] Background log flush failed: {e}")
 
             # Flush metrics (check each metric queue)
             for metric_name, queue in list(self._metric_queues.items()):
@@ -465,7 +479,10 @@ class BackgroundBufferManager:
                     >= self._config.flush_interval
                     or queue.qsize() >= self._config.metric_batch_size
                 ):
-                    self._flush_metric(metric_name)
+                    try:
+                        self._flush_metric(metric_name)
+                    except Exception as e:
+                        warnings.warn(f"[ML-Dash] Background metric flush failed: {e}")
 
             # Flush tracks (check each topic)
             for topic, entries in list(self._track_buffers.items()):
@@ -475,83 +492,26 @@ class BackgroundBufferManager:
                     >= self._config.flush_interval
                     or len(entries) >= self._config.track_batch_size
                 ):
-                    self._flush_track(topic)
+                    try:
+                        self._flush_track(topic)
+                    except Exception as e:
+                        warnings.warn(f"[ML-Dash] Background track flush failed: {e}")
 
             # Flush files (always process file queue)
             if not self._file_queue.empty():
-                self._flush_files()
+                try:
+                    self._flush_files()
+                except Exception as e:
+                    warnings.warn(f"[ML-Dash] Background file flush failed: {e}")
 
             # Clear the flush event after processing
             if triggered:
                 self._flush_event.clear()
 
-        # Final flush on shutdown - loop until all queues are empty
-        # This ensures no data is lost when shutting down with large queues
-        # Show progress bar for large flushes
-        initial_counts = {
-            'logs': self._log_queue.qsize(),
-            'metrics': {name: q.qsize() for name, q in self._metric_queues.items()},
-            'tracks': {topic: len(entries) for topic, entries in self._track_buffers.items()},
-            'files': self._file_queue.qsize(),
-        }
-
-        total_items = (
-            initial_counts['logs'] +
-            sum(initial_counts['metrics'].values()) +
-            sum(initial_counts['tracks'].values()) +
-            initial_counts['files']
-        )
-
-        # Show progress bar if there are many items to flush
-        show_progress = total_items > 200
-        items_flushed = 0
-
-        def update_progress():
-            nonlocal items_flushed
-            if show_progress:
-                progress = items_flushed / total_items
-                bar_length = 40
-                filled = int(bar_length * progress)
-                bar = '█' * filled + '░' * (bar_length - filled)
-                percent = progress * 100
-                print(f'\r[ML-Dash] Flushing: |{bar}| {percent:.1f}% ({items_flushed}/{total_items})', end='', flush=True)
-
-        # Flush logs
-        log_batch_size = self._config.log_batch_size
-        while not self._log_queue.empty():
-            before = self._log_queue.qsize()
-            self._flush_logs()
-            after = self._log_queue.qsize()
-            items_flushed += before - after
-            update_progress()
-
-        # Flush metrics
-        metric_batch_size = self._config.metric_batch_size
-        for metric_name in list(self._metric_queues.keys()):
-            while not self._metric_queues[metric_name].empty():
-                before = self._metric_queues[metric_name].qsize()
-                self._flush_metric(metric_name)
-                after = self._metric_queues[metric_name].qsize()
-                items_flushed += before - after
-                update_progress()
-
-        # Flush tracks
-        for topic in list(self._track_buffers.keys()):
-            track_count = len(self._track_buffers.get(topic, {}))
-            self._flush_track(topic)
-            items_flushed += track_count
-            update_progress()
-
-        # Flush files
-        while not self._file_queue.empty():
-            before = self._file_queue.qsize()
-            self._flush_files()
-            after = self._file_queue.qsize()
-            items_flushed += before - after
-            update_progress()
-
-        if show_progress:
-            print()  # New line after progress bar
+        # Final flush on shutdown — drain all queues, showing progress for large batches
+        log_count, metric_count, track_count, file_count = self._pending_counts()
+        total_items = log_count + metric_count + track_count + file_count
+        self._drain_all_with_progress(total_items)
 
     def _flush_logs(self) -> None:
         """Batch flush logs using client.create_log_entries()."""
@@ -571,36 +531,36 @@ class BackgroundBufferManager:
             return
 
         # Write to backends
-        if self._experiment.run._client:
+        if self._experiment._client:
             try:
-                self._experiment.run._client.create_log_entries(
+                self._experiment._client.create_log_entries(
                     experiment_id=self._experiment._experiment_id,
                     logs=batch,
                 )
             except Exception as e:
-                raise RuntimeError(
+                raise NetworkError(
                     f"Failed to flush {len(batch)} logs to remote server: {e}\n"
                     f"Data loss occurred. Check your network connection and server status."
                 ) from e
 
-        if self._experiment.run._storage:
+        if self._experiment._storage:
             # Local storage writes one at a time (no batch API)
             for log_entry in batch:
                 try:
-                    self._experiment.run._storage.write_log(
-                        owner=self._experiment.run.owner,
-                        project=self._experiment.run.project,
-                        prefix=self._experiment.run._folder_path,
+                    self._experiment._storage.write_log(
+                        owner=self._experiment.owner,
+                        project=self._experiment.project,
+                        prefix=self._experiment._folder_path,
                         message=log_entry["message"],
                         level=log_entry["level"],
                         metadata=log_entry.get("metadata"),
                         timestamp=log_entry["timestamp"],
                     )
                 except Exception as e:
-                    raise RuntimeError(
+                    warnings.warn(
                         f"Failed to write log to local storage: {e}\n"
                         f"Check disk space and file permissions."
-                    ) from e
+                    )
 
         self._last_log_flush = time.time()
 
@@ -640,9 +600,9 @@ class BackgroundBufferManager:
             return
 
         # Write to backends
-        if self._experiment.run._client:
+        if self._experiment._client:
             try:
-                self._experiment.run._client.append_batch_to_metric(
+                self._experiment._client.append_batch_to_metric(
                     experiment_id=self._experiment._experiment_id,
                     metric_name=metric_name,
                     data_points=batch,
@@ -652,17 +612,17 @@ class BackgroundBufferManager:
                 )
             except Exception as e:
                 metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
-                raise RuntimeError(
+                raise NetworkError(
                     f"Failed to flush {len(batch)} points to {metric_display} on remote server: {e}\n"
                     f"Data loss occurred. Check your network connection and server status."
                 ) from e
 
-        if self._experiment.run._storage:
+        if self._experiment._storage:
             try:
-                self._experiment.run._storage.append_batch_to_metric(
-                    owner=self._experiment.run.owner,
-                    project=self._experiment.run.project,
-                    prefix=self._experiment.run._folder_path,
+                self._experiment._storage.append_batch_to_metric(
+                    owner=self._experiment.owner,
+                    project=self._experiment.project,
+                    prefix=self._experiment._folder_path,
                     metric_name=metric_name,
                     data_points=batch,
                     description=description,
@@ -671,7 +631,7 @@ class BackgroundBufferManager:
                 )
             except Exception as e:
                 metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
-                raise RuntimeError(
+                raise StorageError(
                     f"Failed to flush {len(batch)} points to {metric_display} in local storage: {e}\n"
                     f"Check disk space and file permissions."
                 ) from e
@@ -703,31 +663,31 @@ class BackgroundBufferManager:
         self._track_buffers[topic] = {}
 
         # Write to remote backend
-        if self._experiment.run._client:
+        if self._experiment._client:
             try:
-                self._experiment.run._client.append_batch_to_track(
+                self._experiment._client.append_batch_to_track(
                     experiment_id=self._experiment._experiment_id,
                     topic=topic,
                     entries=batch,
                 )
             except Exception as e:
-                raise RuntimeError(
+                raise NetworkError(
                     f"Failed to flush {len(batch)} entries to track '{topic}' on remote server: {e}\n"
                     f"Data loss occurred. Check your network connection and server status."
                 ) from e
 
         # Write to local storage
-        if self._experiment.run._storage:
+        if self._experiment._storage:
             try:
-                self._experiment.run._storage.append_batch_to_track(
-                    owner=self._experiment.run.owner,
-                    project=self._experiment.run.project,
-                    prefix=self._experiment.run._folder_path,
+                self._experiment._storage.append_batch_to_track(
+                    owner=self._experiment.owner,
+                    project=self._experiment.project,
+                    prefix=self._experiment._folder_path,
                     topic=topic,
                     entries=batch,
                 )
             except Exception as e:
-                raise RuntimeError(
+                raise StorageError(
                     f"Failed to flush {len(batch)} entries to track '{topic}' in local storage: {e}\n"
                     f"Check disk space and file permissions."
                 ) from e
@@ -753,8 +713,7 @@ class BackgroundBufferManager:
 
         # Show progress for file uploads
         total_files = len(files_to_upload)
-        if total_files > 0:
-            print(f"[ML-Dash]   Uploading {total_files} file(s)...", flush=True)
+        print(f"[ML-Dash]   Uploading {total_files} file(s)...", flush=True)
 
         # Upload in parallel using ThreadPoolExecutor
         completed = 0
@@ -774,7 +733,7 @@ class BackgroundBufferManager:
                     if total_files > 1:
                         print(f"[ML-Dash]   [{completed}/{total_files}] Uploaded {file_entry['filename']}", flush=True)
                 except Exception as e:
-                    raise RuntimeError(
+                    raise NetworkError(
                         f"Failed to upload file {file_entry['filename']}: {e}\n"
                         f"File upload failed. Check network connection and file permissions."
                     ) from e
@@ -800,41 +759,36 @@ class BackgroundBufferManager:
             temp_dir = os.path.dirname(file_path)
 
         try:
-            if self._experiment.run._client:
-                try:
-                    self._experiment.run._client.upload_file(
-                        experiment_id=self._experiment._experiment_id,
-                        file_path=file_entry["file_path"],
-                        prefix=file_entry["prefix"],
-                        filename=file_entry["filename"],
-                        description=file_entry["description"],
-                        tags=file_entry["tags"],
-                        metadata=file_entry["metadata"],
-                        checksum=file_entry["checksum"],
-                        content_type=file_entry["content_type"],
-                        size_bytes=file_entry["size_bytes"],
-                    )
-                except Exception as e:
-                    raise  # Re-raise to be caught by executor
+            if self._experiment._client:
+                self._experiment._client.upload_file(
+                    experiment_id=self._experiment._experiment_id,
+                    file_path=file_entry["file_path"],
+                    prefix=file_entry["prefix"],
+                    filename=file_entry["filename"],
+                    description=file_entry["description"],
+                    tags=file_entry["tags"],
+                    metadata=file_entry["metadata"],
+                    checksum=file_entry["checksum"],
+                    content_type=file_entry["content_type"],
+                    size_bytes=file_entry["size_bytes"],
+                )
 
-            if self._experiment.run._storage:
-                try:
-                    self._experiment.run._storage.write_file(
-                        owner=self._experiment.run.owner,
-                        project=self._experiment.run.project,
-                        prefix=self._experiment.run._folder_path,
-                        file_path=file_entry["file_path"],
-                        path=file_entry["prefix"],
-                        filename=file_entry["filename"],
-                        description=file_entry["description"],
-                        tags=file_entry["tags"],
-                        metadata=file_entry["metadata"],
-                        checksum=file_entry["checksum"],
-                        content_type=file_entry["content_type"],
-                        size_bytes=file_entry["size_bytes"],
-                    )
-                except Exception as e:
-                    raise  # Re-raise to be caught by executor
+            if self._experiment._storage:
+                self._experiment._storage.write_file(
+                    owner=self._experiment.owner,
+                    project=self._experiment.project,
+                    prefix=self._experiment._folder_path,
+                    file_path=file_entry["file_path"],
+                    path=file_entry["prefix"],
+                    filename=file_entry["filename"],
+                    description=file_entry["description"],
+                    tags=file_entry["tags"],
+                    bindrs=file_entry.get("bindrs"),
+                    metadata=file_entry["metadata"],
+                    checksum=file_entry["checksum"],
+                    content_type=file_entry["content_type"],
+                    size_bytes=file_entry["size_bytes"],
+                )
         finally:
             # Clean up temp file and directory if this was a temp file
             if is_temp_file and temp_dir:
@@ -843,5 +797,8 @@ class BackgroundBufferManager:
                         os.unlink(file_path)
                     if os.path.exists(temp_dir) and not os.listdir(temp_dir):
                         os.rmdir(temp_dir)
-                except Exception:
-                    pass  # Ignore cleanup errors
+                except OSError as e:
+                    warnings.warn(
+                        f"Failed to clean up temp file {file_path}: {e}\n"
+                        f"Check disk space and file permissions."
+                    )

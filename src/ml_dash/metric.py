@@ -5,9 +5,9 @@ Metrics are used for storing continuous data series like training metrics,
 validation losses, system measurements, etc.
 """
 
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from collections import defaultdict
 import statistics
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from .experiment import Experiment
@@ -491,6 +491,9 @@ class MetricsManager:
             # Equivalent to _flush=True
             experiment.metrics.log(epoch=100, _flush=True)
         """
+        # Extract _ts before splitting scalar/nested
+        ts = kwargs.pop('_ts', None)
+
         # Separate nested dicts from scalar values
         scalar_data = {}
         nested_data = {}
@@ -503,12 +506,14 @@ class MetricsManager:
 
         # Log scalar data to unnamed metric
         if scalar_data:
-            self._experiment._append_to_metric(None, scalar_data, None, None, None)
+            self._experiment._append_to_metric(None, scalar_data, None, None, None, timestamp=ts)
 
         # Log nested dicts to their respective prefixed metrics
         for prefix, data in nested_data.items():
             # Include scalar data (like epoch) with each nested metric
             combined_data = {**scalar_data, **data}
+            if ts is not None:
+                combined_data['_ts'] = ts
             self(prefix).log(**combined_data)
 
         if _flush:
@@ -610,7 +615,8 @@ class MetricBuilder:
             experiment.metrics("train").log(loss=0.5, accuracy=0.9)
 
         Args:
-            **kwargs: Data point fields (flexible schema)
+            **kwargs: Data point fields (flexible schema).
+                      Special key: _ts (float or -1) sets the timestamp.
 
         Returns:
             Self for method chaining
@@ -619,12 +625,14 @@ class MetricBuilder:
             experiment.metrics("train").log(loss=0.5, accuracy=0.9)
             experiment.metrics.log(epoch=epoch).flush()
         """
+        timestamp = kwargs.pop('_ts', None)
         self._experiment._append_to_metric(
             name=self._name,
             data=kwargs,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            timestamp=timestamp,
         )
         return self
 

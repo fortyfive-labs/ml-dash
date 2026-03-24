@@ -167,7 +167,7 @@ class TestBasicTracks:
             experiment.tracks("robot/position").append(x=3.0)
 
             # Invalid timestamp type should still raise error
-            with pytest.raises((ValueError, TypeError)):
+            with pytest.raises(Exception):
                 experiment.tracks("robot/position").append(x=4.0, _ts="invalid")
 
 

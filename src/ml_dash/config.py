@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 
+DEFAULT_API_URL = "https://api.dash.ml"
+
+
 class Config:
   """
   Manages ML-Dash CLI configuration file.
@@ -91,7 +94,7 @@ class Config:
   @property
   def remote_url(self) -> Optional[str]:
     """Get default remote URL."""
-    return self.get("remote_url", "https://api.dash.ml")
+    return self.get("remote_url", DEFAULT_API_URL)
 
   @remote_url.setter
   def remote_url(self, url: str):
@@ -117,6 +120,16 @@ class Config:
   def batch_size(self, size: int):
     """Set default batch size."""
     self.set("default_batch_size", size)
+
+  @property
+  def auth_url(self) -> Optional[str]:
+    """Get auth server URL for OAuth device flow."""
+    return self.get("auth_url")
+
+  @auth_url.setter
+  def auth_url(self, url: str):
+    """Set auth server URL."""
+    self.set("auth_url", url)
 
   @property
   def device_secret(self) -> Optional[str]:

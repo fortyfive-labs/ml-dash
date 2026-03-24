@@ -190,7 +190,7 @@ class TestDuplicateRemote:
 
     def test_duplicate_remote_basic(self, remote_experiment):
         """Test basic duplicate in remote mode."""
-        exp = remote_experiment("tom_tao_34833x/test_files/test_duplicate_remote")
+        exp = remote_experiment("tom/test_files/test_duplicate_remote")
         exp.run.start()
 
         # Create test file

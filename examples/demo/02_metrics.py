@@ -5,8 +5,14 @@ Covers:
   - Named metrics with .log()
   - Fluent chaining pattern
   - Nested-dict pattern (log to multiple metrics at once)
-  - MetricsManager.buffer + log_summary()  (batch aggregation)
+  - MetricBuilder.buffer()  (per-metric buffering)
+  - MetricsManager.buffer + log_summary()  (cross-metric batch aggregation)
+  - All log_summary() aggregations: mean, std, min, max, count, median, sum,
+                                     p50, p90, p95, p99, last, first
+  - MetricsManager.buffer.peek()  (inspect buffered values without flushing)
   - SummaryCache  (rolling window statistics)
+  - SummaryCache.peek()   (inspect cache without flushing)
+  - SummaryCache.summarize(clear=False)  (cumulative/non-clearing mode)
   - .read() and .stats()
   - .list_all()
 """
@@ -52,16 +58,36 @@ exp.metrics.log(
 #   metric "eval"  <- {epoch: 3, loss: 0.52, accuracy: 0.76}
 
 # ---------------------------------------------------------------------------
-# 5. metrics.buffer + log_summary  (accumulate many values, log statistics)
+# 5a. MetricBuilder.buffer()  — per-metric buffering via the MetricBuilder
+#     Values are accumulated inside the MetricsManager's BufferManager.
 # ---------------------------------------------------------------------------
-# Accumulate batch losses during a training loop
 for batch_loss in [0.5, 0.48, 0.51, 0.47, 0.49]:
     exp.metrics("train").buffer(loss=batch_loss, accuracy=0.80)
     exp.metrics("eval").buffer(loss=batch_loss + 0.05)
 
-# Compute and log mean (default), optionally std / p95 / min / max
-exp.metrics.buffer.log_summary()                         # logs .mean for each prefix
-exp.metrics.buffer.log_summary("mean", "std", "min", "max")  # explicit aggregations
+# ---------------------------------------------------------------------------
+# 5b. metrics.buffer.peek()  — inspect buffered values without consuming them
+# ---------------------------------------------------------------------------
+buffered = exp.metrics.buffer.peek()
+print("Buffered so far:", buffered)
+# e.g. {'train/loss': [0.5, 0.48, ...], 'eval/loss': [...]}
+
+buffered_train = exp.metrics.buffer.peek("train")
+print("train buffer:", buffered_train)
+
+# ---------------------------------------------------------------------------
+# 5c. MetricsManager.buffer.log_summary()  — compute stats and log
+# ---------------------------------------------------------------------------
+# Default: mean only
+exp.metrics.buffer.log_summary()
+
+# Re-fill buffer for additional aggregations demo
+for batch_loss in [0.5, 0.48, 0.51, 0.47, 0.49]:
+    exp.metrics("train").buffer(loss=batch_loss)
+
+# All supported aggregations:
+#   mean, std, min, max, count, median, sum, p50, p90, p95, p99, last, first
+exp.metrics.buffer.log_summary("mean", "std", "min", "max", "count", "p95", "last")
 
 # ---------------------------------------------------------------------------
 # 6. SummaryCache  (rolling window inside a training loop)
@@ -78,9 +104,22 @@ for batch_idx in range(50):
     eval_metric.summary_cache.store(loss=eval_loss)
 
     if (batch_idx + 1) % log_every == 0:
+        # peek() — inspect what's buffered without consuming it
+        current = train_metric.summary_cache.peek("loss", limit=3)
+        print(f"  batch {batch_idx}: last 3 losses = {current.get('loss', [])}")
+
         train_metric.summary_cache.set(lr=0.001, epoch=batch_idx // log_every)
-        train_metric.summary_cache.summarize()   # logs loss.mean, loss.std, etc.
+        train_metric.summary_cache.summarize()         # rolling: clears after logging
         eval_metric.summary_cache.summarize()
+
+# summarize(clear=False) — cumulative mode: keeps values after logging
+# Useful for running overall statistics without resetting the window
+cumulative_metric = exp.metrics("cumulative")
+for v in [0.9, 0.8, 0.7, 0.6]:
+    cumulative_metric.summary_cache.store(loss=v)
+cumulative_metric.summary_cache.summarize(clear=False)   # values still in cache
+cumulative_metric.summary_cache.store(loss=0.5)
+cumulative_metric.summary_cache.summarize(clear=False)   # now includes all 5 values
 
 exp.flush()   # flush buffered data to remote / local storage
 

@@ -237,6 +237,31 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
         )
 ```
 
+## Timestamps
+
+Every metric data point automatically records a `_ts` field (Unix timestamp, seconds since epoch). You can also provide it explicitly or inherit it from the previous call:
+
+```python
+import time
+
+# Auto-assigned (default)
+exp.metrics("train").log(loss=0.5)
+# → data: {"loss": 0.5, "_ts": 1742382000.123}
+
+# Explicit timestamp
+exp.metrics("train").log(loss=0.5, _ts=time.time())
+
+# Inherit timestamp from previous metric or track call (same thread)
+exp.metrics("train").log(loss=0.5)                  # sets _last_timestamp
+exp.metrics("eval").log(loss=0.6, _ts=-1)           # inherits same _ts
+
+# Cross-inheritance with tracks
+exp.tracks("robot/pos").append(x=1.0, _ts=100.0)   # sets _last_timestamp
+exp.metrics("train").log(loss=0.5, _ts=-1)          # inherits 100.0
+```
+
+`_ts=-1` inherits across **both metrics and tracks** within the same thread.
+
 ## Storage Format
 
 **Local mode** - JSONL files:
@@ -246,9 +271,9 @@ cat .dash/alice/project/my-experiment/metrics/train/data.jsonl
 ```
 
 ```json
-{"index": 0, "data": {"loss": 0.5, "epoch": 1}}
-{"index": 1, "data": {"loss": 0.45, "epoch": 2}}
-{"index": 2, "data": {"loss": 0.40, "epoch": 3}}
+{"index": 0, "data": {"loss": 0.5, "epoch": 1, "_ts": 1742382000.1}, "createdAt": "2026-03-20T10:00:00.000000Z"}
+{"index": 1, "data": {"loss": 0.45, "epoch": 2, "_ts": 1742382001.2}, "createdAt": "2026-03-20T10:00:01.000000Z"}
+{"index": 2, "data": {"loss": 0.40, "epoch": 3, "_ts": 1742382002.3}, "createdAt": "2026-03-20T10:00:02.000000Z"}
 ```
 
 **Remote mode** - Two-tier storage:

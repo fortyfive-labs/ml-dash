@@ -10,10 +10,12 @@ Covers:
   - userinfo singleton   (query authenticated user from server)
   - Tags, readme, metadata on the experiment
   - exp.id and exp.data  (experiment ID and server response)
+  - OperationMode enum  (LOCAL / REMOTE / HYBRID)
+  - exp.owner / exp.project / exp.name  (prefix components, readable and settable)
   - Environment variables that control behaviour
 """
 
-from ml_dash import Experiment
+from ml_dash import Experiment, OperationMode
 
 # ---------------------------------------------------------------------------
 # 1. Local-only mode  (default)
@@ -130,5 +132,40 @@ exp2.run.complete()
 #       export ML_DASH_URL="http://localhost:3000"
 #       python train.py    # Experiment() auto-reads these vars
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 10. OperationMode enum — inspect or branch on the active mode
+# ---------------------------------------------------------------------------
+with Experiment(
+    prefix="alice/nlp/mode-check",
+    dash_root="/tmp/ml-dash-demo",
+).run as exp:
+    mode = exp.mode               # OperationMode.LOCAL / REMOTE / HYBRID
+    if mode == OperationMode.LOCAL:
+        print("Running in local-only mode")
+    elif mode == OperationMode.REMOTE:
+        print("Running in remote-only mode")
+    elif mode == OperationMode.HYBRID:
+        print("Running in hybrid mode")
+    exp.metrics("train").log(loss=0.2)
+
+
+# ---------------------------------------------------------------------------
+# 11. exp.owner / exp.project / exp.name — read back parsed prefix components
+# ---------------------------------------------------------------------------
+with Experiment(
+    prefix="alice/vision/run-42",
+    dash_root="/tmp/ml-dash-demo",
+).run as exp:
+    print("owner  :", exp.owner)    # "alice"
+    print("project:", exp.project)  # "vision"
+    print("name   :", exp.name)     # "run-42"
+
+    # Properties are also settable (useful for dynamic naming)
+    exp.name = "run-42-retrained"
+    print("name (updated):", exp.name)
+
+    exp.metrics("train").log(loss=0.1)
+
 
 print("Done.")

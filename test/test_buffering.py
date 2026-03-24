@@ -354,9 +354,9 @@ class TestBufferErrorHandling:
         """Verify training continues despite network errors."""
         with buffered_experiment().run as exp:
             # Mock client to raise exception
-            if exp.run._client:
-                original_method = exp.run._client.create_log_entries
-                exp.run._client.create_log_entries = MagicMock(
+            if exp._client:
+                original_method = exp._client.create_log_entries
+                exp._client.create_log_entries = MagicMock(
                     side_effect=Exception("Network error")
                 )
 
@@ -375,9 +375,9 @@ class TestBufferErrorHandling:
         """Verify graceful handling of storage errors."""
         with buffered_experiment().run as exp:
             # Mock storage to raise exception
-            if exp.run._storage:
-                original_method = exp.run._storage.write_log
-                exp.run._storage.write_log = MagicMock(
+            if exp._storage:
+                original_method = exp._storage.write_log
+                exp._storage.write_log = MagicMock(
                     side_effect=Exception("Storage error")
                 )
 

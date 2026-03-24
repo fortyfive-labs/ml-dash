@@ -1,7 +1,9 @@
 """Custom exceptions for ml-dash authentication."""
 
+from ml_dash.exceptions import AuthenticationError as _AuthenticationError
 
-class AuthenticationError(Exception):
+
+class AuthenticationError(_AuthenticationError):
     """Base exception for authentication errors."""
     pass
 

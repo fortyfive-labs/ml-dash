@@ -1,11 +1,13 @@
 """Login command for ml-dash CLI."""
 
+import traceback
 import webbrowser
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from ml_dash.auth.constants import VUER_AUTH_URL
 from ml_dash.auth.device_flow import DeviceFlowClient
 from ml_dash.auth.device_secret import get_or_create_device_secret
 from ml_dash.auth.exceptions import (
@@ -54,14 +56,14 @@ def add_parser(subparsers):
   )
 
 
-def generate_qr_code_ascii(url: str) -> str:
+def generate_qr_code_ascii(url: str) -> str | None:
   """Generate ASCII QR code for the given URL.
 
   Args:
       url: URL to encode in QR code
 
   Returns:
-      ASCII art QR code string
+      ASCII art QR code string, or None if unavailable
   """
   try:
     import qrcode
@@ -79,10 +81,8 @@ def generate_qr_code_ascii(url: str) -> str:
       output.append(line)
 
     return "\n".join(output)
-  except ImportError:
-    return "[QR code unavailable - install qrcode: pip install qrcode]"
   except Exception:
-    return "[QR code generation failed]"
+    return None
 
 
 def cmd_login(args) -> int:
@@ -110,7 +110,6 @@ def cmd_login(args) -> int:
     # Initialize device flow
     console.print("[bold]Initializing device authorization...[/bold]\n")
 
-    from ml_dash.auth.constants import VUER_AUTH_URL
     auth_url = args.auth_url or config.auth_url or VUER_AUTH_URL
 
     device_secret = get_or_create_device_secret(config)
@@ -128,14 +127,14 @@ def cmd_login(args) -> int:
 
     # Display rich UI with QR code
     panel_content = (
-      f"[bold cyan]1. Visit this URL:[/bold cyan]\n\n"
+      "[bold cyan]1. Visit this URL:[/bold cyan]\n\n"
       f"   {flow.verification_uri}\n\n"
-      f"[bold cyan]2. Enter this code:[/bold cyan]\n\n"
+      "[bold cyan]2. Enter this code:[/bold cyan]\n\n"
       f"   [bold green]{flow.user_code}[/bold green]\n\n"
     )
 
     # Add QR code if available
-    if "unavailable" not in qr_code and "failed" not in qr_code:
+    if qr_code:
       panel_content += f"[bold cyan]Or scan QR code:[/bold cyan]\n\n{qr_code}\n\n"
 
     panel_content += f"[dim]Code expires in {flow.expires_in // 60} minutes[/dim]"
@@ -236,7 +235,5 @@ def cmd_login(args) -> int:
     return 1
   except Exception as e:
     console.print(f"\n[red]✗ Unexpected error:[/red] {e}")
-    import traceback
-
     console.print(f"\n[dim]{traceback.format_exc()}[/dim]")
     return 1

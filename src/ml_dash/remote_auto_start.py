@@ -36,10 +36,11 @@ import atexit
 # Prefix format: {owner}/{project}/path...
 import getpass
 
+from .config import DEFAULT_API_URL
 from .experiment import Experiment
 
 _owner = getpass.getuser()
-rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", dash_url="https://api.dash.ml")
+rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", dash_url=DEFAULT_API_URL)
 
 
 # Register cleanup handler to complete experiment on Python exit (if still open)

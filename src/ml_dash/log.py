@@ -4,9 +4,9 @@ Log API for ML-Dash SDK.
 Provides fluent interface for structured logging with validation.
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from .experiment import Experiment

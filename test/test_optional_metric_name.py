@@ -96,6 +96,7 @@ class TestOptionalMetricName:
     with remote_experiment("tom/test/no-name-remote").run as experiment:
       experiment.metrics.log(loss=0.5, step=1)
       experiment.metrics.log(loss=0.4, step=2)
+      experiment.flush()
 
       # Verify stats show "None" metric (converted to string by server)
       stats = experiment.metrics(None).stats()
@@ -109,6 +110,7 @@ class TestOptionalMetricName:
     ).run as experiment:
       for i in range(10):
         experiment.metrics.log(loss=i * 0.1, step=i)
+      experiment.flush()
 
       # Verify it went to "None" metric (converted to string by server)
       stats = experiment.metrics(None).stats()

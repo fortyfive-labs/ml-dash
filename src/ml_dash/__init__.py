@@ -37,13 +37,21 @@ Usage:
 """
 
 from .client import RemoteClient, userinfo
+from .exceptions import (
+    AuthenticationError,
+    ConfigurationError,
+    ExperimentError,
+    MlDashError,
+    NetworkError,
+    StorageError,
+)
 from .experiment import Experiment, OperationMode, ml_dash_experiment
 from .log import LogBuilder, LogLevel
 from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.19"
+__version__ = "0.6.21"
 
 
 def _check_version_compatibility():
@@ -98,10 +106,6 @@ def _check_version_compatibility():
         # Silently skip check if PyPI is unreachable or response is malformed
         # Don't block users due to network issues
         pass
-    except Exception:
-        # Catch any other errors and silently continue
-        # Better to let users work than block on unexpected errors
-        pass
 
 
 # Enforce version check on import
@@ -118,4 +122,11 @@ __all__ = [
   "ParametersBuilder",
   "RUN",
   "userinfo",
+  # Exceptions
+  "MlDashError",
+  "AuthenticationError",
+  "ConfigurationError",
+  "ExperimentError",
+  "NetworkError",
+  "StorageError",
 ]

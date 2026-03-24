@@ -5,8 +5,10 @@ Provides fluent API for parameter management with automatic dict flattening.
 Nested dicts are flattened to dot-notation: {"model": {"lr": 0.001}} → {"model.lr": 0.001}
 """
 
-from typing import Dict, Any, Optional, TYPE_CHECKING
 import inspect
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from .exceptions import ExperimentError
 
 if TYPE_CHECKING:
     from .experiment import Experiment
@@ -63,7 +65,7 @@ class ParametersBuilder:
             exp.params.set(**{"model.lr": 0.001, "model.batch_size": 32})
         """
         if not self._experiment._is_open:
-            raise RuntimeError(
+            raise ExperimentError(
                 "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
                 "Example:\n"
                 "  with dxp.run:\n"
@@ -71,7 +73,7 @@ class ParametersBuilder:
             )
 
         if self._experiment._write_protected:
-            raise RuntimeError("Experiment is write-protected and cannot be modified.")
+            raise ExperimentError("Experiment is write-protected and cannot be modified.")
 
         # Convert class objects to dicts (for params_proto support)
         processed_kwargs = self._process_class_objects(kwargs)
@@ -149,7 +151,7 @@ class ParametersBuilder:
             # → {"model": {"lr": 0.001, "batch_size": 32}, "optimizer": "adam"}
         """
         if not self._experiment._is_open:
-            raise RuntimeError(
+            raise ExperimentError(
                 "Experiment not started. Use 'with experiment.run:' or call experiment.run.start() first.\n"
                 "Example:\n"
                 "  with dxp.run:\n"

@@ -6,12 +6,18 @@ or simulation timestamp (_ts).  Typical use cases: robot joint states,
 camera frames, LiDAR scans, or any other sensor data.
 
 Covers:
-  - tracks("topic").append()   – append a single entry with _ts
-  - tracks("topic").flush()    – flush the topic buffer to storage
-  - tracks.flush()             – flush all topics
-  - tracks("topic").read()     – read back as JSON or mocap format
-  - tracks("topic").slice()    – time-range slice
-  - tracks("topic").list_entries() – iterate entries
+  - tracks("topic").append()                    – append a single entry with _ts
+  - tracks("topic").flush()                     – flush the topic buffer to storage
+  - tracks.flush()                              – flush all topics
+  - tracks("topic").read()                      – read back (JSON format)
+  - tracks("topic").read(format="mocap")        – mocap export format
+  - tracks("topic").read(format="jsonl")        – JSONL bytes
+  - tracks("topic").read(format="parquet")      – Parquet bytes
+  - tracks("topic").read(start_timestamp=, end_timestamp=)  – time range filter
+  - tracks("topic").read(columns=[...])         – column projection
+  - tracks("topic").slice()                     – iterable time-range slice
+  - TrackSlice.findByTime()                     – floor-match lookup by timestamp
+  - tracks("topic").list_entries()              – list all entries
 """
 
 from ml_dash import Experiment
@@ -72,27 +78,70 @@ if data["entries"]:
     print("  first entry:", data["entries"][0])
 
 # ---------------------------------------------------------------------------
-# 5. Read back as mocap format (structured for motion-capture pipelines)
+# 5. Read with time-range filter and column projection
 # ---------------------------------------------------------------------------
+windowed = exp.tracks("robot/joints").read(
+    start_timestamp=0.5,
+    end_timestamp=1.0,
+    format="json",
+)
+print(f"entries in [0.5, 1.0]: {windowed['count']}")
+
+# Project only specific columns (field names)
+projected = exp.tracks("robot/joints").read(
+    columns=["timestamp", "q"],
+    format="json",
+)
+if projected["entries"]:
+    print("projected columns:", list(projected["entries"][0].keys()))
+
+# ---------------------------------------------------------------------------
+# 6. Other read formats
+# ---------------------------------------------------------------------------
+# Mocap format (structured for motion-capture pipelines)
 mocap = exp.tracks("robot/joints").read(format="mocap")
 print("mocap keys:", list(mocap.keys()))
 
+# JSONL (bytes) — each line is a JSON record
+jsonl_bytes = exp.tracks("robot/joints").read(format="jsonl")
+print(f"JSONL bytes: {len(jsonl_bytes)} bytes")
+
+# Parquet (bytes) — columnar binary format (requires pyarrow)
+try:
+    parquet_bytes = exp.tracks("robot/joints").read(format="parquet")
+    print(f"Parquet bytes: {len(parquet_bytes)} bytes")
+except Exception:
+    pass  # pyarrow may not be installed
+
 # ---------------------------------------------------------------------------
-# 6. Time-range slice
+# 7. Time-range slice  (iterable)
 # ---------------------------------------------------------------------------
-# Entries between t=0.5 s and t=1.0 s
 sliced = exp.tracks("robot/joints").slice(start_timestamp=0.5, end_timestamp=1.0)
 slice_entries = list(sliced)
 print(f"slice(0.5, 1.0): {len(slice_entries)} entries")
 
 # ---------------------------------------------------------------------------
-# 7. List all entries as an iterable
+# 8. TrackSlice.findByTime()  — floor-match lookup by timestamp
+#    Returns the entry whose timestamp is the largest value <= query
+# ---------------------------------------------------------------------------
+full_slice = exp.tracks("robot/joints").slice()   # no filter = full dataset
+if list(full_slice):
+    full_slice2 = exp.tracks("robot/joints").slice()
+    entry = full_slice2.findByTime(0.5)            # single query
+    print("findByTime(0.5):", entry.get("timestamp"))
+
+    full_slice3 = exp.tracks("robot/joints").slice()
+    entries = full_slice3.findByTime([0.1, 0.5, 1.0])  # batch query
+    print("findByTime batch timestamps:", [e.get("timestamp") for e in entries])
+
+# ---------------------------------------------------------------------------
+# 9. List all entries as a plain list
 # ---------------------------------------------------------------------------
 entries = exp.tracks("robot/eef").list_entries()
 print("eef entry count:", len(entries))
 
 # ---------------------------------------------------------------------------
-# 8. Multiple topics in one experiment
+# 10. Multiple topics in one experiment
 # ---------------------------------------------------------------------------
 for i in range(5):
     exp.tracks("lidar/points").append(

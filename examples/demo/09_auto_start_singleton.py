@@ -44,7 +44,7 @@ Covers:
 # RUN — global experiment config object
 #   Populated via params-proto with environment-variable overrides.
 # ---------------------------------------------------------------------------
-from ml_dash.run import RUN
+from ml_dash import RUN
 
 # Inspect RUN defaults
 run = RUN()   # create an instance to access properties correctly

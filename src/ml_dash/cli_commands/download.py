@@ -474,41 +474,49 @@ class ExperimentDownloader:
       return {"success": False, "error": str(e), "downloaded": 0, "bytes": 0}
 
   def _download_files(self, exp_info: ExperimentInfo, result: DownloadResult):
-    """Download files in parallel."""
-    try:
-      files_data = self.remote.list_files(exp_info.experiment_id)
-    except Exception as e:
-      result.failed.setdefault("files", []).append(f"List files failed: {e}")
-      return
+    """Download files in parallel, paging through all files."""
+    offset = 0
+    limit = 500
+    while True:
+      try:
+        page = self.remote.list_files(exp_info.experiment_id, limit=limit, offset=offset)
+      except Exception as e:
+        result.failed.setdefault("files", []).append(f"List files failed: {e}")
+        return
 
-    if not files_data:
-      return
+      files_data = page["files"]
+      if not files_data:
+        break
 
-    with ThreadPoolExecutor(max_workers=self.max_concurrent_files) as executor:
-      future_to_file = {}
+      with ThreadPoolExecutor(max_workers=self.max_concurrent_files) as executor:
+        future_to_file = {}
 
-      for file_info in files_data:
-        future = executor.submit(
-          self._download_single_file,
-          exp_info.experiment_id,
-          exp_info.project,
-          exp_info.experiment,
-          file_info,
-        )
-        future_to_file[future] = file_info["filename"]
+        for file_info in files_data:
+          future = executor.submit(
+            self._download_single_file,
+            exp_info.experiment_id,
+            exp_info.project,
+            exp_info.experiment,
+            file_info,
+          )
+          future_to_file[future] = file_info.get("name", "unknown")
 
-      for future in as_completed(future_to_file):
-        filename = future_to_file[future]
-        file_result = future.result()
+        for future in as_completed(future_to_file):
+          filename = future_to_file[future]
+          file_result = future.result()
 
-        with self._lock:
-          if file_result["success"]:
-            result.downloaded["files"] = result.downloaded.get("files", 0) + 1
-            result.bytes_downloaded += file_result["bytes"]
-          else:
-            result.failed.setdefault("files", []).append(
-              f"{filename}: {file_result['error']}"
-            )
+          with self._lock:
+            if file_result["success"]:
+              result.downloaded["files"] = result.downloaded.get("files", 0) + 1
+              result.bytes_downloaded += file_result["bytes"]
+            else:
+              result.failed.setdefault("files", []).append(
+                f"{filename}: {file_result['error']}"
+              )
+
+      if not page["hasMore"]:
+        break
+      offset += limit
 
   def _download_single_file(
     self, experiment_id: str, project: str, experiment: str, file_info: Dict[str, Any]

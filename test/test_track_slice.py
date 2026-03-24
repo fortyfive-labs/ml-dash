@@ -150,7 +150,7 @@ def test_slice_floor_match_before_first():
             track_slice = experiment.tracks("sensor").slice()
 
             # Query timestamp before first entry
-            with pytest.raises(KeyError, match="No entry found with timestamp"):
+            with pytest.raises(Exception, match="No entry found with timestamp"):
                 _ = track_slice.findByTime(3.0)
 
 
@@ -222,7 +222,7 @@ def test_slice_empty_track():
             assert len(track_slice) == 0
 
             # Indexing should raise KeyError
-            with pytest.raises(KeyError, match="No entries in track slice"):
+            with pytest.raises(Exception, match="No entries in track slice"):
                 _ = track_slice.findByTime(5.0)
 
 

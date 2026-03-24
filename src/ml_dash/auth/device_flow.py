@@ -30,15 +30,22 @@ class DeviceFlowResponse:
 class DeviceFlowClient:
     """Client for OAuth 2.0 Device Authorization Flow (RFC 8628)."""
 
-    def __init__(self, device_secret: str, ml_dash_server_url: str):
+    def __init__(
+        self,
+        device_secret: str,
+        ml_dash_server_url: str,
+        auth_server_url: str = VUER_AUTH_URL,
+    ):
         """Initialize device flow client.
 
         Args:
             device_secret: Persistent device secret for this client
             ml_dash_server_url: ML-Dash server URL for token exchange
+            auth_server_url: OAuth authorization server URL (default: https://auth.vuer.ai)
         """
         self.device_secret = device_secret
         self.ml_dash_server_url = ml_dash_server_url.rstrip("/")
+        self.auth_server_url = auth_server_url.rstrip("/")
 
     def start_device_flow(self, scope: str = DEFAULT_SCOPE) -> DeviceFlowResponse:
         """Initiate device authorization flow with vuer-auth.
@@ -53,7 +60,7 @@ class DeviceFlowClient:
             httpx.HTTPError: If request fails
         """
         response = httpx.post(
-            f"{VUER_AUTH_URL}/api/device/start",
+            f"{self.auth_server_url}/api/device/start",
             json={
                 "client_id": CLIENT_ID,
                 "scope": scope,
@@ -105,7 +112,7 @@ class DeviceFlowClient:
 
             try:
                 response = httpx.post(
-                    f"{VUER_AUTH_URL}/api/device/poll",
+                    f"{self.auth_server_url}/api/device/poll",
                     json={
                         "client_id": CLIENT_ID,
                         "device_secret_hash": device_secret_hash,

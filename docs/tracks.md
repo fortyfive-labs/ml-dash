@@ -62,7 +62,7 @@ with Experiment("my-project/exp").run as experiment:
 
 ### 3. Timestamp Inheritance with `_ts=-1`
 
-Use `_ts=-1` to inherit the last timestamp across ALL tracks. This is perfect for synchronizing multi-modal data:
+Use `_ts=-1` to inherit the last timestamp from the previous `tracks.append()` or `metrics.log()` call in the same thread. This is perfect for synchronizing multi-modal data:
 
 ```python
 with Experiment("robotics/multi-modal").run as experiment:
@@ -79,11 +79,23 @@ with Experiment("robotics/multi-modal").run as experiment:
         # All 5 tracks now share the exact same timestamp!
 ```
 
+`_ts=-1` also inherits across **metrics and tracks** — they share the same last timestamp per thread:
+
+```python
+# Set timestamp via track, inherit in metric
+experiment.tracks("robot/pose").append(position=[1.0, 2.0, 3.0], _ts=100.0)
+experiment.metrics("train").log(loss=0.5, _ts=-1)   # inherits 100.0
+
+# Set timestamp via metric, inherit in track
+experiment.metrics("train").log(loss=0.5)            # auto _ts, sets _last_timestamp
+experiment.tracks("robot/pose").append(x=1.0, _ts=-1)  # inherits it
+```
+
 **Benefits of `_ts=-1`:**
 - Cleaner code - no need to manually pass timestamps around
 - Less error-prone - can't accidentally use wrong timestamp
 - Perfect for robotics/ML multi-modal data (poses, images, sensors at same instant)
-- Works across ALL tracks globally (not per-track)
+- Works across ALL tracks and metrics globally (per thread)
 
 ## Multiple Tracks
 
@@ -595,7 +607,8 @@ count = len(track_slice)
 |---------|--------|---------|
 | Use Case | Time-series data, trajectories | Training metrics, losses |
 | Structure | Flexible dict per entry | Flat key-value pairs |
-| Timestamp | Explicit or auto | Implicit (step-based) |
+| Timestamp | `_ts` field, explicit or auto | `_ts` field, explicit or auto |
+| `_ts=-1` inheritance | Yes, shared with metrics | Yes, shared with tracks |
 | Merging | Timestamp-based merging | No merging |
 | Best For | Robotics, RL, sensors | Training loss, accuracy |
 

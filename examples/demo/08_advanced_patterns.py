@@ -8,8 +8,8 @@ Covers:
   - MetricsManager.buffer for batch aggregation with multiple stats
   - Experiment run states (complete / fail / cancel)
   - exp.flush()  – manual flush of all buffered data
-  - Write-protect an experiment after creation
-  - Duplicate (copy) a file within an experiment
+  - Experiment run states (complete / fail / cancel) via context manager auto-fail
+  - files().duplicate()  – copy a file to a new path within the same experiment
 """
 
 import math
@@ -160,6 +160,30 @@ with Experiment(
         exp.metrics("train").log(loss=1.0 / (i + 1))
 
     exp.flush()   # ensures all queued writes are persisted
+
+
+# ---------------------------------------------------------------------------
+# 6. files().duplicate() — copy a file to a new path within the experiment
+#    Useful for keeping a "latest" pointer alongside versioned checkpoints.
+# ---------------------------------------------------------------------------
+print("=== 6. Duplicate a file ===")
+
+with Experiment(
+    prefix="alice/vision/dup-demo",
+    dash_root=DASH_ROOT,
+).run as exp:
+    # Save and flush so the file has a real ID before duplicating
+    exp.files.save_json({"epoch": 10, "val_acc": 0.847}, to="models/checkpoint_10.json")
+    exp.flush()
+
+    checkpoints = exp.files.list("models/checkpoint_10.json")
+    if checkpoints:
+        # Duplicate the versioned checkpoint as "latest"
+        exp.files().duplicate(checkpoints[0], to="models/latest.json")
+        exp.flush()
+
+        all_models = exp.files.list("models/*")
+        print("Files after duplicate:", [f["filename"] for f in all_models])
 
 
 print("Done.")

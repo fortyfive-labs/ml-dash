@@ -1,8 +1,12 @@
 """Upload command implementation for ML-Dash CLI."""
 
 import argparse
+import datetime
+import fnmatch
 import json
 import threading
+import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -102,8 +106,6 @@ class UploadState:
 
   def save(self, path: Path):
     """Save state to file."""
-    import datetime
-
     self.timestamp = datetime.datetime.now().isoformat()
     with open(path, "w") as f:
       json.dump(self.to_dict(), f, indent=2)
@@ -145,7 +147,6 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     help="ML-Dash server URL (defaults to config or https://api.dash.ml)",
   )
 
-
   # Track upload mode
   parser.add_argument(
     "--tracks",
@@ -159,7 +160,6 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
   )
 
   # Scope control
-  # project format: {owner}/{proj_name}
   parser.add_argument(
     "-p",
     "--pref",
@@ -178,12 +178,6 @@ def add_parser(subparsers) -> argparse.ArgumentParser:
     type=str,
     help="Target prefix/directory on server where experiments will be uploaded (e.g., 'alice/shared-project'). Similar to 'scp local/ remote-path/'",
   )
-  # parser.add_argument(
-  #   "--experiment",
-  #   type=str,
-  #   help="Upload only this specific experiment (requires --project)",
-  # )
-
   # Data filtering
   parser.add_argument(
     "--skip-logs",
@@ -257,18 +251,15 @@ def discover_experiments(
 
   Args:
       dash_root: Root path of local storage
-      project_filter: Either a simple project name (e.g., "proj1") or a glob
-                     pattern for the full path (e.g., "tom/*/exp*"). If the
-                     filter contains '/', '*', or '?', it's treated as a glob
-                     pattern matched against the full relative path. Otherwise,
-                     it's matched exactly against the project name.
+      project_filter: Filter for experiments. Three modes:
+                     - Glob ('*'/'?' present, e.g. "tom/*/exp*"): fnmatch against full relative path
+                     - Slash-separated (e.g. "tom/test"): prefix match against full relative path
+                     - Simple name (e.g. "proj1"): exact match against project name
       experiment_filter: Only discover this experiment (requires project_filter)
 
   Returns:
       List of ExperimentInfo objects
   """
-  import fnmatch
-
   dash_root = Path(dash_root)
 
   if not dash_root.exists():
@@ -286,7 +277,7 @@ def discover_experiments(
       with open(exp_json, "r") as f:
         metadata = json.load(f)
         prefix = metadata.get("prefix")
-    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+    except (FileNotFoundError, json.JSONDecodeError):
       # Metadata file missing or invalid - will use path-based prefix
       pass
 
@@ -303,7 +294,6 @@ def discover_experiments(
         if len(prefix_parts) < 3:
           continue  # Need at least owner/project/experiment
 
-        # owner = prefix_parts[0]
         project_name = prefix_parts[1]
         exp_name = prefix_parts[-1]
       else:
@@ -314,17 +304,18 @@ def discover_experiments(
         exp_name = parts[-1]
         project_name = parts[-2]
 
-      # Apply filters with glob pattern support
+      # Apply filters
       if project_filter:
-        # Check if project_filter is a glob pattern or simple project name
-        is_glob_pattern = any(c in project_filter for c in ['*', '?', '/'])
-
-        if is_glob_pattern:
-          # Treat as glob pattern - match against full relative path
+        if any(c in project_filter for c in ['*', '?']):
+          # Glob pattern — match against full relative path
           if not fnmatch.fnmatch(full_relative_path, project_filter):
             continue
+        elif '/' in project_filter:
+          # Exact namespace/project — match against full relative path prefix
+          if not full_relative_path.startswith(project_filter + '/') and full_relative_path != project_filter:
+            continue
         else:
-          # Treat as simple project name - match against parsed project
+          # Simple project name
           if project_name != project_filter:
             continue
 
@@ -400,7 +391,6 @@ class ExperimentValidator:
         ValidationResult with validation status and messages
     """
     result = ValidationResult()
-    result.valid_data = {}
 
     # 1. Validate experiment metadata (required)
     if not self._validate_experiment_metadata(exp_info, result):
@@ -670,6 +660,7 @@ class ExperimentUploader:
         console.print("  [dim]Creating experiment...[/dim]")
 
       exp_data = validation_result.valid_data
+      meta = exp_data.get("metadata", {})
 
       # Construct full prefix for server
       # If --target is specified, use it as the base destination prefix
@@ -699,12 +690,12 @@ class ExperimentUploader:
       response = self.remote.create_or_update_experiment(
         project=target_project,
         name=exp_info.experiment,
-        description=exp_data.get("description"),
-        tags=exp_data.get("tags"),
-        bindrs=exp_data.get("bindrs"),
+        description=meta.get("description"),
+        tags=meta.get("tags"),
+        bindrs=meta.get("bindrs"),
         prefix=full_prefix,  # Send full prefix (folder + name) or target prefix
-        write_protected=exp_data.get("write_protected", False),
-        metadata=exp_data.get("metadata"),
+        write_protected=meta.get("write_protected", False),
+        metadata=meta.get("metadata"),
       )
 
       # Extract experiment ID from nested response
@@ -730,21 +721,21 @@ class ExperimentUploader:
       # 3. Upload logs
       if not self.skip_logs and exp_info.has_logs:
         count = self._upload_logs(
-          experiment_id, exp_info, result, task_id, update_progress
+          experiment_id, exp_info, result, update_progress
         )
         result.uploaded["logs"] = count
 
       # 4. Upload metrics
       if not self.skip_metrics and exp_info.metric_names:
         count = self._upload_metrics(
-          experiment_id, exp_info, result, task_id, update_progress
+          experiment_id, exp_info, result, update_progress
         )
         result.uploaded["metrics"] = count
 
       # 5. Upload files
       if not self.skip_files and exp_info.file_count > 0:
         count = self._upload_files(
-          experiment_id, exp_info, result, task_id, update_progress
+          experiment_id, exp_info, result, update_progress
         )
         result.uploaded["files"] = count
 
@@ -763,7 +754,6 @@ class ExperimentUploader:
     experiment_id: str,
     exp_info: ExperimentInfo,
     result: UploadResult,
-    task_id=None,
     update_progress=None,
   ) -> int:
     """Upload logs in batches."""
@@ -828,7 +818,7 @@ class ExperimentUploader:
     return total_uploaded
 
   def _upload_single_metric(
-    self, experiment_id: str, metric_name: str, metric_dir: Path, result: UploadResult
+    self, experiment_id: str, metric_name: str, metric_dir: Path
   ) -> Dict[str, Any]:
     """
     Upload a single metric (thread-safe helper).
@@ -898,7 +888,6 @@ class ExperimentUploader:
     experiment_id: str,
     exp_info: ExperimentInfo,
     result: UploadResult,
-    task_id=None,
     update_progress=None,
   ) -> int:
     """Upload metrics in parallel with concurrency limit."""
@@ -914,7 +903,7 @@ class ExperimentUploader:
       for metric_name in exp_info.metric_names:
         metric_dir = exp_info.path / "metrics" / metric_name
         future = executor.submit(
-          self._upload_single_metric, experiment_id, metric_name, metric_dir, result
+          self._upload_single_metric, experiment_id, metric_name, metric_dir
         )
         future_to_metric[future] = metric_name
 
@@ -955,7 +944,7 @@ class ExperimentUploader:
 
         except Exception as e:
           # Handle unexpected errors
-          error_msg = f"{metric_name}: {str(e)}"
+          error_msg = f"{metric_name}: {e}"
           with self._lock:
             result.failed.setdefault("metrics", []).append(error_msg)
             if self.verbose:
@@ -968,11 +957,9 @@ class ExperimentUploader:
     experiment_id: str,
     exp_info: ExperimentInfo,
     result: UploadResult,
-    task_id=None,
     update_progress=None,
   ) -> int:
     """Upload files one by one."""
-    files_dir = exp_info.path / "files"
     total_uploaded = 0
 
     # Parse prefix to get owner, project, and experiment path
@@ -1056,8 +1043,6 @@ class ExperimentUploader:
 
 def cmd_upload_track(args: argparse.Namespace) -> int:
   """Upload track data file to remote server."""
-  from datetime import datetime
-
   # Load config
   config = Config()
   remote_url = args.dash_url or config.remote_url
@@ -1091,10 +1076,10 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
 
   namespace = parts[0]
   project = parts[1]
-  experiment_name = parts[-2]  # Second to last is experiment
-  topic = "/".join(parts[-1:])  # Last part is topic (could be multi-level)
+  experiment_name = parts[2]
+  topic = "/".join(parts[3:])
 
-  console.print(f"[bold]Uploading track data...[/bold]")
+  console.print("[bold]Uploading track data...[/bold]")
   console.print(f"  Local file: {local_file}")
   console.print(f"  Namespace: {namespace}")
   console.print(f"  Project: {project}")
@@ -1116,7 +1101,7 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
     experiment_id = exp_data["id"]
 
     # Read local file (assume JSONL format)
-    console.print(f"\n[cyan]Reading local file...[/cyan]")
+    console.print("\n[cyan]Reading local file...[/cyan]")
     entries = []
 
     with open(local_file, 'r') as f:
@@ -1139,7 +1124,7 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
     console.print(f"  Found {len(entries)} entries")
 
     # Upload in batches
-    console.print(f"\n[cyan]Uploading to server...[/cyan]")
+    console.print("\n[cyan]Uploading to server...[/cyan]")
     batch_size = 1000
     total_uploaded = 0
 
@@ -1154,7 +1139,7 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
       console.print(f"  Uploaded {total_uploaded}/{len(entries)} entries")
 
     # Success
-    console.print(f"\n[green]✓ Track data uploaded successfully[/green]")
+    console.print("\n[green]✓ Track data uploaded successfully[/green]")
     console.print(f"  Total entries: {total_uploaded}")
     console.print(f"  Topic: {topic}")
     console.print(f"  Experiment: {namespace}/{project}/{experiment_name}")
@@ -1164,7 +1149,6 @@ def cmd_upload_track(args: argparse.Namespace) -> int:
   except Exception as e:
     console.print(f"[red]Error uploading track data:[/red] {e}")
     if args.verbose:
-      import traceback
       console.print(traceback.format_exc())
     return 1
 
@@ -1243,8 +1227,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
   console.print(f"[bold]Scanning local storage:[/bold] {dash_root.absolute()}")
   experiments = discover_experiments(
     dash_root,
-    project_filter=args.project,  # Using --prefix/-p argument
-    experiment_filter=None,
+    project_filter=args.project,
   )
 
   if not experiments:
@@ -1313,16 +1296,16 @@ def cmd_upload(args: argparse.Namespace) -> int:
       invalid_experiments.append(exp)
 
     # Show warnings and errors
-    if args.verbose or validation.errors:
+    if validation.errors:
       exp_key = f"{exp.project}/{exp.experiment}"
-      if validation.errors:
-        console.print(f"  [red]✗[/red] {exp_key}:")
-        for error in validation.errors:
-          console.print(f"      [red]{error}[/red]")
-      elif validation.warnings:
-        console.print(f"  [yellow]⚠[/yellow] {exp_key}:")
-        for warning in validation.warnings:
-          console.print(f"      [yellow]{warning}[/yellow]")
+      console.print(f"  [red]✗[/red] {exp_key}:")
+      for error in validation.errors:
+        console.print(f"      [red]{error}[/red]")
+    elif args.verbose and validation.warnings:
+      exp_key = f"{exp.project}/{exp.experiment}"
+      console.print(f"  [yellow]⚠[/yellow] {exp_key}:")
+      for warning in validation.warnings:
+        console.print(f"      [yellow]{warning}[/yellow]")
 
   if invalid_experiments:
     console.print(
@@ -1344,21 +1327,15 @@ def cmd_upload(args: argparse.Namespace) -> int:
   namespace = None
   if args.target:
     # Parse namespace from target prefix (format: "owner/project/...")
-    target_parts = args.target.strip("/").split("/")
-    if len(target_parts) >= 1:
-      namespace = target_parts[0]
+    namespace = args.target.strip("/").split("/")[0]
   if not namespace and valid_experiments:
     # Parse namespace from first experiment's prefix
     first_prefix = valid_experiments[0].prefix
     if first_prefix:
-      prefix_parts = first_prefix.strip("/").split("/")
-      if len(prefix_parts) >= 1:
-        namespace = prefix_parts[0]
+      namespace = first_prefix.strip("/").split("/")[0]
 
   # Initialize remote client and local storage
   remote_client = RemoteClient(base_url=remote_url, namespace=namespace, api_key=api_key)
-  if not namespace:
-    namespace = remote_client.namespace
   local_storage = LocalStorage(root_path=dash_root)
 
   # Upload experiments with progress tracking
@@ -1368,8 +1345,6 @@ def cmd_upload(args: argparse.Namespace) -> int:
   results = []
 
   # Track upload timing
-  import time
-
   start_time = time.time()
 
   # Create progress bar for overall upload
@@ -1406,8 +1381,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
 
       # Update state - mark as in progress
       upload_state.in_progress_experiment = exp_key
-      if not args.dry_run:
-        upload_state.save(state_file)
+      upload_state.save(state_file)
 
       validation = validation_results[exp_key]
       result = uploader.upload_experiment(exp, validation, task_id=task_id)
@@ -1420,8 +1394,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
       else:
         upload_state.failed_experiments.append(exp_key)
 
-      if not args.dry_run:
-        upload_state.save(state_file)
+      upload_state.save(state_file)
 
       # Update task to completed
       progress.update(task_id, completed=100, total=100)
@@ -1512,10 +1485,10 @@ def cmd_upload(args: argparse.Namespace) -> int:
     console.print(data_table)
 
   # Clean up state file if all uploads succeeded
-  if not args.dry_run and len(failed) == 0 and state_file.exists():
+  if len(failed) == 0 and state_file.exists():
     state_file.unlink()
     console.print("\n[dim]Upload complete. State file removed.[/dim]")
-  elif not args.dry_run and failed:
+  elif failed:
     console.print(
       f"\n[yellow]State saved to {state_file}. Use --resume to retry failed uploads.[/yellow]"
     )

@@ -28,9 +28,11 @@ import sys
 import typing
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 from params_proto import EnvVar, proto
+
+from .config import DEFAULT_API_URL
 
 
 def requires_open(func):
@@ -55,9 +57,7 @@ def requires_open(func):
   return wrapper
 
 if typing.TYPE_CHECKING:
-  from .client import RemoteClient
   from .experiment import Experiment
-  from .storage import LocalStorage
 
 PROJECT_ROOT_FILES = ("pyproject.toml", "requirements.txt", "setup.py", "setup.cfg")
 
@@ -139,7 +139,7 @@ class RUN:
 
   user: str = EnvVar @ "ML_DASH_USER" @ "USER"
 
-  api_url: str = EnvVar @ "ML_DASH_API_URL" | "https://api.dash.ml"
+  api_url: str = EnvVar @ "ML_DASH_API_URL" | DEFAULT_API_URL
   """Remote API server URL"""
 
   ### Experiment and project information
@@ -180,7 +180,7 @@ class RUN:
 
   path_stem: str = None
 
-  job_counter: int = 1  # Default to 0. Use True to increment by 1.
+  job_counter: int = 0  # Incremented by __post_init__; first run gets counter=1.
 
   job_name: str = "{now:%H.%M.%S}/{job_counter:03d}"
 
@@ -202,9 +202,9 @@ class RUN:
   debug = "pydevd" in sys.modules
   "set to True automatically for pyCharm"
 
-  _experiment: "Experiment" = None
-  _client: Optional["RemoteClient"] = None
-  _storage: Optional["LocalStorage"] = None
+  _open_fn: "Callable[[], Experiment]" = None
+  _close_fn: "Callable[[str], None]" = None
+  _is_open_fn: "Callable[[], bool]" = None
 
   # Prefix components (parsed from prefix)
   owner: Optional[str] = None
@@ -259,23 +259,22 @@ class RUN:
         return "/".join(str(path).split("/")[depth:])
 
       self.project_root = str(self.project_root or find_project_root(self.entry))
-      script_root_depth = self.project_root.split("/").__len__()
+      script_root_depth = len(self.project_root.split("/"))
 
       script_truncated = truncate(os.path.abspath(self.entry), depth=script_root_depth)
 
       self.path_stem = stem(script_truncated)
 
-    if isinstance(RUN.job_counter, int) or isinstance(RUN.job_counter, float):
+    if isinstance(RUN.job_counter, int):
       RUN.job_counter += 1
 
-    while "{" in self.prefix:
+    for _ in range(10):
+      if "{" not in self.prefix:
+        break
       data = vars(self)
       for k, v in data.items():
-        if isinstance(v, str):
+        if isinstance(v, str) and "{" in v:
           setattr(self, k, v.format(**data))
-
-    # for k, v in data.items():
-    #   print(f"> {k:>30}: {v}")
 
     # Parse prefix into components: {owner}/{project}/path.../[name]
     if self.prefix:
@@ -296,8 +295,8 @@ class RUN:
     """
     # Prevent prefix changes after experiment has started
     if name == "prefix" and isinstance(value, str):
-      experiment = getattr(self, "_experiment", None)
-      if experiment is not None and getattr(experiment, "_is_open", False):
+      is_open_fn = getattr(self, "_is_open_fn", None)
+      if is_open_fn is not None and is_open_fn():
         raise RuntimeError(
           "Cannot change prefix after experiment has been initialized. "
           "Set prefix before calling experiment.run.start() or entering the context manager."
@@ -349,19 +348,19 @@ class RUN:
     Returns:
         The experiment instance for chaining
     """
-    return self._experiment._open()
+    return self._open_fn()
 
   def complete(self) -> None:
     """Mark experiment as completed (status: COMPLETED)."""
-    self._experiment._close(status="COMPLETED")
+    self._close_fn(status="COMPLETED")
 
   def fail(self) -> None:
     """Mark experiment as failed (status: FAILED)."""
-    self._experiment._close(status="FAILED")
+    self._close_fn(status="FAILED")
 
   def cancel(self) -> None:
     """Mark experiment as cancelled (status: CANCELLED)."""
-    self._experiment._close(status="CANCELLED")
+    self._close_fn(status="CANCELLED")
 
   def __enter__(self) -> "Experiment":
     """Context manager entry - starts the experiment."""

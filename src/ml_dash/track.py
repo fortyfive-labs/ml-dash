@@ -7,8 +7,11 @@ and stores entries with timestamps and arbitrary data fields.
 """
 
 import bisect
-from typing import Dict, Any, List, Optional, TYPE_CHECKING, Iterator, Union
+import time
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
+
+from .exceptions import ConfigurationError, ExperimentError, StorageError
 
 if TYPE_CHECKING:
     from .experiment import Experiment
@@ -146,7 +149,12 @@ class TrackSlice:
         self._load_data()
 
         if not self._timestamps:
-            raise KeyError(f"No entries in track slice")
+            raise StorageError(f"No entries in track slice")
+
+        # Fast path: exact match at current search index
+        if (self._search_index < len(self._timestamps) and
+                self._timestamps[self._search_index] == timestamp):
+            return self._data[self._search_index]
 
         # Try optimized neighborhood search first (for sequential queries)
         if self._search_index < len(self._timestamps):
@@ -174,7 +182,7 @@ class TrackSlice:
         # idx is where timestamp would be inserted, so idx-1 is the floor match
         if idx == 0:
             # All timestamps are > query timestamp
-            raise KeyError(
+            raise StorageError(
                 f"No entry found with timestamp <= {timestamp}. "
                 f"Earliest timestamp: {self._timestamps[0]}"
             )
@@ -326,16 +334,21 @@ class TrackBuilder:
             experiment.tracks("robot/position").append(q=[0.1, -0.22, 0.45])
             experiment.tracks("camera/left").append(width=640, _ts=-1)  # Same timestamp!
         """
-        import time
-
         # Extract and handle timestamp
         if '_ts' not in kwargs:
-            # Auto-generate unique timestamp with collision avoidance
-            timestamp = time.time()
-            if timestamp <= self._experiment._track_last_auto_timestamp:
-                timestamp = self._experiment._track_last_auto_timestamp + 0.000001
-            self._experiment._track_last_auto_timestamp = timestamp
+            # Auto-generate unique timestamp with collision avoidance (thread-safe)
+            with self._experiment._track_timestamp_lock:
+                timestamp = time.time()
+                if timestamp <= self._experiment._track_last_auto_timestamp:
+                    timestamp = self._experiment._track_last_auto_timestamp + 0.000001
+                self._experiment._track_last_auto_timestamp = timestamp
         else:
+            # Validate before popping so _ts remains in kwargs if invalid
+            try:
+                float(kwargs['_ts'])
+            except (TypeError, ValueError):
+                raise ConfigurationError(f"Timestamp '_ts' must be numeric, got: {type(kwargs['_ts'])}")
+
             timestamp = kwargs.pop('_ts')
 
             # Handle _ts=-1 (timestamp inheritance)
@@ -348,12 +361,8 @@ class TrackBuilder:
                     if timestamp <= self._experiment._track_last_auto_timestamp:
                         timestamp = self._experiment._track_last_auto_timestamp + 0.000001
                     self._experiment._track_last_auto_timestamp = timestamp
-
-            # Validate timestamp is numeric
-            try:
+            else:
                 timestamp = float(timestamp)
-            except (TypeError, ValueError):
-                raise ValueError(f"Timestamp '_ts' must be numeric, got: {type(timestamp)}")
 
         # Store global last timestamp (for _ts=-1 inheritance across tracks)
         self._experiment._last_timestamp = timestamp
@@ -423,12 +432,12 @@ class TrackBuilder:
             mocap_data = experiment.tracks("robot/position").read(format="mocap")
         """
         # Remote mode
-        if self._experiment.run._client:
+        if self._experiment._client:
             # Need experiment ID for remote mode
             if not self._experiment._experiment_id:
-                raise ValueError("Experiment must be opened before reading tracks. Use 'with experiment.run:'")
+                raise ExperimentError("Experiment must be opened before reading tracks. Use 'with experiment.run:'")
 
-            return self._experiment.run._client.get_track_data(
+            return self._experiment._client.get_track_data(
                 experiment_id=self._experiment._experiment_id,
                 topic=self._topic,
                 start_timestamp=start_timestamp,
@@ -438,8 +447,8 @@ class TrackBuilder:
             )
 
         # Local mode
-        if self._experiment.run._storage:
-            return self._experiment.run._storage.read_track_data(
+        if self._experiment._storage:
+            return self._experiment._storage.read_track_data(
                 owner=self._experiment.run.owner,
                 project=self._experiment.run.project,
                 prefix=self._experiment.run._folder_path,
@@ -450,7 +459,7 @@ class TrackBuilder:
                 format=format
             )
 
-        raise ValueError("No client or storage configured for experiment")
+        raise ExperimentError("No client or storage configured for experiment")
 
     def list_entries(self) -> List[Dict[str, Any]]:
         """

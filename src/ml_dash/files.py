@@ -4,11 +4,11 @@ Files module for ML-Dash SDK.
 Provides fluent API for file upload, download, list, and delete operations.
 """
 
+import fnmatch
 import hashlib
 import mimetypes
-import fnmatch
-from typing import Dict, Any, List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from .experiment import Experiment
@@ -165,7 +165,8 @@ class FileBuilder:
             description=desc,
             tags=file_tags,
             metadata=file_metadata,
-            to=to
+            to=to,
+            bindrs=self._bindrs,
         )
 
     def save(
@@ -245,7 +246,8 @@ class FileBuilder:
         description: Optional[str],
         tags: Optional[List[str]],
         metadata: Optional[Dict[str, Any]],
-        to: Optional[str] = None
+        to: Optional[str] = None,
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Internal method to save an existing file."""
         fpath_obj = Path(fpath)
@@ -280,7 +282,8 @@ class FileBuilder:
             metadata=metadata,
             checksum=checksum,
             content_type=content_type,
-            size_bytes=file_size
+            size_bytes=file_size,
+            bindrs=bindrs or [],
         )
 
     def _save_bytes(
@@ -290,7 +293,8 @@ class FileBuilder:
         prefix: str,
         description: Optional[str],
         tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]],
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Save bytes data to a file."""
         import tempfile
@@ -308,7 +312,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -328,7 +333,8 @@ class FileBuilder:
         prefix: str,
         description: Optional[str],
         tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]],
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Save JSON content to a file."""
         import json
@@ -347,7 +353,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -367,7 +374,8 @@ class FileBuilder:
         prefix: str,
         description: Optional[str],
         tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]],
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Save PyTorch model to a file."""
         import tempfile
@@ -385,7 +393,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -406,6 +415,7 @@ class FileBuilder:
         description: Optional[str],
         tags: Optional[List[str]],
         metadata: Optional[Dict[str, Any]],
+        bindrs: Optional[List[str]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """Save matplotlib figure to a file."""
@@ -425,7 +435,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -445,7 +456,8 @@ class FileBuilder:
         prefix: str,
         description: Optional[str],
         tags: Optional[List[str]],
-        metadata: Optional[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]],
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Save Python object to a pickle file."""
         import pickle
@@ -464,7 +476,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -485,7 +498,8 @@ class FileBuilder:
         description: Optional[str],
         tags: Optional[List[str]],
         metadata: Optional[Dict[str, Any]],
-        quality: int = 95
+        quality: int = 95,
+        bindrs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Save numpy array as image file."""
         import tempfile
@@ -543,7 +557,8 @@ class FileBuilder:
             prefix=prefix,
             description=description,
             tags=tags,
-            metadata=metadata
+            metadata=metadata,
+            bindrs=bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -677,33 +692,9 @@ class FileBuilder:
 
         # Download single file by path
         if self._path:
-            # Find file by path
-            files = self._experiment._list_files(prefix=None, tags=None)
-            matching = []
-            search_path = self._path.lstrip('/')
-
-            for f in files:
-                filename = f.get('filename', '')
-                prefix = f.get('path', '/').lstrip('/')
-                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
-                full_path = full_path.lstrip('/')
-
-                if full_path == search_path or filename == search_path:
-                    matching.append(f)
-
-            if not matching:
+            file_info = self._experiment._find_file_by_path(self._path)
+            if not file_info:
                 raise ValueError(f"File not found: {self._path}")
-
-            if len(matching) > 1:
-                # If multiple matches, prefer exact path match
-                exact = [f for f in matching if
-                         (f.get('path', '/').lstrip('/').rstrip('/') + '/' + f.get('filename', '')).lstrip('/') == search_path]
-                if exact:
-                    matching = exact[:1]
-                else:
-                    matching = matching[:1]
-
-            file_info = matching[0]
             return self._experiment._download_file(
                 file_id=file_info['id'],
                 dest_path=to
@@ -761,31 +752,10 @@ class FileBuilder:
 
         # Delete single file by path
         if self._path:
-            files = self._experiment._list_files(prefix=None, tags=None)
-            matching = []
-            search_path = self._path.lstrip('/')
-
-            for f in files:
-                filename = f.get('filename', '')
-                prefix = f.get('path', '/').lstrip('/')
-                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
-                full_path = full_path.lstrip('/')
-
-                if full_path == search_path or filename == search_path:
-                    matching.append(f)
-
-            if not matching:
+            file_info = self._experiment._find_file_by_path(self._path)
+            if not file_info:
                 raise ValueError(f"File not found: {self._path}")
-
-            # Delete all matching files
-            if len(matching) == 1:
-                return self._experiment._delete_file(file_id=matching[0]['id'])
-
-            results = []
-            for f in matching:
-                result = self._experiment._delete_file(file_id=f['id'])
-                results.append(result)
-            return results
+            return self._experiment._delete_file(file_id=file_info['id'])
 
         raise ValueError("No file path or pattern specified")
 
@@ -862,7 +832,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
     def save_text(self, content: str, *, to: str) -> Dict[str, Any]:
@@ -895,7 +866,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
     def save_blob(self, data: bytes, *, to: str) -> Dict[str, Any]:
@@ -927,7 +899,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
     def save_torch(
@@ -959,7 +932,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
     def save_pkl(
@@ -990,7 +964,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
     def save_image(
@@ -1033,7 +1008,8 @@ class FileBuilder:
             description=self._description,
             tags=self._tags,
             metadata=self._metadata,
-            quality=quality
+            quality=quality,
+            bindrs=self._bindrs,
         )
 
     def save_fig(
@@ -1075,6 +1051,7 @@ class FileBuilder:
             description=self._description,
             tags=self._tags,
             metadata=self._metadata,
+            bindrs=self._bindrs,
             **kwargs
         )
 
@@ -1108,12 +1085,12 @@ class FileBuilder:
         try:
             import imageio.v3 as iio
         except ImportError:
-            raise ImportError("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
+            raise ImportError("imageio is not installed. Install it with: pip install 'ml-dash[video]'")
 
         try:
             from skimage import img_as_ubyte
         except ImportError:
-            raise ImportError("scikit-image is not installed. Install it with: pip install scikit-image")
+            raise ImportError("scikit-image is not installed. Install it with: pip install 'ml-dash[video]'")
 
         # Validate frame_stack
         try:
@@ -1142,7 +1119,8 @@ class FileBuilder:
             prefix=prefix,
             description=self._description,
             tags=self._tags,
-            metadata=self._metadata
+            metadata=self._metadata,
+            bindrs=self._bindrs,
         )
 
         # Only clean up if NOT queued for buffered upload
@@ -1205,26 +1183,21 @@ class FileBuilder:
         temp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(temp_dir, target_filename)
 
-        try:
-            downloaded_path = self._experiment._download_file(
-                file_id=source_id,
-                dest_path=temp_path
-            )
+        downloaded_path = self._experiment._download_file(
+            file_id=source_id,
+            dest_path=temp_path
+        )
 
-            return self._save_file(
-                fpath=downloaded_path,
-                prefix=target_prefix,
-                description=self._description,
-                tags=self._tags,
-                metadata=self._metadata
-            )
-        finally:
-            try:
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-                os.rmdir(temp_dir)
-            except Exception:
-                pass
+        # Do NOT delete the temp file here — the buffer's is_temp_file detection
+        # (buffer.py) will clean it up automatically after the upload completes.
+        return self._save_file(
+            fpath=downloaded_path,
+            prefix=target_prefix,
+            description=self._description,
+            tags=self._tags,
+            metadata=self._metadata,
+            bindrs=self._bindrs,
+        )
 
     def exists(self) -> bool:
         """
@@ -1252,24 +1225,9 @@ class FileBuilder:
         if not self._path:
             raise ValueError("No file path specified. Use: experiment.files('path/to/file').exists()")
 
-        # Try to find the file
         try:
-            files = self._experiment._list_files(prefix=None, tags=None)
-            search_path = self._path.lstrip('/')
-
-            for f in files:
-                filename = f.get('filename', '')
-                prefix = f.get('path', '/').lstrip('/')
-                full_path = prefix.rstrip('/') + '/' + filename if prefix else filename
-                full_path = full_path.lstrip('/')
-
-                # Check if this file matches (by full path or just filename)
-                if full_path == search_path or filename == search_path:
-                    # Make sure it's not deleted
-                    if f.get('deletedAt') is None:
-                        return True
-
-            return False
+            file_info = self._experiment._find_file_by_path(self._path)
+            return file_info is not None
         except Exception:
             return False
 

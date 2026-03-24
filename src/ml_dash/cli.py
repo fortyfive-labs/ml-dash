@@ -27,6 +27,9 @@ def create_parser() -> argparse.ArgumentParser:
     # Import and add command parsers
     from .cli_commands import upload, download, list as list_cmd, login, logout, profile, api, create, remove
 
+    # Version command
+    subparsers.add_parser("version", help="Show ml-dash version")
+
     # Authentication commands
     login.add_parser(subparsers)
     logout.add_parser(subparsers)
@@ -66,7 +69,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     # Route to command handlers
-    if args.command == "login":
+    if args.command == "version":
+        from . import __version__
+        print(f"ml-dash {__version__}")
+        return 0
+    elif args.command == "login":
         from .cli_commands import login
         return login.cmd_login(args)
     elif args.command == "logout":

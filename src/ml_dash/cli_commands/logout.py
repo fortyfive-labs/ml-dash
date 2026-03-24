@@ -7,48 +7,34 @@ from ml_dash.auth.exceptions import StorageError
 
 
 def add_parser(subparsers):
-    """Add logout command parser.
-
-    Args:
-        subparsers: Subparsers object from argparse
-    """
-    parser = subparsers.add_parser(
-        "logout",
-        help="Clear stored authentication token",
-        description="Logout from ml-dash by clearing stored authentication token",
-    )
+  """Add logout command parser."""
+  subparsers.add_parser(
+    "logout",
+    help="Clear stored authentication token",
+    description="Logout from ml-dash by clearing stored authentication token",
+  )
 
 
 def cmd_logout(args) -> int:
-    """Execute logout command.
+  """Execute logout command."""
+  console = Console()
 
-    Args:
-        args: Parsed command-line arguments
+  try:
+    storage = get_token_storage()
+    storage.delete("ml-dash-token")
 
-    Returns:
-        Exit code (0 for success, 1 for failure)
-    """
-    console = Console()
+    console.print(
+      "[bold green]✓ Logged out successfully![/bold green]\n\n"
+      "Your authentication token has been cleared.\n\n"
+      "To log in again:\n"
+      "  ml-dash login"
+    )
 
-    try:
-        # Get storage backend
-        storage = get_token_storage()
+    return 0
 
-        # Delete stored token
-        storage.delete("ml-dash-token")
-
-        console.print(
-            "[bold green]✓ Logged out successfully![/bold green]\n\n"
-            "Your authentication token has been cleared.\n\n"
-            "To log in again:\n"
-            "  ml-dash login"
-        )
-
-        return 0
-
-    except StorageError as e:
-        console.print(f"[red]✗ Storage error:[/red] {e}")
-        return 1
-    except Exception as e:
-        console.print(f"[red]✗ Unexpected error:[/red] {e}")
-        return 1
+  except StorageError as e:
+    console.print(f"[red]✗ Storage error:[/red] {e}")
+    return 1
+  except Exception as e:
+    console.print(f"[red]✗ Unexpected error:[/red] {e}")
+    return 1

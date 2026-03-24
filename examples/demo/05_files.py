@@ -3,6 +3,7 @@
 
 Covers:
   - files("dir").upload()     – upload an existing file from disk
+  - files("dir").save()       – unified save (auto-detects type from content)
   - files.save_text()         – write a string
   - files.save_json()         – write any JSON-serialisable object
   - files.save_blob()         – write raw bytes
@@ -12,10 +13,13 @@ Covers:
   - files.save_pkl()          – save any pickle-able object
   - files.save_video()        – save a video (list of frames)
   - files.list()              – list files, with optional glob pattern
-  - files.download()          – download to disk
+  - files.download()          – download single file to disk
+  - files("dir").download("*.ext") – batch download matching a glob
   - files("path").exists()    – check existence
   - files("path").read_text() – read text content back
+  - files("path").update()    – update file metadata (description/tags/metadata)
   - files.delete()            – delete by path or pattern
+  - files("dir", bindrs=[]) + exp.bindrs("name").list()  – tag files into named collections
 """
 
 import json
@@ -124,14 +128,60 @@ if exp.files("results/metrics.csv").exists():
     print("metrics.csv:\n", content)
 
 # ---------------------------------------------------------------------------
-# 12. Download a file
+# 12. Download files
 # ---------------------------------------------------------------------------
 with tempfile.TemporaryDirectory() as tmpdir:
+    # Single file — download to a specific path
     dest = exp.files("config.json").download(to=os.path.join(tmpdir, "config.json"))
     print("Downloaded to:", dest)
 
+    # Batch download — all files under a prefix matching a glob
+    paths = exp.files("results").download("*.json", to=os.path.join(tmpdir, "results"))
+    print("Batch downloaded:", len(paths), "file(s)")
+
 # ---------------------------------------------------------------------------
-# 13. Delete files
+# 13. Unified save() — auto-detects content type
+# ---------------------------------------------------------------------------
+import numpy as np
+exp.files("auto").save({"key": "value"}, to="auto_config.json")       # dict -> JSON
+exp.files("auto").save(b"\x00\x01\x02", to="auto_blob.bin")           # bytes -> blob
+# Note: str content -> use save_text(); str that is a file path -> save() calls upload()
+exp.files("auto").save(
+    np.zeros((32, 32, 3), dtype="uint8"), to="auto_image.png"         # ndarray -> image
+)
+
+# ---------------------------------------------------------------------------
+# 14. Update file metadata
+# ---------------------------------------------------------------------------
+exp.files.save_json({"acc": 0.91}, to="results/summary.json")
+exp.flush()   # flush so the file is persisted and has a real ID
+
+all_files = exp.files.list("results/summary.json")
+file_id = all_files[0].get("id") or all_files[0].get("fileId") if all_files else None
+if file_id:
+    exp.files(
+        file_id=file_id,
+        description="Updated: final accuracy",
+        tags=["final", "accuracy"],
+        metadata={"updated": True},
+    ).update()
+
+# ---------------------------------------------------------------------------
+# 15. Bindrs — tag files into named collections for cross-prefix grouping
+# ---------------------------------------------------------------------------
+exp.files("models", bindrs=["checkpoints"]).save_json({"epoch": 5}, to="ckpt5.json")
+exp.files("models", bindrs=["checkpoints", "best"]).save_json({"epoch": 10, "val_acc": 0.91}, to="ckpt10.json")
+exp.flush()
+
+# List files belonging to a bindr
+checkpoints = exp.bindrs("checkpoints").list()
+print("checkpoints bindr:", [f["filename"] for f in checkpoints])  # ckpt5, ckpt10
+
+best = exp.bindrs("best").list()
+print("best bindr:", [f["filename"] for f in best])                # ckpt10 only
+
+# ---------------------------------------------------------------------------
+# 16. Delete files
 # ---------------------------------------------------------------------------
 exp.files.delete("assets/placeholder.png")      # single file by path
 exp.files.delete("images/*")                    # all files matching a pattern
