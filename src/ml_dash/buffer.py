@@ -133,10 +133,12 @@ class BackgroundBufferManager:
             }
             if e.errno in transient_errnos:
                 return True
-        # httpx transport errors
+        # httpx errors — transport failures AND server-side 5xx responses
         try:
             import httpx
             if isinstance(e, (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError)):
+                return True
+            if isinstance(e, httpx.HTTPStatusError) and e.response.status_code >= 500:
                 return True
         except ImportError:
             pass
@@ -632,10 +634,17 @@ class BackgroundBufferManager:
                     f"flush {len(batch)} log(s)",
                 )
             except Exception as e:
-                raise NetworkError(
-                    f"Failed to flush {len(batch)} logs to remote server: {e}\n"
-                    f"Data loss occurred. Check your network connection and server status."
-                ) from e
+                _logger.warning(
+                    "[ML-Dash] Log flush failed after %d retries (%s: %s) — "
+                    "re-queuing %d entries for next flush cycle",
+                    self._config.max_retries, type(e).__name__, e, len(batch),
+                )
+                for entry in batch:
+                    try:
+                        self._log_queue.put_nowait(entry)
+                    except Exception:
+                        break  # Queue full — accept the loss rather than block
+                return
 
         if self._experiment._storage:
             # Local storage writes one at a time (no batch API)
@@ -709,10 +718,22 @@ class BackgroundBufferManager:
                     f"flush {len(batch)} point(s) to metric {metric_display}",
                 )
             except Exception as e:
-                raise NetworkError(
-                    f"Failed to flush {len(batch)} points to {metric_display} on remote server: {e}\n"
-                    f"Data loss occurred. Check your network connection and server status."
-                ) from e
+                _logger.warning(
+                    "[ML-Dash] Metric flush failed after %d retries (%s: %s) — "
+                    "re-queuing %d points for metric %s on next flush cycle",
+                    self._config.max_retries, type(e).__name__, e, len(batch), metric_display,
+                )
+                for data_point in batch:
+                    try:
+                        queue.put_nowait({
+                            "data": data_point,
+                            "description": description,
+                            "tags": tags,
+                            "metadata": metadata,
+                        })
+                    except Exception:
+                        break  # Queue full — accept the loss rather than block
+                return
 
         if self._experiment._storage:
             try:
@@ -756,10 +777,8 @@ class BackgroundBufferManager:
         if not batch:
             return
 
-        # Clear buffer for this topic
-        self._track_buffers[topic] = {}
-
-        # Write to remote backend
+        # Write to remote backend — clear buffer only on success so failed
+        # flushes are automatically retried on the next cycle
         if self._experiment._client:
             try:
                 self._retry_remote_call(
@@ -770,11 +789,18 @@ class BackgroundBufferManager:
                     ),
                     f"flush {len(batch)} entry/entries to track '{topic}'",
                 )
+                # Success — clear the flushed entries
+                self._track_buffers[topic] = {}
             except Exception as e:
-                raise NetworkError(
-                    f"Failed to flush {len(batch)} entries to track '{topic}' on remote server: {e}\n"
-                    f"Data loss occurred. Check your network connection and server status."
-                ) from e
+                _logger.warning(
+                    "[ML-Dash] Track flush failed after %d retries (%s: %s) — "
+                    "keeping %d entries in buffer for topic '%s' for next flush cycle",
+                    self._config.max_retries, type(e).__name__, e, len(batch), topic,
+                )
+                return
+        else:
+            # Local-only mode — clear unconditionally (no remote to fail)
+            self._track_buffers[topic] = {}
 
         # Write to local storage
         if self._experiment._storage:
