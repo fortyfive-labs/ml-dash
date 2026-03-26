@@ -35,7 +35,7 @@ class BufferConfig:
         self,
         flush_interval: float = 5.0,
         log_batch_size: int = 100,
-        metric_batch_size: int = 100,
+        metric_batch_size: int = 1000,
         track_batch_size: int = 100,
         file_upload_workers: int = 4,
         buffer_enabled: bool = True,
@@ -49,7 +49,7 @@ class BufferConfig:
         Args:
             flush_interval: Time-based flush interval in seconds (default: 5.0)
             log_batch_size: Max logs per batch (default: 100)
-            metric_batch_size: Max metric points per batch (default: 100)
+            metric_batch_size: Max metric points per batch (default: 1000)
             track_batch_size: Max track entries per batch (default: 100)
             file_upload_workers: Number of parallel file upload threads (default: 4)
             buffer_enabled: Enable/disable buffering (default: True)
@@ -73,7 +73,7 @@ class BufferConfig:
         return cls(
             flush_interval=float(os.environ.get("ML_DASH_FLUSH_INTERVAL", "5.0")),
             log_batch_size=int(os.environ.get("ML_DASH_LOG_BATCH_SIZE", "100")),
-            metric_batch_size=int(os.environ.get("ML_DASH_METRIC_BATCH_SIZE", "100")),
+            metric_batch_size=int(os.environ.get("ML_DASH_METRIC_BATCH_SIZE", "1000")),
             track_batch_size=int(os.environ.get("ML_DASH_TRACK_BATCH_SIZE", "100")),
             file_upload_workers=int(
                 os.environ.get("ML_DASH_FILE_UPLOAD_WORKERS", "4")
