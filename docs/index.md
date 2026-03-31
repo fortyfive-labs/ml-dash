@@ -1,21 +1,19 @@
-# ML-Dash Documentation
+# ML-Dash
+
+[![PyPI version](https://img.shields.io/pypi/v/ml-dash.svg?style=flat&color=blue)](https://pypi.org/project/ml-dash/)
 
 ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage.
 
 ## Installation
 
-```{parsed-literal}
-pip install ml-dash=={{version}}
-```
+<pre class="terminal"><span class="prompt">$</span> pip install ml-dash</pre>
 
 ## Claude Code Plugin
 
 If you have [Claude Code](https://claude.ai/download) installed, you can install the ML-Dash plugin:
 
-```
-/plugin marketplace add fortyfive-labs/ml-dash
-/plugin install ml-dash@ml-dash
-```
+<pre class="terminal"><span class="prompt">$</span> /plugin marketplace add fortyfive-labs/ml-dash
+<span class="prompt">$</span> /plugin install ml-dash@ml-dash</pre>
 
 Once installed, ask questions like:
 
@@ -43,36 +41,30 @@ Here's a typical training loop with metrics:
 
 ## Quick Start
 
-```python
-from ml_dash import Experiment
+<pre class="terminal"><span class="keyword">from</span> ml_dash <span class="keyword">import</span> <span class="obj">Experiment</span>
 
-# Local mode (no authentication required)
-with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
-    exp.log("Training started")
-    exp.params.set(learning_rate=0.001, batch_size=32)
+<span class="comment"># Local mode (no authentication required)</span>
+<span class="keyword">with</span> <span class="obj">Experiment</span>(<span class="param">prefix</span>=<span class="string">"my-user/my-project/exp1"</span>, <span class="param">dash_root</span>=<span class="string">".dash"</span>).run <span class="keyword">as</span> exp:
+    exp.<span class="method">logs</span>.<span class="method">info</span>(<span class="string">"Training started"</span>)
+    exp.<span class="method">params</span>.<span class="method">set</span>(<span class="param">learning_rate</span>=<span class="num">0.001</span>, <span class="param">batch_size</span>=<span class="num">32</span>)
 
-    for epoch in range(10):
+    <span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="builtin">range</span>(<span class="num">10</span>):
         loss = train_one_epoch()
-        exp.metrics("train").log(loss=loss, epoch=epoch)
-```
+        exp.<span class="method">metrics</span>(<span class="string">"train"</span>).<span class="method">log</span>(<span class="param">loss</span>=loss, <span class="param">epoch</span>=epoch)</pre>
 
 ## Remote Mode (with dash.ml)
 
-```bash
-# Authenticate first
-ml-dash login
-```
+<pre class="terminal"><span class="comment"># Authenticate first</span>
+<span class="prompt">$</span> ml-dash login</pre>
 
-```python
-from ml_dash import Experiment
+<pre class="terminal"><span class="keyword">from</span> ml_dash <span class="keyword">import</span> <span class="obj">Experiment</span>
 
-with Experiment(
-    prefix="my-user/my-project/exp1",
-    dash_url="https://api.dash.ml"
-).run as exp:
-    exp.log("Training on remote")
-    exp.params.set(learning_rate=0.001)
-```
+<span class="keyword">with</span> <span class="obj">Experiment</span>(
+    <span class="param">prefix</span>=<span class="string">"my-user/my-project/exp1"</span>,
+    <span class="param">dash_url</span>=<span class="string">"https://api.dash.ml"</span>
+).run <span class="keyword">as</span> exp:
+    exp.<span class="method">logs</span>.<span class="method">info</span>(<span class="string">"Training on remote"</span>)
+    exp.<span class="method">params</span>.<span class="method">set</span>(<span class="param">learning_rate</span>=<span class="num">0.001</span>)</pre>
 
 ## Documentation
 
