@@ -7,9 +7,33 @@ ML-Dash is a simple and flexible SDK for ML experiment tracking and data storage
 
 ## Installation
 
-```bash
-pip install ml-dash
-```
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+:::tip TIPS
+
+We strongly recommend using [uv](https://docs.astral.sh/uv/) to manage your Python environment and dependencies. It is significantly faster than pip and provides reliable, reproducible installs.
+:::
+
+<Tabs>
+  <TabItem value="pip" label="pip" default>
+    ```bash
+    pip install ml-dash
+    ```
+  </TabItem>
+  <TabItem value="uv" label="uv">
+    ```bash
+    uv add ml-dash
+    ```
+  </TabItem>
+  <TabItem value="conda" label="conda">
+    ```bash
+    conda install -c conda-forge ml-dash
+    ```
+  </TabItem>
+</Tabs>
+
+
 
 ## Claude Code Plugin
 
