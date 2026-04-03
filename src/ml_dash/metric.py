@@ -132,7 +132,7 @@ class BufferManager:
         c = f + 1 if f + 1 < len(sorted_vals) else f
         return sorted_vals[f] + (k - f) * (sorted_vals[c] - sorted_vals[f])
 
-    def log_summary(self, *aggs: str) -> None:
+    def log_summary(self, *aggs: str, **kwargs) -> None:
         """
         Compute statistics from buffered values and log them.
 
@@ -141,11 +141,12 @@ class BufferManager:
                    Supported: "mean", "std", "min", "max", "count",
                              "median", "sum", "p50", "p90", "p95", "p99",
                              "last", "first"
+            **kwargs: Extra fields included as-is in every log call (e.g. step=100, epoch=5).
 
         Example:
-            metrics.buffer.log_summary()                    # default: mean
-            metrics.buffer.log_summary("mean", "std")       # mean and std
-            metrics.buffer.log_summary("mean", "p95")       # mean and 95th percentile
+            metrics.buffer.log_summary(step=global_step)            # mean + step
+            metrics.buffer.log_summary("mean", "std", step=100)     # mean, std + step
+            metrics.buffer.log_summary("mean", "p95", epoch=5)      # mean, p95 + epoch
         """
         # Default to mean
         if not aggs:
@@ -161,7 +162,7 @@ class BufferManager:
             if not buffer:
                 continue
 
-            output_data = {}
+            output_data = {**kwargs}
 
             for key, values in buffer.items():
                 if not values:
