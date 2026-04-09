@@ -14,6 +14,16 @@ const config: Config = {
   url: 'https://docs.dash.ml',
   baseUrl: '/',
 
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'algolia-site-verification',
+        content: '80B062FABBF268CA',
+      },
+    },
+  ],
+
   organizationName: 'fortyfive-labs',
   projectName: 'ml-dash',
 

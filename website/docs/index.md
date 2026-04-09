@@ -74,36 +74,37 @@ Metrics are automatically batched and synced in the background.
 
 ## Quick Start
 
-```python
-from ml_dash import Experiment
+**1. Authenticate:**
 
-# Local mode (no authentication required)
-with Experiment(prefix="my-user/my-project/exp1", dash_root=".dash").run as exp:
-    exp.logs.info("Training started")
-    exp.params.set(learning_rate=0.001, batch_size=32)
+:::tip
+Run `ml-dash login` in your terminal. It will open a browser window to complete authentication.
+:::
 
-    for epoch in range(10):
-        loss = train_one_epoch()
-        exp.metrics("train").log(loss=loss, epoch=epoch)
-```
-
-## Remote Mode (with dash.ml)
-
-```python
-# Authenticate first
+```bash
 ml-dash login
 ```
+
+
+
+**2. Run your first experiment:**
 
 ```python
 from ml_dash import Experiment
 
 with Experiment(
     prefix="my-user/my-project/exp1",
-    dash_url="https://api.dash.ml"
 ).run as exp:
-    exp.logs.info("Training on remote")
-    exp.params.set(learning_rate=0.001)
+    exp.params.set(learning_rate=0.001, batch_size=32)
+    exp.log("Training started")
+
+    for epoch in range(10):
+        loss = train_one_epoch()
+        exp.metrics("train").log(loss=loss, epoch=epoch)
 ```
+
+**3. View your results:**
+
+Visit [https://dash.ml](https://dash.ml) to browse your experiment metrics, parameters, and logs in real time.
 
 ## Documentation
 
