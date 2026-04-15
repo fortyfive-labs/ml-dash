@@ -80,6 +80,13 @@ Here's a typical training loop with metrics:
 - [API Reference](api-reference.md)
 - [Examples](complete-examples.md)
 
+### Dashboard
+
+- **[Dashboard](dashboard.md)** - Web interface overview and experiment view
+- **[Experiment Charts](experiment-charts.md)** - Configure charts with `.dashrc`
+- **[Comparing Experiments](compare.md)** - Live Compare and Compare View
+- **[`.dashrc` Reference](dashrc.md)** - Complete field reference
+
 ### Advanced Features
 
 - **[Background Buffering](buffering.md)** - Non-blocking I/O with automatic batching
@@ -106,6 +113,17 @@ files
 cli
 api-reference
 complete-examples
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Dashboard
+:hidden:
+
+dashboard
+experiment-charts
+compare
+dashrc
 ```
 
 ```{toctree}
