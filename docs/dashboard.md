@@ -12,6 +12,13 @@ The Dashboard uses a three-column layout:
 
 All three columns are resizable. The left column can be collapsed; the right column can be expanded to fullscreen, hiding the middle column.
 
+```{figure} _static/images/dashboard-layout.png
+:alt: Dashboard three-column layout
+:width: 100%
+
+The three-column layout: namespace/project navigator (left), file tree and experiment list (middle), content tabs (right).
+```
+
 ---
 
 ## Tabs: Folder View
@@ -129,3 +136,23 @@ The right column switches tabs automatically as you navigate, following these ru
 - Checking 2 or more experiments in the list → **Live Compare** tab appears (not automatically selected).
 - Unchecking experiments below 2 → **Live Compare** tab disappears.
 - Navigating away from an experiment → experiment-only tabs (Dashboard, Logs, Parameters) are hidden.
+
+---
+
+## Deep Links
+
+The URL path determines which folder the file tree is focused on. Clicking a segment in the path header or the breadcrumb above the file tree navigates to that point and updates the URL.
+
+You can deep-link directly to any folder by constructing the URL:
+
+```
+https://dash.ml/<namespace>/<project>/<path/to/folder>
+```
+
+For example:
+
+```
+https://dash.ml/alice/rl-project/2026/ablations
+```
+
+Opening this URL focuses the file tree at `2026/ablations` inside `rl-project`. This is useful for **sharing a link to a specific folder** with teammates or **bookmarking a frequently used experiment directory**.

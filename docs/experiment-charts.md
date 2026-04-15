@@ -12,6 +12,13 @@ To edit an existing `.dashrc`:
 2. A split view opens: YAML editor on the left, live chart preview on the right.
 3. Edit — charts update automatically.
 
+```{figure} _static/images/dashrc-editor.png
+:alt: .dashrc split editor view
+:width: 100%
+
+The `.dashrc` editor: YAML editor on the left with live chart preview on the right. Charts re-render automatically as you edit.
+```
+
 ## `metrics` — Header Metrics Filter
 
 Controls which metrics appear in the experiment header, displayed as a row of key-value pairs above the charts.
