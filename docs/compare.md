@@ -1,6 +1,6 @@
 # Comparing Experiments
 
-ML-Dash provides two ways to compare experiments side by side: **Live Compare** (instant, no configuration) and **Compare View** (persistent, `.dashrc`-driven).
+ML-Dash provides two ways to compare experiments: **Live Compare** (instant, no configuration) and **Compare View** (persistent, `.dashrc`-driven).
 
 ---
 
@@ -31,8 +31,6 @@ my-project/
 ├── run-lr0.01/    ✓ selected
 └── run-lr0.1/     ✓ selected
 ```
-
-All three runs appear as separate lines on the `train.loss` chart (if at least 2 of them logged `train.loss`).
 
 #### Different Parent Folders — Group Comparison
 
@@ -77,21 +75,6 @@ Compare View is a persistent, fully configurable comparison powered by a `.dashr
 
 ## Compare `.dashrc` Configuration
 
-A folder-level `.dashrc` defines a set of line charts, each with an explicit `series` array that specifies which experiments to include and how to display them.
-
-### File Location
-
-```
-my-project/
-├── .dashrc          ← folder-level, drives Compare View
-├── experiment-a/
-├── experiment-b/
-└── ablations/
-    ├── .dashrc      ← another compare config scoped to this subfolder
-    ├── run-1/
-    └── run-2/
-```
-
 ### Minimal Example
 
 ```yaml
@@ -112,7 +95,7 @@ Each item in the `series` array corresponds to one line on the chart and one API
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `prefix` | `string` | Path prefix of an experiment (e.g. `"alice/project/run-1"`). The backend resolves this to the matching experiment. |
+| `prefix` | `string` | Path prefix of an experiment (e.g. `"alice/project/run-1"`). |
 | `experimentIds` | `string[]` | Explicit list of experiment IDs. Use when you want to pin specific experiments rather than match by path. |
 | `experimentId` | `string` | Single experiment ID. Equivalent to `experimentIds: [id]`. |
 | `label` | `string` | Display name shown in the chart legend. |

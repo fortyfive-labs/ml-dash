@@ -80,12 +80,12 @@ All chart types share these fields:
 | `xLabel` | `string` | xKey name | X-axis label |
 | `yLabel` | `string` | metric name | Y-axis label |
 | `bins` | `number` | `200` | Downsample target point count. Higher = more detail, slower render. |
-| `xFormat` | `string \| null` | `null` | Format specifier for x-axis ticks (passed to backend). |
-| `yFormat` | `string \| null` | `null` | Format specifier for y-axis ticks (passed to backend). |
+| `xFormat` | `string \| null` | `null` | Format specifier for x-axis ticks. |
+| `yFormat` | `string \| null` | `null` | Format specifier for y-axis ticks. |
 | `xTicks` | `number` | auto | Number of x-axis grid lines. |
 | `yTicks` | `number` | auto | Number of y-axis grid lines. |
 
-**`yKey` and `yKeys` are mutually exclusive** — use exactly one. (`series` is available in compare `.dashrc` only.)
+**`yKey`, `yKeys` and `series` are mutually exclusive** — use exactly one. (`series` is available in compare `.dashrc` only.)
 
 ---
 
@@ -95,11 +95,11 @@ Used inside `series` arrays in compare `.dashrc` files only.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `prefix` | `string` | Experiment path prefix. The backend resolves this to matching experiments. |
+| `prefix` | `string` | Experiment path prefix. |
 | `experimentIds` | `string[]` | Explicit list of experiment IDs to include in this series. |
 | `experimentId` | `string` | Single experiment ID. Shorthand for `experimentIds: [id]`. |
 | `label` | `string` | Legend label for this series. |
-| `color` | `string` | Line color as a CSS hex string (e.g. `"#5470c6"`). Explicit colors are always preserved. |
+| `color` | `string` | Line color as a hex string (e.g. `"#5470c6"`). Explicit colors are always preserved. |
 | `dash` | `string` | SVG stroke-dasharray string. Omit for a solid line. |
 | `xKey` | `string` | Overrides the chart-level `xKey` for this series only. |
 | `yKey` | `string` | Overrides the chart-level `yKey` for this series only. |
@@ -170,30 +170,29 @@ When `color` is not specified, series are assigned colors automatically from a f
 
 ### Default Color Palette
 
-| Index | Color | Hex |
-|-------|-------|-----|
-| 0 | Blue | `#5470c6` |
-| 1 | Green | `#91cc75` |
-| 2 | Yellow | `#fac858` |
-| 3 | Red | `#ee6666` |
-| 4 | Sky | `#73c0de` |
-| 5 | Teal | `#3ba272` |
-| 6 | Orange | `#fc8452` |
-| 7 | Purple | `#9a60b4` |
-| 8 | Pink | `#ea7ccc` |
+| Index | Swatch | Color | Hex |
+|-------|--------|-------|-----|
+| 0 | <span style="display:inline-block;width:28px;height:14px;background:#5470c6;border-radius:3px;vertical-align:middle;"></span> | Blue | `#5470c6` |
+| 1 | <span style="display:inline-block;width:28px;height:14px;background:#91cc75;border-radius:3px;vertical-align:middle;"></span> | Green | `#91cc75` |
+| 2 | <span style="display:inline-block;width:28px;height:14px;background:#fac858;border-radius:3px;vertical-align:middle;"></span> | Yellow | `#fac858` |
+| 3 | <span style="display:inline-block;width:28px;height:14px;background:#ee6666;border-radius:3px;vertical-align:middle;"></span> | Red | `#ee6666` |
+| 4 | <span style="display:inline-block;width:28px;height:14px;background:#73c0de;border-radius:3px;vertical-align:middle;"></span> | Sky | `#73c0de` |
+| 5 | <span style="display:inline-block;width:28px;height:14px;background:#3ba272;border-radius:3px;vertical-align:middle;"></span> | Teal | `#3ba272` |
+| 6 | <span style="display:inline-block;width:28px;height:14px;background:#fc8452;border-radius:3px;vertical-align:middle;"></span> | Orange | `#fc8452` |
+| 7 | <span style="display:inline-block;width:28px;height:14px;background:#9a60b4;border-radius:3px;vertical-align:middle;"></span> | Purple | `#9a60b4` |
+| 8 | <span style="display:inline-block;width:28px;height:14px;background:#ea7ccc;border-radius:3px;vertical-align:middle;"></span> | Pink | `#ea7ccc` |
 
 For more than 9 series, colors cycle with a **+40° hue rotation** per round, combined with cycling dash patterns.
 
 ### Dash Pattern Examples
 
-| Value | Appearance |
-|-------|-----------|
-| *(omitted)* | Solid line |
-| `"4 4"` | Short dashes |
-| `"8 4"` | Long dashes |
-| `"8 4 2 4"` | Dash-dot |
-
-Explicit `color` values are **always preserved** regardless of series index.
+| Value | Preview | Appearance |
+|-------|---------|-----------|
+| *(omitted)* | <svg width="80" height="12" style="vertical-align:middle"><line x1="0" y1="6" x2="80" y2="6" stroke="currentColor" stroke-width="2"/></svg> | Solid line |
+| `2 4` | <svg width="80" height="12" style="vertical-align:middle"><line x1="0" y1="6" x2="80" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="2 4"/></svg> | Dotted |
+| `4 4` | <svg width="80" height="12" style="vertical-align:middle"><line x1="0" y1="6" x2="80" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4"/></svg> | Short dashes |
+| `8 4` | <svg width="80" height="12" style="vertical-align:middle"><line x1="0" y1="6" x2="80" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="8 4"/></svg> | Long dashes |
+| `8 4 2 4` | <svg width="80" height="12" style="vertical-align:middle"><line x1="0" y1="6" x2="80" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="8 4 2 4"/></svg> | Dash-dot |
 
 ---
 
@@ -219,7 +218,7 @@ charts:
     title: Chart title
     xKey: default        # or: step, epoch, timestamp, any metric name
     yKey: train.loss     # single metric  ──┐
-    # yKeys:             # multiple metrics ┤ pick one
+    # yKeys:             # multiple metrics │-pick one
     #   - train.loss     #                  │
     #   - eval.loss      #                 ─┘
     xLabel: Steps

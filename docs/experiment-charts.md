@@ -9,14 +9,14 @@ If no `.dashrc` exists yet, click **Save as .dashrc** in the Dashboard tab toolb
 To edit an existing `.dashrc`:
 
 1. Click the **Edit** button in the top-right of the Dashboard tab or click the .dashrc file.
-2. A split view opens: YAML editor on the left, live chart preview on the right.
+2. A split view opens: YAML editor on the right, live chart preview on the left.
 3. Edit — charts update automatically.
 
 ```{figure} _static/images/dashrc-editor.png
 :alt: .dashrc split editor view
 :width: 100%
 
-The `.dashrc` editor: YAML editor on the left with live chart preview on the right. Charts re-render automatically as you edit.
+The `.dashrc` editor: YAML editor on the right with live chart preview on the left. Charts re-render automatically as you edit.
 ```
 
 ## `metrics` — Header Metrics Filter
@@ -79,8 +79,8 @@ charts:
 | `xLabel` | `string` | xKey value | X-axis label |
 | `yLabel` | `string` | metric name | Y-axis label |
 | `bins` | `number` | `200` | Number of points to downsample to. Higher values show more detail but are slower to render |
-| `xFormat` | `string \| null` | `null` | Format specifier for x-axis tick labels (passed to backend) |
-| `yFormat` | `string \| null` | `null` | Format specifier for y-axis tick labels (passed to backend) |
+| `xFormat` | `string \| null` | `null` | Format specifier for x-axis tick labels |
+| `yFormat` | `string \| null` | `null` | Format specifier for y-axis tick labels |
 | `xTicks` | `number` | auto | Number of grid ticks on the x-axis |
 | `yTicks` | `number` | auto | Number of grid ticks on the y-axis |
 
