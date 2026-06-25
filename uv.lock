@@ -850,7 +850,7 @@ wheels = [
 
 [[package]]
 name = "ml-dash"
-version = "0.6.25"
+version = "0.6.27"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -911,7 +911,7 @@ requires-dist = [
     { name = "linkify-it-py", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9.0" },
     { name = "myst-parser", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "params-proto", specifier = ">=3.0.0,<3.2.0" },
+    { name = "params-proto", specifier = ">=3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "qrcode", marker = "extra == 'auth'", specifier = ">=8.0.0" },
