@@ -51,15 +51,23 @@ from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
 
-__version__ = "0.6.25"
+# Single source of truth: derive the version from installed package metadata
+# (pyproject.toml) so the string is never duplicated and can never drift.
+try:
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+    __version__ = _pkg_version("ml-dash")
+except PackageNotFoundError:  # running from a source tree without an install
+    __version__ = "0.0.0+unknown"
 
 
 def _check_version_compatibility():
     """
-    Enforce strict version requirement by checking against PyPI.
+    Warn (don't fail) if the installed version is older than the latest on PyPI.
 
-    Raises ImportError if installed version is older than the latest on PyPI.
-    This ensures all users are on the latest version with newest features and bug fixes.
+    Nudges users toward the newest release without bricking imports: a strict
+    ImportError here means a single bad/late publish takes down every older
+    install, and ties every import to network reachability.
     """
     try:
         from packaging import version
@@ -82,25 +90,13 @@ def _check_version_compatibility():
             latest = version.parse(latest_version)
 
             if current < latest:
-                raise ImportError(
-                    f"\n"
-                    f"{'=' * 80}\n"
-                    f"ERROR: ml-dash version {__version__} is outdated!\n"
-                    f"{'=' * 80}\n"
-                    f"\n"
-                    f"Your installed version ({__version__}) is no longer supported.\n"
-                    f"Latest version on PyPI: {latest_version}\n"
-                    f"\n"
-                    f"Please upgrade to the latest version:\n"
-                    f"\n"
-                    f"  pip install --upgrade ml-dash\n"
-                    f"\n"
-                    f"Or with uv:\n"
-                    f"\n"
-                    f"  uv pip install --upgrade ml-dash\n"
-                    f"  uv sync --upgrade-package ml-dash\n"
-                    f"\n"
-                    f"{'=' * 80}\n"
+                import warnings
+
+                warnings.warn(
+                    f"ml-dash {__version__} is behind the latest release "
+                    f"({latest_version}). Upgrade with `uv sync --upgrade-package "
+                    f"ml-dash` or `pip install --upgrade ml-dash`.",
+                    stacklevel=2,
                 )
     except (httpx.TimeoutException, httpx.ConnectError, KeyError):
         # Silently skip check if PyPI is unreachable or response is malformed
