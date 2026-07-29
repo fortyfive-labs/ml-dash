@@ -435,16 +435,25 @@ if __name__ == "__main__":
 
 ## Running the Examples
 
-All examples are available in the `docs/examples/` directory:
+These scripts are runnable, and live in
+[`examples/tutorials/`](https://github.com/fortyfive-labs/ml-dash/tree/main/examples/tutorials)
+in the ml-dash repo:
 
 ```bash
-# Navigate to docs/examples
-cd docs/examples
+git clone https://github.com/fortyfive-labs/ml-dash
+cd ml-dash/examples/tutorials
 
-# Run any example
-python complete_training.py
-python hyperparameter_search.py
-python architecture_comparison.py
+python 01_basic_experiment.py
+python 02_logging_example.py
+python 03_parameters_example.py
+python 04_metrics_example.py
+python 05_files_example.py
+python 06_complete_training.py
+python 07_project_root_example.py
+python three_usage_styles.py
+
+# Robotics: MuJoCo pose tracking
+python robotics/mujoco_tracking.py
 ```
 
 ## See Also
