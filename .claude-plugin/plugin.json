@@ -1,11 +1,12 @@
 {
   "name": "ml-dash",
-  "version": "0.6.8",
-  "description": "ML experiment tracking skills for Claude Code",
+  "version": "0.6.27",
+  "description": "The ML-Dash documentation as a Claude Code skill — experiment tracking, metrics, files, tracks, CLI, and the dash.ml dashboard",
   "author": {
     "name": "Ge Yang"
   },
-  "repository": "https://github.com/geyang/ml-dash",
+  "repository": "https://github.com/fortyfive-labs/ml-dash",
+  "homepage": "https://docs.dash.ml",
   "license": "MIT",
   "keywords": ["machine-learning", "experiment-tracking", "mlops"],
   "skills": "./skills/"

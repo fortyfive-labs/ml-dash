@@ -3,12 +3,12 @@
   "owner": {
     "name": "Ge Yang"
   },
-  "description": "ML experiment tracking skills for Claude Code",
+  "description": "The ML-Dash documentation as a Claude Code skill",
   "plugins": [
     {
       "name": "ml-dash",
       "source": "./",
-      "description": "ML-Dash skills for experiment tracking"
+      "description": "The full ML-Dash docs, generated from docs.dash.ml — experiment tracking, metrics, files, tracks, CLI, and the dashboard"
     }
   ]
 }

@@ -1,26 +1,21 @@
-.PHONY: build-docs docs preview clean help
+.PHONY: help docs sync-skill check-skill
 
 help:
 	@echo "Available targets:"
-	@echo "  build-docs  - Build the Sphinx documentation"
-	@echo "  docs        - Build and serve documentation with auto-reload"
-	@echo "  preview     - Clean, build and preview documentation in browser"
-	@echo "  clean       - Remove the documentation build directory"
+	@echo "  docs         - Open the documentation site"
+	@echo "  sync-skill   - Refresh skills/dash-docs/ from docs.dash.ml"
+	@echo "  check-skill  - Fail if the vendored skill is stale"
+	@echo ""
+	@echo "Documentation lives at https://docs.dash.ml and is built from"
+	@echo "dreamlake-ai/dash-workspace (docs/). It is no longer built here —"
+	@echo "the Sphinx tree and the Docusaurus site have both been retired."
 
-clean:
-	@echo "Cleaning documentation build directory..."
-	rm -rf docs/_build
+docs:
+	@echo "https://docs.dash.ml"
+	@command -v open >/dev/null && open https://docs.dash.ml || true
 
-build-docs:
-	@echo "Building documentation..."
-	uv run sphinx-build -M html docs docs/_build
+sync-skill:
+	./scripts/sync-docs-skill.sh
 
-docs: build-docs
-	@echo "Starting documentation server at http://127.0.0.1:8001"
-	@echo "Press Ctrl+C to stop the server"
-	cd docs/_build/html && uv run python -m http.server 8001
-
-preview: clean build-docs
-	@echo "Starting documentation server with auto-reload..."
-	@echo "Documentation will be available at http://127.0.0.1:8001"
-	uv run sphinx-autobuild docs docs/_build/html --port 8001 --open-browser
+check-skill:
+	./scripts/sync-docs-skill.sh --check

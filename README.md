@@ -159,7 +159,7 @@ with Experiment("robotics/training").run as experiment:
         print(entry["timestamp"], entry["x"], entry["y"])
 ```
 
-See [docs/tracks.md](docs/tracks.md) for complete documentation.
+See [the Tracks guide](https://docs.dash.ml/guides/tracks) for complete documentation.
 
 ### 🖼️ Numpy Image Support
 
@@ -216,12 +216,11 @@ pip install -e ".[dev]"
 This installs:
 - `pytest>=8.0.0` - Testing framework
 - `pytest-asyncio>=0.23.0` - Async test support
-- `sphinx>=7.2.0` - Documentation builder
-- `sphinx-rtd-theme>=2.0.0` - Read the Docs theme
-- `sphinx-autobuild>=2024.0.0` - Live preview for documentation
-- `myst-parser>=2.0.0` - Markdown support for Sphinx
 - `ruff>=0.3.0` - Linter and formatter
 - `mypy>=1.9.0` - Type checker
+
+The Sphinx toolchain is gone with the docs tree — see
+[Documentation](#documentation) below.
 
 ### Running Tests
 
@@ -248,49 +247,26 @@ pytest
 </tr>
 </table>
 
-### Building Documentation
+### Documentation
 
-Documentation is built using Sphinx with Read the Docs theme.
+The docs live at **[docs.dash.ml](https://docs.dash.ml)** and are built from
+[`dreamlake-ai/dash-workspace`](https://github.com/dreamlake-ai/dash-workspace)
+(`docs/`), not from this repo. The Sphinx tree that used to sit in `docs/` and
+the Docusaurus site in `website/` have both been retired — they had drifted
+apart from each other and from the SDK, and one of them documented `_ts` as a
+required argument that raises `ValueError` when it is optional and raises
+`ConfigurationError`.
 
-<table>
-<tr>
-<td>Build docs</td>
-<td>Live preview</td>
-<td>Clean build</td>
-</tr>
-<tr>
-<td>
+Doc changes therefore go to that repo. It runs a `check:sdk` guard that
+verifies every python snippet against the installed `ml_dash`, so a signature
+change here will fail the docs build there rather than sit unnoticed.
 
-```bash
-uv run python -m sphinx -b html docs docs/_build/html
-```
-
-</td>
-<td>
+The `skills/dash-docs/` directory is a vendored copy of the generated agent
+skill. Never edit it by hand:
 
 ```bash
-uv run sphinx-autobuild docs docs/_build/html
-```
-
-</td>
-<td>
-
-```bash
-rm -rf docs/_build
-```
-
-</td>
-</tr>
-</table>
-
-The live preview command starts a local server and automatically rebuilds when files change.
-
-Alternatively, you can use the Makefile from within the docs directory:
-
-```bash
-cd docs
-make html          # Build HTML documentation
-make clean         # Clean build files
+make sync-skill    # refresh from docs.dash.ml
+make check-skill   # fail if the vendored copy is stale
 ```
 
 For maintainers, to build and publish a new release: `uv build && uv publish`
