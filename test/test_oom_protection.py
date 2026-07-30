@@ -1,8 +1,15 @@
 """Test OOM protection with bounded queues and backpressure."""
 import getpass
 import time
+import pytest
 from ml_dash import Experiment
 
+
+# Hardcodes dash_url='http://localhost:3000', so it cannot pass without a
+# running server. conftest's pytest_collection_modifyitems skips anything
+# marked `remote` when localhost:3000/health is unreachable — this test just
+# never got the marker, so it failed instead of skipping.
+@pytest.mark.remote
 def test_oom_protection():
     """Test that queue backpressure prevents OOM."""
 

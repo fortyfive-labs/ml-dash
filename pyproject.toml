@@ -51,9 +51,23 @@ auth = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    # test/conftest.py mints a test JWT at import time, so the whole suite
+    # fails to collect without this. Test-only — nothing in src/ imports jwt.
+    "pyjwt>=2.8.0",
+    # test_numpy_serialization.py and test_save_video.py import numpy directly.
+    # The `video` extra pulls it in transitively via scikit-image, but the test
+    # suite should not depend on that happening to be installed.
+    "numpy>=1.24",
     "ruff>=0.3.0",
     "mypy>=1.9.0",
 ]
+
+[tool.pytest.ini_options]
+# Scope collection to the SDK's own suite. `examples/` is a separate uv project
+# (name = "ml-experiments") with its own testpaths and its own venv; collecting
+# its tests from here fails on `import ml_experiments`, which is not installed
+# in this environment and should not be.
+testpaths = ["test"]
 
 [tool.ruff]
 indent-width = 2

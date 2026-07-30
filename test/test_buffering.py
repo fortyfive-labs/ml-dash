@@ -70,7 +70,9 @@ class TestBufferConfig:
         config = BufferConfig()
         assert config.flush_interval == 5.0
         assert config.log_batch_size == 100
-        assert config.metric_batch_size == 100
+        # buffer.py:38 defaults this to 1000, and its docstring says 1000. The
+        # test was left at the old value when the default was raised.
+        assert config.metric_batch_size == 1000
         assert config.file_upload_workers == 4
         assert config.buffer_enabled is True
 
