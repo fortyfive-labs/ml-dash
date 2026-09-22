@@ -5,8 +5,10 @@ Provides a pre-configured experiment singleton named 'rdxp' that uses remote mod
 Requires manual start using 'with' statement or explicit start() call.
 
 IMPORTANT: Before using rdxp, you must authenticate with the ML-Dash server:
-    # First time setup - authenticate with the server
-    python -m ml_dash.cli login
+    # First time setup - authenticate with the server.
+    # The CLI ships separately, from npm:
+    #   npm install -g ml-dash
+    $ ml-dash login
 
 Usage:
     from ml_dash.remote_auto_start import rdxp

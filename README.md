@@ -7,7 +7,7 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 ### Core Features
 - **Three Usage Styles**: Pre-configured singleton (dxp), context manager, or direct instantiation
 - **Dual Operation Modes**: Remote (API server) or local (filesystem)
-- **OAuth2 Authentication**: Secure device flow authentication for CLI and SDK
+- **OAuth2 Authentication**: Secure device flow; the SDK reads the token the `ml-dash` CLI stores
 - **Auto-creation**: Automatically creates namespace, project, and folder hierarchy
 - **Upsert Behavior**: Updates existing experiments or creates new ones
 - **Experiment Lifecycle**: Automatic status tracking (RUNNING, COMPLETED, FAILED, CANCELLED)
@@ -23,6 +23,12 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
 ## Installation
+
+This repo is the **Python SDK** — the library you `import ml_dash` from. The
+`ml-dash` **command line** is a separate program, distributed on npm; see
+[The CLI moved to npm](#the-cli-moved-to-npm) below.
+
+### SDK (this package)
 
 <table>
 <tr>
@@ -47,15 +53,52 @@ pip install ml-dash
 </tr>
 </table>
 
+### CLI
+
+```bash
+npm install -g ml-dash
+```
+
+## The CLI moved to npm
+
+Up to and including 0.6.27, `pip install ml-dash` also put an `ml-dash`
+executable on your PATH. It no longer does: the command line has been rewritten
+in TypeScript and ships as its own npm package, so it installs and updates
+without touching your training environment's Python dependencies.
+
+Nothing about the SDK changes. `pip install ml-dash` is still how you get
+`ml_dash`, and every `Experiment`, `files`, `tracks`, and `storage` API is
+untouched.
+
+|  | Before | Now |
+|---|---|---|
+| SDK (`import ml_dash`) | `pip install ml-dash` | `pip install ml-dash` |
+| CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g ml-dash` |
+
+The command names and flags are unchanged, and **the two share credentials**:
+the CLI writes its token to the same OS keyring entry (and the same
+`~/.dash/` fallback files) that `ml_dash.auth.token_storage` reads, so
+`ml-dash login` still authenticates your Python code. You do not need to log in
+again after switching.
+
+If you were importing `ml_dash.cli` or `ml_dash.cli_commands.*` directly from
+Python — an unsupported path, but a real one — those modules are gone. Shell
+out to the `ml-dash` binary instead.
+
+> **Status:** this split is prepared but not yet published. The npm package and
+> the standalone installer are not live at the time of writing.
+
 ## Quick Start
 
 ### 1. Authenticate (Required for Remote Mode)
 
 ```bash
+npm install -g ml-dash   # one time; the CLI is not part of the Python package
 ml-dash login
 ```
 
-This opens your browser for secure OAuth2 authentication. Your credentials are stored securely in your system keychain.
+This opens your browser for secure OAuth2 authentication. Your credentials are
+stored securely in your system keychain — where the Python SDK reads them.
 
 ### 2. Start Tracking Experiments
 
@@ -270,3 +313,4 @@ make check-skill   # fail if the vendored copy is stale
 ```
 
 For maintainers, to build and publish a new release: `uv build && uv publish`
+(this publishes the SDK only — the CLI is released from its own npm repo).

@@ -5,6 +5,26 @@ All notable changes to ML-Dash will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### ⚠️ BREAKING CHANGES
+- **The `ml-dash` command line is no longer part of this package.** It has been
+  rewritten in TypeScript and is distributed on npm; `pip install ml-dash` now
+  installs the SDK only and no longer puts an `ml-dash` executable on your PATH.
+  - **Migration**: `npm install -g ml-dash`. Command names and flags are
+    unchanged, and the CLI writes its token to the same keyring entry and
+    `~/.dash/` files the SDK reads — no re-login needed.
+  - Removed the `ml_dash.cli` module and the `ml_dash.cli_commands` package.
+    Code that imported them directly must shell out to the binary instead.
+  - Dropped the `qrcode` dependency from the `auth` extra; only the CLI's login
+    command drew a QR code. `keyring` stays — the SDK reads tokens through it.
+
+### Unchanged
+- The SDK itself: `Experiment`, `params`, `metrics`, `log`, `files`, `tracks`,
+  `storage`, and `ml_dash.auth` are all untouched, as is remote/local mode.
+
+> Not yet released. The npm package is not published at the time of writing.
+
 ## [0.6.10] - 2026-01-26
 
 ### ⚠️ BREAKING CHANGES

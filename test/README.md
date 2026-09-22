@@ -79,7 +79,6 @@ These tests require a running ML-Dash server at `http://localhost:3000` with:
 - GraphQL and REST API endpoints available
 
 Remote test files (marked with `@pytest.mark.remote`):
-- `test_cli_upload.py` - CLI upload functionality
 - `test_duplicate.py` - Experiment duplication
 - `test_experiment.py` - Remote experiment operations
 - `test_file_upload_download.py` - File upload/download
@@ -124,7 +123,6 @@ The test suite covers:
 - ✅ Multi-experiment pipelines
 - ✅ Error handling
 - ✅ Authentication and token management
-- ✅ CLI upload functionality
 - ✅ Remote server integration
 
 ## Fixtures

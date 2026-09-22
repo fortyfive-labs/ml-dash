@@ -341,6 +341,7 @@ class Experiment:
         "[bold red]Authentication Required[/bold red]\n\n"
         "You need to authenticate before using remote experiments.\n\n"
         "[bold]To authenticate:[/bold]\n"
+        "  [cyan]npm install -g ml-dash[/cyan]  [dim](the CLI ships separately, from npm)[/dim]\n"
         "  [cyan]ml-dash login[/cyan]\n\n"
         "[dim]This will open your browser for secure OAuth2 authentication.\n"
         "Your token will be stored securely in your system keychain.[/dim]\n\n"
@@ -362,6 +363,7 @@ class Experiment:
       print("=" * 60)
       print("\nYou need to authenticate before using remote experiments.\n")
       print("To authenticate:")
+      print("  npm install -g ml-dash   # the CLI ships separately, from npm")
       print("  ml-dash login\n")
       print("Alternative:")
       print("  Use local_path instead of remote for offline experiments\n")
