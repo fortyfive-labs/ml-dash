@@ -25,9 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The SDK itself: `Experiment`, `params`, `metrics`, `log`, `files`, `tracks`,
   `storage`, and `ml_dash.auth` are all untouched, as is remote/local mode.
 
-> Not yet released. No SDK version has been cut from this change, and the npm
-> package is not published — every released Python version, 0.6.27 included,
-> still ships the old CLI.
+> Not yet released. No SDK version has been cut from this change, so every
+> released Python version, 0.6.27 included, still ships the old CLI; this
+> takes effect with the next PyPI release. The replacement installs with
+> `npm install -g ml-dash` (Node.js >= 20.19), or from the standalone
+> installer at `https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.sh`,
+> which needs neither Node.js nor Python.
 
 ## [0.6.10] - 2026-01-26
 

@@ -55,9 +55,25 @@ pip install ml-dash
 
 ### CLI
 
+Version 0.1.0. With Node.js >= 20.19:
+
 ```bash
 npm install -g ml-dash
 ```
+
+Or a self-contained binary, needing neither Node.js nor Python:
+
+```bash
+# macOS / Linux
+curl -fsSL https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.sh | sh
+```
+
+```powershell
+# Windows PowerShell
+irm https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.ps1 | iex
+```
+
+On Alpine the musl builds need `apk add --no-cache libstdc++`.
 
 ## The CLI moved to npm
 
@@ -90,9 +106,10 @@ If you were importing `ml_dash.cli` or `ml_dash.cli_commands.*` directly from
 Python — an unsupported path, but a real one — those modules are gone. Shell
 out to the `ml-dash` binary instead.
 
-> **Status:** prepared, not published. The npm package and the standalone
-> installer are not live, and no SDK release has been cut from this branch, so
-> nothing above has taken effect for anyone installing from PyPI today.
+> **Status:** this split is not merged and no SDK release has been cut from
+> this branch, so it has not taken effect for anyone installing from PyPI.
+> `pip install ml-dash` today gives you 0.6.27, which still carries the old
+> Python CLI. The change above lands with the next PyPI release.
 
 ## Quick Start
 
