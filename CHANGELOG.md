@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The `ml-dash` command line is no longer part of this package.** It has been
   rewritten in TypeScript and is distributed on npm; `pip install ml-dash` now
   installs the SDK only and no longer puts an `ml-dash` executable on your PATH.
-  - **Migration**: `npm install -g ml-dash`. Command names and flags are
-    unchanged, and the CLI writes its token to the same keyring entry and
-    `~/.dash/` files the SDK reads — no re-login needed.
+  - **Migration**: `npm install -g ml-dash` (needs Node.js >= 20.19). Command
+    names and arguments carry over, and the CLI writes its token to the same
+    keyring entry and `~/.dash/` files the SDK reads, so a valid login is
+    normally reused — re-run `ml-dash login` if it is not. Per-command
+    behaviour is not identical; see the CLI's own release notes.
   - Removed the `ml_dash.cli` module and the `ml_dash.cli_commands` package.
     Code that imported them directly must shell out to the binary instead.
   - Dropped the `qrcode` dependency from the `auth` extra; only the CLI's login
@@ -23,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The SDK itself: `Experiment`, `params`, `metrics`, `log`, `files`, `tracks`,
   `storage`, and `ml_dash.auth` are all untouched, as is remote/local mode.
 
-> Not yet released. The npm package is not published at the time of writing.
+> Not yet released. No SDK version has been cut from this change, and the npm
+> package is not published — every released Python version, 0.6.27 included,
+> still ships the old CLI.
 
 ## [0.6.10] - 2026-01-26
 

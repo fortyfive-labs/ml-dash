@@ -61,10 +61,11 @@ npm install -g ml-dash
 
 ## The CLI moved to npm
 
-Up to and including 0.6.27, `pip install ml-dash` also put an `ml-dash`
-executable on your PATH. It no longer does: the command line has been rewritten
-in TypeScript and ships as its own npm package, so it installs and updates
-without touching your training environment's Python dependencies.
+Every released version so far, 0.6.27 included, puts an `ml-dash` executable on
+your PATH alongside the library — and those releases go on doing so. From the
+next release, cut from this branch, it does not: the command line has been
+rewritten in TypeScript and ships as its own npm package, so it installs and
+updates without touching your training environment's Python dependencies.
 
 Nothing about the SDK changes. `pip install ml-dash` is still how you get
 `ml_dash`, and every `Experiment`, `files`, `tracks`, and `storage` API is
@@ -75,25 +76,30 @@ untouched.
 | SDK (`import ml_dash`) | `pip install ml-dash` | `pip install ml-dash` |
 | CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g ml-dash` |
 
-The command names and flags are unchanged, and **the two share credentials**:
-the CLI writes its token to the same OS keyring entry (and the same
+The command names and arguments carry over, and **the two share a credential
+store**: the CLI writes its token to the same OS keyring entry (and the same
 `~/.dash/` fallback files) that `ml_dash.auth.token_storage` reads, so
-`ml-dash login` still authenticates your Python code. You do not need to log in
-again after switching.
+`ml-dash login` still authenticates your Python code and an existing valid
+login is normally picked up as-is. Re-run `ml-dash login` if it is not.
+
+Command *behaviour* is not identical — the rewrite changes and fixes a number
+of things — and the CLI's own release notes are where those differences are
+described.
 
 If you were importing `ml_dash.cli` or `ml_dash.cli_commands.*` directly from
 Python — an unsupported path, but a real one — those modules are gone. Shell
 out to the `ml-dash` binary instead.
 
-> **Status:** this split is prepared but not yet published. The npm package and
-> the standalone installer are not live at the time of writing.
+> **Status:** prepared, not published. The npm package and the standalone
+> installer are not live, and no SDK release has been cut from this branch, so
+> nothing above has taken effect for anyone installing from PyPI today.
 
 ## Quick Start
 
 ### 1. Authenticate (Required for Remote Mode)
 
 ```bash
-npm install -g ml-dash   # one time; the CLI is not part of the Python package
+npm install -g ml-dash   # one time; requires Node.js >= 20.19
 ml-dash login
 ```
 
