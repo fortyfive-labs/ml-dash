@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The `ml-dash` command line is no longer part of this package.** It has been
   rewritten in TypeScript and is distributed on npm; `pip install ml-dash` now
   installs the SDK only and no longer puts an `ml-dash` executable on your PATH.
-  - **Migration**: `npm install -g ml-dash` (needs Node.js >= 20.19). Command
+  - **Migration**: `npm install -g @dreamlake/ml-dash` (needs Node.js >= 20.19). Command
     names and arguments carry over, and the CLI writes its token to the same
     keyring entry and `~/.dash/` files the SDK reads, so a valid login is
     normally reused — re-run `ml-dash login` if it is not. Per-command
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > Not yet released. No SDK version has been cut from this change, so every
 > released Python version, 0.6.27 included, still ships the old CLI; this
 > takes effect with the next PyPI release. The replacement installs with
-> `npm install -g ml-dash` (Node.js >= 20.19), or from the standalone
+> `npm install -g @dreamlake/ml-dash` (Node.js >= 20.19), or from the standalone
 > installer at `https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.sh`,
 > which needs neither Node.js nor Python.
 

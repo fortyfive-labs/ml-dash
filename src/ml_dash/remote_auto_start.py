@@ -7,7 +7,7 @@ Requires manual start using 'with' statement or explicit start() call.
 IMPORTANT: Before using rdxp, you must authenticate with the ML-Dash server:
     # First time setup - authenticate with the server.
     # The CLI ships separately, from npm:
-    #   npm install -g ml-dash
+    #   npm install -g @dreamlake/ml-dash
     $ ml-dash login
 
 Usage:

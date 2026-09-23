@@ -7,7 +7,7 @@ Requires manual start using 'with' statement or explicit start() call.
 
 Usage:
     # First, authenticate. The `ml-dash` CLI ships separately, from npm:
-    # $ npm install -g ml-dash
+    # $ npm install -g @dreamlake/ml-dash
     # $ ml-dash login
 
     from ml_dash.auto_start import dxp

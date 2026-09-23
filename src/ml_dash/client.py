@@ -250,7 +250,7 @@ class RemoteClient:
         if not self.api_key:
             from .auth.exceptions import AuthenticationError
             raise AuthenticationError(
-                "Not authenticated. Install the CLI ('npm install -g ml-dash') "
+                "Not authenticated. Install the CLI ('npm install -g @dreamlake/ml-dash') "
                 "and run 'ml-dash login' to authenticate, "
                 "or provide an explicit api_key parameter."
             )

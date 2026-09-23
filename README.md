@@ -55,10 +55,10 @@ pip install ml-dash
 
 ### CLI
 
-Version 0.1.0. With Node.js >= 20.19:
+Version 0.1.1, published as `@dreamlake/ml-dash`. With Node.js >= 20.19:
 
 ```bash
-npm install -g ml-dash
+npm install -g @dreamlake/ml-dash
 ```
 
 Or a self-contained binary, needing neither Node.js nor Python:
@@ -75,6 +75,15 @@ irm https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.ps1 | iex
 
 On Alpine the musl builds need `apk add --no-cache libstdc++`.
 
+The package is scoped because the unscoped `ml-dash` name is not claimable on
+npm, but **the command is still `ml-dash`**. Either channel updates itself, in
+place and through the channel it was installed from:
+
+```bash
+ml-dash update --check   # report whether a newer release exists
+ml-dash update           # install it
+```
+
 ## The CLI moved to npm
 
 Every released version so far, 0.6.27 included, puts an `ml-dash` executable on
@@ -90,7 +99,7 @@ untouched.
 |  | Before | Now |
 |---|---|---|
 | SDK (`import ml_dash`) | `pip install ml-dash` | `pip install ml-dash` |
-| CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g ml-dash` |
+| CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g @dreamlake/ml-dash` |
 
 The command names and arguments carry over, and **the two share a credential
 store**: the CLI writes its token to the same OS keyring entry (and the same
@@ -116,7 +125,7 @@ out to the `ml-dash` binary instead.
 ### 1. Authenticate (Required for Remote Mode)
 
 ```bash
-npm install -g ml-dash   # one time; requires Node.js >= 20.19
+npm install -g @dreamlake/ml-dash   # one time; requires Node.js >= 20.19
 ml-dash login
 ```
 
