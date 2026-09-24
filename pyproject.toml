@@ -1,6 +1,6 @@
 [project]
 name = "ml-dash"
-version = "0.6.27"
+version = "0.7.0"
 description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,18 +35,17 @@ Documentation = "https://docs.dash.ml"
 Homepage = "https://dash.ml"
 Source = "https://github.com/fortyfive-labs/ml-dash"
 
-[project.scripts]
-ml-dash = "ml_dash.cli:main"
-
 [project.optional-dependencies]
 video = [
     "imageio>=2.31.0",
     "imageio-ffmpeg>=0.4.9",
     "scikit-image>=0.21.0",
 ]
+# Secure token storage for the SDK. The token itself is written by the
+# `ml-dash` CLI, which now ships from npm; this extra is what lets the SDK
+# read it back out of the OS keyring instead of a plaintext file.
 auth = [
     "keyring>=25.0.0",
-    "qrcode>=8.0.0",
 ]
 dev = [
     "pytest>=8.0.0",
