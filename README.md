@@ -86,11 +86,13 @@ ml-dash update           # install it
 
 ## The CLI moved to npm
 
-Every released version so far, 0.6.27 included, puts an `ml-dash` executable on
-your PATH alongside the library — and those releases go on doing so. From the
-next release, cut from this branch, it does not: the command line has been
-rewritten in TypeScript and ships as its own npm package, so it installs and
+Up to and including 0.6.27, `pip install ml-dash` also put an `ml-dash`
+executable on your PATH. From **0.7.0** it does not: the command line has been
+rewritten in TypeScript and ships on its own — as the npm package
+`@dreamlake/ml-dash` or the standalone installer above — so it installs and
 updates without touching your training environment's Python dependencies.
+Upgrading the Python package to 0.7.0 removes the old executable; install the
+new CLI alongside it.
 
 Nothing about the SDK changes. `pip install ml-dash` is still how you get
 `ml_dash`, and every `Experiment`, `files`, `tracks`, and `storage` API is
@@ -99,7 +101,7 @@ untouched.
 |  | Before | Now |
 |---|---|---|
 | SDK (`import ml_dash`) | `pip install ml-dash` | `pip install ml-dash` |
-| CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g @dreamlake/ml-dash` |
+| CLI (`ml-dash login`, `upload`, …) | `pip install ml-dash` | `npm install -g @dreamlake/ml-dash`, or the [standalone installer](#cli) |
 
 The command names and arguments carry over, and **the two share a credential
 store**: the CLI writes its token to the same OS keyring entry (and the same
@@ -115,10 +117,8 @@ If you were importing `ml_dash.cli` or `ml_dash.cli_commands.*` directly from
 Python — an unsupported path, but a real one — those modules are gone. Shell
 out to the `ml-dash` binary instead.
 
-> **Status:** this split is not merged and no SDK release has been cut from
-> this branch, so it has not taken effect for anyone installing from PyPI.
-> `pip install ml-dash` today gives you 0.6.27, which still carries the old
-> Python CLI. The change above lands with the next PyPI release.
+Releases up to 0.6.27 keep the old Python CLI; pin `ml-dash<0.7` only if you
+cannot install the new one yet.
 
 ## Quick Start
 
@@ -126,6 +126,7 @@ out to the `ml-dash` binary instead.
 
 ```bash
 npm install -g @dreamlake/ml-dash   # one time; requires Node.js >= 20.19
+                                    # (or use the standalone installer above)
 ml-dash login
 ```
 

@@ -7,13 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-24
+
 ### ⚠️ BREAKING CHANGES
 - **The `ml-dash` command line is no longer part of this package.** It has been
-  rewritten in TypeScript and is distributed on npm; `pip install ml-dash` now
+  rewritten in TypeScript and ships separately; from 0.7.0, `pip install ml-dash`
   installs the SDK only and no longer puts an `ml-dash` executable on your PATH.
-  - **Migration**: `npm install -g @dreamlake/ml-dash` (needs Node.js >= 20.19). Command
-    names and arguments carry over, and the CLI writes its token to the same
-    keyring entry and `~/.dash/` files the SDK reads, so a valid login is
+  0.6.27 and every earlier release still carry the old Python CLI.
+  - **Migration**: install the CLI on its own. The npm package is
+    `@dreamlake/ml-dash` (the command it installs is still `ml-dash`):
+
+    ```bash
+    npm install -g @dreamlake/ml-dash    # needs Node.js >= 20.19
+    ```
+
+    or, with neither Node.js nor Python, the standalone installer:
+
+    ```bash
+    curl -fsSL https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.sh | sh   # macOS / Linux
+    irm https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.ps1 | iex        # Windows PowerShell
+    ```
+
+    On Alpine the musl builds also need `apk add --no-cache libstdc++`.
+    Upgrading `ml-dash` with pip removes the old executable, so install the new
+    CLI before (or right after) upgrading if scripts call `ml-dash`.
+  - Command names and arguments carry over, and the CLI writes its token to the
+    same keyring entry and `~/.dash/` files the SDK reads, so a valid login is
     normally reused — re-run `ml-dash login` if it is not. Per-command
     behaviour is not identical; see the CLI's own release notes.
   - Removed the `ml_dash.cli` module and the `ml_dash.cli_commands` package.
@@ -21,16 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dropped the `qrcode` dependency from the `auth` extra; only the CLI's login
     command drew a QR code. `keyring` stays — the SDK reads tokens through it.
 
+### Changed
+- The `dev` extra now declares `pyjwt` and `numpy`, which the test suite
+  imports directly.
+
 ### Unchanged
 - The SDK itself: `Experiment`, `params`, `metrics`, `log`, `files`, `tracks`,
   `storage`, and `ml_dash.auth` are all untouched, as is remote/local mode.
-
-> Not yet released. No SDK version has been cut from this change, so every
-> released Python version, 0.6.27 included, still ships the old CLI; this
-> takes effect with the next PyPI release. The replacement installs with
-> `npm install -g @dreamlake/ml-dash` (Node.js >= 20.19), or from the standalone
-> installer at `https://pub-42e1dcc7de574d4a92984865fdc95f10.r2.dev/install.sh`,
-> which needs neither Node.js nor Python.
 
 ## [0.6.10] - 2026-01-26
 
