@@ -23,6 +23,7 @@ Usage:
 """
 
 import functools
+import logging
 import os
 import sys
 import typing
@@ -33,6 +34,8 @@ from typing import Callable, Optional, Union
 from params_proto import EnvVar, proto
 
 from .config import DEFAULT_API_URL
+
+_logger = logging.getLogger("ml_dash.run")
 
 
 def requires_open(func):
@@ -367,9 +370,23 @@ class RUN:
     return self.start()
 
   def __exit__(self, exc_type, exc_val, exc_tb):
-    """Context manager exit - completes or fails the experiment."""
+    """Context manager exit - completes or fails the experiment.
+
+    If the body raised, that exception propagates even when marking the
+    experiment FAILED also fails. The cleanup error is attached to it as a note
+    (Python 3.11+) and logged; neither can raise in place of the body's exception.
+    """
     if exc_type is not None:
-      self.fail()
+      try:
+        self.fail()
+      except Exception as cleanup_error:
+        message = (
+          f"[ML-Dash] Closing the experiment after {exc_type.__name__} also failed: "
+          f"{type(cleanup_error).__name__}: {cleanup_error}"
+        )
+        if hasattr(exc_val, "add_note"):
+          exc_val.add_note(message)
+        _logger.error(message)
     else:
       self.complete()
     return False

@@ -7,10 +7,11 @@ validation losses, system measurements, etc.
 
 import statistics
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 if TYPE_CHECKING:
     from .experiment import Experiment
+    from .metric_rows import MetricRowBlock, MetricRowsPage
 
 
 class BufferManager:
@@ -233,6 +234,7 @@ class SummaryCache:
         self._metric_builder = metric_builder
         self._buffer: Dict[str, List[float]] = defaultdict(list)
         self._metadata: Dict[str, Any] = {}  # For set() metadata
+        self._stored_since_summary = 0  # values not yet in any summary (warned about at close)
 
     def store(self, **kwargs) -> None:
         """
@@ -256,6 +258,7 @@ class SummaryCache:
                     f"Cannot store non-numeric value for '{key}': {value!r} (type: {type(value).__name__})\n"
                     f"SummaryCache only accepts numeric values. Use exp.log() for non-numeric data."
                 ) from e
+            self._stored_since_summary += 1
 
     def set(self, **kwargs) -> None:
         """
@@ -334,11 +337,10 @@ class SummaryCache:
         # Merge metadata with statistics
         output_data = {**self._metadata, **stats_data}
 
-        if not output_data:
-            return
-
-        # Log combined data as a single metric data point
-        self._metric_builder.log(**output_data)
+        # Log combined data as a single metric data point (a window of only NaN logs nothing)
+        if output_data:
+            self._metric_builder.log(**output_data)
+        self._stored_since_summary = 0
 
         # Clear buffer if requested (default behavior for "tiled" mode)
         if clear:
@@ -524,17 +526,17 @@ class MetricsManager:
 
     def flush(self) -> 'MetricsManager':
         """
-        Flush buffered data (for method chaining).
+        No-op, kept for method chaining. It does not send anything.
 
-        Currently a no-op as data is written immediately, but supports
-        the fluent API pattern:
+        With buffering on (the default), logged points are sent by a background
+        thread; call ``experiment.flush()`` to send them now. Supports the
+        fluent API pattern:
             experiment.metrics.log(epoch=epoch).flush()
 
         Returns:
             Self for method chaining
         """
-        # Data is written immediately, so nothing to flush
-        # This method exists for API consistency and chaining
+        # Sending is done by the experiment's buffer (experiment.flush()); this exists for chaining
         return self
 
 
@@ -548,8 +550,12 @@ class MetricBuilder:
         # Log single data point
         experiment.metrics("train").log(loss=0.5, accuracy=0.9)
 
-        # Read data
+        # Read data (local storage)
         data = experiment.metrics("train").read(start_index=0, limit=100)
+
+        # Read committed rows from the server
+        for block in experiment.metrics("train").iter_row_blocks():
+            print(block.columns, len(block.rows))
 
         # Get statistics
         stats = experiment.metrics("train").stats()
@@ -639,22 +645,25 @@ class MetricBuilder:
 
     def flush(self) -> 'MetricBuilder':
         """
-        Flush buffered data (for method chaining).
+        No-op, kept for method chaining. It does not send anything.
 
-        Currently a no-op as data is written immediately, but supports
-        the fluent API pattern:
+        With buffering on (the default), logged points are sent by a background
+        thread; call ``experiment.flush()`` to send them now. Supports the
+        fluent API pattern:
             experiment.metrics.log(epoch=epoch).flush()
 
         Returns:
             Self for method chaining
         """
-        # Data is written immediately, so nothing to flush
-        # This method exists for API consistency and chaining
+        # Sending is done by the experiment's buffer (experiment.flush()); this exists for chaining
         return self
 
     def read(self, start_index: int = 0, limit: int = 1000) -> Dict[str, Any]:
         """
-        Read data points from the metric by index range.
+        Read data points from the metric by index range, from local storage.
+
+        A remote-only experiment raises ConfigurationError: the server no longer
+        assigns indices. Use read_rows() or iter_row_blocks() there.
 
         Args:
             start_index: Starting index (inclusive, default 0)
@@ -679,6 +688,68 @@ class MetricBuilder:
             limit=limit
         )
 
+    def read_rows(self, limit: Optional[int] = None, cursor: Optional[str] = None) -> 'MetricRowsPage':
+        """
+        Read one page of this metric's committed rows from the server, as stored.
+
+        Returns a MetricRowsPage (see ``ml_dash.metric_rows``):
+        - blocks: list of MetricRowBlock. Each has ``columns`` (a tuple of
+          MetricColumn(name, type); names may repeat and differ per block) and
+          ``rows``, lists of cells in column order. Cells are float, int, bool,
+          str or None; a column a block lacks is not in its columns.
+        - returned: rows in this page. has_more / next_cursor: the next page.
+        - metric_id, visibility ("committed"), order ("storage").
+
+        Rows are in storage order, not step order, and points the server has not
+        yet committed are not included. There is no index, total or timestamp.
+
+        Args:
+            limit: Max rows in this page (server default 1000, max 10000)
+            cursor: ``next_cursor`` of the previous page; None for the first page
+
+        Raises:
+            ConfigurationError: if the experiment is local-only
+            MetricRowsError: if the read fails, with ``status_code`` and ``code``.
+                ``code == "snapshot_changed"`` (409): the stored data changed
+                since the first page; start again without a cursor.
+
+        Example:
+            page = experiment.metrics("train").read_rows(limit=500)
+            while True:
+                for block in page.blocks:
+                    names = [c.name for c in block.columns]
+                    for row in block.rows:
+                        print(list(zip(names, row)))
+                if not page.has_more:
+                    break
+                page = experiment.metrics("train").read_rows(limit=500, cursor=page.next_cursor)
+        """
+        return self._experiment._read_metric_rows(name=self._name, limit=limit, cursor=cursor)
+
+    def iter_row_blocks(self, limit: Optional[int] = None) -> Iterator['MetricRowBlock']:
+        """
+        Yield every block of this metric's committed rows, following cursors.
+
+        Blocks are yielded as read_rows() returns them, so a block's columns and
+        types always travel with its rows. Pages are fetched lazily; ``limit`` is
+        the page size. A failed page raises MetricRowsError after the blocks
+        already yielded; the read is never restarted silently, so a
+        ``snapshot_changed`` error means starting over (and discarding what was
+        yielded) is up to the caller.
+
+        Example:
+            for block in experiment.metrics("train").iter_row_blocks():
+                steps = [i for i, c in enumerate(block.columns) if c.name == "step"]
+                ...
+        """
+        cursor = None
+        while True:
+            page = self.read_rows(limit=limit, cursor=cursor)
+            yield from page.blocks
+            if not page.has_more:
+                return
+            cursor = page.next_cursor
+
     def stats(self) -> Dict[str, Any]:
         """
         Get metric statistics and metadata.
@@ -699,6 +770,9 @@ class MetricBuilder:
             - lastDataAt: Timestamp of last point (if data has timestamp)
             - createdAt: Metric creation time
             - updatedAt: Last update time
+
+            The point and chunk counts come from local storage. Current remote
+            servers no longer track them, so remote results may omit them.
 
         Example:
             stats = experiment.metric(name="train_loss").stats()

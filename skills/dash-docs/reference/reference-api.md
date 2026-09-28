@@ -359,7 +359,9 @@ stats = exp.metrics("train_loss").stats()
 | `metrics("prefix").buffer(**data)` | Flexible data fields | `None` | Buffer values for summary |
 | `metrics.buffer.log_summary(*aggs)` | aggregation names | `None` | Log summary statistics |
 | `metrics.flush()` | - | `None` | Flush pending metrics |
-| `metrics("prefix").read(start_index, limit)` | int, int | `dict` | Read data points |
+| `metrics("prefix").read(start_index, limit)` | int, int | `dict` | Read data points from local storage (remote-only: `ConfigurationError`) |
+| `metrics("prefix").read_rows(limit, cursor)` | int, str | `MetricRowsPage` | Read one page of committed rows from the server |
+| `metrics("prefix").iter_row_blocks(limit)` | int | iterator of `MetricRowBlock` | All committed row blocks, following cursors |
 | `metrics("prefix").stats()` | - | `dict` | Get metric statistics |
 
 ---

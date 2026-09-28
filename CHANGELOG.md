@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-28
+
+Remote reads of committed metric rows need an ML-Dash server that serves
+`GET /api/experiments/:expId/metrics/:metricName/rows`. Without that route,
+`read_rows()` fails with `MetricRowsError` (404).
+
+### ⚠️ BREAKING CHANGES
+- **Index-based remote metric reads now raise `ConfigurationError`** without
+  contacting the server. The server no longer assigns point indices or chunk
+  numbers, so these reads cannot be mapped to stored rows. This affects
+  `exp.metrics(name).read()` on a remote-only experiment and
+  `RemoteClient.read_metric_data()`, `get_metric_data()` and
+  `download_metric_chunk()`.
+  - **Migration**: read committed rows by cursor with
+    `exp.metrics(name).read_rows()` / `iter_row_blocks()` or
+    `RemoteClient.read_metric_rows()`. `read()` on local and hybrid
+    experiments works as before.
+- **Remote metrics reject NaN and inf** when they are logged, with a
+  `ValueError`, instead of failing later in a background flush. Local storage
+  still accepts them, and `buffer()` / `summary_cache.store()` still take NaN.
+
+### Added
+- `MetricBuilder.read_rows(limit, cursor)` and `iter_row_blocks(limit)` read a
+  metric's committed rows in storage order, in blocks with their own typed
+  columns (`ml-dash.metric-rows.v1`). New public types: `MetricRowsPage`,
+  `MetricRowBlock`, `MetricColumn`, and `MetricRowsError` (a `NetworkError`
+  with `status_code` and the server's `code`, e.g. `snapshot_changed`).
+- `ML_DASH_NO_VERSION_CHECK=1` skips the PyPI version check at import.
+
+### Changed
+- The SDK reads tokens from every store the CLI writes, in the CLI's order:
+  the OS keyring, then `tokens.encrypted`, then `tokens.json`. An unreadable
+  store raises `StorageError`, and the message names the file and error type
+  only, never the stored contents.
+- Buffered sends are retried on transport errors, 429 and 5xx, honouring
+  `Retry-After`. Batches that could not be sent are kept until they are sent
+  instead of being dropped. `flush()` and closing the experiment raise
+  `NetworkError` when data is still unsent or was lost.
+- If buffered data cannot all be sent, closing the experiment records it as
+  `FAILED` instead of `COMPLETED`.
+- An exception raised inside `with exp.run:` is no longer replaced by an error
+  from marking the experiment failed. That error is logged, and attached as a
+  note on Python 3.11+.
+- Closing an experiment logs a warning for values stored in `summary_cache`
+  that no summary included.
+- The import-time version check can no longer break the import, whatever the
+  failure.
+
 ## [0.7.0] - 2026-09-24
 
 ### ⚠️ BREAKING CHANGES

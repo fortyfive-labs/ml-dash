@@ -8,6 +8,9 @@ Supports three usage styles:
 """
 
 import functools
+import logging
+import math
+import numbers
 import re
 import sys
 import threading
@@ -24,9 +27,12 @@ from .client import RemoteClient
 from .exceptions import ConfigurationError, ExperimentError, NetworkError, StorageError
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
+from .metric_rows import MetricRowsPage
 from .params import ParametersBuilder
 from .run import RUN, requires_open
 from .storage import LocalStorage
+
+_logger = logging.getLogger("ml_dash.experiment")
 
 
 def _expand_exp_template(template: str) -> str:
@@ -56,6 +62,29 @@ def _expand_exp_template(template: str) -> str:
   # Match {EXP.attr_name} pattern
   pattern = r"\{EXP\.(\w+)\}"
   return re.sub(pattern, replace_match, template)
+
+
+def _non_finite_field(value: Any, path: str = "") -> Optional[str]:
+  """Return the path of the first NaN/inf number in value (dicts, lists, numpy), else None."""
+  if isinstance(value, bool):
+    return None
+  if isinstance(value, numbers.Real):
+    return None if math.isfinite(value) else path
+  if isinstance(value, dict):
+    for key, item in value.items():
+      found = _non_finite_field(item, f"{path}.{key}" if path else str(key))
+      if found is not None:
+        return found
+    return None
+  if isinstance(value, (list, tuple)):
+    for index, item in enumerate(value):
+      found = _non_finite_field(item, f"{path}[{index}]")
+      if found is not None:
+        return found
+    return None
+  if hasattr(value, "tolist"):  # numpy arrays and scalars
+    return _non_finite_field(value.tolist(), path)
+  return None
 
 
 class OperationMode(Enum):
@@ -373,13 +402,23 @@ class Experiment:
     """
     Internal method to close the experiment and update status.
 
+    If buffered data cannot all be sent, a requested COMPLETED is written as
+    FAILED (FAILED and CANCELLED are kept) and the flush error is raised.
+
     Args:
         status: Status to set - "COMPLETED" (default), "FAILED", or "CANCELLED"
     """
+    self._report_unsummarized_metrics()
+
     # Flush and stop buffer BEFORE status update
-    # Waits indefinitely for all data to be flushed (important for large files)
+    flush_error = None
     if self._buffer_manager:
-      self._buffer_manager.stop()
+      try:
+        self._buffer_manager.stop()
+      except Exception as e:
+        flush_error = e
+        if status == "COMPLETED":
+          status = "FAILED"
 
     # Update experiment status in remote mode
     if self._client and self._experiment_id:
@@ -424,13 +463,53 @@ class Experiment:
           print(f"ml-dash version: {__version__}")
 
       except Exception as e:
+        if flush_error is not None:
+          self._is_open = False
+          raise NetworkError(
+            f"{flush_error}\n"
+            f"Also failed to update experiment status to {status}: {type(e).__name__}: {e}"
+          ) from flush_error
         # Raise on status update failure
         raise NetworkError(
-          f"Failed to update experiment status to COMPLETED: {e}\n"
-          f"Experiment may not be marked as completed on the server."
+          f"Failed to update experiment status to {status}: {e}\n"
+          f"Experiment may not be marked as {status.lower()} on the server."
         ) from e
 
     self._is_open = False
+
+    if flush_error is not None:
+      if self._client and self._experiment_id:
+        raise NetworkError(f"{flush_error}\nExperiment status set to {status}.") from flush_error
+      raise flush_error
+
+  def _report_unsummarized_metrics(self) -> None:
+    """
+    Log values stored for a summary but never summarized; close does not send them.
+
+    Logged, not warnings.warn(): a warnings-as-errors filter must not stop close.
+    """
+    manager = self._metrics_manager
+    if manager is None:
+      return
+
+    pending = []
+    if manager._buffer_manager is not None:
+      for prefix, keys in manager._buffer_manager._buffers.items():
+        count = sum(len(values) for values in keys.values())
+        if count:
+          pending.append(f"{prefix or 'unnamed'} buffer(): {count} value(s)")
+    for name, builder in manager._metric_builders.items():
+      cache = builder._summary_cache
+      if cache is not None and cache._stored_since_summary:
+        pending.append(f"{name} summary_cache: {cache._stored_since_summary} value(s)")
+
+    if pending:
+      _logger.warning(
+        "[ML-Dash] Closing with stored values that were never summarized, so they are "
+        "not sent: %s. Call metrics.buffer.log_summary() or "
+        "metrics(name).summary_cache.summarize() for the last window before closing.",
+        "; ".join(pending),
+      )
 
   @property
   @requires_open
@@ -1123,6 +1202,18 @@ class Experiment:
     Returns:
         Dict with metricId, index, bufferedDataPoints, chunkSize or None if buffering enabled/all backends fail
     """
+    # The server cannot store NaN or inf; fail here rather than in a background flush.
+    # Local storage keeps accepting them.
+    if self._client:
+      bad_field = _non_finite_field(data)
+      if bad_field is not None:
+        metric_display = f"'{name}'" if name else "unnamed metric"
+        raise ValueError(
+          f"Cannot log a non-finite value (NaN or inf) in field '{bad_field}' of {metric_display}: "
+          f"the remote server does not accept them. Use buffer() or summary_cache.store() "
+          f"for values that may be NaN; summaries leave NaN out."
+        )
+
     # Resolve timestamp
     if timestamp == -1:
       if self._last_timestamp is None:
@@ -1314,21 +1405,14 @@ class Experiment:
 
     Returns:
         Dict with data, startIndex, endIndex, total, hasMore
+
+    Raises:
+        ConfigurationError: for a remote-only experiment. The server no longer
+            pages by index; use _read_metric_rows().
     """
-    result = None
-
-    if self._client:
-      # Remote mode: read via API
-      result = self._client.read_metric_data(
-        experiment_id=self._experiment_id,
-        metric_name=name,
-        start_index=start_index,
-        limit=limit,
-      )
-
     if self._storage:
-      # Local mode: read from local storage
-      result = self._storage.read_metric_data(
+      # Local and hybrid mode: read from local storage, which keeps the index
+      return self._storage.read_metric_data(
         owner=self.run.owner,
         project=self.run.project,
         prefix=self.run._folder_path,
@@ -1337,7 +1421,43 @@ class Experiment:
         limit=limit,
       )
 
-    return result
+    if self._client:
+      # Remote-only: raises, pointing at read_rows()
+      return self._client.read_metric_data(
+        experiment_id=self._experiment_id,
+        metric_name=name,
+        start_index=start_index,
+        limit=limit,
+      )
+
+    return None
+
+  def _read_metric_rows(
+    self, name: str, limit: Optional[int], cursor: Optional[str]
+  ) -> MetricRowsPage:
+    """
+    Internal method to read one page of a metric's committed rows from the server.
+
+    Raises:
+        ConfigurationError: if the experiment has no server (local-only)
+        ExperimentError: if the experiment has no server-side ID yet
+        MetricRowsError: if the read fails; see RemoteClient.read_metric_rows
+    """
+    if not self._client:
+      raise ConfigurationError(
+        "read_rows() reads committed rows from the server, and this experiment is "
+        "local-only. Use read() for local metric data."
+      )
+    if not self._experiment_id:
+      raise ExperimentError(
+        "The experiment has no server-side ID yet. Open it first, e.g. `with exp.run:`."
+      )
+    return self._client.read_metric_rows(
+      experiment_id=self._experiment_id,
+      metric_name=name,
+      limit=limit,
+      cursor=cursor,
+    )
 
   def _get_metric_stats(self, name: str) -> Dict[str, Any]:
     """

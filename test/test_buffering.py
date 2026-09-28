@@ -5,14 +5,19 @@ Tests background buffer manager for logs, metrics, and files.
 """
 
 import os
+import threading
 import time
+import warnings
+from email.utils import formatdate
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from ml_dash import Experiment
 from ml_dash.buffer import BackgroundBufferManager, BufferConfig
+from ml_dash.exceptions import NetworkError
 
 
 @pytest.fixture
@@ -573,3 +578,300 @@ class TestIntegration:
             # Don't manually flush
 
         # All data should be flushed automatically on context exit
+
+
+# ---------------------------------------------------------------------------
+# Remote failure handling, against a mocked client (no network)
+# ---------------------------------------------------------------------------
+
+def _status_error(code, headers=None):
+    request = httpx.Request("POST", "http://stub.invalid/api/x")
+    response = httpx.Response(code, headers=headers or {}, request=request)
+    return httpx.HTTPStatusError(f"HTTP {code}", request=request, response=response)
+
+
+def _remote_manager(client, **overrides):
+    experiment = MagicMock()
+    experiment._client = client
+    experiment._storage = None
+    experiment._experiment_id = "1"
+    settings = dict(flush_interval=0.5, metric_batch_size=5, max_retries=1, retry_base_delay=0.0)
+    settings.update(overrides)
+    return BackgroundBufferManager(experiment, BufferConfig(**settings))
+
+
+def _run_bounded(fn, seconds=20):
+    """Run fn in a thread; fail the test instead of hanging if it does not return."""
+    outcome = {}
+
+    def target():
+        try:
+            fn()
+        except BaseException as e:
+            outcome["error"] = e
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(seconds)
+    assert not thread.is_alive(), f"did not return within {seconds}s"
+    return outcome.get("error")
+
+
+def _point(i):
+    return {"data": {"x": i}, "description": None, "tags": None, "metadata": None}
+
+
+class TestRemoteFailureHandling:
+    """F1/F2: bounded flushes that report unsent data; 429 and Retry-After."""
+
+    def test_stop_is_bounded_and_reports_unsent_points(self, capsys):
+        client = MagicMock()
+        client.append_batch_to_metric.side_effect = _status_error(400)
+        manager = _remote_manager(client)
+        manager.start()
+        for i in range(3):
+            manager.buffer_metric("m", {"x": i}, None, None, None)
+
+        error = _run_bounded(manager.stop)
+
+        assert isinstance(error, NetworkError)
+        assert "3 metric point(s)" in str(error)
+        assert "HTTPStatusError" in str(error)
+        assert client.append_batch_to_metric.call_count <= 3
+        assert "All data flushed successfully" not in capsys.readouterr().out
+
+    def test_stop_after_failed_stop_retries_and_never_falsely_succeeds(self):
+        client = MagicMock()
+        client.append_batch_to_metric.side_effect = _status_error(400)
+        manager = _remote_manager(client)
+        manager.start()
+        for i in range(3):
+            manager.buffer_metric("m", {"x": i}, None, None, None)
+
+        assert isinstance(_run_bounded(manager.stop), NetworkError)
+        calls = client.append_batch_to_metric.call_count
+
+        error = _run_bounded(manager.stop)  # thread is gone; the batch is not
+        assert isinstance(error, NetworkError)
+        assert "3 metric point(s)" in str(error)
+        assert client.append_batch_to_metric.call_count > calls
+
+        client.append_batch_to_metric.side_effect = None
+        assert _run_bounded(manager.stop) is None
+        sent = client.append_batch_to_metric.call_args.kwargs["data_points"]
+        assert [p["x"] for p in sent] == [0, 1, 2]
+        assert manager._pending_counts() == (0, 0, 0, 0)
+        assert _run_bounded(manager.stop) is None  # idempotent once drained
+
+    def test_failed_batch_is_kept_when_queue_refills(self):
+        client = MagicMock()
+        client.append_batch_to_metric.side_effect = [_status_error(400), None, None]
+        manager = _remote_manager(client)
+        manager._metric_queues["m"] = __import__("queue").Queue(maxsize=5)
+        for i in range(5):
+            manager._metric_queues["m"].put(_point(i))
+
+        assert manager._flush_metric("m") is False
+        for i in range(5, 10):
+            manager._metric_queues["m"].put_nowait(_point(i))  # queue full again
+        assert manager._pending_counts()[1] == 10
+
+        manager.flush_all()
+
+        sent = [p["x"] for call in client.append_batch_to_metric.call_args_list[1:]
+                for p in call.kwargs["data_points"]]
+        assert sent == list(range(10))
+        assert manager._pending_counts()[1] == 0
+
+    def test_background_retries_are_paced_and_flush_reports_failure(self):
+        client = MagicMock()
+        client.append_batch_to_metric.side_effect = _status_error(400)
+        manager = _remote_manager(client, flush_interval=0.5)
+        manager.start()
+        manager.buffer_metric("m", {"x": 1}, None, None, None)
+        manager._flush_event.set()
+        time.sleep(1.3)
+
+        # At 100 ms polling an unpaced loop would have sent ~13 times
+        assert 1 <= client.append_batch_to_metric.call_count <= 4
+        error = _run_bounded(manager.flush_all)
+        assert isinstance(error, NetworkError)
+        assert manager._pending_counts()[1] == 1  # still buffered after a failed flush
+        assert isinstance(_run_bounded(manager.stop), NetworkError)
+
+    def test_file_upload_failure_is_reported_at_stop_and_logs_still_sent(self):
+        client = MagicMock()
+        client.upload_file.side_effect = RuntimeError("upload refused")
+        manager = _remote_manager(client)
+        manager.start()
+        manager._file_queue.put({
+            "file_path": "/nonexistent/file.bin", "prefix": "/", "filename": "file.bin",
+            "description": None, "tags": None, "bindrs": None, "metadata": None,
+            "checksum": "0", "content_type": "application/octet-stream", "size_bytes": 1,
+        })
+        manager.buffer_log("hello", "info", None, None)
+
+        error = _run_bounded(manager.stop)
+
+        assert isinstance(error, NetworkError)
+        assert "file.bin" in str(error)
+        assert client.create_log_entries.call_count == 1
+
+    def test_track_entries_restored_and_merged_on_failure(self):
+        client = MagicMock()
+        manager = _remote_manager(client)
+
+        def fail_while_producer_adds(**_):
+            manager.buffer_track("t", 1.0, {"b": 2})
+            manager.buffer_track("t", 2.0, {"c": 3})
+            raise _status_error(400)
+
+        client.append_batch_to_track.side_effect = fail_while_producer_adds
+        manager.buffer_track("t", 1.0, {"a": 1})
+
+        assert manager._flush_track("t") is False
+        assert manager._track_buffers["t"] == {1.0: {"a": 1, "b": 2}, 2.0: {"c": 3}}
+        assert manager._pending_counts()[2] == 2
+
+    def test_429_is_retried_after_numeric_retry_after(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr("ml_dash.buffer.time.sleep", sleeps.append)
+        fn = MagicMock(side_effect=[_status_error(429, {"Retry-After": "2"}), None])
+        manager = _remote_manager(MagicMock(), retry_base_delay=1.0)
+
+        manager._retry_remote_call(fn, "test", "logs")
+
+        assert fn.call_count == 2
+        assert sleeps == [2.0]
+
+    def test_retry_after_http_date_is_a_minimum_wait(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr("ml_dash.buffer.time.sleep", sleeps.append)
+        when = formatdate(time.time() + 10, usegmt=True)
+        fn = MagicMock(side_effect=[_status_error(429, {"Retry-After": when}), None])
+        manager = _remote_manager(MagicMock(), retry_base_delay=1.0)
+
+        manager._retry_remote_call(fn, "test", "logs")
+
+        assert len(sleeps) == 1 and 8.0 <= sleeps[0] <= 10.5
+
+    def test_429_without_retry_after_uses_backoff(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr("ml_dash.buffer.time.sleep", sleeps.append)
+        fn = MagicMock(side_effect=[_status_error(429), None])
+        manager = _remote_manager(MagicMock(), retry_base_delay=1.0)
+
+        manager._retry_remote_call(fn, "test", "logs")
+
+        assert sleeps == [1.0]
+
+    def test_retry_after_beyond_budget_keeps_batch_and_is_not_sent_early(self, monkeypatch):
+        sleeps = []
+        monkeypatch.setattr("ml_dash.buffer.time.sleep", sleeps.append)
+        client = MagicMock()
+        client.append_batch_to_metric.side_effect = _status_error(429, {"Retry-After": "120"})
+        manager = _remote_manager(client, max_retries=3, retry_max_delay=30.0)
+        manager.buffer_metric("m", {"x": 1}, None, None, None)
+
+        with pytest.raises(NetworkError):
+            manager.flush_all()
+        with pytest.raises(NetworkError, match="Retry-After"):
+            manager.flush_all()
+
+        assert client.append_batch_to_metric.call_count == 1
+        assert sleeps == []
+        assert manager._pending_counts()[1] == 1
+        assert not manager._background_ready("metric 'm'")
+
+
+@pytest.fixture
+def stub_remote_experiment(mock_remote_token, monkeypatch):
+    """Remote-mode experiment whose RemoteClient calls are stubbed (no network)."""
+    from ml_dash.client import RemoteClient
+
+    statuses = []
+    monkeypatch.setattr(RemoteClient, "create_or_update_experiment",
+                        lambda self, **kw: {"experiment": {"id": "1"}})
+    monkeypatch.setattr(RemoteClient, "update_experiment_status",
+                        lambda self, experiment_id, status: statuses.append(status))
+    monkeypatch.setattr(RemoteClient, "append_batch_to_metric",
+                        MagicMock(side_effect=_status_error(400)))
+    monkeypatch.setattr(
+        "ml_dash.experiment.BufferConfig.from_env",
+        lambda: BufferConfig(flush_interval=0.5, max_retries=0, retry_base_delay=0.0),
+    )
+
+    def create():
+        return Experiment(prefix="tom/stub-project/stub-exp", dash_url="http://stub.invalid")
+
+    return create, statuses
+
+
+class TestCloseLifecycle:
+    """F1 close semantics, D1 status, and F4 early rejection in remote mode."""
+
+    def test_unsent_data_marks_run_failed_not_completed(self, stub_remote_experiment):
+        create, statuses = stub_remote_experiment
+
+        def run():
+            with create().run as exp:
+                exp.metrics("m").log(x=1)
+
+        error = _run_bounded(run)
+
+        assert isinstance(error, NetworkError)
+        assert "1 metric point(s)" in str(error)
+        assert "status set to FAILED" in str(error)
+        assert statuses == ["FAILED"]
+
+    def test_cancel_intent_is_kept_when_flush_fails(self, stub_remote_experiment):
+        create, statuses = stub_remote_experiment
+        exp = create().run.start()
+        exp.metrics("m").log(x=1)
+
+        with pytest.raises(NetworkError):
+            exp.run.cancel()
+        assert statuses == ["CANCELLED"]
+
+    def test_body_exception_survives_failed_cleanup(self, stub_remote_experiment, caplog):
+        create, statuses = stub_remote_experiment
+
+        # Warnings as errors must not let cleanup reporting replace the body's exception
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with pytest.raises(ValueError, match="boom"):
+                with create().run as exp:
+                    exp.metrics("m").log(x=1)
+                    raise ValueError("boom")
+        assert statuses == ["FAILED"]
+        assert "also failed: NetworkError" in caplog.text
+
+    def test_unsummarized_report_does_not_block_cleanup(self, stub_remote_experiment, caplog):
+        from ml_dash.client import RemoteClient
+
+        create, statuses = stub_remote_experiment
+        RemoteClient.append_batch_to_metric.side_effect = None  # uploads succeed
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with create().run as exp:
+                exp.metrics("m").log(x=1)
+                exp.metrics("m").buffer(loss=0.5)  # never summarized
+
+        assert statuses == ["COMPLETED"]
+        assert RemoteClient.append_batch_to_metric.call_count == 1
+        assert "never summarized" in caplog.text and "m buffer(): 1 value" in caplog.text
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), [1.0, float("-inf")]])
+    def test_remote_log_rejects_non_finite_before_queueing(self, stub_remote_experiment, value):
+        create, _ = stub_remote_experiment
+        exp = create().run.start()
+
+        with pytest.raises(ValueError, match="non-finite"):
+            exp.metrics("m").log(x=value)
+        assert exp._buffer_manager._pending_counts()[1] == 0
+        exp.run.complete()
+
+    def test_local_log_still_accepts_nan(self, local_experiment):
+        with local_experiment().run as exp:
+            exp.metrics("m").log(x=float("nan"))

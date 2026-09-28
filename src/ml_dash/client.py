@@ -6,8 +6,19 @@ import time
 from typing import Optional, Dict, Any, List
 import httpx
 
-from .config import DEFAULT_API_URL
 from .exceptions import ConfigurationError, NetworkError, StorageError
+from .metric_rows import MetricRowsPage, error_from_response, parse_metric_rows_page
+
+
+def _index_read_unsupported(method: str) -> ConfigurationError:
+    """The error for the legacy remote metric reads, which paged by a server-assigned index."""
+    return ConfigurationError(
+        f"{method} is no longer supported for remote metrics: the server does not assign "
+        f"point indices or chunk numbers, so they cannot be mapped to stored rows. Read "
+        f"committed rows by cursor instead: exp.metrics(name).read_rows() or "
+        f"iter_row_blocks(), or RemoteClient.read_metric_rows(). Local reads with "
+        f"exp.metrics(name).read() are unchanged."
+    )
 
 
 class UserInfo:
@@ -36,7 +47,10 @@ class UserInfo:
 
         self._fetched = True
         try:
-            client = RemoteClient(DEFAULT_API_URL)
+            # Same server as Experiment(dash_url=True): honours ML_DASH_API_URL
+            from .run import RUN
+
+            client = RemoteClient(RUN.api_url)
             self._data = client.get_current_user()
         except Exception:
             self._data = None
@@ -127,10 +141,9 @@ class RemoteClient:
 
         # If no api_key provided, try to load from storage
         if not api_key:
-            from .auth.token_storage import get_token_storage
+            from .auth.token_storage import load_token
 
-            storage = get_token_storage()
-            api_key = storage.load("ml-dash-token")
+            api_key = load_token("ml-dash-token")
 
         self.api_key = api_key
 
@@ -1326,26 +1339,64 @@ class RemoteClient:
         limit: int = 1000
     ) -> Dict[str, Any]:
         """
-        Read data points from a metric.
+        Unsupported: the server no longer pages metric points by index.
+        Use read_metric_rows().
+
+        Raises:
+            ConfigurationError: always, without contacting the server
+        """
+        raise _index_read_unsupported("read_metric_data")
+
+    def read_metric_rows(
+        self,
+        experiment_id: str,
+        metric_name: str,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> MetricRowsPage:
+        """
+        Read one page of a metric's committed rows, as stored.
+
+        Rows are grouped in blocks, each with its own columns (names may repeat)
+        and wire types; cells are decoded as described in ``ml_dash.metric_rows``.
+        There is no index, total or timestamp. Points not yet committed by the
+        server are not included.
 
         Args:
             experiment_id: Experiment ID (Snowflake ID)
             metric_name: Metric name
-            start_index: Starting index (default 0)
-            limit: Max points to read (default 1000, max 10000)
+            limit: Max rows in this page (server default 1000, max 10000)
+            cursor: ``next_cursor`` of the previous page; None for the first page
 
         Returns:
-            Dict with data, startIndex, endIndex, total, hasMore
+            MetricRowsPage
 
         Raises:
-            httpx.HTTPStatusError: If request fails
+            MetricRowsError: on a non-2xx response, with its ``status_code`` and
+                ``code``, or on a malformed response. A 409 ``snapshot_changed``
+                means the stored data changed since the first page: start again
+                without a cursor. This method never restarts by itself.
         """
+        import urllib.parse
+
+        params: Dict[str, str] = {}
+        if limit is not None:
+            params["limit"] = str(limit)
+        if cursor is not None:
+            params["cursor"] = cursor
+
+        metric_encoded = urllib.parse.quote(metric_name, safe='')
         response = self._client.get(
-            f"experiments/{experiment_id}/metrics/{metric_name}/data",
-            params={"startIndex": start_index, "limit": limit}
+            f"experiments/{experiment_id}/metrics/{metric_encoded}/rows",
+            params=params,
         )
-        response.raise_for_status()
-        return response.json()
+        if not response.is_success:
+            raise error_from_response(response)
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        return parse_metric_rows_page(body, response.status_code)
 
     def get_metric_stats(
         self,
@@ -1509,9 +1560,6 @@ class RemoteClient:
                   slug
                 }
               }
-              logMetadata {
-                totalLogs
-              }
               metrics {
                 name
               }
@@ -1574,14 +1622,8 @@ class RemoteClient:
                 slug
               }
             }
-            logMetadata {
-              totalLogs
-            }
             metrics {
               name
-              metricMetadata {
-                totalDataPoints
-              }
             }
             files {
               id
@@ -1780,14 +1822,8 @@ class RemoteClient:
                   slug
                 }
               }
-              logMetadata {
-                totalLogs
-              }
               metrics {
                 name
-                metricMetadata {
-                  totalDataPoints
-                }
               }
               files {
                 id
@@ -1912,36 +1948,13 @@ class RemoteClient:
         buffer_only: bool = False,
     ) -> Dict[str, Any]:
         """
-        Get data points for a metric.
-
-        Args:
-            experiment_id: Experiment ID
-            metric_name: Name of the metric
-            start_index: Starting index for pagination
-            limit: Maximum number of data points to return
-            buffer_only: If True, only fetch buffer data (skip chunks)
-
-        Returns:
-            Dict with dataPoints array and pagination info
+        Unsupported: the server no longer pages metric points by index.
+        Use read_metric_rows().
 
         Raises:
-            httpx.HTTPStatusError: If request fails
+            ConfigurationError: always, without contacting the server
         """
-        params: Dict[str, str] = {}
-
-        if start_index is not None:
-            params["startIndex"] = str(start_index)
-        if limit is not None:
-            params["limit"] = str(limit)
-        if buffer_only:
-            params["bufferOnly"] = "true"
-
-        response = self._client.get(
-            f"experiments/{experiment_id}/metrics/{metric_name}/data",
-            params=params
-        )
-        response.raise_for_status()
-        return response.json()
+        raise _index_read_unsupported("get_metric_data")
 
     def download_metric_chunk(
         self,
@@ -1950,24 +1963,13 @@ class RemoteClient:
         chunk_number: int,
     ) -> Dict[str, Any]:
         """
-        Download a specific chunk by chunk number.
-
-        Args:
-            experiment_id: Experiment ID
-            metric_name: Name of the metric
-            chunk_number: Chunk number to download
-
-        Returns:
-            Dict with chunk data including chunkNumber, startIndex, endIndex, dataCount, and data array
+        Unsupported: the server no longer numbers metric chunks.
+        Use read_metric_rows().
 
         Raises:
-            httpx.HTTPStatusError: If request fails
+            ConfigurationError: always, without contacting the server
         """
-        response = self._client.get(
-            f"experiments/{experiment_id}/metrics/{metric_name}/chunks/{chunk_number}"
-        )
-        response.raise_for_status()
-        return response.json()
+        raise _index_read_unsupported("download_metric_chunk")
 
     # =============================================================================
     # Track Methods

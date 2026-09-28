@@ -115,6 +115,11 @@ with Experiment(
     exp.log("Using remote server")
 ```
 
+In remote mode, a project that does not exist yet is created with the
+server's default visibility. On the current server that default is
+**private**. The SDK has no option to set visibility. Check it in the
+dashboard, or with GraphQL `project { visibility }`, before sharing data.
+
 ## Experiment Metadata
 
 Add description, tags, and bindrs for organization:
@@ -193,7 +198,10 @@ except Exception as e:
 
 ## Resuming Experiments
 
-Experiments use **upsert behavior** - reopen by using the same prefix:
+Experiments use **upsert behavior** - reopen by using the same prefix. A rerun
+with the same prefix appends to the existing experiment instead of creating a new one.
+For sweeps and reruns that must stay separate, put something unique in each name
+(a timestamp or run index):
 
 ```python
 
@@ -207,6 +215,12 @@ with Experiment(prefix="alice/ml/long-training").run as exp:
     exp.log("Resuming from checkpoint")
     exp.metrics("train").log(loss=0.3, epoch=2)
 ```
+
+## Closing When Uploads Fail
+
+If buffered data cannot be sent at close, `NetworkError` is raised with the counts. A run
+that was completing is marked FAILED instead of COMPLETED. An explicit `fail()` or
+`cancel()` keeps its status. See [Background Buffering](guides-buffering.md#error-handling).
 
 ## Available Operations
 

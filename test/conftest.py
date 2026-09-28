@@ -115,6 +115,10 @@ def mock_remote_token(monkeypatch):
   monkeypatch.setattr(
     "ml_dash.auth.token_storage.get_token_storage", mock_get_token_storage
   )
+  # RemoteClient reads its token through load_token; never touch a real keyring or ~/.dash
+  monkeypatch.setattr(
+    "ml_dash.auth.token_storage.load_token", lambda key, config_dir=None: mock_storage.load(key)
+  )
 
   return mock_storage
 
