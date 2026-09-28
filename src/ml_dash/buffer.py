@@ -13,6 +13,7 @@ import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from queue import Empty, Queue
 from typing import Any, Callable, Dict, List, Optional
 
@@ -119,6 +120,22 @@ class BackgroundBufferManager:
         self._stop_event = threading.Event()
         self._flush_event = threading.Event()  # Manual flush trigger
 
+        # One flush at a time: exp.flush() and the background thread share this state
+        self._flush_lock = threading.Lock()
+        # Guards _track_buffers, which the caller and the flush thread both mutate
+        self._track_lock = threading.Lock()
+
+        # A batch whose send failed is kept here, not re-queued, until it is sent.
+        # Producers filling the queue therefore cannot push it out.
+        self._failed_log_batch: Optional[List[Dict[str, Any]]] = None
+        self._failed_metric_batches: Dict[Optional[str], Dict[str, Any]] = {}
+
+        # Failure bookkeeping, keyed by a label such as "logs" or "metric 'train'"
+        self._failed_at: Dict[str, float] = {}  # paces background retries
+        self._retry_after_until: Dict[str, float] = {}  # server Retry-After deadline
+        self._pending_errors: Dict[str, str] = {}  # cleared once the data is sent
+        self._lost_errors: Dict[str, str] = {}  # data dropped; reported at next flush/stop
+
     @staticmethod
     def _is_transient_error(e: Exception) -> bool:
         """Return True if the exception looks like a transient network failure worth retrying."""
@@ -133,12 +150,14 @@ class BackgroundBufferManager:
             }
             if e.errno in transient_errnos:
                 return True
-        # httpx errors — transport failures AND server-side 5xx responses
+        # httpx errors — transport failures, rate limiting (429) and server-side 5xx responses
         try:
             import httpx
             if isinstance(e, (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError)):
                 return True
-            if isinstance(e, httpx.HTTPStatusError) and e.response.status_code >= 500:
+            if isinstance(e, httpx.HTTPStatusError) and (
+                e.response.status_code >= 500 or e.response.status_code == 429
+            ):
                 return True
         except ImportError:
             pass
@@ -147,15 +166,42 @@ class BackgroundBufferManager:
             return BackgroundBufferManager._is_transient_error(e.__cause__)
         return False
 
-    def _retry_remote_call(self, fn: Callable, description: str) -> None:
+    @staticmethod
+    def _retry_after_seconds(e: Exception) -> Optional[float]:
+        """Seconds the server asked us to wait (Retry-After), or None if absent or invalid."""
+        response = getattr(e, "response", None)
+        if response is None:
+            if e.__cause__ is not None and e.__cause__ is not e:
+                return BackgroundBufferManager._retry_after_seconds(e.__cause__)
+            return None
+        value = (response.headers.get("Retry-After") or "").strip()
+        if not value:
+            return None
+        if value.isdigit():
+            return float(value)
+        try:
+            when = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+        if when is None:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
+
+    def _retry_remote_call(self, fn: Callable, description: str, label: str) -> None:
         """
         Call fn() retrying on transient network errors with exponential backoff.
 
-        Logs each retry attempt at WARNING and raises on permanent failure.
+        A server Retry-After is a minimum wait. If it is longer than
+        retry_max_delay, this call gives up at once and records the deadline, so
+        no later flush sends before it. Logs each retry attempt at WARNING and
+        raises on permanent failure.
 
         Args:
             fn: Zero-argument callable to attempt
             description: Human-readable description for log messages
+            label: Resource label, e.g. "logs" or "metric 'train'"
         """
         max_retries = self._config.max_retries
         base_delay = self._config.retry_base_delay
@@ -173,20 +219,57 @@ class BackgroundBufferManager:
             except Exception as e:
                 is_last = attempt >= max_retries
                 is_transient = self._is_transient_error(e)
+                retry_after = self._retry_after_seconds(e)
+                if retry_after is not None:
+                    self._retry_after_until[label] = time.time() + retry_after
 
-                if not is_last and is_transient:
-                    delay = min(base_delay * (2 ** attempt), max_delay)
-                    _logger.warning(
-                        "[ML-Dash] %s failed (attempt %d/%d) — %s: %s "
-                        "(errno=%s) — retrying in %.1fs",
-                        description, attempt + 1, max_retries + 1,
-                        type(e).__name__, e,
-                        getattr(e.__cause__ or e, "errno", "n/a"),
-                        delay,
-                    )
-                    time.sleep(delay)
-                else:
+                if is_last or not is_transient:
                     raise
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                if retry_after is not None:
+                    if retry_after > max_delay:
+                        raise  # beyond this flush's retry budget; the caller keeps the batch
+                    delay = max(delay, retry_after)
+                _logger.warning(
+                    "[ML-Dash] %s failed (attempt %d/%d) — %s: %s "
+                    "(errno=%s) — retrying in %.1fs",
+                    description, attempt + 1, max_retries + 1,
+                    type(e).__name__, e,
+                    getattr(e.__cause__ or e, "errno", "n/a"),
+                    delay,
+                )
+                time.sleep(delay)
+
+    def _deferred_by_server(self, label: str) -> bool:
+        """True while a Retry-After the server gave for this label has not elapsed."""
+        until = self._retry_after_until.get(label)
+        if until is None or time.time() >= until:
+            return False
+        self._pending_errors[label] = (
+            f"server asked to retry after {until - time.time():.0f}s (Retry-After)"
+        )
+        return True
+
+    def _background_ready(self, label: str) -> bool:
+        """Background retries of a failed batch wait flush_interval and any Retry-After."""
+        now = time.time()
+        failed_at = self._failed_at.get(label)
+        if failed_at is not None and now - failed_at < self._config.flush_interval:
+            return False
+        return now >= self._retry_after_until.get(label, 0.0)
+
+    def _record_failure(self, label: str, e: Exception) -> None:
+        self._failed_at[label] = time.time()
+        self._pending_errors[label] = f"{type(e).__name__}: {e}"
+
+    def _record_success(self, label: str) -> None:
+        self._failed_at.pop(label, None)
+        self._retry_after_until.pop(label, None)
+        self._pending_errors.pop(label, None)
+
+    @staticmethod
+    def _metric_label(metric_name: Optional[str]) -> str:
+        return f"metric '{metric_name}'" if metric_name else "unnamed metric"
 
     def start(self) -> None:
         """Start background flushing thread."""
@@ -200,13 +283,22 @@ class BackgroundBufferManager:
 
     def stop(self) -> None:
         """
-        Stop thread and flush remaining items.
+        Stop the background thread, then flush everything still buffered.
 
-        Waits indefinitely for all buffered data to be flushed to ensure data integrity.
-        This is important for large file uploads which may take significant time.
+        Waiting for the background thread's current flush has no timeout. The
+        final flush then gives each batch at most ``max_retries`` retries and
+        stops draining a queue at its first failed batch, so it ends. How long it
+        takes depends on the HTTP timeouts, retry delays and upload sizes.
+
+        Calling it again after a failed stop retries the unsent data and raises
+        again if it is still unsent. It returns quietly only when nothing is left.
+
+        Raises:
+            NetworkError: if any data could not be sent. The message gives counts
+                and errors, never the data itself.
         """
-        if self._thread is None:
-            return  # Not started
+        if self._thread is None and not any(self._pending_counts()) and not self._lost_errors:
+            return  # Not started, or already stopped with everything sent
 
         # Snapshot counts before signalling stop (for the user-facing message)
         log_count, metric_count, track_count, file_count = self._pending_counts()
@@ -217,17 +309,21 @@ class BackgroundBufferManager:
             print(f"\n[ML-Dash] Flushing buffered data...", flush=True)
             print(f"[ML-Dash]   - {desc}", flush=True)
 
-        # Signal stop and trigger flush
-        self._stop_event.set()
-        self._flush_event.set()
+        if self._thread is not None:
+            # Signal stop and trigger flush
+            self._stop_event.set()
+            self._flush_event.set()
 
-        # Wait for thread to finish (no timeout - ensure all data is flushed)
-        self._thread.join()
+            # Let the in-progress background flush finish; the final drain runs here
+            self._thread.join()
+            self._thread = None
+
+        with self._flush_lock:
+            errors = self._drain_all_with_progress(total)
+        self._raise_if_unsent(errors, "Final flush")
 
         if total > 0:
             print("[ML-Dash] ✓ All data flushed successfully", flush=True)
-
-        self._thread = None
 
     def _check_queue_pressure(self, queue: Queue, queue_name: str) -> None:
         """
@@ -258,11 +354,14 @@ class BackgroundBufferManager:
                 self._warned_queues.add(queue_name)
 
     def _pending_counts(self) -> tuple:
-        """Return (log_count, metric_count, track_count, file_count) snapshot."""
+        """Return (log_count, metric_count, track_count, file_count) snapshot, failed batches included."""
+        with self._track_lock:
+            track_count = sum(len(e) for e in self._track_buffers.values())
         return (
-            self._log_queue.qsize(),
-            sum(q.qsize() for q in self._metric_queues.values()),
-            sum(len(e) for e in self._track_buffers.values()),
+            self._log_queue.qsize() + len(self._failed_log_batch or []),
+            sum(q.qsize() for q in list(self._metric_queues.values()))
+            + sum(len(f["batch"]) for f in list(self._failed_metric_batches.values())),
+            track_count,
             self._file_queue.qsize(),
         )
 
@@ -285,21 +384,41 @@ class BackgroundBufferManager:
             items.append(f"{file_count} file(s)")
         return ", ".join(items)
 
-    def _drain_all_with_progress(self, total_items: int) -> None:
+    def _raise_if_unsent(self, errors: List[str], what: str) -> None:
+        """Raise NetworkError if data is still unsent or was lost. Counts and errors only."""
+        problems = [f"{label}: {msg}" for label, msg in self._lost_errors.items()]
+        self._lost_errors.clear()
+        problems += errors
+        unsent = self._describe_pending(*self._pending_counts())
+        if not unsent and not problems:
+            return
+        lines = [f"[ML-Dash] {what} incomplete."]
+        if unsent:
+            problems += [f"{label}: {msg}" for label, msg in self._pending_errors.items()]
+            lines.append(f"Not sent (held in memory in this process only): {unsent}.")
+        if problems:
+            lines.append("Errors: " + "; ".join(problems))
+        raise NetworkError("\n".join(lines))
+
+    def _drain_all_with_progress(self, total_items: int) -> List[str]:
         """
         Drain all queues to their respective backends.
 
-        Shows an ASCII progress bar when total_items > 200.
+        Shows an ASCII progress bar when total_items > 200. A queue stops draining at
+        its first batch that cannot be sent; that batch stays pending.
 
         Args:
             total_items: Pre-computed total used to size the progress bar.
+
+        Returns:
+            Errors raised while draining (e.g. a failed file upload or local write).
         """
         show_progress = total_items > 200
-        items_flushed = 0
+        errors: List[str] = []
 
         def update_progress() -> None:
-            nonlocal items_flushed
             if show_progress:
+                items_flushed = min(total_items, max(0, total_items - sum(self._pending_counts())))
                 progress = items_flushed / total_items
                 bar_length = 40
                 filled = int(bar_length * progress)
@@ -312,33 +431,44 @@ class BackgroundBufferManager:
                     flush=True,
                 )
 
-        while not self._log_queue.empty():
-            before = self._log_queue.qsize()
-            self._flush_logs()
-            items_flushed += before - self._log_queue.qsize()
-            update_progress()
+        def drain(label: str, has_pending: Callable[[], bool], flush_once: Callable[[], bool]) -> None:
+            try:
+                while has_pending():
+                    if not flush_once():
+                        break
+                    update_progress()
+            except Exception as e:
+                errors.append(f"{label}: {type(e).__name__}: {e}")
+
+        drain(
+            "logs",
+            lambda: self._failed_log_batch is not None or not self._log_queue.empty(),
+            self._flush_logs,
+        )
 
         for metric_name in list(self._metric_queues.keys()):
-            while not self._metric_queues[metric_name].empty():
-                before = self._metric_queues[metric_name].qsize()
-                self._flush_metric(metric_name)
-                items_flushed += before - self._metric_queues[metric_name].qsize()
-                update_progress()
+            drain(
+                self._metric_label(metric_name),
+                lambda n=metric_name: n in self._failed_metric_batches
+                or not self._metric_queues[n].empty(),
+                lambda n=metric_name: self._flush_metric(n),
+            )
 
-        for topic in list(self._track_buffers.keys()):
-            track_count = len(self._track_buffers.get(topic, {}))
-            self._flush_track(topic)
-            items_flushed += track_count
-            update_progress()
+        with self._track_lock:
+            topics = list(self._track_buffers.keys())
+        for topic in topics:
+            drain(
+                f"track '{topic}'",
+                lambda t=topic: bool(self._track_buffers.get(t)),
+                lambda t=topic: self._flush_track(t),
+            )
 
-        while not self._file_queue.empty():
-            before = self._file_queue.qsize()
-            self._flush_files()
-            items_flushed += before - self._file_queue.qsize()
-            update_progress()
+        drain("files", lambda: not self._file_queue.empty(), self._flush_files)
 
         if show_progress:
             print()  # newline after progress bar
+
+        return errors
 
     def buffer_log(
         self,
@@ -433,19 +563,20 @@ class BackgroundBufferManager:
             timestamp: Entry timestamp
             data: Data fields
         """
-        # Get or create buffer for this topic
-        if topic not in self._track_buffers:
-            self._track_buffers[topic] = {}
-            self._last_track_flush[topic] = time.time()
-
         # Serialize data to handle numpy arrays and other non-JSON types
         serialized_data = _serialize_value(data)
 
-        # Merge with existing entry at same timestamp
-        if timestamp in self._track_buffers[topic]:
-            self._track_buffers[topic][timestamp].update(serialized_data)
-        else:
-            self._track_buffers[topic][timestamp] = serialized_data
+        with self._track_lock:
+            # Get or create buffer for this topic
+            if topic not in self._track_buffers:
+                self._track_buffers[topic] = {}
+                self._last_track_flush[topic] = time.time()
+
+            # Merge with existing entry at same timestamp
+            if timestamp in self._track_buffers[topic]:
+                self._track_buffers[topic][timestamp].update(serialized_data)
+            else:
+                self._track_buffers[topic][timestamp] = serialized_data
 
     def buffer_file(
         self,
@@ -502,15 +633,22 @@ class BackgroundBufferManager:
 
         This forces an immediate flush of all queued logs, metrics, tracks, and files
         without waiting for time or size triggers.
+
+        Raises:
+            NetworkError: if any data could not be sent. Unsent logs, metrics and
+                tracks stay buffered for the next flush; the message gives counts
+                and errors, never the data itself.
         """
-        log_count, metric_count, track_count, file_count = self._pending_counts()
-        total = log_count + metric_count + track_count + file_count
+        with self._flush_lock:
+            log_count, metric_count, track_count, file_count = self._pending_counts()
+            total = log_count + metric_count + track_count + file_count
 
-        if total > 0:
-            desc = self._describe_pending(log_count, metric_count, track_count, file_count)
-            print(f"[ML-Dash] Flushing {desc}...", flush=True)
+            if total > 0:
+                desc = self._describe_pending(log_count, metric_count, track_count, file_count)
+                print(f"[ML-Dash] Flushing {desc}...", flush=True)
 
-        self._drain_all_with_progress(total)
+            errors = self._drain_all_with_progress(total)
+            self._raise_if_unsent(errors, "Flush")
 
         if total > 0:
             print("[ML-Dash] ✓ Flush complete", flush=True)
@@ -531,100 +669,114 @@ class BackgroundBufferManager:
         Args:
             topic: Track topic to flush
         """
-        if topic not in self._track_buffers or not self._track_buffers[topic]:
-            return
-
-        self._flush_track(topic)
+        with self._flush_lock:
+            self._flush_track(topic)
 
     def _flush_loop(self) -> None:
-        """Background thread main loop."""
+        """Background thread main loop. The final drain runs in stop(), on the caller's thread."""
         while not self._stop_event.is_set():
             # Wait for flush event or timeout (100ms polling interval for faster response)
             triggered = self._flush_event.wait(timeout=0.1)
 
-            # Check time-based triggers and flush if needed
-            current_time = time.time()
-
-            # Flush logs if time elapsed or queue size exceeded or manual trigger
-            if not self._log_queue.empty() and (
-                triggered
-                or current_time - self._last_log_flush >= self._config.flush_interval
-                or self._log_queue.qsize() >= self._config.log_batch_size
-            ):
-                try:
-                    self._flush_logs()
-                except Exception as e:
-                    _logger.error("[ML-Dash] Background log flush failed: %s: %s",
-                                  type(e).__name__, e, exc_info=True)
-                    warnings.warn(f"[ML-Dash] Background log flush failed: {e}")
-
-            # Flush metrics (check each metric queue)
-            for metric_name, queue in list(self._metric_queues.items()):
-                if not queue.empty() and (
-                    triggered
-                    or current_time - self._last_metric_flush.get(metric_name, 0)
-                    >= self._config.flush_interval
-                    or queue.qsize() >= self._config.metric_batch_size
-                ):
-                    try:
-                        self._flush_metric(metric_name)
-                    except Exception as e:
-                        _logger.error("[ML-Dash] Background metric flush failed for '%s': %s: %s",
-                                      metric_name, type(e).__name__, e, exc_info=True)
-                        warnings.warn(f"[ML-Dash] Background metric flush failed: {e}")
-
-            # Flush tracks (check each topic)
-            for topic, entries in list(self._track_buffers.items()):
-                if entries and (
-                    triggered
-                    or current_time - self._last_track_flush.get(topic, 0)
-                    >= self._config.flush_interval
-                    or len(entries) >= self._config.track_batch_size
-                ):
-                    try:
-                        self._flush_track(topic)
-                    except Exception as e:
-                        _logger.error("[ML-Dash] Background track flush failed for topic '%s': %s: %s",
-                                      topic, type(e).__name__, e, exc_info=True)
-                        warnings.warn(f"[ML-Dash] Background track flush failed: {e}")
-
-            # Flush files (always process file queue)
-            if not self._file_queue.empty():
-                try:
-                    self._flush_files()
-                except Exception as e:
-                    _logger.error("[ML-Dash] Background file flush failed: %s: %s",
-                                  type(e).__name__, e, exc_info=True)
-                    warnings.warn(f"[ML-Dash] Background file flush failed: {e}")
+            with self._flush_lock:
+                self._flush_due(triggered)
 
             # Clear the flush event after processing
             if triggered:
                 self._flush_event.clear()
 
-        # Final flush on shutdown — drain all queues, showing progress for large batches
-        log_count, metric_count, track_count, file_count = self._pending_counts()
-        total_items = log_count + metric_count + track_count + file_count
-        self._drain_all_with_progress(total_items)
+    def _flush_due(self, triggered: bool) -> None:
+        """
+        One background pass: flush each resource whose time, size or manual trigger fired.
 
-    def _flush_logs(self) -> None:
-        """Batch flush logs using client.create_log_entries()."""
-        if self._log_queue.empty():
-            return
+        A resource with a failed batch is retried at most once per flush_interval and
+        never before a server Retry-After. Errors that lose data are kept for the
+        next exp.flush() or close to report.
+        """
+        current_time = time.time()
 
-        # Collect batch
-        batch = []
-        try:
-            while len(batch) < self._config.log_batch_size:
-                log_entry = self._log_queue.get_nowait()
-                batch.append(log_entry)
-        except Empty:
-            pass  # Queue exhausted
+        def background_error(label: str, e: Exception) -> None:
+            self._lost_errors[label] = f"{type(e).__name__}: {e}"  # recorded first: warn may raise
+            _logger.error("[ML-Dash] Background flush failed for %s: %s: %s",
+                          label, type(e).__name__, e, exc_info=True)
+            warnings.warn(f"[ML-Dash] Background flush failed for {label}: {e}")
 
-        if not batch:
-            return
+        # Flush logs if time elapsed or queue size exceeded or manual trigger
+        has_logs = self._failed_log_batch is not None or not self._log_queue.empty()
+        if has_logs and self._background_ready("logs") and (
+            triggered
+            or current_time - self._last_log_flush >= self._config.flush_interval
+            or self._log_queue.qsize() >= self._config.log_batch_size
+        ):
+            try:
+                self._flush_logs()
+            except Exception as e:
+                background_error("logs", e)
+
+        # Flush metrics (check each metric queue)
+        for metric_name, queue in list(self._metric_queues.items()):
+            label = self._metric_label(metric_name)
+            has_points = metric_name in self._failed_metric_batches or not queue.empty()
+            if has_points and self._background_ready(label) and (
+                triggered
+                or current_time - self._last_metric_flush.get(metric_name, 0)
+                >= self._config.flush_interval
+                or queue.qsize() >= self._config.metric_batch_size
+            ):
+                try:
+                    self._flush_metric(metric_name)
+                except Exception as e:
+                    background_error(label, e)
+
+        # Flush tracks (check each topic)
+        with self._track_lock:
+            topic_sizes = [(topic, len(entries)) for topic, entries in self._track_buffers.items()]
+        for topic, size in topic_sizes:
+            label = f"track '{topic}'"
+            if size and self._background_ready(label) and (
+                triggered
+                or current_time - self._last_track_flush.get(topic, 0)
+                >= self._config.flush_interval
+                or size >= self._config.track_batch_size
+            ):
+                try:
+                    self._flush_track(topic)
+                except Exception as e:
+                    background_error(label, e)
+
+        # Flush files (always process file queue)
+        if not self._file_queue.empty():
+            try:
+                self._flush_files()
+            except Exception as e:
+                background_error("files", e)
+
+    def _flush_logs(self) -> bool:
+        """
+        Batch flush logs using client.create_log_entries().
+
+        Returns:
+            False if the batch could not be sent; it is kept and sent first next time.
+        """
+        batch = self._failed_log_batch
+        if batch is None:
+            # Collect batch
+            batch = []
+            try:
+                while len(batch) < self._config.log_batch_size:
+                    log_entry = self._log_queue.get_nowait()
+                    batch.append(log_entry)
+            except Empty:
+                pass  # Queue exhausted
+
+            if not batch:
+                return True
 
         # Write to backends
         if self._experiment._client:
+            if self._deferred_by_server("logs"):
+                self._failed_log_batch = batch
+                return False
             try:
                 self._retry_remote_call(
                     lambda: self._experiment._client.create_log_entries(
@@ -632,19 +784,18 @@ class BackgroundBufferManager:
                         logs=batch,
                     ),
                     f"flush {len(batch)} log(s)",
+                    "logs",
                 )
             except Exception as e:
+                self._failed_log_batch = batch
+                self._record_failure("logs", e)
                 _logger.warning(
-                    "[ML-Dash] Log flush failed after %d retries (%s: %s) — "
-                    "re-queuing %d entries for next flush cycle",
-                    self._config.max_retries, type(e).__name__, e, len(batch),
+                    "[ML-Dash] Log flush failed (%s: %s) — keeping %d entries for the next flush",
+                    type(e).__name__, e, len(batch),
                 )
-                for entry in batch:
-                    try:
-                        self._log_queue.put_nowait(entry)
-                    except Exception:
-                        break  # Queue full — accept the loss rather than block
-                return
+                return False
+            self._failed_log_batch = None
+            self._record_success("logs")
 
         if self._experiment._storage:
             # Local storage writes one at a time (no batch API)
@@ -666,45 +817,52 @@ class BackgroundBufferManager:
                     )
 
         self._last_log_flush = time.time()
+        return True
 
-    def _flush_metric(self, metric_name: Optional[str]) -> None:
+    def _flush_metric(self, metric_name: Optional[str]) -> bool:
         """
         Batch flush metrics using client.append_batch_to_metric().
 
         Args:
             metric_name: Metric name (can be None for unnamed metrics)
+
+        Returns:
+            False if the batch could not be sent; it is kept and sent first next time.
         """
-        queue = self._metric_queues.get(metric_name)
-        if queue is None or queue.empty():
-            return
+        pending = self._failed_metric_batches.pop(metric_name, None)
+        if pending is None:
+            queue = self._metric_queues.get(metric_name)
+            if queue is None or queue.empty():
+                return True
 
-        # Collect batch
-        batch = []
-        description = None
-        tags = None
-        metadata = None
+            # Collect batch
+            pending = {"batch": [], "description": None, "tags": None, "metadata": None}
+            try:
+                while len(pending["batch"]) < self._config.metric_batch_size:
+                    metric_entry = queue.get_nowait()
+                    pending["batch"].append(metric_entry["data"])
 
-        try:
-            while len(batch) < self._config.metric_batch_size:
-                metric_entry = queue.get_nowait()
-                batch.append(metric_entry["data"])
+                    # Use first non-None description/tags/metadata
+                    for field in ("description", "tags", "metadata"):
+                        if pending[field] is None and metric_entry[field]:
+                            pending[field] = metric_entry[field]
+            except Empty:
+                pass  # Queue exhausted
 
-                # Use first non-None description/tags/metadata
-                if description is None and metric_entry["description"]:
-                    description = metric_entry["description"]
-                if tags is None and metric_entry["tags"]:
-                    tags = metric_entry["tags"]
-                if metadata is None and metric_entry["metadata"]:
-                    metadata = metric_entry["metadata"]
-        except Empty:
-            pass  # Queue exhausted
+            if not pending["batch"]:
+                return True
 
-        if not batch:
-            return
+        batch = pending["batch"]
+        description = pending["description"]
+        tags = pending["tags"]
+        metadata = pending["metadata"]
+        label = self._metric_label(metric_name)
 
         # Write to backends
         if self._experiment._client:
-            metric_display = f"'{metric_name}'" if metric_name else "unnamed metric"
+            if self._deferred_by_server(label):
+                self._failed_metric_batches[metric_name] = pending
+                return False
             try:
                 self._retry_remote_call(
                     lambda: self._experiment._client.append_batch_to_metric(
@@ -715,25 +873,18 @@ class BackgroundBufferManager:
                         tags=tags,
                         metadata=metadata,
                     ),
-                    f"flush {len(batch)} point(s) to metric {metric_display}",
+                    f"flush {len(batch)} point(s) to {label}",
+                    label,
                 )
             except Exception as e:
+                self._failed_metric_batches[metric_name] = pending
+                self._record_failure(label, e)
                 _logger.warning(
-                    "[ML-Dash] Metric flush failed after %d retries (%s: %s) — "
-                    "re-queuing %d points for metric %s on next flush cycle",
-                    self._config.max_retries, type(e).__name__, e, len(batch), metric_display,
+                    "[ML-Dash] Metric flush failed (%s: %s) — keeping %d points for %s for the next flush",
+                    type(e).__name__, e, len(batch), label,
                 )
-                for data_point in batch:
-                    try:
-                        queue.put_nowait({
-                            "data": data_point,
-                            "description": description,
-                            "tags": tags,
-                            "metadata": metadata,
-                        })
-                    except Exception:
-                        break  # Queue full — accept the loss rather than block
-                return
+                return False
+            self._record_success(label)
 
         if self._experiment._storage:
             try:
@@ -755,17 +906,34 @@ class BackgroundBufferManager:
                 ) from e
 
         self._last_metric_flush[metric_name] = time.time()
+        return True
 
-    def _flush_track(self, topic: str) -> None:
+    def _restore_track_entries(self, topic: str, entries: Dict[float, Dict[str, Any]]) -> None:
+        """Put back entries whose send failed; fields added since then win on the same timestamp."""
+        with self._track_lock:
+            for timestamp, data in self._track_buffers.get(topic, {}).items():
+                entries[timestamp] = {**entries.get(timestamp, {}), **data}
+            self._track_buffers[topic] = entries
+
+    def _flush_track(self, topic: str) -> bool:
         """
         Batch flush track entries using client.append_batch_to_track().
 
         Args:
             topic: Track topic
+
+        Returns:
+            False if the entries could not be sent; they stay buffered.
         """
-        entries_dict = self._track_buffers.get(topic)
-        if not entries_dict:
-            return
+        label = f"track '{topic}'"
+        with self._track_lock:
+            entries_dict = self._track_buffers.get(topic)
+            if not entries_dict:
+                return True
+            if self._experiment._client and self._deferred_by_server(label):
+                return False
+            # Take the entries out so producers can keep adding while we send
+            self._track_buffers[topic] = {}
 
         # Convert timestamp-indexed dict to batch entries
         batch = []
@@ -774,11 +942,7 @@ class BackgroundBufferManager:
             entry.update(data)
             batch.append(entry)
 
-        if not batch:
-            return
-
-        # Write to remote backend — clear buffer only on success so failed
-        # flushes are automatically retried on the next cycle
+        # Write to remote backend — failed entries go back into the buffer
         if self._experiment._client:
             try:
                 self._retry_remote_call(
@@ -788,19 +952,18 @@ class BackgroundBufferManager:
                         entries=batch,
                     ),
                     f"flush {len(batch)} entry/entries to track '{topic}'",
+                    label,
                 )
-                # Success — clear the flushed entries
-                self._track_buffers[topic] = {}
             except Exception as e:
+                self._restore_track_entries(topic, entries_dict)
+                self._record_failure(label, e)
                 _logger.warning(
-                    "[ML-Dash] Track flush failed after %d retries (%s: %s) — "
-                    "keeping %d entries in buffer for topic '%s' for next flush cycle",
-                    self._config.max_retries, type(e).__name__, e, len(batch), topic,
+                    "[ML-Dash] Track flush failed (%s: %s) — "
+                    "keeping %d entries in buffer for topic '%s' for the next flush",
+                    type(e).__name__, e, len(batch), topic,
                 )
-                return
-        else:
-            # Local-only mode — clear unconditionally (no remote to fail)
-            self._track_buffers[topic] = {}
+                return False
+            self._record_success(label)
 
         # Write to local storage
         if self._experiment._storage:
@@ -819,11 +982,12 @@ class BackgroundBufferManager:
                 ) from e
 
         self._last_track_flush[topic] = time.time()
+        return True
 
-    def _flush_files(self) -> None:
-        """Upload files using ThreadPoolExecutor."""
+    def _flush_files(self) -> bool:
+        """Upload files using ThreadPoolExecutor. Raises NetworkError if an upload fails."""
         if self._file_queue.empty():
-            return
+            return True
 
         # Collect all pending files
         files_to_upload = []
@@ -835,7 +999,7 @@ class BackgroundBufferManager:
             pass  # Queue exhausted
 
         if not files_to_upload:
-            return
+            return True
 
         # Show progress for file uploads
         total_files = len(files_to_upload)
@@ -863,6 +1027,7 @@ class BackgroundBufferManager:
                         f"Failed to upload file {file_entry['filename']}: {e}\n"
                         f"File upload failed. Check network connection and file permissions."
                     ) from e
+        return True
 
     def _upload_single_file(self, file_entry: Dict[str, Any]) -> None:
         """

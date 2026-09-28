@@ -15,6 +15,14 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
     exp.log("Failed to load checkpoint", level="error")
 ```
 
+### Reading Logs Back
+
+In remote mode, the server accepts logs into a delivery queue and stores them
+shortly after. A read right after writing can return none or only some of them.
+In an observed sweep, this took tens of seconds; there is no guaranteed bound. The SDK
+does not wait or poll for you. If you read logs back, retry your read with a
+deadline.
+
 ## Log Levels
 
 **Available levels:** `debug`, `info` (default), `warn`, `error`, `fatal`

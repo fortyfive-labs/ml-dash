@@ -63,7 +63,7 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
 
 ## Reading Data
 
-Read metric data by index range:
+Read metric data from local storage by index range:
 
 ```python
 
@@ -78,6 +78,38 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
     for point in result['data']:
         print(f"Index {point['index']}: {point['data']}")
 ```
+
+### Reading from the server
+
+The server does not assign point indices, so `read()` on a remote-only
+experiment raises `ConfigurationError` (as do `RemoteClient.read_metric_data`,
+`get_metric_data` and `download_metric_chunk`). A hybrid experiment still
+reads from local storage. To read what the server stored, use `read_rows()`
+or `iter_row_blocks()`:
+
+```python
+for block in exp.metrics("train").iter_row_blocks():
+    names = [c.name for c in block.columns]   # may repeat; may differ per block
+    for row in block.rows:                    # cells in column order
+        print(list(zip(names, row)))
+```
+
+- Rows come in **blocks**. Each block has its own `columns`, a tuple of
+  `MetricColumn(name, type)`, and `rows`, lists of cells in that order. Keep
+  them together: names can repeat, so a dict per row would lose columns.
+- Cells are Python values: floats (including NaN, ±inf and -0.0), ints (64-bit
+  values exact), bools, strings or `None`. A column a block lacks is not in its
+  `columns`.
+- Only **committed** rows are returned: points the server has not yet committed
+  are missing. Rows are in **storage order**, not step order. Duplicates are
+  kept. There is no index, total or timestamp.
+- `read_rows(limit=None, cursor=None)` returns one `MetricRowsPage`
+  (`blocks`, `returned`, `has_more`, `next_cursor`, `metric_id`).
+  `iter_row_blocks(limit=None)` follows the cursors for you.
+- Failures raise `MetricRowsError` with `status_code` and `code`. A 409
+  `snapshot_changed` means the stored data changed during the read: start again
+  without a cursor. The SDK never restarts by itself. A 404 with `code=None`
+  means the server does not have the rows endpoint yet.
 
 ## Buffer API
 
@@ -125,6 +157,27 @@ exp.metrics.buffer.log_summary("first", "last")
 ```
 
 Available aggregations: `mean`, `std`, `min`, `max`, `count`, `median`, `sum`, `p50`, `p90`, `p95`, `p99`, `first`, `last`
+
+### The Last Window
+
+Buffered values are only sent when you summarize them. Closing the experiment
+does **not** summarize for you, because it cannot know which aggregations or step
+you want. Summarize the last (tail) window yourself before the run ends:
+
+```python
+for step, batch in enumerate(dataloader, 1):
+    exp.metrics("train").buffer(loss=train_step(batch))
+    if step % 100 == 0:
+        exp.metrics.buffer.log_summary("mean", "count", step=step)
+
+exp.metrics.buffer.log_summary("mean", "count", step=step)  # tail window
+```
+
+If values are still unsummarized at close, a warning is logged (logger
+`ml_dash.experiment`) naming the metrics and value counts. Those values are not sent.
+
+None and NaN are left out of summary statistics. A window with only NaN
+values logs nothing and is cleared.
 
 ### Multiple Prefixes
 

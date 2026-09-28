@@ -88,6 +88,17 @@ Claude will provide code examples and best practices tailored to ML-Dash.
 pip install ml-dash
 ```
 
+On import, ml-dash asks pypi.org (2 s timeout) whether a newer release exists, and warns if there is one.
+A failed check never breaks the import. To skip the request, for example offline
+or in air-gapped environments, set:
+
+```bash
+export ML_DASH_NO_VERSION_CHECK=1
+```
+
+`ml_dash.userinfo` and `Experiment(dash_url=True)` both use `ML_DASH_API_URL`
+(default `https://api.dash.ml`).
+
 ## Quick Start with Remote Mode
 
 The fastest way to get started is using remote tracking with the ML-Dash server:

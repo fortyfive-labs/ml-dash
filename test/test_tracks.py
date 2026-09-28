@@ -5,6 +5,8 @@ import json
 
 import pytest
 
+from ml_dash import ConfigurationError
+
 
 @pytest.fixture(autouse=True)
 def disable_buffering(monkeypatch):
@@ -263,13 +265,13 @@ class TestMetricRead:
 
   @pytest.mark.remote
   def test_read_metric_data_remote(self, remote_experiment):
-    """Test reading metric data in remote mode."""
+    """Remote-only index reads are refused; read_rows() replaces them."""
     with remote_experiment("tom/test/metric-read-remote").run as experiment:
       for i in range(15):
         experiment.metrics("metric").log(loss=i * 0.05, step=i)
 
-      result = experiment.metrics("metric").read(start_index=0, limit=5)
-      assert len(result["data"]) <= 15
+      with pytest.raises(ConfigurationError, match="read_rows"):
+        experiment.metrics("metric").read(start_index=0, limit=5)
 
 
 class TestListMetrics:

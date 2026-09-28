@@ -61,6 +61,11 @@ export ML_DASH_TRACK_BATCH_SIZE=100
 
 # File upload workers (default: 4)
 export ML_DASH_FILE_UPLOAD_WORKERS=4
+
+# Retries per batch on network errors, 5xx and 429 (defaults: 3, 1.0 s, 30.0 s)
+export ML_DASH_MAX_RETRIES=3
+export ML_DASH_RETRY_BASE_DELAY=1.0
+export ML_DASH_RETRY_MAX_DELAY=30.0
 ```
 
 ### Programmatic Configuration
@@ -99,6 +104,13 @@ with Experiment("my-project/exp").run as experiment:
     # Now safe to save model knowing all metrics are uploaded
     torch.save(model, "checkpoint.pt")
 ```
+
+`experiment.flush()` is the call that sends data. `metrics.flush()` and
+`metrics("name").flush()` are no-ops kept for chaining
+(`exp.metrics.log(epoch=1).flush()`); they send nothing.
+
+If any data cannot be sent, `experiment.flush()` raises `NetworkError` with the counts
+not sent. That data stays buffered and is retried on the next flush.
 
 ## Disabling Buffering
 
@@ -154,7 +166,23 @@ When the experiment completes, you'll see:
 
 ## Error Handling
 
-The buffering system handles errors gracefully:
+Training is not interrupted by upload failures, but failures are not hidden either:
+
+- **During the run**, a batch that fails keeps its place and is retried in the
+  background at most once per flush interval (never sooner than a server
+  `Retry-After`). Each failure logs a warning.
+- **Network errors, 5xx and 429** are retried within a flush up to
+  `ML_DASH_MAX_RETRIES` times with exponential backoff. A server `Retry-After`
+  (seconds or HTTP date) is the minimum wait. If it exceeds `ML_DASH_RETRY_MAX_DELAY`,
+  the flush gives up at once and the batch is not sent before that time.
+- **On close** (`exp.run.complete()` or leaving `with exp.run:`), each queue gets one
+  more bounded attempt. The attempt stops at the first batch that still fails. If anything was not sent, or a file
+  upload failed, close raises `NetworkError` with the counts. A run that was
+  completing is then marked **FAILED**, not COMPLETED. An exception raised by
+  your own code in the `with` block is kept and re-raised. The close failure is logged
+  (logger `ml_dash.run`) and, on Python 3.11+, added as a note on your exception.
+- Close waits for an in-progress background flush without a timeout. After that,
+  the time taken is bounded by the retry settings, the HTTP timeouts and upload sizes, not by a fixed deadline.
 
 ```python
 with Experiment("my-project/exp").run as experiment:
@@ -163,9 +191,12 @@ with Experiment("my-project/exp").run as experiment:
         experiment.log(f"Step {i}")
         # If upload fails, warning is shown but training continues
 
-    # Errors are logged, not raised
-    # Your training won't crash due to I/O issues
+# Data that could not be sent is reported here, as NetworkError
 ```
+
+Values that are NaN or infinite cannot be sent to the server. In remote mode,
+`metrics(...).log()` rejects them at once with `ValueError`. To aggregate
+values that may be NaN, use `buffer()`/`summary_cache.store()`; summaries leave NaN out.
 
 ## Thread Safety
 

@@ -387,6 +387,36 @@ def test_buffer_method_chaining(experiment):
   assert data["data"][0]["data"]["loss.mean"] == pytest.approx(0.45)
 
 
+def test_all_nan_window_is_cleared(local_experiment):
+  """F4: a window of only NaN logs nothing and does not leak into the next window."""
+  with local_experiment().run as exp:
+    cache = exp.metrics("train").summary_cache
+    cache.store(loss=float("nan"))
+    cache.store(loss=None)
+    cache.summarize()
+    assert cache.peek() == {}
+
+    cache.store(loss=1.0)
+    assert cache._compute_stats()["loss.count"] == 1
+    cache.summarize()
+
+
+def test_close_reports_unsummarized_tail(local_experiment, caplog):
+  """F3: values stored after the last summary are not sent; close says so."""
+  with local_experiment().run as exp:
+    exp.metrics("train").buffer(loss=0.5)
+    exp.metrics("train").buffer(loss=0.4)
+  assert "never summarized" in caplog.text and "train buffer(): 2 value" in caplog.text
+
+
+def test_close_does_not_report_after_cumulative_summary(local_experiment, caplog):
+  """F3: summarize(clear=False) keeps values that were already summarized; no warning."""
+  with local_experiment().run as exp:
+    exp.metrics("train").summary_cache.store(loss=0.5)
+    exp.metrics("train").summary_cache.summarize(clear=False)
+  assert "never summarized" not in caplog.text
+
+
 if __name__ == "__main__":
   """Run all tests with pytest."""
   import sys

@@ -1,6 +1,7 @@
 """Token storage backends for ml-dash authentication."""
 
 import json
+import os
 from abc import ABC, abstractmethod
 from base64 import urlsafe_b64decode
 from pathlib import Path
@@ -264,6 +265,76 @@ def get_token_storage(config_dir: Optional[Path] = None) -> TokenStorage:
   return PlaintextFileStorage(config_dir)
 
 
+def load_token(key: str, config_dir: Optional[Path] = None) -> Optional[str]:
+  """Load a token from the stores the ml-dash CLI writes, in the CLI's order.
+
+  Order: the OS keyring, then ``tokens.encrypted`` (with ``encryption.key``),
+  then ``tokens.json``. A later store is read only when the earlier ones have
+  no token (or there is no keyring backend). Everything here only reads: no
+  directory, key or token file is created.
+
+  A keyring that refuses access, ciphertext without its key, or a store that
+  cannot be decrypted or parsed raises StorageError instead of falling through.
+  Messages name the file and error type only, never stored contents.
+
+  Args:
+      key: Token key, e.g. "ml-dash-token"
+      config_dir: Configuration directory (defaults to $ML_DASH_CONFIG_DIR, then ~/.dash)
+
+  Returns:
+      The token, or None if no store has one
+  """
+  try:
+    import keyring
+  except ImportError:
+    keyring = None
+  if keyring is not None:
+    no_backend = getattr(getattr(keyring, "errors", None), "NoKeyringError", None)
+    try:
+      value = keyring.get_password(KeyringStorage.SERVICE_NAME, key)
+    except Exception as e:
+      if no_backend is None or not isinstance(e, no_backend):
+        # Name the error type only, as for the files below: its text may carry stored contents
+        raise StorageError(f"Failed to load token from keyring: {type(e).__name__}") from None
+      value = None
+    if value:
+      return value
+
+  if config_dir is None:
+    config_dir = os.environ.get("ML_DASH_CONFIG_DIR") or Path.home() / ".dash"
+  config_dir = Path(config_dir)
+
+  def read_tokens(path: Path, decode) -> dict:
+    # Name the error type only: stored contents must not reach a message or traceback
+    try:
+      tokens = json.loads(decode(path.read_bytes()))
+    except Exception as e:
+      raise StorageError(f"Failed to read {path}: {type(e).__name__}") from None
+    if not isinstance(tokens, dict) or not isinstance(tokens.get(key, ""), str):
+      raise StorageError(f"Failed to read {path}: unexpected content")
+    return tokens
+
+  tokens_file = config_dir / "tokens.encrypted"
+  if tokens_file.exists():
+    key_file = config_dir / "encryption.key"
+    if not key_file.exists():
+      raise StorageError(f"Failed to read {tokens_file}: {key_file.name} is missing")
+
+    def decrypt(data: bytes) -> bytes:
+      from cryptography.fernet import Fernet
+
+      return Fernet(key_file.read_bytes().strip()).decrypt(data)
+
+    value = read_tokens(tokens_file, decrypt).get(key)
+    if value:
+      return value
+
+  plain_file = config_dir / "tokens.json"
+  if plain_file.exists():
+    return read_tokens(plain_file, lambda data: data).get(key) or None
+  return None
+
+
 def decode_jwt_payload(token: str) -> dict:
   """Decode JWT payload without verification (for display only).
 
@@ -290,5 +361,3 @@ def decode_jwt_payload(token: str) -> dict:
     return json.loads(decoded)
   except Exception:
     return {}
-
-

@@ -36,17 +36,21 @@ Usage:
         exp.log("Training started")
 """
 
+import os
+
 from .client import RemoteClient, userinfo
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
     ExperimentError,
+    MetricRowsError,
     MlDashError,
     NetworkError,
     StorageError,
 )
 from .experiment import Experiment, OperationMode, ml_dash_experiment
 from .log import LogBuilder, LogLevel
+from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .params import ParametersBuilder
 from .run import RUN
 from .storage import LocalStorage
@@ -68,7 +72,12 @@ def _check_version_compatibility():
     Nudges users toward the newest release without bricking imports: a strict
     ImportError here means a single bad/late publish takes down every older
     install, and ties every import to network reachability.
+
+    Set ML_DASH_NO_VERSION_CHECK=1 to skip the request to pypi.org entirely.
     """
+    if os.environ.get("ML_DASH_NO_VERSION_CHECK", "").lower() in ("1", "true", "yes"):
+        return
+
     try:
         from packaging import version
         import httpx
@@ -98,9 +107,8 @@ def _check_version_compatibility():
                     f"ml-dash` or `pip install --upgrade ml-dash`.",
                     stacklevel=2,
                 )
-    except (httpx.TimeoutException, httpx.ConnectError, KeyError):
-        # Silently skip check if PyPI is unreachable or response is malformed
-        # Don't block users due to network issues
+    except Exception:
+        # The check is advisory: no network, HTTP or JSON problem may break the import
         pass
 
 
@@ -118,11 +126,15 @@ __all__ = [
   "ParametersBuilder",
   "RUN",
   "userinfo",
+  "MetricColumn",
+  "MetricRowBlock",
+  "MetricRowsPage",
   # Exceptions
   "MlDashError",
   "AuthenticationError",
   "ConfigurationError",
   "ExperimentError",
+  "MetricRowsError",
   "NetworkError",
   "StorageError",
 ]
