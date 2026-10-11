@@ -357,13 +357,13 @@ experiment.tracks("agent/rewards").append(
 
 ```python
 # Good: Clear topic hierarchy
-experiment.tracks("robot/joints/arm").append(data)
-experiment.tracks("robot/joints/leg").append(data)
-experiment.tracks("robot/sensors/imu").append(data)
+experiment.tracks("robot/joints/arm").append(**data)
+experiment.tracks("robot/joints/leg").append(**data)
+experiment.tracks("robot/sensors/imu").append(**data)
 
 # Less clear: Flat structure
-experiment.tracks("arm_data").append(data)
-experiment.tracks("leg_data").append(data)
+experiment.tracks("arm_data").append(**data)
+experiment.tracks("leg_data").append(**data)
 ```
 
 ### 4. Zero-Pad Filenames for Alignment
@@ -454,8 +454,8 @@ entries = track_slice.findByTime([1.0, 3.5, 7.0])  # Returns list of 3 entries
 # entries[1] -> timestamp 3.0 (floor match for 3.5)
 # entries[2] -> timestamp 7.0
 
-# Query before first timestamp raises KeyError
-# track_slice.findByTime(0.5)  # KeyError: No entry found with timestamp <= 0.5
+# Query before first timestamp raises ml_dash.StorageError
+# track_slice.findByTime(0.5)  # StorageError: No entry found with timestamp <= 0.5
 
 # Query after last timestamp returns last entry
 entry = track_slice.findByTime(100.0)  # Returns entry at timestamp 9.0
@@ -522,7 +522,7 @@ with Experiment("robotics/sync").run as experiment:
 **Timestamp Queries:**
 - `slice.findByTime(timestamp)` - Get entry by timestamp (floor match)
 - Optimized for sequential queries using internal index
-- Raises `KeyError` if query timestamp is before first entry
+- Raises `StorageError` (from `ml_dash`) if query timestamp is before first entry
 
 **Length:**
 - `len(slice)` - Get number of entries in slice
@@ -542,32 +542,31 @@ Returns a TrackBuilder for the specified topic.
 **Returns:**
 - TrackBuilder instance
 
-### `TrackBuilder.append(data: Dict[str, Any] = None, *, timestamp: float = None) -> None`
+### `TrackBuilder.append(**fields, _ts=None) -> TrackBuilder`
 
-Append a data entry to the track.
+Append a data entry to the track. Keyword-only: each keyword becomes a field.
 
 **Parameters:**
-- `data` (dict, optional): Data fields to track
-- `timestamp` (float, optional): Explicit timestamp (uses current time if not provided)
+- `**fields`: Data fields to track
+- `_ts` (float, optional): Timestamp. Omitted: generated from the current time. `-1`: reuse the previous timestamp. A number: use it as given.
 
 **Examples:**
 
 ```python
 # With automatic timestamp
-experiment.tracks("sensor/temp").append(value=25.0
-)
+experiment.tracks("sensor/temp").append(value=25.0)
 
 # With explicit timestamp
-experiment.tracks("sensor/temp").append(
-    timestamp=time.time(),
-    data={"value": 25.0}
-)
+experiment.tracks("sensor/temp").append(value=25.0, _ts=time.time())
 
-# Positional data argument
+# Multiple fields
 experiment.tracks("sensor/temp").append(
     step=100,
     value=25.0
 )
+
+# From a dict
+experiment.tracks("sensor/temp").append(**{"value": 25.0})
 ```
 
 ### `TrackBuilder.slice(start_timestamp: float = None, end_timestamp: float = None) -> TrackSlice`

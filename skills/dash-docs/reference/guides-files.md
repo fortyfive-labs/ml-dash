@@ -54,11 +54,16 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
 
     # Upload a file to a prefix
     result = exp.files("models").upload("./model.pth")
-
-    print(f"Uploaded: {result['filename']}")
-    print(f"Size: {result['sizeBytes']} bytes")
-    print(f"Checksum: {result['checksum']}")
+    print(result)  # {'id': 'pending', 'status': 'queued'}
 ```
+
+Uploads are [buffered](reference/guides-buffering.md) by default, so `upload()` and the
+`save*()` methods return `{"id": "pending", "status": "queued"}` and write the
+file in the background. The file can't be listed or downloaded until the buffer
+flushes (at the latest when the `with` block exits). To get the stored record
+(`filename`, `sizeBytes`, `checksum`, `id`, ...) back from the call itself,
+set `ML_DASH_BUFFER_ENABLED=false` before creating the experiment, or read it
+later with `exp.files("models").list()`.
 
 ### Save Objects as Files
 
@@ -199,9 +204,8 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
 
 with Experiment(prefix="alice/project/my-experiment").run as exp:
 
-    # Upload a file first
-    upload_result = exp.files("models").upload("./model.pth")
-    file_id = upload_result["id"]
+    # Look up the ID of a file uploaded in an earlier run
+    file_id = exp.files("models").list()[0]["id"]
 
     # Download by ID
     downloaded_path = exp.files(file_id=file_id).download()
@@ -210,16 +214,15 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
 
 ### Checksum Verification
 
-Downloads automatically verify checksums to ensure file integrity:
+Downloads automatically verify checksums to ensure file integrity. Download
+from a later run, after the upload has been flushed:
 
 ```python
 
 with Experiment(prefix="alice/project/my-experiment").run as exp:
 
-    # Upload
-    upload_result = exp.files("models").upload("./model.pth")
-    original_checksum = upload_result["checksum"]
-    print(f"Original checksum: {original_checksum}")
+    # The stored SHA-256 checksum
+    print(exp.files("models").list()[0]["checksum"])
 
     # Download (checksum verified automatically)
     downloaded = exp.files("model.pth").download(to="./verified_model.pth")
@@ -349,9 +352,8 @@ with Experiment(prefix="alice/cv/resnet-training").run as exp:
         )
 
         # Alternative: prefix-based logging
-        # exp.metrics("train").log(loss=train_loss, accuracy=val_accuracy)
-        # exp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy)
-        # exp.metrics.log(epoch=epoch).flush()
+        # exp.metrics("train").log(loss=train_loss, accuracy=val_accuracy, epoch=epoch)
+        # exp.metrics("eval").log(loss=val_loss, accuracy=val_accuracy, epoch=epoch)
 
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
@@ -415,6 +417,12 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
 
 Upload video frame stacks using the `save_video()` method. This is useful for saving training visualizations, agent rollouts, or any sequence of images.
 
+`save_video()` needs the video extra, which installs imageio and ffmpeg:
+
+```bash
+pip install "ml-dash[video]"
+```
+
 ```python
 
 import numpy as np
@@ -456,8 +464,7 @@ with Experiment(prefix="alice/rl/agent-rollout").run as exp:
     # Simulate agent moving across the canvas
     frames = [render_frame(100 + i, 80) for i in range(20)]
 
-    result = exp.files("videos").save_video(frames, to="rollout.mp4")
-    print(f"Saved: {result['filename']} ({result['sizeBytes']} bytes)")
+    exp.files("videos").save_video(frames, to="rollout.mp4")
 ```
 
 ### Video Encoding Options
@@ -533,7 +540,9 @@ Each file is stored as: `files/{prefix}/{snowflake_id}/{filename}`
 - Files stored: `s3://bucket/files/{namespace}/{project}/{experiment}/{prefix}/{file_id}/filename`
 - Metadata: path, size, SHA256 checksum, tags, description
 
-**File size limit:** 100GB per file
+**File size limit:** the ML-Dash server accepts up to 256MB per file and
+rejects larger uploads with `413 Payload Too Large`. The SDK itself refuses
+files over 100GB, which is the only limit in local mode.
 
 ---
 

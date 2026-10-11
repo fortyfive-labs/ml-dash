@@ -39,7 +39,7 @@ with Experiment("my-project/exp").run as experiment:
 Data is automatically flushed when:
 
 1. **Time-based**: Every 5 seconds (default)
-2. **Size-based**: When queue reaches 100 items (default)
+2. **Size-based**: When a queue reaches its batch size (100 logs or track entries, 1000 metric points by default)
 3. **Manual**: When you call `experiment.flush()`
 4. **Context exit**: When the experiment context manager exits
 
@@ -54,38 +54,19 @@ export ML_DASH_BUFFER_ENABLED=true
 # Flush interval in seconds (default: 5.0)
 export ML_DASH_FLUSH_INTERVAL=5.0
 
-# Batch sizes (default: 100)
-export ML_DASH_LOG_BATCH_SIZE=100
-export ML_DASH_METRIC_BATCH_SIZE=100
-export ML_DASH_TRACK_BATCH_SIZE=100
+# Batch sizes
+export ML_DASH_LOG_BATCH_SIZE=100      # default: 100
+export ML_DASH_METRIC_BATCH_SIZE=1000  # default: 1000
+export ML_DASH_TRACK_BATCH_SIZE=100    # default: 100
 
 # File upload workers (default: 4)
 export ML_DASH_FILE_UPLOAD_WORKERS=4
-
-# Retries per batch on network errors, 5xx and 429 (defaults: 3, 1.0 s, 30.0 s)
-export ML_DASH_MAX_RETRIES=3
-export ML_DASH_RETRY_BASE_DELAY=1.0
-export ML_DASH_RETRY_MAX_DELAY=30.0
 ```
 
-### Programmatic Configuration
-
-```python
-from ml_dash import Experiment
-from ml_dash.buffer import BufferConfig
-
-# Custom buffer configuration
-config = BufferConfig(
-    flush_interval=10.0,      # Flush every 10 seconds
-    log_batch_size=200,       # Batch 200 logs
-    metric_batch_size=500,    # Batch 500 metrics
-    file_upload_workers=8     # 8 parallel file uploads
-)
-
-with Experiment("my-project/exp", buffer_config=config).run as exp:
-    # Use custom configuration
-    exp.log("Using custom buffer config")
-```
+The settings are read from the environment when the `Experiment` is
+constructed, so set them before you create it. There is no per-experiment
+argument: `Experiment(..., buffer_config=...)` is not a parameter, and like any
+unknown keyword it is silently ignored.
 
 ## Manual Flushing
 
@@ -105,26 +86,15 @@ with Experiment("my-project/exp").run as experiment:
     torch.save(model, "checkpoint.pt")
 ```
 
-`experiment.flush()` is the call that sends data. `metrics.flush()` and
-`metrics("name").flush()` are no-ops kept for chaining
-(`exp.metrics.log(epoch=1).flush()`); they send nothing.
-
-If any data cannot be sent, `experiment.flush()` raises `NetworkError` with the counts
-not sent. That data stays buffered and is retried on the next flush.
-
 ## Disabling Buffering
 
 For debugging or special cases, you can disable buffering:
 
 ```python
 import os
-os.environ["ML_DASH_BUFFER_ENABLED"] = "false"
+os.environ["ML_DASH_BUFFER_ENABLED"] = "false"  # before creating the Experiment
 
-# Or programmatically
-from ml_dash.buffer import BufferConfig
-
-config = BufferConfig(buffer_enabled=False)
-with Experiment("my-project/exp", buffer_config=config).run as exp:
+with Experiment(prefix="alice/project/exp").run as exp:
     # All writes are immediate (blocking)
     exp.log("Immediate write")
 ```
@@ -155,34 +125,17 @@ When the experiment completes, you'll see:
 
 ```
 [ML-Dash] Flushing buffered data...
-[ML-Dash]   - 1000 log(s), 100 metric(s), 50 track(s), 10 file(s)
+[ML-Dash]   - 1000 log(s), 100 metric point(s), 50 track entry(ies), 10 file(s)
 [ML-Dash]   Uploading 10 file(s)...
 [ML-Dash]   [1/10] Uploaded frame_0001.jpg
 [ML-Dash]   [2/10] Uploaded frame_0002.jpg
 ...
 [ML-Dash] ✓ All data flushed successfully
-✓ Experiment completed: my-experiment
 ```
 
 ## Error Handling
 
-Training is not interrupted by upload failures, but failures are not hidden either:
-
-- **During the run**, a batch that fails keeps its place and is retried in the
-  background at most once per flush interval (never sooner than a server
-  `Retry-After`). Each failure logs a warning.
-- **Network errors, 5xx and 429** are retried within a flush up to
-  `ML_DASH_MAX_RETRIES` times with exponential backoff. A server `Retry-After`
-  (seconds or HTTP date) is the minimum wait. If it exceeds `ML_DASH_RETRY_MAX_DELAY`,
-  the flush gives up at once and the batch is not sent before that time.
-- **On close** (`exp.run.complete()` or leaving `with exp.run:`), each queue gets one
-  more bounded attempt. The attempt stops at the first batch that still fails. If anything was not sent, or a file
-  upload failed, close raises `NetworkError` with the counts. A run that was
-  completing is then marked **FAILED**, not COMPLETED. An exception raised by
-  your own code in the `with` block is kept and re-raised. The close failure is logged
-  (logger `ml_dash.run`) and, on Python 3.11+, added as a note on your exception.
-- Close waits for an in-progress background flush without a timeout. After that,
-  the time taken is bounded by the retry settings, the HTTP timeouts and upload sizes, not by a fixed deadline.
+The buffering system handles errors gracefully:
 
 ```python
 with Experiment("my-project/exp").run as experiment:
@@ -191,12 +144,9 @@ with Experiment("my-project/exp").run as experiment:
         experiment.log(f"Step {i}")
         # If upload fails, warning is shown but training continues
 
-# Data that could not be sent is reported here, as NetworkError
+    # Errors are logged, not raised
+    # Your training won't crash due to I/O issues
 ```
-
-Values that are NaN or infinite cannot be sent to the server. In remote mode,
-`metrics(...).log()` rejects them at once with `ValueError`. To aggregate
-values that may be NaN, use `buffer()`/`summary_cache.store()`; summaries leave NaN out.
 
 ## Thread Safety
 
@@ -262,19 +212,17 @@ experiment.flush()  # Force immediate upload
 
 If you're generating data faster than it can be uploaded:
 
-```python
-# Reduce batch sizes or flush more frequently
-config = BufferConfig(
-    flush_interval=2.0,  # Flush every 2 seconds instead of 5
-    log_batch_size=50    # Smaller batches
-)
+```bash
+# Reduce batch sizes or flush more frequently (set before creating the Experiment)
+export ML_DASH_FLUSH_INTERVAL=2.0   # every 2 seconds instead of 5
+export ML_DASH_LOG_BATCH_SIZE=50    # smaller batches
 ```
 
 ### Uploads failing
 
 Check the warnings in console output. Common issues:
 - Network connectivity
-- Authentication expired (run `ml-dash login`)
+- Authentication expired (run `ml-dash login` again with the separately installed CLI; see [Authentication](reference/get-started-authentication.md))
 - Server unavailable
 
 The buffering system will retry and warn you, but training continues.

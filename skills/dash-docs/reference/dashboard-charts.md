@@ -4,11 +4,11 @@ Customize the charts displayed in an experiment's Dashboard tab by creating a `.
 
 ## Creating and Editing `.dashrc`
 
-If no `.dashrc` exists yet, click **Save as .dashrc** in the Dashboard tab toolbar. This generates a default configuration based on the current auto-generated charts, which you can then edit.
+If no `.dashrc` exists yet, click the save icon (tooltip *Save current dashboard view as .dashrc*) in the Dashboard tab toolbar. This generates a default configuration based on the current auto-generated charts, which you can then edit.
 
 To edit an existing `.dashrc`:
 
-1. Click the **Edit** button in the top-right of the Dashboard tab or click the .dashrc file.
+1. Click the edit icon (tooltip *Edit .dashrc*) in the top-right of the Dashboard tab, or click the `.dashrc` file.
 2. A split view opens: YAML editor on the right, live chart preview on the left.
 3. Edit — charts update automatically.
 
@@ -70,12 +70,12 @@ charts:
 |-------|------|---------|-------------|
 | `ctype` | `"line"` | — | Chart type (required) |
 | `title` | `string` | metric name | Chart title shown above the chart |
-| `xKey` | `string` | `"default"` | Metric name for the x-axis. Use `"default"` to let the backend auto-select (timestamp → step → epoch) |
+| `xKey` | `string` | — | Metric name for the x-axis (required). Use `"default"` to let the server pick one, see below |
 | `yKey` | `string` | — | Single y-axis metric. Mutually exclusive with `yKeys` |
 | `yKeys` | `string[]` | — | Multiple y-axis metrics on the same chart. Mutually exclusive with `yKey` |
 | `xLabel` | `string` | xKey value | X-axis label |
 | `yLabel` | `string` | metric name | Y-axis label |
-| `bins` | `number` | `200` | Number of points to downsample to. Higher values show more detail but are slower to render |
+| `bins` | `number` | `1000` | Number of points to downsample to. Higher values show more detail but are slower to render |
 | `xFormat` | `string \| null` | `null` | Format specifier for x-axis tick labels |
 | `yFormat` | `string \| null` | `null` | Format specifier for y-axis tick labels |
 | `xTicks` | `number` | auto | Number of grid ticks on the x-axis |
@@ -103,13 +103,12 @@ Use `yKeys` to plot multiple metrics on the same chart:
 
 ### `xKey: "default"`
 
-When `xKey` is set to `"default"`, the backend automatically selects the best x-axis metric in this priority order:
+When `xKey` is set to `"default"`, the server picks the x-axis from the metric's own fields, in this order:
 
-1. `timestamp`
-2. `step`
-3. `epoch`
+1. `step`
+2. `epoch`
 
-If none of these exist, the data index is used.
+If the metric has neither, the data index (the order points were logged in) is used. To plot against wall-clock time, set `xKey: timestamp` explicitly.
 
 ---
 
@@ -134,12 +133,11 @@ charts:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `ctype` | `"image"` | — | Chart type (required) |
-| `title` | `string` | — | Title shown above the grid |
+| `title` | `string` | `"Images"` | Title shown above the grid |
 | `glob` | `string` | `"**/*.{png,jpg,jpeg,gif,webp}"` | Glob pattern to match image files within the experiment folder |
 | `nCols` | `number` | `3` | Number of columns in the image grid |
-| `nRows` | `number` | `2` | Number of rows in the image grid |
-| `limit` | `number` | `nCols × nRows` | Maximum number of images to display |
-| `sort` | `"name" \| "date" \| "size"` | `"date"` | Sort order for matched files |
+| `nRows` | `number` | `2` | Number of rows in the image grid. The grid shows at most `nCols × nRows` images |
+| `sort` | `"name" \| "date" \| "size"` | `"name"` | Sort order for matched files |
 
 ---
 
@@ -164,12 +162,11 @@ charts:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `ctype` | `"video"` | — | Chart type (required) |
-| `title` | `string` | — | Title shown above the grid |
+| `title` | `string` | `"Videos"` | Title shown above the grid |
 | `glob` | `string` | `"**/*.{mp4,webm,mov}"` | Glob pattern to match video files within the experiment folder |
 | `nCols` | `number` | `3` | Number of columns in the video grid |
-| `nRows` | `number` | `2` | Number of rows in the video grid |
-| `limit` | `number` | `nCols × nRows` | Maximum number of videos to display |
-| `sort` | `"name" \| "date" \| "size"` | `"date"` | Sort order for matched files |
+| `nRows` | `number` | `2` | Number of rows in the video grid. The grid shows at most `nCols × nRows` videos |
+| `sort` | `"name" \| "date" \| "size"` | `"name"` | Sort order for matched files |
 
 ---
 

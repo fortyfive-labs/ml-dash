@@ -27,7 +27,7 @@ The `Experiment` class is the main entry point for ML-Dash. It represents a sing
 Experiment(
     prefix: Optional[str] = None,
     *,
-    description: Optional[str] = None,
+    readme: Optional[str] = None,
     tags: Optional[List[str]] = None,
     bindrs: Optional[List[str]] = None,
     metadata: Optional[Dict[str, Any]] = None,
@@ -53,34 +53,39 @@ The prefix is a universal key that identifies your experiment:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `prefix` | `str` | `None` | Universal key in format `owner/project/name` |
-| `description` | `str` | `None` | Human-readable description of the experiment |
+| `readme` | `str` | `None` | Human-readable description of the experiment, stored as its description on the server |
 | `tags` | `List[str]` | `None` | Tags for categorization and search |
 | `bindrs` | `List[str]` | `None` | Binders for advanced organization |
 | `metadata` | `Dict[str, Any]` | `None` | Additional structured metadata |
+| `dash_url` | `str \| bool` | `None` | Server URL. `True` uses `ML_DASH_API_URL`, or `https://api.dash.ml` if unset. `None` means no server |
+| `dash_root` | `str` | `".dash"` | Local storage directory. `None` means no local copy |
+
+Any other keyword argument is passed to the run configuration (`RUN`).
+Unknown keywords are not an error, so a misspelled argument, or
+`description=` instead of `readme=`, is silently ignored.
 
 #### Mode Configuration
 
-**Local Mode** (filesystem storage):
+`dash_url` and `dash_root` together choose where data goes:
+
+| `dash_url` | `dash_root` | Mode | Writes to |
+|---|---|---|---|
+| `None` (default) | `".dash"` (default) | local | the local directory only |
+| a URL or `True` | `".dash"` (default) | hybrid | the server **and** the local directory |
+| a URL or `True` | `None` | remote | the server only |
+
 ```python
-Experiment(
-    prefix="alice/my-project/my-experiment",
-    dash_root=".dash"  # Default
-)
+# Local (the default): no server, no login
+Experiment(prefix="alice/my-project/my-experiment")
+
+# Hybrid: server plus a local copy in .dash/
+Experiment(prefix="alice/my-project/my-experiment", dash_url="https://api.dash.ml")
+
+# Remote only
+Experiment(prefix="alice/my-project/my-experiment", dash_url="https://api.dash.ml", dash_root=None)
 ```
 
-**Remote Mode** (API + S3 storage):
-```python
-# Default remote mode (uses https://api.dash.ml)
-Experiment(
-    prefix="alice/my-project/my-experiment"
-)
-
-# Custom remote server
-Experiment(
-    prefix="alice/my-project/my-experiment",
-    dash_url="https://custom-server.com"
-)
-```
+The chosen mode is available as `experiment.mode` (an `OperationMode`).
 
 ---
 
@@ -147,12 +152,12 @@ except Exception:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `experiment.name` | `str` | Experiment name |
-| `experiment.project` | `str` | Project name |
-| `experiment.description` | `str` | Experiment description |
+| `experiment.name` | `str` | Experiment name (last prefix segment) |
+| `experiment.project` | `str` | Project name (second prefix segment) |
+| `experiment.owner` | `str` | Owner namespace (first prefix segment) |
+| `experiment.readme` | `str` | Experiment description, as passed to `readme=` |
 | `experiment.tags` | `List[str]` | Experiment tags |
-| `experiment.bindrs` | `List[str]` | Experiment bindrs |
-| `experiment.folder` | `str` | Folder path |
+| `experiment.mode` | `OperationMode` | `LOCAL`, `HYBRID`, or `REMOTE` |
 | `experiment.id` | `str` | Experiment ID (remote mode only, after start) |
 | `experiment.data` | `dict` | Full experiment data (remote mode only, after start) |
 
@@ -286,15 +291,15 @@ exp.metrics.log(
 Log metrics using namespace prefixes:
 
 ```python
-# Log train metrics with prefix
-exp.metrics("train").log(loss=0.5, accuracy=0.85)
+# Log train metrics with prefix; put epoch/step in each call
+exp.metrics("train").log(loss=0.5, accuracy=0.85, epoch=epoch)
 
 # Log eval metrics with prefix
-exp.metrics("eval").log(loss=0.6, accuracy=0.82)
-
-# Set context and flush
-exp.metrics.log(epoch=epoch).flush()
+exp.metrics("eval").log(loss=0.6, accuracy=0.82, epoch=epoch)
 ```
+
+A bare `exp.metrics.log(epoch=epoch)` writes to a separate unnamed series and
+is not attached to the `train`/`eval` rows.
 
 ### Buffer API
 
@@ -309,8 +314,7 @@ for batch in dataloader:
     exp.metrics("train").buffer(loss=loss, accuracy=acc)
 
 # At end of epoch, compute and log summary statistics
-exp.metrics.buffer.log_summary()  # default: mean
-exp.metrics.log(epoch=epoch).flush()
+exp.metrics.buffer.log_summary(epoch=epoch)  # default: mean, plus epoch
 ```
 
 ### Multiple Aggregations
@@ -359,9 +363,7 @@ stats = exp.metrics("train_loss").stats()
 | `metrics("prefix").buffer(**data)` | Flexible data fields | `None` | Buffer values for summary |
 | `metrics.buffer.log_summary(*aggs)` | aggregation names | `None` | Log summary statistics |
 | `metrics.flush()` | - | `None` | Flush pending metrics |
-| `metrics("prefix").read(start_index, limit)` | int, int | `dict` | Read data points from local storage (remote-only: `ConfigurationError`) |
-| `metrics("prefix").read_rows(limit, cursor)` | int, str | `MetricRowsPage` | Read one page of committed rows from the server |
-| `metrics("prefix").iter_row_blocks(limit)` | int | iterator of `MetricRowBlock` | All committed row blocks, following cursors |
+| `metrics("prefix").read(start_index, limit)` | int, int | `dict` | Read data points |
 | `metrics("prefix").stats()` | - | `dict` | Get metric statistics |
 
 ---
@@ -757,7 +759,7 @@ from ml_dash import Experiment
 # Create experiment
 with Experiment(
     prefix="alice/image-classification/resnet50-training",
-    description="ResNet50 on CIFAR-10",
+    readme="ResNet50 on CIFAR-10",
     tags=["resnet", "cifar10", "baseline"]
 ).run as exp:
 
@@ -793,9 +795,8 @@ with Experiment(
         val_loss, val_acc = validate()  # Your validation code
 
         # Log metrics
-        exp.metrics("train").log(loss=train_loss, accuracy=train_acc)
-        exp.metrics("eval").log(loss=val_loss, accuracy=val_acc)
-        exp.metrics.log(epoch=epoch).flush()
+        exp.metrics("train").log(loss=train_loss, accuracy=train_acc, epoch=epoch)
+        exp.metrics("eval").log(loss=val_loss, accuracy=val_acc, epoch=epoch)
 
         # Log progress
         if epoch % 10 == 0:
@@ -899,7 +900,7 @@ from ml_dash import Experiment
 with Experiment(
     prefix="alice/shared-project/team-experiment",
     dash_url="http://ml-dash-server:3000",
-    description="Collaborative experiment",
+    readme="Collaborative experiment",
     tags=["team", "production"]
 ).run as exp:
 

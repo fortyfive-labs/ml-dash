@@ -73,13 +73,13 @@ All chart types share these fields:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `xKey` | `string` | `"default"` | X-axis metric name. See [xKey values](#xkey-values) below. |
+| `xKey` | `string` | — | X-axis metric name (required). See [xKey values](#xkey-values) below. |
 | `yKey` | `string` | — | Single y-axis metric. Mutually exclusive with `yKeys`. |
 | `yKeys` | `string[]` | — | Multiple y-axis metrics on the same chart. Mutually exclusive with `yKey`. |
 | `series` | `SeriesConfig[]` | — | Per-series config. **Compare `.dashrc` only.** Mutually exclusive with `yKey` and `yKeys`. Each series issues one API request. |
 | `xLabel` | `string` | xKey name | X-axis label |
 | `yLabel` | `string` | metric name | Y-axis label |
-| `bins` | `number` | `200` | Downsample target point count. Higher = more detail, slower render. |
+| `bins` | `number` | `1000` | Downsample target point count. Higher = more detail, slower render. |
 | `xFormat` | `string \| null` | `null` | Format specifier for x-axis ticks. |
 | `yFormat` | `string \| null` | `null` | Format specifier for y-axis ticks. |
 | `xTicks` | `number` | auto | Number of x-axis grid lines. |
@@ -114,7 +114,6 @@ Used inside `series` arrays in compare `.dashrc` files only.
   glob: "frames/**/*.png"
   nCols: 4
   nRows: 2
-  limit: 8
   sort: date
 ```
 
@@ -122,9 +121,8 @@ Used inside `series` arrays in compare `.dashrc` files only.
 |-------|------|---------|-------------|
 | `glob` | `string` | `"**/*.{png,jpg,jpeg,gif,webp}"` | Glob pattern to match files within the experiment folder. |
 | `nCols` | `number` | `3` | Number of grid columns. |
-| `nRows` | `number` | `2` | Number of grid rows. |
-| `limit` | `number` | `nCols × nRows` | Maximum number of files to display. |
-| `sort` | `"name" \| "date" \| "size"` | `"date"` | File sort order. |
+| `nRows` | `number` | `2` | Number of grid rows. The grid shows at most `nCols × nRows` files. |
+| `sort` | `"name" \| "date" \| "size"` | `"name"` | File sort order. |
 
 ---
 
@@ -136,7 +134,6 @@ Used inside `series` arrays in compare `.dashrc` files only.
   glob: "videos/**/*.mp4"
   nCols: 2
   nRows: 2
-  limit: 4
   sort: name
 ```
 
@@ -144,9 +141,8 @@ Used inside `series` arrays in compare `.dashrc` files only.
 |-------|------|---------|-------------|
 | `glob` | `string` | `"**/*.{mp4,webm,mov}"` | Glob pattern to match files within the experiment folder. |
 | `nCols` | `number` | `3` | Number of grid columns. |
-| `nRows` | `number` | `2` | Number of grid rows. |
-| `limit` | `number` | `nCols × nRows` | Maximum number of files to display. |
-| `sort` | `"name" \| "date" \| "size"` | `"date"` | File sort order. |
+| `nRows` | `number` | `2` | Number of grid rows. The grid shows at most `nCols × nRows` files. |
+| `sort` | `"name" \| "date" \| "size"` | `"name"` | File sort order. |
 
 ---
 
@@ -156,7 +152,7 @@ The `xKey` field specifies which metric is used as the x-axis.
 
 | Value | Behavior |
 |-------|----------|
-| `"default"` | Backend auto-selects in priority order: `timestamp` → `step` → `epoch`. Falls back to data index if none exist. |
+| `"default"` | The server picks `step`, then `epoch`, from the metric's own fields. Falls back to the data index if it has neither. |
 | `"step"` | Uses the `step` field logged alongside each metric. |
 | `"epoch"` | Uses the `epoch` field logged alongside each metric. |
 | `"timestamp"` | Uses the Unix timestamp recorded automatically by ML-Dash. |
