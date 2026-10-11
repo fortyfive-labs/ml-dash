@@ -10,7 +10,7 @@ import random
 def train_with_debug():
     with Experiment(
         prefix="alice/debugging/debug-training",
-        description="Training with debug logging",
+        readme="Training with debug logging",
         tags=["debug"]
     ).run as experiment:
         experiment.params.set(learning_rate=0.001, batch_size=32, model="debug_net")

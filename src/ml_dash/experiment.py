@@ -26,6 +26,7 @@ from .buffer import BackgroundBufferManager, BufferConfig
 from .client import RemoteClient
 from .exceptions import ConfigurationError, ExperimentError, NetworkError, StorageError
 from .files import BindrsBuilder, FilesAccessor
+from .job_lifecycle import JobLifecycle
 from .log import LogBuilder, LogLevel
 from .metric_rows import MetricRowsPage
 from .params import ParametersBuilder
@@ -165,6 +166,8 @@ class Experiment:
     bindrs: Optional[List[str]] = None,
     # Instance-only: not propagated to the RUN namespace
     metadata: Optional[Dict[str, Any]] = None,
+    # Explicit application lifecycle for an existing DreamLake job attempt.
+    job_lifecycle: Optional[JobLifecycle] = None,
     # Mode configuration
     dash_url: Optional[Union[str, bool]] = None,
     dash_root: Optional[str] = ".dash",
@@ -190,6 +193,7 @@ class Experiment:
         tags: Optional list of tags
         bindrs: Optional list of bindrs
         metadata: Optional metadata dict
+        job_lifecycle: Explicit, durably journaled DreamLake job/attempt reporter.
         dash_url: Remote API URL. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
         dash_root: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
         remote: (Deprecated) Use dash_url instead
@@ -237,6 +241,7 @@ class Experiment:
     self._bindrs_list = bindrs
     self._write_protected = _write_protected
     self.metadata = metadata
+    self._job_lifecycle = job_lifecycle
 
     # Determine operation mode
     # dash_root defaults to ".dash", dash_url defaults to None
@@ -290,6 +295,9 @@ class Experiment:
     """
     if self._is_open:
       return self
+
+    if self._job_lifecycle:
+      self._job_lifecycle.start()
 
     self._open_remote()
     self._open_local()
@@ -419,6 +427,17 @@ class Experiment:
         flush_error = e
         if status == "COMPLETED":
           status = "FAILED"
+
+    # Explicit application evidence precedes the unrelated experiment PATCH.
+    # Preserve the existing completion-to-failure rule for a failed buffer flush.
+    if self._job_lifecycle:
+      # A lost terminal ACK (or later experiment PATCH failure) must not leave
+      # this instance open: a subsequent start must check the durable terminal
+      # guard before allowing another application body to run.
+      self._is_open = False
+      {"COMPLETED": self._job_lifecycle.complete,
+       "FAILED": self._job_lifecycle.fail,
+       "CANCELLED": self._job_lifecycle.cancel}[status]()
 
     # Update experiment status in remote mode
     if self._client and self._experiment_id:

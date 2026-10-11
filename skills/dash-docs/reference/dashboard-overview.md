@@ -10,7 +10,7 @@ The Dashboard uses a three-column layout:
 - **Middle column** — File tree (top) and experiment list (bottom). Browse folders and experiments within the selected project.
 - **Right column** — Content view. Displays tabs relevant to whatever is selected.
 
-All three columns are resizable. The left column can be collapsed; the right column can be expanded to fullscreen, hiding the middle column.
+The left column has a fixed width and can be collapsed. The divider between the middle and right columns can be dragged. The right column can be expanded to fullscreen, which hides the other two.
 
 ![Dashboard three-column layout](/images/dashboard-layout.png)
 
@@ -25,7 +25,7 @@ When a folder is selected (no experiment highlighted), the right panel shows:
 | Tab | Shown when | Description |
 |-----|-----------|-------------|
 | **README** | Always | Displays `README.md` if present in the current folder |
-| **List View** | Always | Lists all experiments in the current folder |
+| **List View** | Always | Lists the experiments in the current folder, as rows or a grid |
 | **Compare** | Folder contains `.dashrc` | Cross-experiment comparison charts (see [Compare](reference/dashboard-compare.md)) |
 | **Live Compare** | ≥ 2 experiments checked | Auto-generated comparison for the selected experiments |
 
@@ -39,8 +39,6 @@ When an experiment is selected, the right panel shows:
 |-----|-------------|
 | **README** | Displays the experiment's `README.md` if present |
 | **Dashboard** | Metric charts, image grids, and video players |
-| **Logs** | Log messages written by `exp.log()` |
-| **Parameters** | Hyperparameters recorded by `exp.params.set()` |
 
 Additional tabs appear when a file is selected in the file tree:
 
@@ -54,6 +52,38 @@ Additional tabs appear when a file is selected in the file tree:
 Displays the experiment's `README.md` rendered as Markdown. If no README exists, the tab shows an empty state. Writing a `README.md` in your experiment folder is a good place to document what the experiment does and how to reproduce it.
 
 ### Dashboard Tab
+
+Displays charts for the experiment's tracked data. See the sections below for details.
+
+---
+
+## Parameters and Logs
+
+Parameters and logs don't have tabs of their own. Every experiment in the
+**List View** has a **params** and a **log** chip. Click one to open an inline
+panel under that experiment, and press `Esc` or click outside it to close it.
+
+- **params** shows the hyperparameters recorded with `exp.params.set()`,
+  grouped by their dot-notation prefix. `model.architecture` and
+  `model.pretrained` appear together under **model**.
+- **log** shows the messages written with `exp.log()`: timestamp, level,
+  message, and metadata. Narrow it to a time range with the **From** / **To**
+  fields.
+
+```python
+exp.params.set(
+    learning_rate=0.001,
+    batch_size=32,
+    model={"architecture": "resnet50", "pretrained": True}
+)
+exp.log("GPU memory low", level="warn")
+```
+
+See [Parameters](reference/guides-parameters.md) and [Logs](reference/guides-logging.md) for the SDK side.
+
+---
+
+## Dashboard Tab
 
 Displays charts for the experiment's tracked data. See the sections below for details.
 
@@ -96,12 +126,12 @@ See [Parameters](reference/guides-parameters.md) for the full API.
 When no `.dashrc` file exists in the experiment folder, the Dashboard automatically generates one chart per metric:
 
 - Each metric gets its own line chart.
-- The x-axis defaults to `default`, resolved by the backend in priority order: **timestamp → step → epoch**.
+- The x-axis is `default`, which the server resolves to the first of **step → epoch** that the metric has, and otherwise to the data index.
 - Each chart is downsampled to 200 points.
 
 ### Customizing Charts
 
-To customize which charts appear and how they look, create a `.dashrc` file in the experiment folder. The easiest way is to click **Save as .dashrc** in the Dashboard tab toolbar — this generates a default configuration file based on the current auto-generated charts, which you can then edit. See [Experiment Chart Configuration](reference/dashboard-charts.md) for details.
+To customize which charts appear and how they look, create a `.dashrc` file in the experiment folder. The easiest way is the save icon (tooltip *Save current dashboard view as .dashrc*) in the Dashboard tab toolbar. It generates a default configuration file based on the current auto-generated charts, which you can then edit. See [Experiment Chart Configuration](reference/dashboard-charts.md) for details.
 
 ---
 
@@ -132,7 +162,7 @@ The right column switches tabs automatically as you navigate, following these ru
 
 - Checking 2 or more experiments in the list → **Live Compare** tab appears (not automatically selected).
 - Unchecking experiments below 2 → **Live Compare** tab disappears.
-- Navigating away from an experiment → experiment-only tabs (Dashboard, Logs, Parameters) are hidden.
+- Navigating away from an experiment → the experiment-only **Dashboard** tab is hidden.
 
 ---
 

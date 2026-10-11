@@ -383,12 +383,10 @@ experiment.files("frames",
 
 ## Requirements
 
-```bash
-# Required
-pip install Pillow
+Image saving needs Pillow and NumPy. Neither is installed with `ml-dash`:
 
-# Optional (for numpy arrays)
-pip install numpy  # Usually already installed for ML
+```bash
+pip install Pillow numpy
 ```
 
 ## API Reference

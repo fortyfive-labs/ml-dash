@@ -91,44 +91,51 @@ This is useful when:
 - You want the prefix to automatically reflect the file structure
 - Organizing experiments by script location
 
-## Local vs Remote Mode
+## Local, Hybrid, and Remote Mode
 
-**Local mode** - Zero setup, filesystem storage:
+Where an experiment writes depends on `dash_url` and `dash_root`:
+
+| Mode | How to get it | Writes to |
+|---|---|---|
+| **Local** (default) | no `dash_url` | `.dash/` on disk. No server, no login |
+| **Hybrid** | `dash_url=...` | the server **and** `.dash/` |
+| **Remote** | `dash_url=...`, `dash_root=None` | the server only |
 
 ```python
 
-with Experiment(
-    prefix="alice/project/my-experiment",
-    dash_root=".dash"
-).run as exp:
+# Local: zero setup, filesystem storage
+with Experiment(prefix="alice/project/my-experiment").run as exp:
     exp.log("Using local storage")
-```
 
-**Remote mode** - Team collaboration with server:
-
-```python
-
+# Hybrid: the server, plus a local copy
 with Experiment(
     prefix="alice/project/my-experiment",
     dash_url="https://api.dash.ml"
 ).run as exp:
-    exp.log("Using remote server")
+    exp.log("Using the server and .dash/")
+
+# Remote only
+with Experiment(
+    prefix="alice/project/my-experiment",
+    dash_url="https://api.dash.ml",
+    dash_root=None
+).run as exp:
+    exp.log("Using the server only")
 ```
 
-In remote mode, a project that does not exist yet is created with the
-server's default visibility. On the current server that default is
-**private**. The SDK has no option to set visibility. Check it in the
-dashboard, or with GraphQL `project { visibility }`, before sharing data.
+Any mode that uses the server needs a login first. See
+[Authentication](reference/get-started-authentication.md). Runs recorded in local mode can
+be uploaded later with [`ml-dash upload`](reference/reference-cli.md#ml-dash-upload).
 
 ## Experiment Metadata
 
-Add description, tags, and bindrs for organization:
+Add a description (`readme`), tags, and bindrs for organization:
 
 ```python
 
 with Experiment(
     prefix="alice/computer-vision/resnet50-imagenet",
-    description="ResNet-50 training with new augmentation",
+    readme="ResNet-50 training with new augmentation",
     tags=["resnet", "imagenet", "baseline"],
     bindrs=["gpu-cluster", "team-a"]
 ).run as exp:
@@ -136,7 +143,7 @@ with Experiment(
 ```
 
 **Metadata fields:**
-- `description`: Human-readable experiment description
+- `readme`: Human-readable experiment description (shown as the description on the server). Note that the argument is `readme`, not `description`. Unknown keyword arguments are silently ignored.
 - `tags`: List of tags for categorization (e.g., ["baseline", "production"])
 - `bindrs`: List of bindrs for resource/team association (e.g., ["gpu-1", "team-ml"])
 
@@ -198,10 +205,7 @@ except Exception as e:
 
 ## Resuming Experiments
 
-Experiments use **upsert behavior** - reopen by using the same prefix. A rerun
-with the same prefix appends to the existing experiment instead of creating a new one.
-For sweeps and reruns that must stay separate, put something unique in each name
-(a timestamp or run index):
+Experiments use **upsert behavior** - reopen by using the same prefix:
 
 ```python
 
@@ -216,11 +220,63 @@ with Experiment(prefix="alice/ml/long-training").run as exp:
     exp.metrics("train").log(loss=0.3, epoch=2)
 ```
 
-## Closing When Uploads Fail
+## Report an application lifecycle to DreamLake Jobs
 
-If buffered data cannot be sent at close, `NetworkError` is raised with the counts. A run
-that was completing is marked FAILED instead of COMPLETED. An explicit `fail()` or
-`cancel()` keeps its status. See [Background Buffering](guides-buffering.md#error-handling).
+This optional integration requires **ml-dash 0.9.0+** and a DreamLake API that
+supports the job lifecycle endpoint described below.
+Dash experiment status and DreamLake job execution status are separate records.
+To report application start, success, failure or cancellation, bind the reporter
+to the exact existing DreamLake job and its accepted execution receipt:
+
+```python
+import os
+from ml_dash import Experiment, JobLifecycle
+
+lifecycle = JobLifecycle(
+    api_url="https://api.dreamlake.ai",
+    namespace="alice",
+    job_id=os.environ["MY_JOB_ID"],
+    attempt_id=os.environ["MY_EXECUTION_RECEIPT_ID"],
+    token=os.environ["DREAMLAKE_API_KEY"],
+    journal_dir="/persistent/private/job-lifecycle",
+)
+with Experiment(
+    prefix="alice/training/run-1",
+    job_lifecycle=lifecycle,
+).run as experiment:
+    train()
+```
+
+The caller supplies `MY_JOB_ID` and `MY_EXECUTION_RECEIPT_ID` from the existing
+authenticated Jobs response (`id` and `attemptId`). These example environment
+variables are not automatically injected by Nymph. Do not substitute a Dash
+experiment ID, prefix, scheduler ID or worker ID. Use a DreamLake credential
+authorized for this job; the Dash credential is separate. No credentials are
+written to the journal.
+
+The explicit `run.start()`, `run.complete()`, `run.fail()` and `run.cancel()`
+contract drives reporting. Normal context-manager exit requests success; an
+exception requests failure. Existing buffer-flush failures still downgrade a
+requested completion to failure. A return value such as `False` or `None` does
+not by itself mean failure. Reporting does not inspect program outputs or turn
+a process exit into application success.
+
+Each event is saved durably before transmission, with a stable event ID and the
+exact API origin, namespace, job and attempt binding. Keep the private journal
+on persistent storage. After a lost acknowledgment or process restart, construct
+the reporter with the same binding and journal, then call `lifecycle.flush()`
+to resend pending events. This sends only previously saved evidence. An API
+restart returns the same accepted receipt on replay. A stale attempt or
+conflicting terminal report is rejected; do not generate a replacement event
+or change the attempt to make it pass. Credential renewal may retry the same
+journal under the currently authorized actor.
+
+DreamLake list/summary/detail responses expose `applicationStatus` and accepted
+`applicationLifecycle` receipts. With no accepted event, the application status
+is `unknown`. No terminal event is invented after a crash or forced termination.
+The legacy `status` and its explicit `executionStatus` alias retain script-exit
+compatibility; use `applicationStatus` to determine application lifecycle success.
+An experiment timeout or stale dashboard status is not a job lifecycle receipt.
 
 ## Available Operations
 
