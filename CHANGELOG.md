@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-16
+
+### Added
+- `ManagedConnection.from_login(namespace, project)` reuses the selected DreamLake
+  login for `Experiment(..., managed=connection)`, with project-scoped, short-lived
+  reporting credentials renewed in memory. Matching managed server releases are
+  required. Independent Dash credentials are never a fallback.
+- Managed runs support parameters, buffered metrics, logs, status, committed metric
+  reads and root-level file uploads/downloads up to 8 MiB. Run links use the
+  server-verified DreamLake page URL. Nested folders and run/metric/file metadata
+  operations are explicitly unsupported in managed mode; standalone behavior is
+  unchanged.
+- Managed setup retains the reviewed operation identity across interrupted calls.
+  Credential renewal pins the service instance, project and endpoint, and rejects
+  a changed destination. Revoked DreamLake grants prevent renewal; already-issued
+  capabilities expire within 65 seconds including allowed clock skew.
+
 ## [0.8.0] - 2026-09-28
 
 Remote reads of committed metric rows need an ML-Dash server that serves

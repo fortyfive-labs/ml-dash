@@ -168,6 +168,7 @@ class Experiment:
     # Mode configuration
     dash_url: Optional[Union[str, bool]] = None,
     dash_root: Optional[str] = ".dash",
+    managed=None,
     # Deprecated parameters (for backward compatibility)
     remote: Optional[Union[str, bool]] = None,
     local_path: Optional[str] = None,
@@ -237,6 +238,7 @@ class Experiment:
     self._bindrs_list = bindrs
     self._write_protected = _write_protected
     self.metadata = metadata
+    self._managed_connection = managed
 
     # Determine operation mode
     # dash_root defaults to ".dash", dash_url defaults to None
@@ -264,7 +266,13 @@ class Experiment:
     self._track_last_auto_timestamp: float = 0.0  # Ensure unique auto-generated timestamps
     self._track_timestamp_lock = threading.Lock()
 
-    if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
+    if managed is not None:
+      if dash_url is not None or remote is not None or local_path is not None or dash_root not in (None, ".dash"):
+        raise ValueError("managed cannot be combined with standalone server or local storage options")
+      self.mode = OperationMode.REMOTE
+      self._client = managed.client()
+
+    if managed is None and self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
@@ -343,8 +351,22 @@ class Experiment:
       self._buffer_manager = BackgroundBufferManager(self, self._buffer_config)
       self._buffer_manager.start()
 
+  def _view_url(self) -> Optional[str]:
+    if self._managed_connection is None:
+      return f"https://dash.ml/{self.run.prefix}"
+    base = self._managed_connection._experiment_url
+    if not base:
+      return None
+    from urllib.parse import quote
+    return f"{base}?run={quote(str(self._experiment_id), safe='')}"
+
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
+    if self._managed_connection is not None:
+      connection = self._managed_connection
+      destination = self._view_url() or f'DreamLake project {connection.namespace}/{connection.project} (page URL unavailable)'
+      print(f"Experiment started: {destination}")
+      return
     experiment_url = f"https://dash.ml/{self.run.prefix}"
     try:
       from rich.console import Console
@@ -443,23 +465,24 @@ class Experiment:
           from ml_dash import __version__
 
           console = Console()
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
+          experiment_url = self._view_url()
+          result_link = f"[link={experiment_url}]{experiment_url}[/link]" if experiment_url else 'Open the project Experiments page in DreamLake.'
           console.print(
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
             f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
             f"[dim]View results, statistics, and plots online at:[/dim] "
-            f"[link={experiment_url}]{experiment_url}[/link]\n"
+            f"{result_link}\n"
             f"[dim]ml-dash version: {__version__}[/dim]"
           )
         except ImportError:
           # Fallback if rich is not available
           from ml_dash import __version__
 
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
+          experiment_url = self._view_url()
           print(
             f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
-          print(f"View results at: {experiment_url}")
+          print(f"View results at: {experiment_url}" if experiment_url else 'Open the project Experiments page in DreamLake.')
           print(f"ml-dash version: {__version__}")
 
       except Exception as e:

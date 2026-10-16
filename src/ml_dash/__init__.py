@@ -39,6 +39,7 @@ Usage:
 import os
 
 from .client import RemoteClient, userinfo
+from .managed import ManagedConnection
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -117,6 +118,7 @@ _check_version_compatibility()
 
 __all__ = [
   "Experiment",
+  "ManagedConnection",
   "ml_dash_experiment",
   "OperationMode",
   "RemoteClient",

@@ -24,6 +24,19 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 
 ## Installation
 
+### DreamLake managed Experiments (0.9.0)
+
+The development SDK also supports `ManagedConnection.from_login(org, project)`
+and `Experiment(prefix="org/project/run", managed=connection)`. This uses
+DreamLake project permissions and the existing DreamLake login; it does not
+require another Dash organization. Matching server and CLI releases are required.
+See the authoritative [managed setup and Python guide](https://docs.dash.ml/get-started/managed-experiments)
+after publication. Until then, the source is in `dash-workspace/docs/pages/get-started/managed-experiments/+Page.mdx`.
+Managed credentials are short lived, renewed in memory, and never exported into
+plans. The managed transport currently supports flat run paths, parameters,
+metrics, logs, lifecycle status, and root attachments up to 8 MiB. Standalone
+logging remains available and unchanged.
+
 This repo is the **Python SDK** — the library you `import ml_dash` from. The
 `ml-dash` **command line** is a separate program, distributed on npm; see
 [The CLI moved to npm](#the-cli-moved-to-npm) below.
