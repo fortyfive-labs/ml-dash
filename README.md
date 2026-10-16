@@ -22,7 +22,7 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
-## Nymph job Experiments broker (development)
+## Nymph job Experiments broker (0.11.0)
 
 The worker integration supplies `DREAMLAKE_EXPERIMENT_BROKER` and
 `DREAMLAKE_EXPERIMENT_BROKER_TOKEN` to the job process. These select a local
@@ -59,10 +59,13 @@ broker credentials in worker-provided process memory/environment; do not print,
 export into training configuration, or persist them. No long-lived user token is
 required in the job. The broker authorizes an exact task run, not arbitrary runs.
 
-This integration requires the matching Nymph worker broker and DreamLake BFF
-job-session routes; this source change is not included in the already-published
-0.10.0 package. Source-backed storage remains outside this increment. The
-explicit application `JobLifecycle` contract below is separate and unchanged.
+This integration is included in SDK 0.11.0 and requires the matching DreamLake
+BFF job-session routes, Dash backend, control plane, and opt-in Nymph 0.1.28
+worker broker. Installing the SDK does not upgrade an existing worker or launch
+a task. Production compute execution has not been accepted in this release; the
+worker-to-SDK flow is covered by local integration tests. Source-backed storage
+remains outside this increment. The explicit application `JobLifecycle` contract
+below is separate and unchanged.
 
 ## DreamLake job lifecycle (explicit opt-in)
 
@@ -118,12 +121,11 @@ resume delivery. Missing terminal evidence remains unknown.
 
 ### DreamLake managed Experiments (0.10.0)
 
-The development SDK also supports `ManagedConnection.from_login(org, project)`
+The SDK supports `ManagedConnection.from_login(org, project)`
 and `Experiment(prefix="org/project/run", managed=connection)`. This uses
 DreamLake project permissions and the existing DreamLake login; it does not
 require another Dash organization. Matching server and CLI releases are required.
-See the authoritative [managed setup and Python guide](https://docs.dash.ml/get-started/managed-experiments)
-after publication. Until then, the source is in `dash-workspace/docs/pages/get-started/managed-experiments/+Page.mdx`.
+See the authoritative [managed setup and Python guide](https://docs.dash.ml/get-started/managed-experiments).
 Managed credentials are short lived, renewed in memory, and never exported into
 plans. The managed transport currently supports flat run paths, parameters,
 metrics, logs, lifecycle status, and root attachments up to 8 MiB. Standalone
