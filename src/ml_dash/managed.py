@@ -13,7 +13,7 @@ import os
 import json
 from pathlib import Path
 from typing import Callable
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlsplit, parse_qsl
 
 import httpx
 
@@ -31,6 +31,15 @@ def _authorization(value: str) -> str:
     if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9._~+-]{1,16384}', value):
         raise ValueError('Authentication provider returned an invalid credential')
     return f'Bearer {value}'
+
+
+def _page_url(value: str, run_id=None) -> str:
+    """A page may select its exact run; service endpoints may not carry queries."""
+    parsed = urlsplit(value)
+    _url(parsed._replace(query='').geturl())
+    if parsed.query and (not run_id or parse_qsl(parsed.query, strict_parsing=True) != [('run', run_id)]):
+        raise ValueError('Invalid managed experiment page')
+    return value.rstrip('/')
 
 
 class ManagedConnection:
@@ -54,6 +63,11 @@ class ManagedConnection:
 
     def client(self):
         return ManagedRemoteClient(self)
+
+    @classmethod
+    def from_job(cls):
+        """Use the worker's local broker and its exact pre-created job run."""
+        return JobManagedConnection()
 
     @classmethod
     def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None):
@@ -117,30 +131,36 @@ class ManagedRemoteClient:
         with self._lock:
             if self._credential and self._credential['expiresAt'] > time.time() + 5:
                 return self._credential
-            response = self._http.post(f'{self.connection._root}/session',
-                headers={'Authorization': _authorization(self.connection._provider())}, json={
-                    'mode': 'write', **({'workloadId': self._workload_id} if self._workload_id else {'idempotencyKey': self._creation_key})})
-            response.raise_for_status()
-            result = response.json()
-            expires = result.get('expiresAt')
-            if not isinstance(expires, (int, float)) or not time.time() < expires <= time.time() + 61 or not isinstance(result.get('token'), str) or not result['token']:
-                raise ValueError('Invalid managed credential response')
-            destination = (_url(result['apiUrl']), result['instanceId'], result['projectId'])
-            if not all(isinstance(v, str) and v for v in destination) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', destination[2]):
-                raise ValueError('Invalid managed destination')
-            if self._destination and self._destination != destination:
-                raise ValueError('Managed destination changed; reconnect explicitly')
-            self._destination = destination
-            _authorization(result['token'])
-            result['apiUrl'] = destination[0]
-            if result.get('experimentUrl') is not None:
-                view = _url(result['experimentUrl'])
-                if self.connection._experiment_url and self.connection._experiment_url != view:
-                    raise ValueError('Managed project page changed; reconnect explicitly')
-                self.connection._experiment_url = view
+            result = self._acquire_session()
+            self._validate_session(result)
             self._workload_id = result.get('workloadId')
             self._credential = result
             return result
+
+    def _acquire_session(self):
+        response = self._http.post(f'{self.connection._root}/session',
+            headers={'Authorization': _authorization(self.connection._provider())}, json={
+                'mode': 'write', **({'workloadId': self._workload_id} if self._workload_id else {'idempotencyKey': self._creation_key})})
+        response.raise_for_status()
+        return response.json()
+
+    def _validate_session(self, result):
+        expires = result.get('expiresAt')
+        if not isinstance(expires, (int, float)) or not time.time() < expires <= time.time() + 61 or not isinstance(result.get('token'), str) or not result['token']:
+            raise ValueError('Invalid managed credential response')
+        destination = (_url(result['apiUrl']), result['instanceId'], result['projectId'])
+        if not all(isinstance(v, str) and v for v in destination) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', destination[2]):
+            raise ValueError('Invalid managed destination')
+        if self._destination and self._destination != destination:
+            raise ValueError('Managed destination changed; reconnect explicitly')
+        self._destination = destination
+        _authorization(result['token'])
+        result['apiUrl'] = destination[0]
+        if result.get('experimentUrl') is not None:
+            view = _page_url(result['experimentUrl'], result.get('runId'))
+            if self.connection._experiment_url and self.connection._experiment_url != view:
+                raise ValueError('Managed project page changed; reconnect explicitly')
+            self.connection._experiment_url = view
 
     def _request(self, method, path, data):
         session = self._session()
@@ -208,3 +228,110 @@ class ManagedRemoteClient:
     def close(self):
         self._credential = None
         self._http.close()
+
+
+class JobManagedConnection(ManagedConnection):
+    """Memory-only worker broker connection. Never reads a user login."""
+    platform_controls_status = True
+    def __init__(self):
+        endpoint = os.environ.get('DREAMLAKE_EXPERIMENT_BROKER', '')
+        secret = os.environ.get('DREAMLAKE_EXPERIMENT_BROKER_TOKEN', '')
+        try:
+            parsed = urlsplit(endpoint)
+            valid = (re.fullmatch(r'http://(?:127\.0\.0\.1|\[::1\]):[0-9]{1,5}/?', endpoint)
+                     and parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', '::1')
+                     and parsed.port and parsed.path in ('', '/') and not parsed.username
+                     and not parsed.password and not parsed.query and not parsed.fragment)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError('Invalid job experiment broker endpoint')
+        if not secret:
+            raise ValueError('Job experiment broker credential is required')
+        _authorization(secret)
+        self._broker = endpoint.rstrip('/')
+        self._broker_secret = secret
+        self._experiment_url = None
+        self._pins = None
+        self._client = JobManagedRemoteClient(self)
+        try:
+            self._client._session()
+        except Exception:
+            self._client.close()
+            raise
+
+    @property
+    def prefix(self):
+        return f'{self.namespace}/{self.project}/{self.run_key}'
+
+    def client(self):
+        return self._client
+
+    def matches_job_environment(self):
+        return (os.environ.get('DREAMLAKE_EXPERIMENT_BROKER', '').rstrip('/') == self._broker
+                and os.environ.get('DREAMLAKE_EXPERIMENT_BROKER_TOKEN') == self._broker_secret)
+
+    def setup(self):
+        raise ValueError('Job experiment is provisioned by the platform')
+
+
+class JobManagedRemoteClient(ManagedRemoteClient):
+    def __init__(self, connection):
+        super().__init__(connection)
+        self._http.close()
+        # A local broker credential must never reach an environment proxy.
+        self._http = httpx.Client(follow_redirects=False, trust_env=False, timeout=30)
+
+    def _acquire_session(self):
+        try:
+            response = self._http.post(self.connection._broker + '/session',
+                headers={'Authorization': _authorization(self.connection._broker_secret)}, json={})
+            if response.status_code != 200:
+                raise ValueError('Job experiment broker denied session')
+            result = response.json()
+            if not isinstance(result, dict):
+                raise ValueError('Invalid job experiment session')
+            return result
+        except (httpx.HTTPError, ValueError):
+            raise ValueError('Job experiment broker session unavailable or rejected') from None
+
+    def _validate_session(self, result):
+        try:
+            keys = ('namespace', 'project', 'runKey', 'runId', 'workloadId', 'instanceId', 'projectId')
+            if any(not isinstance(result.get(k), str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', result[k]) for k in keys):
+                raise ValueError('Invalid job experiment pins')
+            if not isinstance(result.get('generation'), int) or isinstance(result['generation'], bool) or result['generation'] < 1:
+                raise ValueError('Invalid job experiment generation')
+            if not result.get('experimentUrl'):
+                raise ValueError('Missing job experiment page')
+            if parse_qsl(urlsplit(result['experimentUrl']).query, strict_parsing=True) != [('run', result['runId'])]:
+                raise ValueError('Job page must select the platform run')
+            pins = tuple(result[k] for k in keys) + (result['generation'],)
+            if self.connection._pins and self.connection._pins != pins:
+                raise ValueError('Job experiment pins changed')
+            super()._validate_session(result)
+            self.connection._pins = pins
+            self.connection.namespace, self.connection.project, self.connection.run_key = pins[:3]
+            self.connection.run_id = result['runId']
+        except (KeyError, TypeError, ValueError):
+            self._credential = None
+            raise ValueError('Invalid or changed job experiment session') from None
+
+    def create_or_update_experiment(self, project, name, prefix=None, **kwargs):
+        session = self._session()
+        if project != self.connection.project or name != self.connection.run_key or prefix != self.connection.prefix:
+            raise ValueError('Job experiment must use the platform run')
+        if kwargs.get('write_protected') or any(kwargs.get(k) for k in ('description', 'tags', 'bindrs', 'metadata')):
+            raise ValueError('Job experiment metadata is platform controlled')
+        return {'experiment': {'id': session['runId'], 'name': session['runKey']}}
+
+    def update_experiment_status(self, experiment_id, status):
+        raise ValueError('Compute experiment status is controlled by the DreamLake execution receipt')
+
+    def _request(self, method, path, data):
+        if path.split('?')[0].split('/')[1:3] != ['runs', self.connection.run_id]:
+            raise ValueError('Job experiment request must use the platform run')
+        try:
+            return super()._request(method, path, data)
+        except httpx.HTTPError:
+            raise ValueError('Job experiment operation rejected or unavailable') from None

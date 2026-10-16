@@ -11,6 +11,7 @@ import functools
 import logging
 import math
 import numbers
+import os
 import re
 import sys
 import threading
@@ -206,6 +207,24 @@ class Experiment:
         - dash_url + dash_root: Hybrid mode (local + remote)
         - dash_url + dash_root=None: Remote-only mode
     """
+    # A worker-provided broker is authoritative, including malformed/partial
+    # environment configuration. Never fall back to standalone or local auth.
+    if any(key in os.environ for key in ('DREAMLAKE_EXPERIMENT_BROKER', 'DREAMLAKE_EXPERIMENT_BROKER_TOKEN')):
+      from .managed import ManagedConnection, JobManagedConnection
+      if dash_url is not None or remote is not None or local_path is not None or dash_root not in (None, ".dash"):
+        raise ValueError("Job experiment cannot use standalone server or local storage options")
+      if managed is not None and not isinstance(managed, JobManagedConnection):
+        raise ValueError("Job experiment cannot use another managed connection")
+      owns_job_connection = managed is None
+      managed = managed if managed is not None else ManagedConnection.from_job()
+      if not managed.matches_job_environment():
+        raise ValueError("Job experiment broker must match the worker environment")
+      if prefix is not None and prefix != managed.prefix:
+        if owns_job_connection:
+          managed.client().close()
+        raise ValueError("Job experiment prefix must match the platform run")
+      prefix = managed.prefix
+
     # Handle backward compatibility
     if remote is not None:
       warnings.warn(
@@ -365,8 +384,9 @@ class Experiment:
     base = self._managed_connection._experiment_url
     if not base:
       return None
-    from urllib.parse import quote
-    return f"{base}?run={quote(str(self._experiment_id), safe='')}"
+    from urllib.parse import urlsplit, urlencode, urlunsplit
+    parts = urlsplit(base)
+    return urlunsplit(parts._replace(query=urlencode({'run': str(self._experiment_id)})))
 
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
@@ -461,8 +481,14 @@ class Experiment:
        "FAILED": self._job_lifecycle.fail,
        "CANCELLED": self._job_lifecycle.cancel}[status]()
 
-    # Update experiment status in remote mode
-    if self._client and self._experiment_id:
+    # A compute task's terminal state comes from the execution receipt. Closing
+    # a logging scope cannot mark a still-running or cancelled process complete.
+    platform_status = bool(getattr(self._managed_connection, 'platform_controls_status', False))
+    if platform_status:
+      print(f"Experiment reporting scope closed; task status is tracked by DreamLake. Results: {self._view_url()}")
+
+    # Update experiment status in ordinary remote mode.
+    if self._client and self._experiment_id and not platform_status:
       try:
         self._client.update_experiment_status(
           experiment_id=self._experiment_id, status=status
@@ -520,7 +546,7 @@ class Experiment:
     self._is_open = False
 
     if flush_error is not None:
-      if self._client and self._experiment_id:
+      if self._client and self._experiment_id and not platform_status:
         raise NetworkError(f"{flush_error}\nExperiment status set to {status}.") from flush_error
       raise flush_error
 

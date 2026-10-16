@@ -22,6 +22,48 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
+## Nymph job Experiments broker (development)
+
+The worker integration supplies `DREAMLAKE_EXPERIMENT_BROKER` and
+`DREAMLAKE_EXPERIMENT_BROKER_TOKEN` to the job process. These select a local
+memory-only broker; they are not DreamLake or Dash user credentials. With that
+environment, `Experiment()` automatically uses the platform's pre-created run:
+
+```python
+from ml_dash import Experiment
+
+with Experiment().run as exp:
+    exp.params.set(lr=0.001)
+    exp.metrics("loss").log(step=0, loss=0.1)
+    exp.flush()
+```
+
+Closing the SDK logging scope flushes data; it does not complete or cancel the
+compute task. DreamLake projects the execution receipt's terminal state onto
+the experiment. Calling the job client's status mutation directly is rejected.
+The returned results URL selects the exact run with one `?run=` parameter.
+
+`ManagedConnection.from_job()` also explicitly selects the same broker. The
+broker must be literal HTTP loopback (`127.0.0.1` or `[::1]`) with an explicit
+port and no path, credentials, query or fragment. Each renewed lease goes back
+through the broker, where the worker checks the live job attempt and project
+authorization. Leases expire within 60 seconds; the SDK validates that expiry
+and fixes the instance, project, run, workload, generation, API URL and experiment
+page across renewals. The SDK reuses the existing run rather than creating one.
+
+An explicit different prefix, another managed connection, standalone server, or
+custom local storage conflicts with job scope and is rejected. Partial broker
+environment, revocation, terminal jobs, stale attempts and changed destinations
+fail without falling back to standalone login, Keychain or local storage. Keep
+broker credentials in worker-provided process memory/environment; do not print,
+export into training configuration, or persist them. No long-lived user token is
+required in the job. The broker authorizes an exact task run, not arbitrary runs.
+
+This integration requires the matching Nymph worker broker and DreamLake BFF
+job-session routes; this source change is not included in the already-published
+0.10.0 package. Source-backed storage remains outside this increment. The
+explicit application `JobLifecycle` contract below is separate and unchanged.
+
 ## DreamLake job lifecycle (explicit opt-in)
 
 `JobLifecycle` reports application outcomes through the existing authenticated

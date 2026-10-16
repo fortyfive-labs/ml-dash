@@ -183,3 +183,13 @@ def test_graphql_queries_omit_removed_count_fields(method, args):
 
   assert captured
   assert "logMetadata" not in captured[0] and "metricMetadata" not in captured[0]
+
+@pytest.mark.parametrize('key', ['DREAMLAKE_EXPERIMENT_BROKER', 'DREAMLAKE_EXPERIMENT_BROKER_TOKEN'])
+def test_job_import_does_not_query_registry(monkeypatch, key):
+    import ml_dash
+    monkeypatch.delenv('ML_DASH_NO_VERSION_CHECK', raising=False)
+    monkeypatch.setenv(key, 'synthetic-local-context')
+    get = MagicMock(side_effect=AssertionError('job import must stay offline'))
+    monkeypatch.setattr(httpx, 'get', get)
+    ml_dash._check_version_compatibility()
+    get.assert_not_called()

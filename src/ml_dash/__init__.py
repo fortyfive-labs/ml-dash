@@ -79,6 +79,10 @@ def _check_version_compatibility():
     """
     if os.environ.get("ML_DASH_NO_VERSION_CHECK", "").lower() in ("1", "true", "yes"):
         return
+    # A platform task uses its pinned SDK dependency and local broker. Importing
+    # it must not add an unrelated public-registry request to the execution.
+    if any(key in os.environ for key in ("DREAMLAKE_EXPERIMENT_BROKER", "DREAMLAKE_EXPERIMENT_BROKER_TOKEN")):
+        return
 
     try:
         from packaging import version
