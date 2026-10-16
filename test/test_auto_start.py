@@ -11,6 +11,11 @@ import pytest
 def cleanup_dxp(monkeypatch):
   """Clean up .dash directory and reset dxp state before and after each test."""
   import getpass
+  from types import SimpleNamespace
+  # Importing the remote singleton must not consult the developer's login or
+  # keyring. This fixture replaces its backend with local storage below.
+  monkeypatch.setattr("ml_dash.client.userinfo", SimpleNamespace(username="tom"))
+  monkeypatch.setattr("ml_dash.auth.token_storage.load_token", lambda *args, **kwargs: "synthetic-local-test-token")
   from ml_dash.auto_start import dxp
   from ml_dash.storage import LocalStorage
   from ml_dash.buffer import BufferConfig
