@@ -1,345 +1,283 @@
-# Command-Line Interface (CLI)
+# CLI Reference
 
-ML-Dash provides a command-line interface for authenticating, exploring, and managing experiments on the remote server.
+The `ml-dash` command logs you in, inspects projects and experiments, and
+moves experiment data to and from an ML-Dash server. This page covers CLI
+0.1.1.
 
-## Commands
+The CLI is a separate program from the Python SDK. Install it with the
+standalone installer or `npm install -g @dreamlake/ml-dash` (see
+[Install](reference/overview.md#cli)). `pip install ml-dash` no longer installs it (since SDK
+0.7.0).
 
 | Command | Description |
 |---|---|
-| `version` | Show ml-dash version |
-| `login` | Authenticate using OAuth2 device authorization flow |
-| `logout` | Clear stored authentication token |
-| `profile` | Show current user profile |
-| `api` | Send GraphQL queries to the server |
-| `list` | List projects and experiments on the remote server |
-| `create` | Create a new project |
-| `remove` | Delete a project |
-| `upload` | Upload local experiments to the remote server |
-| `download` | Download experiments from the remote server |
+| [`login`](#ml-dash-login) | Authenticate with the OAuth device flow |
+| [`logout`](#ml-dash-logout) | Clear the stored token |
+| [`profile`](#ml-dash-profile) | Show the current user and configuration |
+| [`list`](#ml-dash-list) | List projects, experiments, and tracks on the server |
+| [`create`](#ml-dash-create) | Create a project |
+| [`remove`](#ml-dash-remove) | Delete a project and everything in it |
+| [`upload`](#ml-dash-upload) | Upload locally stored experiments to the server |
+| [`download`](#ml-dash-download) | Download experiments from the server to local storage |
+| [`api`](#ml-dash-api) | Send a raw GraphQL query or mutation |
+| [`update`](#ml-dash-update) | Update the CLI itself |
+| [`version`](#ml-dash-version) | Print the CLI version |
 
-## Installation
+Run `ml-dash <command> --help` for the exact flags of your installed version.
 
-The CLI is included with the ML-Dash Python package:
+## Common options
 
-```bash
-pip install ml-dash
-# or
-uv pip install ml-dash
-```
-
-Verify installation:
-
-```bash
-ml-dash --help
-ml-dash version
-```
-
----
-
-## `ml-dash version`
-
-Print the installed ml-dash version.
-
-```bash
-ml-dash version
-# ml-dash 0.6.21
-```
+| Flag | Description |
+|---|---|
+| `--dash-url`, `--api-url` URL | Server to talk to. Defaults to `remote_url` in `~/.dash/config.json`, then `https://api.dash.ml`. Accepted by every command that contacts the server. |
+| `-h`, `--help` | Show help for the command |
 
 ---
 
 ## `ml-dash login`
 
-Authenticate with the ML-Dash server using OAuth2 device authorization flow.
-
 ```bash
 ml-dash login [--dash-url URL] [--auth-url URL] [--no-browser]
 ```
 
-**Options:**
-
 | Flag | Description |
 |---|---|
-| `--dash-url`, `--api-url` | ML-Dash server URL (e.g. `https://api.dash.ml`) |
-| `--auth-url` | OAuth authorization server URL (e.g. `https://auth.vuer.ai`) |
-| `--no-browser` | Don't automatically open the browser |
+| `--dash-url`, `--api-url` | ML-Dash server to log in to |
+| `--auth-url` | OAuth authorization server (default `https://auth.vuer.ai`) |
+| `--no-browser` | Print the code and URL, but don't open a browser |
 
-**What it does:**
-
-1. Starts an OAuth2 device flow — displays a URL, user code, and QR code
-2. Opens your browser automatically (unless `--no-browser`)
-3. Polls for authorization (10-minute timeout)
-4. Exchanges the OAuth token with the ml-dash server for a permanent token
-5. Stores the token securely in your system keychain
-
-```bash
-# Login to default server
-ml-dash login
-
-# Login to a custom server
-ml-dash login --dash-url https://your-server.com
-
-# Display code only, don't open browser
-ml-dash login --no-browser
-```
-
-After logging in, all other commands pick up the stored token automatically — no `--api-key` needed.
-
----
+Starts the device authorization flow. It prints a code, a URL, and a QR code,
+waits up to 10 minutes for you to approve in a browser, exchanges the result
+for an ML-Dash token, and stores it. See [Authentication](reference/get-started-authentication.md)
+for where the token goes and how the SDK reads it.
 
 ## `ml-dash logout`
-
-Clear the stored authentication token.
 
 ```bash
 ml-dash logout
 ```
 
-Removes the token from your system keychain. Run `ml-dash login` to re-authenticate.
-
----
+Clears the stored token from the keychain and from the `~/.dash/` token files.
 
 ## `ml-dash profile`
-
-Show the current authenticated user and configuration.
 
 ```bash
 ml-dash profile [--dash-url URL] [--json] [--cached]
 ```
 
-**Options:**
+| Flag | Description |
+|---|---|
+| `--json` | Output as JSON |
+| `--cached` | Read the stored token only, without fetching from the server |
+
+Shows your username, name, email, server URL, token expiry, and whether the
+data came from the server or the cached token.
+
+---
+
+## `ml-dash list`
+
+```bash
+ml-dash list [-p PROJECT] [-n NAMESPACE] [--status STATUS] [--tags TAGS]
+             [--detailed] [--tracks] [--topic-filter TOPIC] [--dash-url URL] [-v]
+```
 
 | Flag | Description |
 |---|---|
-| `--dash-url`, `--api-url` | ML-Dash server URL |
-| `--json` | Output as JSON |
-| `--cached` | Use token data instead of fetching fresh from server |
+| `-p`, `--project` (aliases `--prefix`, `--pref`, `--proj`) | List experiments in this project. Without it, lists projects. Accepts glob patterns: always quote them, e.g. `-p 'tom/tut*'` |
+| `-n`, `--namespace` | Namespace for all queries. Defaults to your own |
+| `--status` | Filter experiments: `COMPLETED`, `RUNNING`, `FAILED`, or `ARCHIVED` |
+| `--tags` | Filter experiments by tags (comma-separated) |
+| `--detailed` | Show more columns |
+| `--tracks` | List the tracks in one experiment. Needs `-p namespace/project/experiment` |
+| `--topic-filter` | Filter tracks by topic, e.g. `'robot/*'` |
+| `-v`, `--verbose` | Verbose output |
 
-By default, profile fetches live data from the server (`me { username email ... }`). Use `--cached` for an offline/faster check using the stored token payload.
+Results come 50 per page. In a terminal, move between pages with `n` / `→` /
+`Space` / `Enter` (next) and `p` / `b` / `←` (previous). Any other key quits.
+When output is piped, `list` prints the first page and notes that more results
+are available.
 
-**Displays:** username, user ID, name, email, remote URL, token expiration status, data source.
+A glob without a namespace is expanded against your own namespace:
+
+| Input | Searches |
+|---|---|
+| `tes*` | `<your-namespace>/tes*/*` |
+| `tom/tes*` | `tom/tes*/*` |
+| `tom/test/exp*` | `tom/test/exp*` |
 
 ```bash
-# Show profile (fetches from server)
-ml-dash profile
+ml-dash list                                   # your projects
+ml-dash list -n alice                          # alice's projects
+ml-dash list -p my-project                     # experiments in a project
+ml-dash list -p 'tom/tes*' --status RUNNING    # glob across projects
+ml-dash list --tracks -p tom/test/run-1 --topic-filter 'robot/*'
+```
 
-# Faster offline check using cached token
-ml-dash profile --cached
+## `ml-dash create`
 
-# JSON output
-ml-dash profile --json
+```bash
+ml-dash create -p PROJECT [-d DESCRIPTION] [--dash-url URL]
+```
+
+| Flag | Description |
+|---|---|
+| `-p`, `--project` | `project` or `namespace/project`. Without a namespace, your own is used |
+| `-d`, `--description` | Optional description |
+
+If the project already exists, `create` prints a warning and exits
+successfully.
+
+## `ml-dash remove`
+
+```bash
+ml-dash remove -p PROJECT [-y] [--dash-url URL]
+```
+
+| Flag | Description |
+|---|---|
+| `-p`, `--project` | `project` or `namespace/project` |
+| `-y`, `--yes` | Skip the confirmation prompt |
+
+> **Warning:** `remove` deletes the project and all of its experiments, metrics, files, and
+> logs. It cannot be undone.
+
+---
+
+## `ml-dash upload`
+
+```bash
+ml-dash upload [PATH] [options]
+```
+
+Uploads experiments that the SDK wrote in local mode. `PATH` is the local
+storage directory and defaults to `./.dash`.
+
+| Flag | Description |
+|---|---|
+| `-p`, `--project` (aliases `--prefix`, `--pref`, `--proj`) | Only upload experiments matching this prefix or glob, e.g. `'tom/*/exp*'` |
+| `-t`, `--target` | Upload under this prefix on the server instead, e.g. `alice/shared-project` |
+| `--skip-logs`, `--skip-metrics`, `--skip-files`, `--skip-params` | Leave that kind of data out |
+| `--dry-run` | Show what would be uploaded without uploading |
+| `--strict` | Fail on any validation error. By default, invalid data is skipped |
+| `--batch-size N` | Batch size for logs and metrics (default 100) |
+| `--resume` | Resume an interrupted upload |
+| `--state-file FILE` | State file for `--resume` (default `.dash-upload-state.json`) |
+| `--tracks FILE` | Upload a single track data file (e.g. `robot_position.jsonl`). Needs `--remote-path` |
+| `--remote-path PATH` | Where the track goes, e.g. `namespace/project/exp/robot/position` |
+| `-v`, `--verbose` | Show detailed progress |
+
+```bash
+ml-dash upload                                  # everything in ./.dash
+ml-dash upload ./.dash -p 'tom/*/exp*'          # a subset
+ml-dash upload --dry-run -v                     # preview
+ml-dash upload -t alice/shared-project          # into another project
+ml-dash upload --tracks robot_position.jsonl --remote-path tom/proj/exp/robot/position
+```
+
+## `ml-dash download`
+
+```bash
+ml-dash download [PATH] [options]
+```
+
+Downloads experiments into a local storage directory (`PATH`, default
+`./.dash`) in the same layout local mode writes.
+
+| Flag | Description |
+|---|---|
+| `-p`, `--project` (aliases `--prefix`, `--pref`, `--proj`) | Project or glob to download, e.g. `alice/my-project`, `'tut*'` |
+| `--experiment NAME` | Only this experiment. Needs `--project` |
+| `--skip-logs`, `--skip-metrics`, `--skip-files`, `--skip-params` | Leave that kind of data out |
+| `--dry-run` | Preview without downloading |
+| `--overwrite` | Overwrite experiments that already exist locally |
+| `--resume` | Resume an interrupted download |
+| `--state-file FILE` | State file for `--resume` (default `.dash-download-state.json`) |
+| `--batch-size N` | Batch size for logs and metrics (default 1000, max 10000) |
+| `--max-concurrent-metrics N` | Parallel metric downloads (default 5) |
+| `--max-concurrent-files N` | Parallel file downloads (default 3) |
+| `--tracks PATH` | Download one track instead, e.g. `namespace/project/exp/robot/position` |
+| `-f`, `--format` | Track export format (default `jsonl`) |
+| `-o`, `--output FILE` | Track output file (default: named after the topic) |
+| `-v`, `--verbose` | Detailed progress |
+
+```bash
+ml-dash download -p alice/my-project
+ml-dash download ./backup -p alice/my-project --experiment exp-one
+ml-dash download -p 'alice/tut*' --dry-run
+ml-dash download --tracks alice/proj/exp/robot/position -f jsonl -o joints.jsonl
 ```
 
 ---
 
 ## `ml-dash api`
 
-Send raw GraphQL queries or mutations to the server.
-
 ```bash
 ml-dash api (--query QUERY | --mutation MUTATION) [--jq PATH] [--dash-url URL]
 ```
 
-**Options:**
+| Flag | Description |
+|---|---|
+| `-q`, `--query` | GraphQL query |
+| `-m`, `--mutation` | GraphQL mutation |
+| `--jq PATH` | Pull out one value with a dot path, e.g. `.me.username` |
+
+- A bare body is wrapped for you: `me { username }` is sent as `{ me { username } }`.
+- Single quotes are converted to double quotes, so you can write
+  `user(title: 'hello')` inside a double-quoted shell string.
+- `--jq` paths start from the response data. There is no top-level `data` key,
+  so write `.me.username`, not `.data.me.username`.
+
+```bash
+ml-dash api --query "me { username name email }"
+ml-dash api --query "me { username }" --jq ".me.username"
+```
+
+## `ml-dash update`
+
+```bash
+ml-dash update [--check] [--version VERSION] [--json]
+```
 
 | Flag | Description |
 |---|---|
-| `--query`, `-q` | GraphQL query string (mutually exclusive with `--mutation`) |
-| `--mutation`, `-m` | GraphQL mutation string |
-| `--jq PATH` | Extract a value using dot-path notation (e.g. `.me.username`) |
-| `--dash-url`, `--api-url` | ML-Dash server URL |
+| `--check` | Report whether an update exists. Change nothing |
+| `--version` | Install this exact release instead of the latest |
+| `--json` | Output as JSON |
 
-**Notes:**
-- Single quotes in queries are auto-converted to double quotes for GraphQL compatibility
-- `--jq` paths start from the unwrapped response — there is no top-level `data` key (e.g. use `.me.username`, not `.data.me.username`)
-- Bare query bodies are automatically wrapped: `me { username }` → `{ me { username } }`
+Updates through the channel you installed from. An npm install is updated with
+`npm install -g @dreamlake/ml-dash@<version>`. A standalone binary downloads the
+new build, checks its sha256 and size against the release manifest, runs it
+once, and only then replaces itself. `update` refuses to downgrade. It also
+refuses to touch a copy it doesn't own (Homebrew, Nix, pipx, a `node_modules`
+tree) and tells you which tool to use instead.
+
+## `ml-dash version`
 
 ```bash
-# Query current user
-ml-dash api --query "me { username email }" --api-url http://localhost:3000
-
-# Extract a specific field
-ml-dash api --query "me { username }" --jq ".me.username" --api-url http://localhost:3000
-
-# Using single quotes (auto-converted)
-ml-dash api --query "user(title: 'hello') { id title }" --api-url http://localhost:3000
-
-# Send a mutation
-ml-dash api --mutation "updateUser(username: 'newname') { username }" --api-url http://localhost:3000
+ml-dash version        # also: ml-dash --version, ml-dash -V
 ```
 
 ---
 
-## `ml-dash create`
+## Files and environment variables
 
-Create a new project on the remote server.
-
-```bash
-ml-dash create -p PROJECT [-d DESCRIPTION] [--dash-url URL]
-```
-
-**Options:**
-
-| Flag | Description |
+| | Used for |
 |---|---|
-| `-p`, `--project` | Project name — `project` or `namespace/project` (required) |
-| `-d`, `--description` | Project description (optional) |
-| `--dash-url`, `--api-url` | Server URL |
-
-If no namespace is provided, it is auto-resolved from the authenticated user's account.
-
-If the project already exists, a warning is shown and the command exits successfully.
-
-```bash
-# Create in your own namespace (auto-resolved)
-ml-dash create -p my-project --api-url https://api.dash.ml
-
-# Create with explicit namespace
-ml-dash create -p tom/my-project --api-url https://api.dash.ml
-
-# Create with description
-ml-dash create -p tom/my-project -d "Baseline experiments" --api-url https://api.dash.ml
-```
-
----
-
-## `ml-dash list`
-
-List projects and experiments on the remote server with real server-side pagination.
-
-```bash
-ml-dash list [-p PROJECT] [-n NAMESPACE] [--status STATUS] [--tags TAGS]
-             [--detailed] [--tracks] [--topic-filter TOPIC]
-             [--dash-url URL] [--api-key TOKEN] [-v]
-```
-
-**Options:**
-
-| Flag | Description |
-|---|---|
-| `-p`, `--project` | Project filter. Without this, lists all projects. Supports glob patterns — **always quote them** to prevent shell expansion |
-| `-n`, `--namespace` | Namespace for all queries (defaults to the authenticated user's namespace) |
-| `--status` | Filter experiments by status: `COMPLETED`, `RUNNING`, `FAILED`, `ARCHIVED` |
-| `--tags` | Filter experiments by tags (comma-separated) |
-| `--detailed` | Show additional columns: tags and created time |
-| `--tracks` | List tracks inside an experiment (requires full `namespace/project/experiment` path) |
-| `--topic-filter` | Filter tracks by topic pattern (e.g. `robot/*`) |
-| `--dash-url`, `--api-url` | ML-Dash server URL |
-| `-v`, `--verbose` | Show full error tracebacks |
-
-**Pagination:**
-
-Results are fetched and displayed one page at a time (50 per page). Navigate with:
-
-| Key | Action |
-|---|---|
-| `n`, `→`, `Space`, `Enter` | Next page |
-| `p`, `b`, `←` | Previous page |
-| Any other key | Quit |
-
-Each page shows a `Page X/Y · N total` caption.
-
-**Pattern expansion for glob searches:**
-
-| Input | Expanded to |
-|---|---|
-| `tes*` | `{current_namespace}/tes*/*` |
-| `tom/tes*` | `tom/tes*/*` |
-| `tom/test/exp*` | `tom/test/exp*` (unchanged) |
-
-> Always quote glob patterns to prevent the shell from expanding `*` before Python sees it.
-
-```bash
-# List all your projects (paginated)
-ml-dash list --api-url http://localhost:3000
-
-# List projects in another namespace
-ml-dash list -n alice --api-url http://localhost:3000
-
-# List experiments in a specific project
-ml-dash list -p test --api-url http://localhost:3000
-
-# List experiments with namespace/project
-ml-dash list -p tom/test --api-url http://localhost:3000
-
-# Wildcard search across projects (quote the pattern!)
-ml-dash list -p 'tom/tes*' --api-url http://localhost:3000
-
-# Filter by status
-ml-dash list -p test --status RUNNING --api-url http://localhost:3000
-
-# Show detailed view
-ml-dash list -p test --detailed --api-url http://localhost:3000
-
-# List tracks in a specific experiment
-ml-dash list --tracks -p tom/test/my-experiment --api-url http://localhost:3000
-
-# Filter tracks by topic
-ml-dash list --tracks -p tom/test/my-experiment --topic-filter "robot/*" --api-url http://localhost:3000
-```
-
----
-
-## Global Options
-
-All commands support:
-
-| Flag | Description |
-|---|---|
-| `--dash-url`, `--api-url` | Remote server URL (defaults to `https://api.dash.ml` or stored config) |
-| `--help` | Show command-specific help |
-
----
-
-## Authentication Flow
-
-```bash
-# 1. Authenticate once — token stored in system keychain
-ml-dash login
-
-# 2. Check who you're logged in as
-ml-dash profile
-
-# 3. Use any command — no --api-key needed
-ml-dash list
-
-# 4. Logout when done
-ml-dash logout
-```
-
-For CI/CD or scripting, set the token in `~/.dash/config.json`:
-
-```json
-{
-  "remote_url": "https://api.dash.ml",
-  "api_key": "your-jwt-token"
-}
-```
-
----
+| `~/.dash/config.json` | `remote_url`, an optional `api_key` (used instead of the stored login), `auth_url`, and the device-flow secret |
+| `~/.dash/tokens.encrypted`, `~/.dash/encryption.key` | The token, when no keychain is used |
+| `ML_DASH_CONFIG_DIR` | Use a different directory than `~/.dash` for the CLI. The Python SDK always reads `~/.dash` |
+| `ML_DASH_NO_KEYCHAIN=1` | Never use the OS keychain. Store and read the token in the encrypted file |
 
 ## Troubleshooting
 
-### Command not found
+**`ml-dash: command not found` after upgrading the SDK.** Since SDK 0.7.0, pip
+doesn't install the CLI. Install it as shown in [Install](reference/overview.md#cli).
+`python -m ml_dash.cli` no longer exists.
 
-```bash
-python -m ml_dash.cli --help
-# or
-uv run ml-dash --help
-```
+**Authentication errors.** Run `ml-dash profile`. It reports an expired token.
+Then run `ml-dash logout && ml-dash login`.
 
-### Authentication errors
-
-```bash
-# Re-authenticate
-ml-dash logout && ml-dash login
-
-# Check current auth state
-ml-dash profile
-```
-
-### Token expired
-
-```bash
-ml-dash profile  # shows "Token expired" if so
-ml-dash login    # re-authenticate
-```
+**The SDK can't find your login but the CLI can.** The SDK and the CLI must
+agree on where the token lives. See
+[Using the token from Python](reference/get-started-authentication.md#using-the-token-from-python).

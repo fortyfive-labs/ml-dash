@@ -22,7 +22,7 @@ def compare_architectures():
     for arch in architectures:
         with Experiment(
             prefix=f"alice/architecture-comparison/comparison-{arch}",
-            description=f"Training {arch} on CIFAR-10",
+            readme=f"Training {arch} on CIFAR-10",
             tags=["comparison", arch, "cifar10"]
         ).run as experiment:
             experiment.params.set(architecture=arch, dataset="cifar10", batch_size=128, epochs=20)

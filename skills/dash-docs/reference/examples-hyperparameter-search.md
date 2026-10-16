@@ -23,7 +23,7 @@ def hyperparameter_search():
     for lr, bs in product(learning_rates, batch_sizes):
         with Experiment(
             prefix=f"alice/hyperparameter-search/search-lr{lr}-bs{bs}",
-            description=f"Grid search: lr={lr}, batch_size={bs}",
+            readme=f"Grid search: lr={lr}, batch_size={bs}",
             tags=["grid-search", f"lr-{lr}", f"bs-{bs}"]
         ).run as experiment:
             experiment.params.set(learning_rate=lr, batch_size=bs, optimizer="sgd", epochs=10)
@@ -31,8 +31,7 @@ def hyperparameter_search():
 
             final_accuracy = train_with_config(lr, bs, experiment)
             experiment.log(f"Final accuracy: {final_accuracy:.4f}")
-            results.append(lr=lr, batch_size=bs, accuracy=final_accuracy
-            )
+            results.append(dict(lr=lr, batch_size=bs, accuracy=final_accuracy))
 
     best = max(results, key=lambda x: x["accuracy"])
     print(f"Best: lr={best['lr']}, batch_size={best['batch_size']}, accuracy={best['accuracy']:.4f}")

@@ -50,6 +50,7 @@ from .exceptions import (
     StorageError,
 )
 from .experiment import Experiment, OperationMode, ml_dash_experiment
+from .job_lifecycle import JobLifecycle
 from .log import LogBuilder, LogLevel
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .params import ParametersBuilder
@@ -119,6 +120,7 @@ _check_version_compatibility()
 __all__ = [
   "Experiment",
   "ManagedConnection",
+  "JobLifecycle",
   "ml_dash_experiment",
   "OperationMode",
   "RemoteClient",

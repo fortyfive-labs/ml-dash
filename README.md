@@ -22,9 +22,59 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
+## DreamLake job lifecycle (explicit opt-in)
+
+`JobLifecycle` reports application outcomes through the existing authenticated
+DreamLake run API. It does not infer an outcome from Nymph process exit, experiment
+status, inactivity, or an interpreter exit hook. Existing experiments without this
+option keep their behavior.
+
+```python
+from ml_dash import Experiment, JobLifecycle
+
+lifecycle = JobLifecycle(
+    api_url="https://api.dreamlake.ai",
+    namespace="your-namespace",
+    job_id=tracked_run_id,
+    attempt_id=tracked_run_exec_id,
+    token=dreamlake_access_token,  # supplied explicitly; independent of Dash auth
+    journal_dir="/durable/private/job-attempt-lifecycle",
+)
+with Experiment(prefix="your-namespace/project/run", job_lifecycle=lifecycle).run:
+    train()
+```
+
+Pass the exact existing tracked run ID and its stored execution ID; names,
+experiment prefixes, and environment variables are never used to guess a binding.
+Use the base URL for the API that owns `/namespaces/{namespace}/runs/{job_id}`.
+The token must authorize that namespace and run. The journal never stores tokens.
+
+The existing `run.start()`, `complete()`, `fail()`, and `cancel()` contract reports
+`running`, `succeeded`, `failed`, and `cancelled`. Context-manager exit reports
+completion only when the body returns normally; exceptions report failure.
+Buffered-data flush failure keeps the SDK's existing completion-to-failure rule.
+Terminal evidence is durably recorded before the unrelated Dash experiment status
+request. Reporting errors propagate; they never manufacture an acknowledgment.
+
+Use a dedicated private directory on durable local POSIX storage (mode 0700).
+Events and acknowledgments are atomically replaced and fsynced, and a nonblocking
+OS lock rejects concurrent writers. Do not put this directory on ephemeral storage
+or filesystems without local locking and fsync guarantees. Keep the directory after
+completion: it binds immutable event IDs to one exact API URL, namespace, job, and
+attempt. Reusing it with another binding fails before any request.
+
+After a network error or process restart, reconstruct `JobLifecycle` with the same
+binding and directory and call `lifecycle.flush()` to replay pending events. A lost
+acknowledgment replays the original event ID and payload. `flush()` only sends
+already-recorded evidence; it never creates completion. For a restarted application,
+call `run.start()` again only if there is no recorded terminal outcome. A journal
+with terminal evidence cannot begin another application execution. There is no
+background sender or automatic restart hook: the caller must explicitly retry or
+resume delivery. Missing terminal evidence remains unknown.
+
 ## Installation
 
-### DreamLake managed Experiments (0.9.0)
+### DreamLake managed Experiments (0.10.0)
 
 The development SDK also supports `ManagedConnection.from_login(org, project)`
 and `Experiment(prefix="org/project/run", managed=connection)`. This uses

@@ -1,15 +1,16 @@
 ---
 name: dash-docs
-description: ML-Dash is a simple, flexible SDK for ML experiment tracking and data storage — log parameters, metrics, files, and time-series tracks locally or against a remote dash.ml server. Use when: tracking ML experiments with ml-dash (parameters, metrics, logs, tracks); uploading or downloading files, artifacts, checkpoints, and videos; using the ml-dash CLI or configuring the Experiment class; working against a remote dash.ml server or in local mode.
+description: ML-Dash is ML experiment tracking — a Python SDK that logs parameters, metrics, logs, files, and time-series tracks locally or to a dash.ml server, a separate `ml-dash` command line for login and moving runs, and the dash.ml dashboard. Use when: tracking ML experiments with the ml-dash Python SDK (parameters, metrics, logs, tracks); uploading or downloading files, artifacts, checkpoints, and videos; installing or using the ml-dash CLI (login, list, upload, download, update); working against a remote dash.ml server or in local mode.
 ---
 # ML-Dash
 
-> ML-Dash is a simple, flexible SDK for ML experiment tracking and data storage — log parameters, metrics, files, and time-series tracks locally or against a remote dash.ml server.
+> ML-Dash is ML experiment tracking — a Python SDK that logs parameters, metrics, logs, files, and time-series tracks locally or to a dash.ml server, a separate `ml-dash` command line for login and moving runs, and the dash.ml dashboard.
 
 ## Quickstart
 
 ```bash
-pip install ml-dash
+pip install ml-dash                  # the Python SDK
+npm install -g @dreamlake/ml-dash    # the `ml-dash` CLI (or the standalone installer)
 ```
 
 ```python
@@ -26,15 +27,16 @@ with Experiment("alice/my-project").run as exp:
 
 One `Experiment` owns one run. `params` are static key-values, `metrics` are
 step-indexed scalars, `logs` are structured events, `files` are artifacts, and
-`tracks` are timestamp-indexed multi-modal streams. The same object works
-locally or against a remote dash.ml server.
+`tracks` are timestamp-indexed multi-modal streams. With no `dash_url` the run
+is written to `.dash/` locally; pass `dash_url="https://api.dash.ml"` (after
+`ml-dash login`) to also send it to the server.
 
 ## Task routing
 
 | Task | Read |
 | --- | --- |
-| Install and run a first tracked experiment | `reference/get-started-installation.md` |
-| Authenticate against a dash.ml server | `reference/get-started-device-flow.md` |
+| Install the SDK and CLI, run a first tracked experiment | `reference/overview.md` |
+| Log in; where the token lives; SDK can't find the login | `reference/get-started-authentication.md` |
 | Scope a run — decorator, context manager, or explicit object | `reference/guides-experiments.md` |
 | Record hyperparameters or a whole config class | `reference/guides-parameters.md` |
 | Log loss/accuracy curves | `reference/guides-metrics.md` |
@@ -48,9 +50,9 @@ locally or against a remote dash.ml server.
 | Compare runs side by side | `reference/dashboard-compare.md` |
 | Exact signatures and return types | `reference/reference-api.md` |
 | Command-line usage | `reference/reference-cli.md` |
-| A complete worked script | `reference/examples-complete.md` |
+| A complete worked script | `reference/examples.md`, then one of `reference/examples-*.md` |
 
-## Two things that are easy to get wrong
+## Things that are easy to get wrong
 
 - **File annotations go on the builder, not the save call.** `save_torch(model,
   *, to)` and its siblings take only content and `to`. `description`, `tags`,
@@ -60,6 +62,11 @@ locally or against a remote dash.ml server.
   `append(x=1, y=2)`, never `append({"x": 1})`. `_ts` is optional: omitted it
   is generated from `time.time()`, and `_ts=-1` inherits the previous
   timestamp across all tracks.
+- **The CLI is not in the pip package.** Since SDK 0.7.0, `pip install ml-dash`
+  installs only the SDK; `ml-dash login`/`upload`/`download` come from the
+  separate `@dreamlake/ml-dash` CLI.
+- **`readme=`, not `description=`.** `Experiment(...)` passes unknown keywords
+  through to its run config, so `description=` is silently ignored.
 
 This skill bundles the ML-Dash documentation. Read the reference
 file that matches the question; each is a self-contained markdown page.
@@ -68,12 +75,8 @@ file that matches the question; each is a self-contained markdown page.
 
 **Overview**
 
-- `reference/overview.md` — Overview: ML-Dash is a Python SDK for ML experiment tracking and data storage — parameters, metrics, logs, files, and time-series tracks, locally or against a dash.ml server.
-
-**Setup**
-
-- `reference/get-started-installation.md` — Getting Started: Install ml-dash, run your first tracked experiment, and sync it to a dash.ml server.
-- `reference/get-started-device-flow.md` — Authentication: Authenticate the CLI and SDK against a remote dash.ml server using the OAuth device flow.
+- `reference/overview.md` — ML-Dash: ML experiment tracking — install the Python SDK and the ml-dash CLI, track your first run locally, then send it to dash.ml.
+- `reference/get-started-authentication.md` — Authentication: Log in with the ml-dash CLI, where the token is stored, how the Python SDK picks it up, and how the device flow works.
 
 **Tracking**
 
@@ -98,7 +101,7 @@ file that matches the question; each is a self-contained markdown page.
 
 **Examples**
 
-- `reference/examples-complete.md` — Complete Examples: End-to-end scripts showing the three experiment styles, config-class parameters, and a full training loop.
+- `reference/examples.md` — Examples: Complete, runnable training scripts tracked with ml-dash — a minimal loop, PyTorch MNIST, a hyperparameter sweep, comparing runs, and debugging with logs.
 - `reference/examples-simple-training.md` — Simple Training: A minimal training loop with parameters, per-epoch metrics, and a saved checkpoint.
 - `reference/examples-pytorch-mnist.md` — PyTorch MNIST: A complete PyTorch MNIST run tracked end to end, from config to final model artifact.
 - `reference/examples-hyperparameter-search.md` — Hyperparameter Search: Sweep hyperparameters across many runs under one project and compare the results.
@@ -108,7 +111,7 @@ file that matches the question; each is a self-contained markdown page.
 **Reference**
 
 - `reference/reference-api.md` — API Reference: Every public class, accessor, and method in the ml-dash Python SDK, with signatures and return types.
-- `reference/reference-cli.md` — CLI: The ml-dash command line: authenticate, inspect projects and experiments, and move files to and from a server.
+- `reference/reference-cli.md` — CLI Reference: Every ml-dash command and flag: login, profile, list, create, remove, upload, download, api, update, and version.
 - `reference/reference-llm-readable.md` — LLM-Readable Docs: Every page is available as clean markdown, plus an llms.txt index, a full-corpus dump, and an importable agent skill.
 
 ## Canonical source

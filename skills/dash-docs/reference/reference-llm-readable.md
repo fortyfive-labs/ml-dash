@@ -10,13 +10,13 @@ and have it answer accurately.
 Append `.md` to any docs URL to get the raw markdown — no nav, no chrome:
 
 ```bash
-curl https://docs.dash.ml/getting-started.md
+curl https://docs.dash.ml/guides/experiments.md
 ```
 
 Every page also advertises its markdown twin in the HTML head:
 
 ```html
-<link rel="alternate" type="text/markdown" href="/getting-started.md" />
+<link rel="alternate" type="text/markdown" href="/guides/experiments.md" />
 ```
 
 ## The whole site, two ways

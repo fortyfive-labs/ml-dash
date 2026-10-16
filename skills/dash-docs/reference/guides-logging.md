@@ -15,14 +15,6 @@ with Experiment(prefix="alice/project/my-experiment").run as exp:
     exp.log("Failed to load checkpoint", level="error")
 ```
 
-### Reading Logs Back
-
-In remote mode, the server accepts logs into a delivery queue and stores them
-shortly after. A read right after writing can return none or only some of them.
-In an observed sweep, this took tens of seconds; there is no guaranteed bound. The SDK
-does not wait or poll for you. If you read logs back, retry your read with a
-deadline.
-
 ## Log Levels
 
 **Available levels:** `debug`, `info` (default), `warn`, `error`, `fatal`
@@ -143,11 +135,11 @@ with Experiment(prefix="alice/etl/data-processing").run as exp:
 cat .dash/alice/project/my-experiment/logs/logs.jsonl
 ```
 
-Each line is a JSON object:
+Each line is a JSON object. `metadata` is present only when you pass it:
 
 ```json
-{"timestamp": "2025-10-29T10:30:00Z", "level": "info", "message": "Training started", "metadata": null, "sequenceNumber": 0}
-{"timestamp": "2025-10-29T10:30:05Z", "level": "info", "message": "Epoch 1 complete", "metadata": {"train_loss": 0.5}, "sequenceNumber": 1}
+{"sequenceNumber": 0, "timestamp": "2025-10-29T10:30:00.000000Z", "level": "info", "message": "Training started"}
+{"sequenceNumber": 1, "timestamp": "2025-10-29T10:30:05.000000Z", "level": "info", "message": "Epoch 1 complete", "metadata": {"train_loss": 0.5}}
 ```
 
 **Remote mode** - Logs stored in MongoDB with automatic indexing on timestamp and level.

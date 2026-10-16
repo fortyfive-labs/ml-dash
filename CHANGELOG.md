@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- Add explicit DreamLake Jobs application lifecycle reporting bound to an exact job and execution receipt.
+- Persist immutable lifecycle events and acknowledgments in a private durable journal for retry and process-restart recovery.
+- Keep application outcomes separate from process exit and Dash experiment status; no outcome is inferred after a crash.
+
 All notable changes to ML-Dash will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -7,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-10-16
+## [0.10.0] - 2026-10-16
 
 ### Added
 - `ManagedConnection.from_login(namespace, project)` reuses the selected DreamLake
