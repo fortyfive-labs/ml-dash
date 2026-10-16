@@ -384,8 +384,9 @@ class Experiment:
     base = self._managed_connection._experiment_url
     if not base:
       return None
-    from urllib.parse import quote
-    return f"{base}?run={quote(str(self._experiment_id), safe='')}"
+    from urllib.parse import urlsplit, urlencode, urlunsplit
+    parts = urlsplit(base)
+    return urlunsplit(parts._replace(query=urlencode({'run': str(self._experiment_id)})))
 
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
@@ -480,8 +481,14 @@ class Experiment:
        "FAILED": self._job_lifecycle.fail,
        "CANCELLED": self._job_lifecycle.cancel}[status]()
 
-    # Update experiment status in remote mode
-    if self._client and self._experiment_id:
+    # A compute task's terminal state comes from the execution receipt. Closing
+    # a logging scope cannot mark a still-running or cancelled process complete.
+    platform_status = bool(getattr(self._managed_connection, 'platform_controls_status', False))
+    if platform_status:
+      print(f"Experiment reporting scope closed; task status is tracked by DreamLake. Results: {self._view_url()}")
+
+    # Update experiment status in ordinary remote mode.
+    if self._client and self._experiment_id and not platform_status:
       try:
         self._client.update_experiment_status(
           experiment_id=self._experiment_id, status=status
@@ -539,7 +546,7 @@ class Experiment:
     self._is_open = False
 
     if flush_error is not None:
-      if self._client and self._experiment_id:
+      if self._client and self._experiment_id and not platform_status:
         raise NetworkError(f"{flush_error}\nExperiment status set to {status}.") from flush_error
       raise flush_error
 

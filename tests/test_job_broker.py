@@ -23,7 +23,7 @@ def broker(monkeypatch):
             if self.path == '/session':
                 assert data == {}
                 assert self.headers.get('authorization') == 'Bearer synthetic-broker'
-                result = dict(apiUrl=state['url'] + '/api/managed', experimentUrl=state['url'] + '/lab/projects/research/experiments',
+                result = dict(apiUrl=state['url'] + '/api/managed', experimentUrl=state['url'] + '/lab/projects/research/experiments?run=fixed-run',
                     namespace='lab', project='research', runKey='job-attempt', runId='fixed-run',
                     instanceId='instance-one', projectId='project-one', workloadId='workload-one', generation=1,
                     token='synthetic-lease', expiresAt=time.time()+60)
@@ -58,12 +58,14 @@ def test_default_experiment_reuses_platform_run_and_writes(broker, monkeypatch, 
     monkeypatch.chdir(tmp_path)
     with Experiment().run as exp:
         assert exp.run.prefix == 'lab/research/job-attempt'
+        assert exp._view_url() == broker['url'] + '/lab/projects/research/experiments?run=fixed-run'
         exp.params.set(lr=0.001)
         exp.metrics('loss').log(step=0, loss=0.1)
         exp.flush()
     assert any('/runs/fixed-run/metrics/loss' == p.removeprefix('/api/managed/projects/project-one') for p, _, _ in broker['calls'])
     assert all('synthetic' not in str(p) for p, _, _ in broker['calls'])
     assert not (tmp_path / '.dash').exists()
+    assert not any(p.endswith('/status') for p, _, _ in broker['calls'])
     output = capsys.readouterr()
     assert 'synthetic' not in output.out + output.err
 
@@ -139,6 +141,8 @@ def test_explicit_scope_and_standalone_conflicts_rejected(broker):
         c.client().set_parameters('other-run', {})
     with pytest.raises(ValueError):
         c.client().create_or_update_experiment('research','other',prefix='lab/research/other')
+    with pytest.raises(ValueError, match='execution receipt'):
+        c.client().update_experiment_status('fixed-run', 'CANCELLED')
     c.client().close()
 
 
@@ -148,3 +152,10 @@ def test_invalid_lease_is_sanitized(broker, override):
     with pytest.raises(ValueError) as error:
         ManagedConnection.from_job()
     assert 'secret' not in str(error.value)
+
+
+@pytest.mark.parametrize('query', ['run=other', 'run=fixed-run&run=fixed-run', 'token=secret', 'run=fixed-run&other=1', ''])
+def test_job_page_requires_one_exact_run_query(broker, query):
+    broker['override']['experimentUrl'] = broker['url'] + '/lab/projects/research/experiments' + ('?' + query if query else '')
+    with pytest.raises(ValueError, match='job experiment session'):
+        ManagedConnection.from_job()

@@ -38,6 +38,11 @@ with Experiment().run as exp:
     exp.flush()
 ```
 
+Closing the SDK logging scope flushes data; it does not complete or cancel the
+compute task. DreamLake projects the execution receipt's terminal state onto
+the experiment. Calling the job client's status mutation directly is rejected.
+The returned results URL selects the exact run with one `?run=` parameter.
+
 `ManagedConnection.from_job()` also explicitly selects the same broker. The
 broker must be literal HTTP loopback (`127.0.0.1` or `[::1]`) with an explicit
 port and no path, credentials, query or fragment. Each renewed lease goes back

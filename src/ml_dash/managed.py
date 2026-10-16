@@ -13,7 +13,7 @@ import os
 import json
 from pathlib import Path
 from typing import Callable
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlsplit, parse_qsl
 
 import httpx
 
@@ -31,6 +31,15 @@ def _authorization(value: str) -> str:
     if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9._~+-]{1,16384}', value):
         raise ValueError('Authentication provider returned an invalid credential')
     return f'Bearer {value}'
+
+
+def _page_url(value: str, run_id=None) -> str:
+    """A page may select its exact run; service endpoints may not carry queries."""
+    parsed = urlsplit(value)
+    _url(parsed._replace(query='').geturl())
+    if parsed.query and (not run_id or parse_qsl(parsed.query, strict_parsing=True) != [('run', run_id)]):
+        raise ValueError('Invalid managed experiment page')
+    return value.rstrip('/')
 
 
 class ManagedConnection:
@@ -148,7 +157,7 @@ class ManagedRemoteClient:
         _authorization(result['token'])
         result['apiUrl'] = destination[0]
         if result.get('experimentUrl') is not None:
-            view = _url(result['experimentUrl'])
+            view = _page_url(result['experimentUrl'], result.get('runId'))
             if self.connection._experiment_url and self.connection._experiment_url != view:
                 raise ValueError('Managed project page changed; reconnect explicitly')
             self.connection._experiment_url = view
@@ -223,6 +232,7 @@ class ManagedRemoteClient:
 
 class JobManagedConnection(ManagedConnection):
     """Memory-only worker broker connection. Never reads a user login."""
+    platform_controls_status = True
     def __init__(self):
         endpoint = os.environ.get('DREAMLAKE_EXPERIMENT_BROKER', '')
         secret = os.environ.get('DREAMLAKE_EXPERIMENT_BROKER_TOKEN', '')
@@ -294,6 +304,8 @@ class JobManagedRemoteClient(ManagedRemoteClient):
                 raise ValueError('Invalid job experiment generation')
             if not result.get('experimentUrl'):
                 raise ValueError('Missing job experiment page')
+            if parse_qsl(urlsplit(result['experimentUrl']).query, strict_parsing=True) != [('run', result['runId'])]:
+                raise ValueError('Job page must select the platform run')
             pins = tuple(result[k] for k in keys) + (result['generation'],)
             if self.connection._pins and self.connection._pins != pins:
                 raise ValueError('Job experiment pins changed')
@@ -312,6 +324,9 @@ class JobManagedRemoteClient(ManagedRemoteClient):
         if kwargs.get('write_protected') or any(kwargs.get(k) for k in ('description', 'tags', 'bindrs', 'metadata')):
             raise ValueError('Job experiment metadata is platform controlled')
         return {'experiment': {'id': session['runId'], 'name': session['runKey']}}
+
+    def update_experiment_status(self, experiment_id, status):
+        raise ValueError('Compute experiment status is controlled by the DreamLake execution receipt')
 
     def _request(self, method, path, data):
         if path.split('?')[0].split('/')[1:3] != ['runs', self.connection.run_id]:
