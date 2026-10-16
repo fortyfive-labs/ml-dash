@@ -119,7 +119,7 @@ resume delivery. Missing terminal evidence remains unknown.
 
 ## Installation
 
-### DreamLake managed Experiments (0.10.0)
+### DreamLake managed Experiments (since 0.10.0)
 
 The SDK supports `ManagedConnection.from_login(org, project)`
 and `Experiment(prefix="org/project/run", managed=connection)`. This uses
@@ -162,7 +162,9 @@ pip install ml-dash
 
 ### CLI
 
-Version 0.1.1, published as `@dreamlake/ml-dash`. With Node.js >= 20.19:
+The CLI is distributed as `@dreamlake/ml-dash` on npm. Check the registry or
+the [original releases](https://github.com/fortyfive-labs/ml-dash-cli/releases)
+for available versions. With Node.js >= 20.19:
 
 ```bash
 npm install -g @dreamlake/ml-dash
