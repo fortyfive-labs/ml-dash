@@ -11,6 +11,7 @@ import functools
 import logging
 import math
 import numbers
+import os
 import re
 import sys
 import threading
@@ -206,6 +207,24 @@ class Experiment:
         - dash_url + dash_root: Hybrid mode (local + remote)
         - dash_url + dash_root=None: Remote-only mode
     """
+    # A worker-provided broker is authoritative, including malformed/partial
+    # environment configuration. Never fall back to standalone or local auth.
+    if any(key in os.environ for key in ('DREAMLAKE_EXPERIMENT_BROKER', 'DREAMLAKE_EXPERIMENT_BROKER_TOKEN')):
+      from .managed import ManagedConnection, JobManagedConnection
+      if dash_url is not None or remote is not None or local_path is not None or dash_root not in (None, ".dash"):
+        raise ValueError("Job experiment cannot use standalone server or local storage options")
+      if managed is not None and not isinstance(managed, JobManagedConnection):
+        raise ValueError("Job experiment cannot use another managed connection")
+      owns_job_connection = managed is None
+      managed = managed if managed is not None else ManagedConnection.from_job()
+      if not managed.matches_job_environment():
+        raise ValueError("Job experiment broker must match the worker environment")
+      if prefix is not None and prefix != managed.prefix:
+        if owns_job_connection:
+          managed.client().close()
+        raise ValueError("Job experiment prefix must match the platform run")
+      prefix = managed.prefix
+
     # Handle backward compatibility
     if remote is not None:
       warnings.warn(
