@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.0] - Release candidate
+## [0.11.0] - 2026-10-16
 
 - Add memory-only worker broker logging for managed compute tasks. `Experiment()` reuses the platform run without user login or local fallback.
 - Pin destination, run, workload and generation across renewals; validate exact run links and keep task imports offline.
 - SDK scope close flushes data; only the control plane execution receipt controls task completion/cancellation.
-- Requires matching BFF, Dash, control plane and opt-in Nymph releases. This candidate is not yet published; production compute acceptance is deferred.
+- Requires matching BFF, Dash, control plane and opt-in Nymph releases. Production compute acceptance is deferred; existing workers are not upgraded automatically.
 
 ## [0.10.0] - 2026-10-16
 
