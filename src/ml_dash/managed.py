@@ -11,6 +11,7 @@ import base64
 import hashlib
 import os
 import json
+import fnmatch
 from pathlib import Path
 from typing import Callable
 from urllib.parse import quote, urlsplit, parse_qsl
@@ -306,6 +307,12 @@ class JobManagedRemoteClient(ManagedRemoteClient):
                 raise ValueError('Missing job experiment page')
             if parse_qsl(urlsplit(result['experimentUrl']).query, strict_parsing=True) != [('run', result['runId'])]:
                 raise ValueError('Job page must select the platform run')
+            native = result['instanceId'] == 'dreamlake-native-v1'
+            if native:
+                expected = (f'/native-experiments/ns/{quote(result["namespace"], safe="")}'
+                            f'/projects/{quote(result["project"], safe="")}')
+                if urlsplit(result['apiUrl']).path != expected:
+                    raise ValueError('Invalid native job destination')
             pins = tuple(result[k] for k in keys) + (result['generation'],)
             if self.connection._pins and self.connection._pins != pins:
                 raise ValueError('Job experiment pins changed')
@@ -313,6 +320,7 @@ class JobManagedRemoteClient(ManagedRemoteClient):
             self.connection._pins = pins
             self.connection.namespace, self.connection.project, self.connection.run_key = pins[:3]
             self.connection.run_id = result['runId']
+            self._native = native
         except (KeyError, TypeError, ValueError):
             self._credential = None
             raise ValueError('Invalid or changed job experiment session') from None
@@ -332,6 +340,71 @@ class JobManagedRemoteClient(ManagedRemoteClient):
         if path.split('?')[0].split('/')[1:3] != ['runs', self.connection.run_id]:
             raise ValueError('Job experiment request must use the platform run')
         try:
+            if self._native:
+                session = self._session()
+                response = self._http.request(method, session['apiUrl'] + path,
+                    headers={'Authorization': _authorization(session['token'])}, json=data)
+                if response.status_code not in (200, 201):
+                    raise ValueError('Native job experiment operation rejected or unavailable')
+                return response.json()
             return super()._request(method, path, data)
         except httpx.HTTPError:
             raise ValueError('Job experiment operation rejected or unavailable') from None
+
+    def get_parameters(self, experiment_id):
+        result = super().get_parameters(experiment_id)
+        return (result.get('parameters') or {}).get('data', {}) if self._native else result
+
+    def upload_file(self, experiment_id, file_path, prefix, filename, description=None,
+                    tags=None, metadata=None, checksum=None, content_type=None, size_bytes=None, **kwargs):
+        if not self._native:
+            return super().upload_file(experiment_id, file_path, prefix, filename, description,
+                tags, metadata, checksum, content_type, size_bytes, **kwargs)
+        if experiment_id != self.connection.run_id:
+            raise ValueError('Job artifact must belong to the platform run')
+        session = self._session()
+        fields = {'prefix': prefix or '/', 'checksum': checksum, 'sizeBytes': str(size_bytes)}
+        if description:
+            fields['description'] = description
+        if tags:
+            fields['tags'] = ','.join(tags)
+        if metadata:
+            fields['metadata'] = json.dumps(metadata)
+        with open(file_path, 'rb') as source:
+            response = self._http.post(session['apiUrl'] + f'/runs/{session["runId"]}/files',
+                headers={'Authorization': _authorization(session['token'])}, data=fields,
+                files={'file': (filename, source, content_type or 'application/octet-stream')}, timeout=300)
+        if response.status_code not in (200, 201):
+            raise ValueError('Native job artifact upload rejected or unavailable')
+        return response.json()
+
+    def list_files(self, experiment_id, limit=500, offset=0):
+        if not self._native or experiment_id != self.connection.run_id:
+            raise ValueError('Job artifact listing requires a native platform run')
+        files = self._request('GET', f'/runs/{experiment_id}/files', None)['files']
+        return {'files': files[offset:offset + limit], 'hasMore': offset + limit < len(files)}
+
+    def search_files(self, pattern, experiment_id, limit=100, **kwargs):
+        files = self.list_files(experiment_id, limit=100000)['files']
+        matches = []
+        for file in files:
+            path = (file.get('prefix') or '').strip('/')
+            full_path = (path + '/' if path else '') + file['filename']
+            if fnmatch.fnmatch(full_path, pattern) or fnmatch.fnmatch(file['filename'], pattern.removeprefix('**/')):
+                matches.append({**file, 'path': full_path})
+        return matches[:limit]
+
+    def download_file(self, experiment_id, file_id, dest_path=None):
+        if not self._native or experiment_id != self.connection.run_id or not re.fullmatch(r'[a-f0-9]{24}', file_id):
+            raise ValueError('Invalid native job artifact binding')
+        info = self._request('GET', f'/runs/{experiment_id}/files/{file_id}', None)['file']
+        session = self._session()
+        response = self._http.get(session['apiUrl'] + f'/runs/{experiment_id}/files/{file_id}/download',
+            headers={'Authorization': _authorization(session['token'])}, timeout=300)
+        if response.status_code != 200:
+            raise ValueError('Native job artifact download rejected or unavailable')
+        if hashlib.sha256(response.content).hexdigest() != info['checksum']:
+            raise ValueError('Native job artifact checksum mismatch')
+        target = Path(dest_path or info['filename'])
+        target.write_bytes(response.content)
+        return str(target)

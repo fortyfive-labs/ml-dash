@@ -1,5 +1,6 @@
 """Real loopback sockets, synthetic credentials; no user login or Keychain."""
 import json
+import hashlib
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,12 +14,15 @@ from ml_dash.managed import ManagedConnection
 @pytest.fixture
 def broker(monkeypatch):
     state = {'calls': [], 'override': {}, 'status': 200}
+    artifact = {'id': 'b'*24, 'filename': 'model.txt', 'prefix': '/models',
+                'checksum': hashlib.sha256(b'model state').hexdigest()}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
 
         def do_POST(self):
-            data = json.loads(self.rfile.read(int(self.headers.get('content-length', '0'))) or b'{}')
+            raw = self.rfile.read(int(self.headers.get('content-length', '0')))
+            data = raw if self.path.endswith('/files') else json.loads(raw or b'{}')
             state['calls'].append((self.path, data, self.headers.get('authorization')))
             if self.path == '/session':
                 assert data == {}
@@ -31,13 +35,31 @@ def broker(monkeypatch):
                 status = state['status']
             else:
                 assert self.headers.get('authorization') == 'Bearer synthetic-lease'
-                result, status = {'count': 1}, 200
+                result, status = (artifact if self.path.endswith('/files') else {'count': 1}), 200
             payload = json.dumps(result).encode()
             self.send_response(status)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
+
+        def do_GET(self):
+            state['calls'].append((self.path, None, self.headers.get('authorization')))
+            assert self.headers.get('authorization') == 'Bearer synthetic-lease'
+            if self.path.endswith('/files'):
+                data = json.dumps({'files': [artifact], 'hasMore': False}).encode()
+            elif self.path.endswith('/files/' + artifact['id']):
+                data = json.dumps({'file': artifact}).encode()
+            elif self.path.endswith('/files/' + artifact['id'] + '/download'):
+                data = b'model state'
+            elif self.path.endswith('/parameters'):
+                data = json.dumps({'parameters': {'data': {'lr': 0.001}}}).encode()
+            else:
+                raise AssertionError(self.path)
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
 
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     state['url'] = f'http://127.0.0.1:{server.server_port}'
@@ -68,6 +90,25 @@ def test_default_experiment_reuses_platform_run_and_writes(broker, monkeypatch, 
     assert not any(p.endswith('/status') for p, _, _ in broker['calls'])
     output = capsys.readouterr()
     assert 'synthetic' not in output.out + output.err
+
+
+def test_native_job_uses_existing_run_and_reads_writes_artifacts(broker, monkeypatch, tmp_path):
+    broker['override'].update(instanceId='dreamlake-native-v1',
+        apiUrl=broker['url'] + '/native-experiments/ns/lab/projects/research')
+    monkeypatch.setenv('ML_DASH_BUFFER_ENABLED', 'false')
+    with Experiment().run as exp:
+        exp.params.set(lr=0.001)
+        assert exp.params.get()['lr'] == 0.001
+        exp.metrics('loss').log(value=0.5)
+        exp.files('models').save_text('model state', to='model.txt')
+        assert [file['id'] for file in exp.files('models').list()] == ['b'*24]
+        path = exp.files('models/model.txt').download(to=str(tmp_path / 'model.txt'))
+        assert path == str(tmp_path / 'model.txt')
+        assert (tmp_path / 'model.txt').read_text() == 'model state'
+    calls = broker['calls']
+    assert all(path == '/session' or path.startswith('/native-experiments/ns/lab/projects/research/runs/fixed-run/')
+               for path, _, _ in calls)
+    assert not any(path.endswith('/status') for path, _, _ in calls)
 
 
 @pytest.mark.parametrize('denied', [401, 403])

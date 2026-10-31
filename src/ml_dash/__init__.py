@@ -118,8 +118,11 @@ def _check_version_compatibility():
         pass
 
 
-# Enforce version check on import
-_check_version_compatibility()
+# A job receives only a scoped broker credential; importing the SDK must not
+# perform an unrelated network request before the job's reporting lease exists.
+import os as _os
+if not _os.environ.get("DREAMLAKE_EXPERIMENT_BROKER"):
+    _check_version_compatibility()
 
 __all__ = [
   "Experiment",
