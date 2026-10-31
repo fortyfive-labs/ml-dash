@@ -11,6 +11,7 @@ import functools
 import logging
 import math
 import numbers
+import os
 import re
 import sys
 import threading
@@ -24,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from .auth.exceptions import AuthenticationError
 from .buffer import BackgroundBufferManager, BufferConfig
 from .client import RemoteClient
+from .native_broker import NativeBrokerClient
 from .exceptions import ConfigurationError, ExperimentError, NetworkError, StorageError
 from .files import BindrsBuilder, FilesAccessor
 from .log import LogBuilder, LogLevel
@@ -223,6 +225,18 @@ class Experiment:
     if prefix:
       run_params["prefix"] = prefix
 
+    broker_present = bool(os.environ.get("DREAMLAKE_EXPERIMENT_BROKER") or
+                          os.environ.get("DREAMLAKE_EXPERIMENT_BROKER_TOKEN"))
+    broker_client = NativeBrokerClient() if broker_present else None
+    if broker_client:
+      bound_prefix = f"{broker_client.namespace}/{broker_client.project}/{broker_client.run_key}"
+      requested_prefix = run_params.get("prefix")
+      if requested_prefix and requested_prefix != bound_prefix:
+        raise ConfigurationError("Experiment prefix does not match the DreamLake job run")
+      run_params["prefix"] = bound_prefix
+      dash_url = None
+      dash_root = None
+
     # Must be set before RUN() so the _is_open_fn lambda resolves on construction.
     self._is_open = False
     self.run = RUN(
@@ -240,7 +254,9 @@ class Experiment:
 
     # Determine operation mode
     # dash_root defaults to ".dash", dash_url defaults to None
-    if dash_url and dash_root:
+    if broker_client:
+      self.mode = OperationMode.REMOTE
+    elif dash_url and dash_root:
       self.mode = OperationMode.HYBRID
     elif dash_url:
       self.mode = OperationMode.REMOTE
@@ -252,7 +268,7 @@ class Experiment:
     self._experiment_data: Optional[Dict[str, Any]] = None
     self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
     self._tracks_manager: Optional["TracksManager"] = None  # Cached tracks manager
-    self._client: Optional["RemoteClient"] = None
+    self._client: Optional[Union["RemoteClient", "NativeBrokerClient"]] = None
     self._storage: Optional["LocalStorage"] = None
 
     # Initialize buffer manager
@@ -264,7 +280,9 @@ class Experiment:
     self._track_last_auto_timestamp: float = 0.0  # Ensure unique auto-generated timestamps
     self._track_timestamp_lock = threading.Lock()
 
-    if self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
+    if broker_client:
+      self._client = broker_client
+    elif self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
@@ -345,7 +363,8 @@ class Experiment:
 
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
-    experiment_url = f"https://dash.ml/{self.run.prefix}"
+    experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
+                      else f"https://dash.ml/{self.run.prefix}")
     try:
       from rich.console import Console
 
@@ -443,7 +462,8 @@ class Experiment:
           from ml_dash import __version__
 
           console = Console()
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
+          experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
+                            else f"https://dash.ml/{self.run.prefix}")
           console.print(
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
             f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
@@ -455,7 +475,8 @@ class Experiment:
           # Fallback if rich is not available
           from ml_dash import __version__
 
-          experiment_url = f"https://dash.ml/{self.run.prefix}"
+          experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
+                            else f"https://dash.ml/{self.run.prefix}")
           print(
             f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
