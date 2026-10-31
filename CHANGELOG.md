@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-01
+
+- Route Nymph job experiment logging to the DreamLake-native project API when the broker selects the native provider, while retaining the existing Dash job destination for older tasks.
+- Support native job parameters, logs, metrics, and file upload and download through the pinned run session. Production compute execution still requires an explicitly configured launch server and remains unverified.
+
 ## [0.11.0] - 2026-10-16
 
 - Add memory-only worker broker logging for managed compute tasks. `Experiment()` reuses the platform run without user login or local fallback.
