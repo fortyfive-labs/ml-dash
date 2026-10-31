@@ -1,6 +1,7 @@
 """Exercise the public Experiment API through a real loopback broker and API."""
 
 import json
+import hashlib
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,10 +12,13 @@ from ml_dash import Experiment
 from ml_dash.exceptions import ConfigurationError
 
 
-def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
+def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch, tmp_path):
     calls = []
     state = {"api": "", "renewals": 0, "revoked": False}
     run_id = "a" * 24
+    file_id = "b" * 24
+    file_info = {"id": file_id, "filename": "model.txt", "prefix": "/models",
+                 "checksum": hashlib.sha256(b"model state").hexdigest()}
 
     class API(BaseHTTPRequestHandler):
         def do_POST(self):
@@ -31,8 +35,23 @@ def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
             if self.path.endswith("/files"):
                 assert self.headers["Content-Type"].startswith("multipart/form-data;")
                 assert b"model state" in raw
-            result = {"count": 1}
+            result = file_info if self.path.endswith("/files") else {"count": 1}
             payload = json.dumps(result).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def do_GET(self):
+            assert self.headers["Authorization"].startswith("Bearer lease-")
+            if self.path.endswith("/files"):
+                payload = json.dumps({"files": [file_info], "hasMore": False}).encode()
+            elif self.path.endswith("/files/" + file_id):
+                payload = json.dumps({"file": file_info}).encode()
+            elif self.path.endswith("/files/" + file_id + "/download"):
+                payload = b"model state"
+            else:
+                raise AssertionError(self.path)
             self.send_response(200)
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
@@ -84,12 +103,16 @@ def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
             exp.log("training")
             exp.metrics("loss").log(value=0.5)
             exp.files("models").save_text("model state", to="model.txt")
+            assert [item["id"] for item in exp.files("models").list()] == [file_id]
+            output = exp.files("models/model.txt").download(to=str(tmp_path / "model.txt"))
+            assert (tmp_path / "model.txt").read_text() == "model state"
+            assert output == str(tmp_path / "model.txt")
         assert len(calls) == 4
         assert calls[0][0].endswith("/parameters")
         assert calls[1][0].endswith("/logs")
         assert calls[2][0].endswith("/metrics/loss")
         assert calls[3][0].endswith("/files")
-        assert state["renewals"] >= 5
+        assert state["renewals"] >= 8
         assert all(token != "Bearer broker-secret" for _, token, _ in calls)
         with pytest.raises(ConfigurationError):
             Experiment(prefix="other/project/run")

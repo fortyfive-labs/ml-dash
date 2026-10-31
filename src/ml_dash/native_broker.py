@@ -7,6 +7,8 @@ run-bound lease, so cancelled or replaced attempts lose write access promptly.
 import os
 import re
 import time
+from pathlib import Path
+from fnmatch import fnmatch
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -167,8 +169,45 @@ class NativeBrokerClient:
                     raise ConfigurationError("DreamLake experiment API redirected the upload")
                 return response.json()
 
+    def list_files(self, *, experiment_id, limit=500, offset=0):
+        self._bound(experiment_id)
+        files = self._request("GET", "/files")["files"]
+        return {"files": files[offset:offset + limit], "hasMore": offset + limit < len(files)}
+
+    def search_files(self, *, pattern, experiment_id, limit=100, **_kwargs):
+        self._bound(experiment_id)
+        files = self._request("GET", "/files")["files"]
+        matches = []
+        for file in files:
+            path = (file.get("prefix") or "").strip("/")
+            full_path = (path + "/" if path else "") + file["filename"]
+            if fnmatch(full_path, pattern) or fnmatch(file["filename"], pattern.removeprefix("**/")):
+                matches.append({**file, "path": full_path})
+        return matches[:limit]
+
+    def download_file(self, *, experiment_id, file_id, dest_path=None):
+        self._bound(experiment_id)
+        if not re.fullmatch(r"[a-f0-9]{24}", file_id):
+            raise ConfigurationError("Invalid DreamLake artifact ID")
+        info = self._request("GET", "/files/" + file_id)["file"]
+        lease = self._renew()
+        with httpx.Client(timeout=120, trust_env=False, follow_redirects=False) as client:
+            response = client.get(lease["apiUrl"] + "/runs/" + lease["runId"] +
+                                  "/files/" + file_id + "/download",
+                                  headers={"Authorization": "Bearer " + lease["token"]})
+            if response.status_code != 200:
+                response.raise_for_status()
+                raise ConfigurationError("DreamLake experiment API redirected the download")
+            data = response.content
+        import hashlib
+        if hashlib.sha256(data).hexdigest() != info["checksum"]:
+            raise ConfigurationError("DreamLake artifact checksum mismatch")
+        target = Path(dest_path or info["filename"])
+        target.write_bytes(data)
+        return str(target)
+
     def unsupported(self, *_args, **_kwargs):
         raise ConfigurationError("This ML-Dash operation is not yet available for DreamLake jobs")
 
-    list_files = search_files = download_file = delete_file = update_file = unsupported
+    delete_file = update_file = unsupported
     read_metric_data = read_metric_rows = get_metric_stats = unsupported
