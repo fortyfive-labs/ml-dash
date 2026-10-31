@@ -22,7 +22,114 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
+## Nymph job Experiments broker (0.11.0)
+
+The worker integration supplies `DREAMLAKE_EXPERIMENT_BROKER` and
+`DREAMLAKE_EXPERIMENT_BROKER_TOKEN` to the job process. These select a local
+memory-only broker; they are not DreamLake or Dash user credentials. With that
+environment, `Experiment()` automatically uses the platform's pre-created run:
+
+```python
+from ml_dash import Experiment
+
+with Experiment().run as exp:
+    exp.params.set(lr=0.001)
+    exp.metrics("loss").log(step=0, loss=0.1)
+    exp.flush()
+```
+
+Closing the SDK logging scope flushes data; it does not complete or cancel the
+compute task. DreamLake projects the execution receipt's terminal state onto
+the experiment. Calling the job client's status mutation directly is rejected.
+The returned results URL selects the exact run with one `?run=` parameter.
+
+`ManagedConnection.from_job()` also explicitly selects the same broker. The
+broker must be literal HTTP loopback (`127.0.0.1` or `[::1]`) with an explicit
+port and no path, credentials, query or fragment. Each renewed lease goes back
+through the broker, where the worker checks the live job attempt and project
+authorization. Leases expire within 60 seconds; the SDK validates that expiry
+and fixes the instance, project, run, workload, generation, API URL and experiment
+page across renewals. The SDK reuses the existing run rather than creating one.
+
+An explicit different prefix, another managed connection, standalone server, or
+custom local storage conflicts with job scope and is rejected. Partial broker
+environment, revocation, terminal jobs, stale attempts and changed destinations
+fail without falling back to standalone login, Keychain or local storage. Keep
+broker credentials in worker-provided process memory/environment; do not print,
+export into training configuration, or persist them. No long-lived user token is
+required in the job. The broker authorizes an exact task run, not arbitrary runs.
+
+This integration is included in SDK 0.11.0 and requires the matching DreamLake
+BFF job-session routes, Dash backend, control plane, and opt-in Nymph 0.1.28
+worker broker. Installing the SDK does not upgrade an existing worker or launch
+a task. Production compute execution has not been accepted in this release; the
+worker-to-SDK flow is covered by local integration tests. Source-backed storage
+remains outside this increment. The explicit application `JobLifecycle` contract
+below is separate and unchanged.
+
+## DreamLake job lifecycle (explicit opt-in)
+
+`JobLifecycle` reports application outcomes through the existing authenticated
+DreamLake run API. It does not infer an outcome from Nymph process exit, experiment
+status, inactivity, or an interpreter exit hook. Existing experiments without this
+option keep their behavior.
+
+```python
+from ml_dash import Experiment, JobLifecycle
+
+lifecycle = JobLifecycle(
+    api_url="https://api.dreamlake.ai",
+    namespace="your-namespace",
+    job_id=tracked_run_id,
+    attempt_id=tracked_run_exec_id,
+    token=dreamlake_access_token,  # supplied explicitly; independent of Dash auth
+    journal_dir="/durable/private/job-attempt-lifecycle",
+)
+with Experiment(prefix="your-namespace/project/run", job_lifecycle=lifecycle).run:
+    train()
+```
+
+Pass the exact existing tracked run ID and its stored execution ID; names,
+experiment prefixes, and environment variables are never used to guess a binding.
+Use the base URL for the API that owns `/namespaces/{namespace}/runs/{job_id}`.
+The token must authorize that namespace and run. The journal never stores tokens.
+
+The existing `run.start()`, `complete()`, `fail()`, and `cancel()` contract reports
+`running`, `succeeded`, `failed`, and `cancelled`. Context-manager exit reports
+completion only when the body returns normally; exceptions report failure.
+Buffered-data flush failure keeps the SDK's existing completion-to-failure rule.
+Terminal evidence is durably recorded before the unrelated Dash experiment status
+request. Reporting errors propagate; they never manufacture an acknowledgment.
+
+Use a dedicated private directory on durable local POSIX storage (mode 0700).
+Events and acknowledgments are atomically replaced and fsynced, and a nonblocking
+OS lock rejects concurrent writers. Do not put this directory on ephemeral storage
+or filesystems without local locking and fsync guarantees. Keep the directory after
+completion: it binds immutable event IDs to one exact API URL, namespace, job, and
+attempt. Reusing it with another binding fails before any request.
+
+After a network error or process restart, reconstruct `JobLifecycle` with the same
+binding and directory and call `lifecycle.flush()` to replay pending events. A lost
+acknowledgment replays the original event ID and payload. `flush()` only sends
+already-recorded evidence; it never creates completion. For a restarted application,
+call `run.start()` again only if there is no recorded terminal outcome. A journal
+with terminal evidence cannot begin another application execution. There is no
+background sender or automatic restart hook: the caller must explicitly retry or
+resume delivery. Missing terminal evidence remains unknown.
+
 ## Installation
+
+### DreamLake managed Experiments (since 0.10.0)
+
+The SDK supports `ManagedConnection.from_login(org, project)`
+and `Experiment(prefix="org/project/run", managed=connection)`. This uses
+DreamLake project permissions and the existing DreamLake login; it does not
+require another Dash organization. Matching server and CLI releases are required.
+See the authoritative [managed setup and Python guide](https://docs.dash.ml/get-started/managed-experiments).
+Managed credentials are short lived, renewed in memory, and never exported into
+plans. The managed transport currently supports flat run paths, parameters,
+metrics, logs, lifecycle status, and root attachments up to 8 MiB. Standalone
+logging remains available and unchanged.
 
 This repo is the **Python SDK** — the library you `import ml_dash` from. The
 `ml-dash` **command line** is a separate program, distributed on npm; see
@@ -55,7 +162,9 @@ pip install ml-dash
 
 ### CLI
 
-Version 0.1.1, published as `@dreamlake/ml-dash`. With Node.js >= 20.19:
+The CLI is distributed as `@dreamlake/ml-dash` on npm. Check the registry or
+the [original releases](https://github.com/fortyfive-labs/ml-dash-cli/releases)
+for available versions. With Node.js >= 20.19:
 
 ```bash
 npm install -g @dreamlake/ml-dash

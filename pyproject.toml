@@ -1,6 +1,6 @@
 [project]
 name = "ml-dash"
-version = "0.8.0"
+version = "0.11.0"
 description = "ML experiment tracking and data storage"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -66,7 +66,7 @@ dev = [
 # (name = "ml-experiments") with its own testpaths and its own venv; collecting
 # its tests from here fails on `import ml_experiments`, which is not installed
 # in this environment and should not be.
-testpaths = ["test"]
+testpaths = ["test", "tests"]
 
 [tool.ruff]
 indent-width = 2

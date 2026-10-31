@@ -75,7 +75,7 @@ Private attributes (starting with `_`) are automatically skipped.
 
 ## Updating Parameters
 
-Call `parameters().set()` multiple times - values merge and overwrite:
+Call `exp.params.set()` multiple times - values merge and overwrite:
 
 ```python
 
@@ -238,13 +238,20 @@ Retrieve current parameters:
 cat .dash/alice/project/my-experiment/parameters.json
 ```
 
+The flattened parameters sit under `"data"`:
+
 ```json
 {
-  "learning_rate": 0.001,
-  "batch_size": 32,
-  "optimizer": "adam",
-  "model.architecture": "resnet50",
-  "model.pretrained": true
+  "version": 1,
+  "data": {
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "optimizer": "adam",
+    "model.architecture": "resnet50",
+    "model.pretrained": true
+  },
+  "createdAt": "2025-10-29T10:30:00.000000Z",
+  "updatedAt": "2025-10-29T10:30:00.000000Z"
 }
 ```
 

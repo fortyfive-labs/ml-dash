@@ -39,6 +39,7 @@ Usage:
 import os
 
 from .client import RemoteClient, userinfo
+from .managed import ManagedConnection
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -49,6 +50,7 @@ from .exceptions import (
     StorageError,
 )
 from .experiment import Experiment, OperationMode, ml_dash_experiment
+from .job_lifecycle import JobLifecycle
 from .log import LogBuilder, LogLevel
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .params import ParametersBuilder
@@ -76,6 +78,10 @@ def _check_version_compatibility():
     Set ML_DASH_NO_VERSION_CHECK=1 to skip the request to pypi.org entirely.
     """
     if os.environ.get("ML_DASH_NO_VERSION_CHECK", "").lower() in ("1", "true", "yes"):
+        return
+    # A platform task uses its pinned SDK dependency and local broker. Importing
+    # it must not add an unrelated public-registry request to the execution.
+    if any(key in os.environ for key in ("DREAMLAKE_EXPERIMENT_BROKER", "DREAMLAKE_EXPERIMENT_BROKER_TOKEN")):
         return
 
     try:
@@ -120,6 +126,8 @@ if not _os.environ.get("DREAMLAKE_EXPERIMENT_BROKER"):
 
 __all__ = [
   "Experiment",
+  "ManagedConnection",
+  "JobLifecycle",
   "ml_dash_experiment",
   "OperationMode",
   "RemoteClient",

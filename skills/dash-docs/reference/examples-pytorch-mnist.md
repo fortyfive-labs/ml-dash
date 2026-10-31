@@ -49,16 +49,16 @@ def train_mnist():
 
     with Experiment(
         prefix="alice/computer-vision/mnist-pytorch",
-        description="MNIST classification with PyTorch",
+        readme="MNIST classification with PyTorch",
         tags=["mnist", "pytorch", "classification"]
     ).run as experiment:
-        experiment.params.set({
-            "model": {"architecture": "SimpleMLP", "layers": [784, 128, 64, 10]},
-            "training": {"optimizer": "adam", "learning_rate": learning_rate,
-                         "batch_size": batch_size, "epochs": epochs},
-            "device": str(device),
-            "dataset": "MNIST"
-        })
+        experiment.params.set(
+            model={"architecture": "SimpleMLP", "layers": [784, 128, 64, 10]},
+            training={"optimizer": "adam", "learning_rate": learning_rate,
+                      "batch_size": batch_size, "epochs": epochs},
+            device=str(device),
+            dataset="MNIST",
+        )
 
         best_accuracy = 0.0
 

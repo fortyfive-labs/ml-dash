@@ -10,7 +10,7 @@ from ml_dash import Experiment
 def train_simple_model():
     with Experiment(
         prefix="alice/tutorials/simple-training",
-        description="Simple training example",
+        readme="Simple training example",
         tags=["tutorial", "simple"]
     ).run as experiment:
         experiment.params.set(

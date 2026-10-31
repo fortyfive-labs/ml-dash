@@ -25,9 +25,9 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from .auth.exceptions import AuthenticationError
 from .buffer import BackgroundBufferManager, BufferConfig
 from .client import RemoteClient
-from .native_broker import NativeBrokerClient
 from .exceptions import ConfigurationError, ExperimentError, NetworkError, StorageError
 from .files import BindrsBuilder, FilesAccessor
+from .job_lifecycle import JobLifecycle
 from .log import LogBuilder, LogLevel
 from .metric_rows import MetricRowsPage
 from .params import ParametersBuilder
@@ -167,9 +167,12 @@ class Experiment:
     bindrs: Optional[List[str]] = None,
     # Instance-only: not propagated to the RUN namespace
     metadata: Optional[Dict[str, Any]] = None,
+    # Explicit application lifecycle for an existing DreamLake job attempt.
+    job_lifecycle: Optional[JobLifecycle] = None,
     # Mode configuration
     dash_url: Optional[Union[str, bool]] = None,
     dash_root: Optional[str] = ".dash",
+    managed=None,
     # Deprecated parameters (for backward compatibility)
     remote: Optional[Union[str, bool]] = None,
     local_path: Optional[str] = None,
@@ -192,6 +195,7 @@ class Experiment:
         tags: Optional list of tags
         bindrs: Optional list of bindrs
         metadata: Optional metadata dict
+        job_lifecycle: Explicit, durably journaled DreamLake job/attempt reporter.
         dash_url: Remote API URL. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
         dash_root: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
         remote: (Deprecated) Use dash_url instead
@@ -203,6 +207,24 @@ class Experiment:
         - dash_url + dash_root: Hybrid mode (local + remote)
         - dash_url + dash_root=None: Remote-only mode
     """
+    # A worker-provided broker is authoritative, including malformed/partial
+    # environment configuration. Never fall back to standalone or local auth.
+    if any(key in os.environ for key in ('DREAMLAKE_EXPERIMENT_BROKER', 'DREAMLAKE_EXPERIMENT_BROKER_TOKEN')):
+      from .managed import ManagedConnection, JobManagedConnection
+      if dash_url is not None or remote is not None or local_path is not None or dash_root not in (None, ".dash"):
+        raise ValueError("Job experiment cannot use standalone server or local storage options")
+      if managed is not None and not isinstance(managed, JobManagedConnection):
+        raise ValueError("Job experiment cannot use another managed connection")
+      owns_job_connection = managed is None
+      managed = managed if managed is not None else ManagedConnection.from_job()
+      if not managed.matches_job_environment():
+        raise ValueError("Job experiment broker must match the worker environment")
+      if prefix is not None and prefix != managed.prefix:
+        if owns_job_connection:
+          managed.client().close()
+        raise ValueError("Job experiment prefix must match the platform run")
+      prefix = managed.prefix
+
     # Handle backward compatibility
     if remote is not None:
       warnings.warn(
@@ -225,18 +247,6 @@ class Experiment:
     if prefix:
       run_params["prefix"] = prefix
 
-    broker_present = bool(os.environ.get("DREAMLAKE_EXPERIMENT_BROKER") or
-                          os.environ.get("DREAMLAKE_EXPERIMENT_BROKER_TOKEN"))
-    broker_client = NativeBrokerClient() if broker_present else None
-    if broker_client:
-      bound_prefix = f"{broker_client.namespace}/{broker_client.project}/{broker_client.run_key}"
-      requested_prefix = run_params.get("prefix")
-      if requested_prefix and requested_prefix != bound_prefix:
-        raise ConfigurationError("Experiment prefix does not match the DreamLake job run")
-      run_params["prefix"] = bound_prefix
-      dash_url = None
-      dash_root = None
-
     # Must be set before RUN() so the _is_open_fn lambda resolves on construction.
     self._is_open = False
     self.run = RUN(
@@ -251,12 +261,12 @@ class Experiment:
     self._bindrs_list = bindrs
     self._write_protected = _write_protected
     self.metadata = metadata
+    self._managed_connection = managed
+    self._job_lifecycle = job_lifecycle
 
     # Determine operation mode
     # dash_root defaults to ".dash", dash_url defaults to None
-    if broker_client:
-      self.mode = OperationMode.REMOTE
-    elif dash_url and dash_root:
+    if dash_url and dash_root:
       self.mode = OperationMode.HYBRID
     elif dash_url:
       self.mode = OperationMode.REMOTE
@@ -268,7 +278,7 @@ class Experiment:
     self._experiment_data: Optional[Dict[str, Any]] = None
     self._metrics_manager: Optional["MetricsManager"] = None  # Cached metrics manager
     self._tracks_manager: Optional["TracksManager"] = None  # Cached tracks manager
-    self._client: Optional[Union["RemoteClient", "NativeBrokerClient"]] = None
+    self._client: Optional["RemoteClient"] = None
     self._storage: Optional["LocalStorage"] = None
 
     # Initialize buffer manager
@@ -280,9 +290,13 @@ class Experiment:
     self._track_last_auto_timestamp: float = 0.0  # Ensure unique auto-generated timestamps
     self._track_timestamp_lock = threading.Lock()
 
-    if broker_client:
-      self._client = broker_client
-    elif self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
+    if managed is not None:
+      if dash_url is not None or remote is not None or local_path is not None or dash_root not in (None, ".dash"):
+        raise ValueError("managed cannot be combined with standalone server or local storage options")
+      self.mode = OperationMode.REMOTE
+      self._client = managed.client()
+
+    if managed is None and self.mode in (OperationMode.REMOTE, OperationMode.HYBRID):
       # RemoteClient will autoload token from ~/.dash/token.enc
       # Use RUN.api_url if dash_url=True (boolean), otherwise use the provided URL
       api_url = RUN.api_url if dash_url is True else dash_url
@@ -308,6 +322,9 @@ class Experiment:
     """
     if self._is_open:
       return self
+
+    if self._job_lifecycle:
+      self._job_lifecycle.start()
 
     self._open_remote()
     self._open_local()
@@ -361,10 +378,24 @@ class Experiment:
       self._buffer_manager = BackgroundBufferManager(self, self._buffer_config)
       self._buffer_manager.start()
 
+  def _view_url(self) -> Optional[str]:
+    if self._managed_connection is None:
+      return f"https://dash.ml/{self.run.prefix}"
+    base = self._managed_connection._experiment_url
+    if not base:
+      return None
+    from urllib.parse import urlsplit, urlencode, urlunsplit
+    parts = urlsplit(base)
+    return urlunsplit(parts._replace(query=urlencode({'run': str(self._experiment_id)})))
+
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
-    experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
-                      else f"https://dash.ml/{self.run.prefix}")
+    if self._managed_connection is not None:
+      connection = self._managed_connection
+      destination = self._view_url() or f'DreamLake project {connection.namespace}/{connection.project} (page URL unavailable)'
+      print(f"Experiment started: {destination}")
+      return
+    experiment_url = f"https://dash.ml/{self.run.prefix}"
     try:
       from rich.console import Console
 
@@ -439,8 +470,25 @@ class Experiment:
         if status == "COMPLETED":
           status = "FAILED"
 
-    # Update experiment status in remote mode
-    if self._client and self._experiment_id:
+    # Explicit application evidence precedes the unrelated experiment PATCH.
+    # Preserve the existing completion-to-failure rule for a failed buffer flush.
+    if self._job_lifecycle:
+      # A lost terminal ACK (or later experiment PATCH failure) must not leave
+      # this instance open: a subsequent start must check the durable terminal
+      # guard before allowing another application body to run.
+      self._is_open = False
+      {"COMPLETED": self._job_lifecycle.complete,
+       "FAILED": self._job_lifecycle.fail,
+       "CANCELLED": self._job_lifecycle.cancel}[status]()
+
+    # A compute task's terminal state comes from the execution receipt. Closing
+    # a logging scope cannot mark a still-running or cancelled process complete.
+    platform_status = bool(getattr(self._managed_connection, 'platform_controls_status', False))
+    if platform_status:
+      print(f"Experiment reporting scope closed; task status is tracked by DreamLake. Results: {self._view_url()}")
+
+    # Update experiment status in ordinary remote mode.
+    if self._client and self._experiment_id and not platform_status:
       try:
         self._client.update_experiment_status(
           experiment_id=self._experiment_id, status=status
@@ -462,25 +510,24 @@ class Experiment:
           from ml_dash import __version__
 
           console = Console()
-          experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
-                            else f"https://dash.ml/{self.run.prefix}")
+          experiment_url = self._view_url()
+          result_link = f"[link={experiment_url}]{experiment_url}[/link]" if experiment_url else 'Open the project Experiments page in DreamLake.'
           console.print(
             f"[{status_color}]{status_emoji} Experiment {status.lower()}: "
             f"[bold]{self.run.name}[/bold] (project: {self.run.project})[/{status_color}]\n"
             f"[dim]View results, statistics, and plots online at:[/dim] "
-            f"[link={experiment_url}]{experiment_url}[/link]\n"
+            f"{result_link}\n"
             f"[dim]ml-dash version: {__version__}[/dim]"
           )
         except ImportError:
           # Fallback if rich is not available
           from ml_dash import __version__
 
-          experiment_url = (self._client.experiment_url if isinstance(self._client, NativeBrokerClient)
-                            else f"https://dash.ml/{self.run.prefix}")
+          experiment_url = self._view_url()
           print(
             f"{status_emoji} Experiment {status.lower()}: {self.run.name} (project: {self.run.project})"
           )
-          print(f"View results at: {experiment_url}")
+          print(f"View results at: {experiment_url}" if experiment_url else 'Open the project Experiments page in DreamLake.')
           print(f"ml-dash version: {__version__}")
 
       except Exception as e:
@@ -499,7 +546,7 @@ class Experiment:
     self._is_open = False
 
     if flush_error is not None:
-      if self._client and self._experiment_id:
+      if self._client and self._experiment_id and not platform_status:
         raise NetworkError(f"{flush_error}\nExperiment status set to {status}.") from flush_error
       raise flush_error
 
