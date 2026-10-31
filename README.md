@@ -22,7 +22,7 @@ A simple and flexible SDK for ML experiment tracking and data storage with backg
 - **Numpy Image Support**: Direct saving of numpy arrays as PNG/JPEG images
 - **Parallel Uploads**: ThreadPoolExecutor for efficient file uploads
 
-## Nymph job Experiments broker (0.11.0)
+## Nymph job Experiments broker (0.11.0; native destination in 0.12.0)
 
 The worker integration supplies `DREAMLAKE_EXPERIMENT_BROKER` and
 `DREAMLAKE_EXPERIMENT_BROKER_TOKEN` to the job process. These select a local
@@ -59,13 +59,15 @@ broker credentials in worker-provided process memory/environment; do not print,
 export into training configuration, or persist them. No long-lived user token is
 required in the job. The broker authorizes an exact task run, not arbitrary runs.
 
-This integration is included in SDK 0.11.0 and requires the matching DreamLake
-BFF job-session routes, Dash backend, control plane, and opt-in Nymph 0.1.28
-worker broker. Installing the SDK does not upgrade an existing worker or launch
-a task. Production compute execution has not been accepted in this release; the
-worker-to-SDK flow is covered by local integration tests. Source-backed storage
-remains outside this increment. The explicit application `JobLifecycle` contract
-below is separate and unchanged.
+The broker integration began in SDK 0.11.0 and requires the matching DreamLake
+BFF job-session routes, control plane, and opt-in Nymph 0.1.28 worker broker.
+SDK 0.12.0 also accepts the DreamLake-native destination from the broker and
+uses its project API for parameters, logs, metrics, and files. Older Dash-backed
+tasks still use the Dash backend. Installing the SDK does not upgrade an existing
+worker or launch a task. Production compute execution has not yet been accepted;
+the worker-to-SDK flow is covered by local integration tests. Source-backed
+storage remains outside this increment. The explicit application `JobLifecycle`
+contract below is separate and unchanged.
 
 ## DreamLake job lifecycle (explicit opt-in)
 
