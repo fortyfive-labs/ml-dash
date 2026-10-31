@@ -144,8 +144,31 @@ class NativeBrokerClient:
         self._bound(experiment_id)
         return self._request("GET", "/metrics")["metrics"]
 
+    def upload_file(self, *, experiment_id, file_path, prefix, filename, description,
+                    tags, metadata, checksum, content_type, size_bytes, **_kwargs):
+        self._bound(experiment_id)
+        lease = self._renew()
+        fields = {"prefix": prefix or "/", "checksum": checksum,
+                  "sizeBytes": str(size_bytes)}
+        if description:
+            fields["description"] = description
+        if tags:
+            fields["tags"] = ",".join(tags)
+        if metadata:
+            import json
+            fields["metadata"] = json.dumps(metadata)
+        with open(file_path, "rb") as source:
+            with httpx.Client(timeout=120, trust_env=False, follow_redirects=False) as client:
+                response = client.post(lease["apiUrl"] + "/runs/" + lease["runId"] + "/files",
+                                       headers={"Authorization": "Bearer " + lease["token"]},
+                                       data=fields, files={"file": (filename, source, content_type or "application/octet-stream")})
+                if response.status_code != 200 and response.status_code != 201:
+                    response.raise_for_status()
+                    raise ConfigurationError("DreamLake experiment API redirected the upload")
+                return response.json()
+
     def unsupported(self, *_args, **_kwargs):
         raise ConfigurationError("This ML-Dash operation is not yet available for DreamLake jobs")
 
-    upload_file = list_files = search_files = download_file = delete_file = update_file = unsupported
+    list_files = search_files = download_file = delete_file = update_file = unsupported
     read_metric_data = read_metric_rows = get_metric_stats = unsupported

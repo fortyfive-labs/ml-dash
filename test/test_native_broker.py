@@ -19,7 +19,8 @@ def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
     class API(BaseHTTPRequestHandler):
         def do_POST(self):
             length = int(self.headers["Content-Length"])
-            body = json.loads(self.rfile.read(length))
+            raw = self.rfile.read(length)
+            body = raw if self.path.endswith("/files") else json.loads(raw)
             calls.append((self.path, self.headers.get("Authorization"), body))
             if state["revoked"]:
                 self.send_response(403)
@@ -27,6 +28,9 @@ def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
                 return
             assert self.path.startswith(f"/native-experiments/ns/team/projects/train/runs/{run_id}/")
             assert self.headers["Authorization"].startswith("Bearer lease-")
+            if self.path.endswith("/files"):
+                assert self.headers["Content-Type"].startswith("multipart/form-data;")
+                assert b"model state" in raw
             result = {"count": 1}
             payload = json.dumps(result).encode()
             self.send_response(200)
@@ -79,11 +83,13 @@ def test_job_scoped_experiment_renews_and_never_uses_dash(monkeypatch):
             exp.params.set(lr=0.1)
             exp.log("training")
             exp.metrics("loss").log(value=0.5)
-        assert len(calls) == 3
+            exp.files("models").save_text("model state", to="model.txt")
+        assert len(calls) == 4
         assert calls[0][0].endswith("/parameters")
         assert calls[1][0].endswith("/logs")
         assert calls[2][0].endswith("/metrics/loss")
-        assert state["renewals"] >= 4
+        assert calls[3][0].endswith("/files")
+        assert state["renewals"] >= 5
         assert all(token != "Bearer broker-secret" for _, token, _ in calls)
         with pytest.raises(ConfigurationError):
             Experiment(prefix="other/project/run")
