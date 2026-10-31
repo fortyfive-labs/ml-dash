@@ -373,7 +373,7 @@ class JobManagedRemoteClient(ManagedRemoteClient):
         with open(file_path, 'rb') as source:
             response = self._http.post(session['apiUrl'] + f'/runs/{session["runId"]}/files',
                 headers={'Authorization': _authorization(session['token'])}, data=fields,
-                files={'file': (filename, source, content_type or 'application/octet-stream')})
+                files={'file': (filename, source, content_type or 'application/octet-stream')}, timeout=300)
         if response.status_code not in (200, 201):
             raise ValueError('Native job artifact upload rejected or unavailable')
         return response.json()
@@ -400,7 +400,7 @@ class JobManagedRemoteClient(ManagedRemoteClient):
         info = self._request('GET', f'/runs/{experiment_id}/files/{file_id}', None)['file']
         session = self._session()
         response = self._http.get(session['apiUrl'] + f'/runs/{experiment_id}/files/{file_id}/download',
-            headers={'Authorization': _authorization(session['token'])})
+            headers={'Authorization': _authorization(session['token'])}, timeout=300)
         if response.status_code != 200:
             raise ValueError('Native job artifact download rejected or unavailable')
         if hashlib.sha256(response.content).hexdigest() != info['checksum']:
