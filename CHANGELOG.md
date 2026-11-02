@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified). Nested folders, bindrs, run metadata, write protection, metric metadata and metric reads are refused or not yet available on this path.
+
 ## [0.12.0] - 2026-11-01
 
 - Route Nymph job experiment logging to the DreamLake-native project API when the broker selects the native provider, while retaining the existing Dash job destination for older tasks.

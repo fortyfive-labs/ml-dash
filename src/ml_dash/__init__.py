@@ -40,6 +40,7 @@ import os
 
 from .client import RemoteClient, userinfo
 from .managed import ManagedConnection
+from .native import NativeConnection, NativeExperimentError
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
@@ -127,6 +128,8 @@ if not _os.environ.get("DREAMLAKE_EXPERIMENT_BROKER"):
 __all__ = [
   "Experiment",
   "ManagedConnection",
+  "NativeConnection",
+  "NativeExperimentError",
   "JobLifecycle",
   "ml_dash_experiment",
   "OperationMode",
