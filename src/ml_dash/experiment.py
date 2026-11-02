@@ -198,6 +198,8 @@ class Experiment:
         job_lifecycle: Explicit, durably journaled DreamLake job/attempt reporter.
         dash_url: Remote API URL. True=use EXP.API_URL, str=custom URL, None=no remote. Token auto-loaded from ~/.dash/token.enc
         dash_root: Local storage root path (defaults to ".dash"). Set to None for remote-only mode.
+        managed: A DreamLake connection instead of a Dash server: ``ManagedConnection`` (managed Dash)
+                 or ``NativeConnection`` (DreamLake-native runs). Prefix is ``namespace/project/run``.
         remote: (Deprecated) Use dash_url instead
         local_path: (Deprecated) Use dash_root instead
         _write_protected: Internal parameter - if True, experiment becomes immutable after creation

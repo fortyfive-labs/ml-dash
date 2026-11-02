@@ -43,6 +43,41 @@ def _page_url(value: str, run_id=None) -> str:
     return value.rstrip('/')
 
 
+def _login_provider(dreamlake_url=None, config_dir=None):
+    """The selected DreamLake URL and a provider of the current login token for it.
+
+    Reads ``~/.dreamlake`` (or ``config_dir``) at each call; never writes files,
+    invokes Keychain or starts a login flow. A login for one server is never
+    returned for a different selected server.
+    """
+    directory = Path(config_dir or os.environ.get('ML_DASH_MANAGED_CONFIG_DIR') or Path.home() / '.dreamlake')
+
+    def read(name):
+        try:
+            value = json.loads((directory / name).read_text())
+            return value if isinstance(value, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    configured = _url(read('config.json').get('remote_url') or 'https://api.dreamlake.ai')
+    selected = _url(dreamlake_url or os.environ.get('DREAMLAKE_REMOTE') or configured)
+
+    def provider():
+        current = _url(read('config.json').get('remote_url') or 'https://api.dreamlake.ai')
+        environment_url = _url(os.environ.get('DREAMLAKE_REMOTE') or current)
+        override = os.environ.get('DREAMLAKE_API_KEY')
+        if override and selected == environment_url:
+            return override
+        # Re-read config as well as tokens. An environment switch cannot
+        # cause an existing connection to send the new environment's token.
+        token = read('tokens.json').get('dreamlake-token') if selected == current else None
+        if not isinstance(token, str) or not token:
+            raise ValueError('No DreamLake login for this server; run ml-dash auth login for the intended environment')
+        return token
+
+    return selected, provider
+
+
 class ManagedConnection:
     """Select an existing DreamLake organization project, never a Dash namespace.
 
@@ -78,31 +113,7 @@ class ManagedConnection:
         configured server are never forwarded to a different selected endpoint.
         This method does not write files, invoke Keychain or start a login flow.
         """
-        directory = Path(config_dir or os.environ.get('ML_DASH_MANAGED_CONFIG_DIR') or Path.home() / '.dreamlake')
-
-        def read(name):
-            try:
-                value = json.loads((directory / name).read_text())
-                return value if isinstance(value, dict) else {}
-            except (OSError, ValueError):
-                return {}
-
-        configured = _url(read('config.json').get('remote_url') or 'https://api.dreamlake.ai')
-        selected = _url(dreamlake_url or os.environ.get('DREAMLAKE_REMOTE') or configured)
-
-        def provider():
-            current = _url(read('config.json').get('remote_url') or 'https://api.dreamlake.ai')
-            environment_url = _url(os.environ.get('DREAMLAKE_REMOTE') or current)
-            override = os.environ.get('DREAMLAKE_API_KEY')
-            if override and selected == environment_url:
-                return override
-            # Re-read config as well as tokens. An environment switch cannot
-            # cause an existing connection to send the new environment's token.
-            token = read('tokens.json').get('dreamlake-token') if selected == current else None
-            if not isinstance(token, str) or not token:
-                raise ValueError('No DreamLake login for this server; run ml-dash auth login for the intended environment')
-            return token
-
+        selected, provider = _login_provider(dreamlake_url, config_dir)
         return cls(selected, namespace, project, provider)
 
     def setup(self):
