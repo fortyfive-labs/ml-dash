@@ -10,6 +10,7 @@ the server's decision.
 from __future__ import annotations
 
 import fnmatch
+import os
 import hashlib
 import json
 import re
@@ -22,7 +23,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MetricRowsError, MlDashError
+from .exceptions import MetricRowsError, MlDashError, NetworkError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .utils import _serialize_value
@@ -94,7 +95,8 @@ class NativeConnection:
     platform_controls_status = False
 
     def __init__(self, dreamlake_url: str, namespace: str, project: str,
-                 token_provider: Callable[[], str], *, workload_id=None, idempotency_key=None, run_id=None):
+                 token_provider: Callable[[], str], auto_create_project: bool = False, *,
+                 workload_id=None, idempotency_key=None, run_id=None):
         if not namespace or not project or '/' in namespace or '/' in project:
             raise ValueError('Native namespace and project must be individual slugs')
         if workload_id is not None and idempotency_key is not None:
@@ -110,12 +112,45 @@ class NativeConnection:
         self.workload_id = None if workload_id is None else _workload_id(workload_id, 'workload_id')
         self.idempotency_key = None if idempotency_key is None else _workload_id(idempotency_key, 'idempotency_key')
         self.run_id = run_id
-        # Interactive: the person's own run, opened with no writer option. Only then may the SDK use the
-        # person's session for a person's action (``_write_protected=True``); the server decides finally.
-        self._interactive = workload_id is None and idempotency_key is None and run_id is None
+
+        # As ml-dash's remote experiments: a missing project is created (private) before the first write, through
+        # DreamLake's project API and the user's own permission there; an existing one is used as is.
+        self.auto_create_project = auto_create_project
+
+    @staticmethod
+    def default_namespace(dreamlake_url=None, config_dir=None) -> str:
+        """The namespace of the DreamLake login on this machine: ``ML_DASH_NATIVE_NAMESPACE``, else the active
+        profile's ``namespace`` (``~/.dreamlake/config.json``, for the login's server), else ``/auth/me``."""
+        explicit = os.environ.get('ML_DASH_NATIVE_NAMESPACE')
+        if explicit:
+            return explicit
+        selected, provider = _login_provider(dreamlake_url, config_dir)
+        directory = Path(config_dir or os.environ.get('ML_DASH_MANAGED_CONFIG_DIR') or Path.home() / '.dreamlake')
+        try:
+            config = json.loads((directory / 'config.json').read_text())
+        except (OSError, ValueError):
+            config = {}
+        if isinstance(config, dict) and isinstance(config.get('namespace'), str) and config['namespace'] \
+                and _url(config.get('remote_url') or 'https://api.dreamlake.ai') == selected:
+            return config['namespace']
+        try:
+            response = httpx.get(selected + '/auth/me', headers={'Authorization': _authorization(provider())}, timeout=30)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake unavailable while resolving the login namespace') from None
+        if response.status_code != 200:
+            raise _error(response, 'DreamLake login namespace')
+        slug = ((response.json() or {}).get('namespace') or {}).get('slug')
+        if not isinstance(slug, str) or not slug:
+            raise NativeExperimentError(None, 'The DreamLake login has no namespace; set ML_DASH_NATIVE_NAMESPACE')
+        return slug
 
     @classmethod
-    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None, **writer):
+    def anonymous(cls, dreamlake_url: str, namespace: str, project: str):
+        """Read a public project without a login (as ml-dash's PUBLIC projects): reads only; any write raises."""
+        return cls(dreamlake_url, namespace, project, None)
+
+    @classmethod
+    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None, auto_create_project=False, **writer):
         """Use the DreamLake login already on this machine (``~/.dreamlake``), or an
         explicitly provided ``DREAMLAKE_API_KEY`` for ``DREAMLAKE_REMOTE``.
 
@@ -124,7 +159,7 @@ class NativeConnection:
         ``writer`` takes the ``workload_id``/``idempotency_key``/``run_id`` options.
         """
         selected, provider = _login_provider(dreamlake_url, config_dir)
-        return cls(selected, namespace, project, provider, **writer)
+        return cls(selected, namespace, project, provider, auto_create_project=auto_create_project, **writer)
 
     def client(self):
         return NativeRemoteClient(self)
@@ -187,7 +222,9 @@ def _segment(value) -> bool:
 def _error(response: httpx.Response, action: str) -> NativeExperimentError:
     try:
         body = response.json()
-        code = body.get('error', {}).get('code') if isinstance(body, dict) else None
+        error = body.get('error') if isinstance(body, dict) else None
+        # Native routes answer {error: {code}}; DreamLake's other routes (project create) {error: "message"}.
+        code = error.get('code') if isinstance(error, dict) else None
     except ValueError:
         code = None
     code = code if isinstance(code, str) else None
@@ -202,30 +239,52 @@ class NativeRemoteClient:
         self.connection = connection
         self._http = httpx.Client(follow_redirects=False, timeout=30)
         self._lock = threading.RLock()
-        self._token = None
-        self._renew_at = 0.0
+        # One short-lived session per mode: writes use the writer's session, reads a read session (a READ grant
+        # suffices), unless a writer is selected explicitly: then every request uses that writer's scoped session.
+        self._sessions = {}
+        self._token = None  # a subclass session (`native_job.NativeJobDataClient`) renews on None
+        self._project_ready = not connection.auto_create_project
         # As ManagedRemoteClient: one creation intent per client, then the writer it registered.
         self.workload_id = connection.workload_id
         self._creation_key = connection.idempotency_key or str(uuid.uuid4())
 
     # -- session ----------------------------------------------------------------
 
-    def _session_token(self) -> str:
+    def _ensure_project(self):
+        """Create the selected project (private) if it does not exist: 201 created, 409 already there."""
+        connection = self.connection
+        try:
+            response = self._http.post(f'{connection.dreamlake_url}/namespaces/{quote(connection.namespace, safe="")}/projects',
+                                       json={'name': connection.project, 'slug': connection.project, 'visibility': 'private'},
+                                       headers={'Authorization': _authorization(connection._provider())})
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake unavailable while creating the project') from None
+        if response.status_code not in (201, 409):
+            raise _error(response, 'DreamLake project create')
+        self._project_ready = True
+
+    def _session_token(self, mode: str = 'write') -> str:
         with self._lock:
-            if self._token and time.time() < self._renew_at:
-                return self._token
-            self._token = None
+            if mode == 'write' and not self._project_ready:
+                self._ensure_project()
+            current = self._sessions.get(mode)
+            if current and time.time() < current[1]:
+                return current[0]
+            self._sessions.pop(mode, None)
             try:
-                body = {'mode': 'write', **({'workloadId': self.workload_id} if self.workload_id
-                                            else {'idempotencyKey': self._creation_key})}
-                if self.connection.run_id:
-                    body['runId'] = self.connection.run_id
+                if mode == 'write':
+                    body = {'mode': 'write', **({'workloadId': self.workload_id} if self.workload_id
+                                                else {'idempotencyKey': self._creation_key})}
+                    if self.connection.run_id:
+                        body['runId'] = self.connection.run_id
+                else:
+                    body = {'mode': 'read'}
                 response = self._http.post(self.connection._root + '/session', json=body,
                     headers={'Authorization': _authorization(self.connection._provider())})
             except httpx.HTTPError:
                 raise NativeExperimentError(None, 'DreamLake native session unavailable') from None
             if response.status_code != 200:
-                raise _error(response, 'DreamLake native write session')
+                raise _error(response, f'DreamLake native {mode} session')
             try:
                 result = response.json()
                 token, api_url = result['token'], result['apiUrl']
@@ -234,30 +293,51 @@ class NativeRemoteClient:
                 if urlsplit(_url(api_url)).path != self.connection._path:
                     raise ValueError
                 _authorization(token)
-                # The session must be for exactly the writer (and run) asked for.
-                writer = result['workloadId']
-                if (writer != (self.workload_id or self._creation_key) or not isinstance(result['generation'], int)
+                # A write session must be for exactly the writer (and run) asked for.
+                writer = result['workloadId'] if mode == 'write' else None
+                if mode == 'write' and (writer != (self.workload_id or self._creation_key) or not isinstance(result['generation'], int)
                         or result.get('runId') != self.connection.run_id):
                     raise ValueError
             except (ValueError, KeyError, TypeError):
                 raise NativeExperimentError(None, 'Invalid DreamLake native session response') from None
-            self.workload_id = writer
-            self._token, self._renew_at = token, time.time() + _SESSION_SECONDS
+            if mode == 'write':
+                self.workload_id = writer
+            self._sessions[mode] = (token, time.time() + _SESSION_SECONDS)
             return token
 
+    def _token_for(self, mode: str) -> str:
+        # A subclass with its own session (`native_job.NativeJobDataClient`) overrides `_session_token()`
+        # without modes: its single session is used for reads and writes alike.
+        if type(self)._session_token is not NativeRemoteClient._session_token:
+            return self._session_token()
+        # An explicitly selected writer scopes every request, reads included, to its session.
+        return self._session_token('write' if self._explicit_writer() else mode)
+
+    def _explicit_writer(self) -> bool:
+        connection = self.connection
+        return bool(getattr(connection, 'workload_id', None) or getattr(connection, 'idempotency_key', None)
+                    or getattr(connection, 'run_id', None))
+
     def _send(self, method: str, path: str, action: str, **kwargs) -> httpx.Response:
+        read = method == 'GET'
+        # A connection without a login provider is anonymous; one without the attribute (a job's broker
+        # destination, `native_job._BrokerDestination`) carries its own session.
+        anonymous = getattr(self.connection, '_provider', True) is None
+        if anonymous and not read:
+            raise NativeExperimentError(401, f'{action} needs a DreamLake login (this connection is anonymous)', 'NATIVE_LOGIN_REQUIRED')
+        mode = 'read' if read else 'write'
         for attempt in range(2):
-            token = self._session_token()
+            headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
             try:
-                response = self._http.request(method, self.connection._root + path,
-                    headers={'Authorization': _authorization(token)}, **kwargs)
+                response = self._http.request(method, self.connection._root + path, headers=headers, **kwargs)
             except httpx.HTTPError:
                 raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable; '
                                                   'reconcile before retrying writes') from None
-            if response.status_code == 401 and attempt == 0:
+            if response.status_code == 401 and attempt == 0 and not anonymous:
                 # 401 is decided before any write, so one retry with a fresh session is safe.
                 with self._lock:
-                    self._token = None
+                    self._sessions.pop(mode, None)
+                    self._token = None  # a subclass session (`NativeJobDataClient`) renews on this
                 continue
             if response.is_success:
                 return response
@@ -266,6 +346,7 @@ class NativeRemoteClient:
                 # Rotated: the next explicit call renews under the new generation. Retired: that
                 # renewal is refused. Nothing is replayed here (the failed write stays failed).
                 with self._lock:
+                    self._sessions.clear()
                     self._token = None
             raise error
         raise AssertionError('unreachable')
@@ -308,7 +389,8 @@ class NativeRemoteClient:
             raise ValueError('Native runs do not support bindrs from the SDK')
         if metadata is not None and not isinstance(metadata, dict):
             raise ValueError('Native run metadata must be a dict')
-        if write_protected and not connection._interactive:
+        # Interactive means no writer option at all (`_explicit_writer`); the server decides finally.
+        if write_protected and self._explicit_writer():
             # Never the person's login behind an explicit writer: protection is the person's own action.
             raise ValueError('Write protection is a person\'s action: use a NativeConnection without '
                              'workload_id, idempotency_key or run_id')
@@ -335,6 +417,9 @@ class NativeRemoteClient:
 
     def _person_session(self) -> str:
         """A plain project write session of the person (no writer), for one person's action; never cached."""
+        with self._lock:
+            if not self._project_ready:
+                self._ensure_project()
         try:
             response = self._http.post(self.connection._root + '/session', json={'mode': 'write'},
                 headers={'Authorization': _authorization(self.connection._provider())})
@@ -358,6 +443,9 @@ class NativeRemoteClient:
     def _person_json(self, method: str, path: str, action: str, **kwargs) -> dict:
         """One request under a fresh person's session: a 401 (decided before any write) renews it once; any
         other failure is not replayed. A refusal is final: there is no fallback to a writer's session."""
+        if getattr(self.connection, '_provider', None) is None:
+            # Anonymous (or no login at all): refused before any request, as every native write is.
+            raise NativeExperimentError(401, f'{action} needs a DreamLake login (this connection is anonymous)', 'NATIVE_LOGIN_REQUIRED')
         for attempt in range(2):
             token = self._person_session()
             try:
@@ -595,9 +683,42 @@ class NativeRemoteClient:
         target.write_bytes(content)
         return str(target)
 
+    # -- GraphQL (ml-dash's API, served natively at /native-dash/graphql) -------------
+
+    @property
+    def namespace(self):
+        return self.connection.namespace
+
+    def _graphql_headers(self):
+        # Anonymous: public projects only. An explicit writer: its scoped session, never the user's login (the
+        # server narrows a writer to its project and run). Otherwise the user's login, as ml-dash's raw queries.
+        if self.connection._provider is None:
+            return {}
+        if self._explicit_writer():
+            return {'Authorization': _authorization(self._session_token('write'))}
+        return {'Authorization': _authorization(self.connection._provider())}
+
+    def graphql_query(self, query, variables=None):
+        """Run an ml-dash GraphQL query or mutation against DreamLake's native compatibility endpoint.
+
+        Sent with the user's DreamLake login (not the project session): ml-dash queries may span projects,
+        and every project is authorized by the server. Errors raise ``NetworkError`` as ``RemoteClient`` does.
+        """
+        try:
+            response = self._http.post(self.connection.dreamlake_url + '/native-dash/graphql',
+                                       json={'query': query, 'variables': variables or {}},
+                                       headers=self._graphql_headers())
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake native GraphQL unavailable') from None
+        response.raise_for_status()
+        result = response.json()
+        if result.get('errors'):
+            raise NetworkError('; '.join(error.get('message', str(error)) for error in result['errors']))
+        return result.get('data') or {}
+
     def close(self):
         with self._lock:
-            self._token = None
+            self._sessions.clear()
         self._http.close()
 
 
@@ -649,3 +770,12 @@ def _blocks(rows):
                     row[i] = float(row[i])
         result.append(MetricRowBlock(tuple(MetricColumn(name, kind) for name, kind in zip(names, kinds)), block_rows))
     return result
+
+
+# ml-dash's GraphQL helpers run unchanged on the native endpoint: they only call graphql_query and namespace.
+from .client import RemoteClient as _RemoteClient  # noqa: E402
+
+for _name in ('list_projects_graphql', 'list_experiments_graphql', 'get_experiment_graphql',
+              'get_experiment_by_path_graphql', 'search_experiments_graphql'):
+    setattr(NativeRemoteClient, _name, getattr(_RemoteClient, _name))
+del _name
