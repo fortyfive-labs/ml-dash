@@ -243,7 +243,9 @@ class NativeRemoteClient:
         # suffices), unless a writer is selected explicitly: then every request uses that writer's scoped session.
         self._sessions = {}
         self._token = None  # a subclass session (`native_job.NativeJobDataClient`) renews on None
-        self._project_ready = not connection.auto_create_project
+        # Creating a missing project is the interactive person's bootstrap only (ml-dash's rdxp): an explicit writer
+        # (or a job's broker, or an anonymous connection) never uses the login to create one; its session decides.
+        self._project_ready = not connection.auto_create_project or self._explicit_writer() or connection._provider is None
         # As ManagedRemoteClient: one creation intent per client, then the writer it registered.
         self.workload_id = connection.workload_id
         self._creation_key = connection.idempotency_key or str(uuid.uuid4())
@@ -251,16 +253,25 @@ class NativeRemoteClient:
     # -- session ----------------------------------------------------------------
 
     def _ensure_project(self):
-        """Create the selected project (private) if it does not exist: 201 created, 409 already there."""
+        """The interactive person's project bootstrap: an existing project (any role that may read it, e.g. a WRITE
+        collaborator without namespace create) is used as it is; only one the server reports missing (404) is
+        created (private). Any other answer is the server's refusal and is raised; nothing is created then."""
         connection = self.connection
+        namespace = f'{connection.dreamlake_url}/namespaces/{quote(connection.namespace, safe="")}/projects'
+        headers = {'Authorization': _authorization(connection._provider())}
         try:
-            response = self._http.post(f'{connection.dreamlake_url}/namespaces/{quote(connection.namespace, safe="")}/projects',
-                                       json={'name': connection.project, 'slug': connection.project, 'visibility': 'private'},
-                                       headers={'Authorization': _authorization(connection._provider())})
+            found = self._http.get(f'{namespace}/{quote(connection.project, safe="")}', headers=headers)
+            if found.status_code == 404:
+                response = self._http.post(namespace, json={'name': connection.project, 'slug': connection.project,
+                                                            'visibility': 'private'}, headers=headers)
         except httpx.HTTPError:
             raise NativeExperimentError(None, 'DreamLake unavailable while creating the project') from None
-        if response.status_code not in (201, 409):
-            raise _error(response, 'DreamLake project create')
+        if found.status_code == 404:
+            # 409: created meanwhile (or not visible to this login): the project session decides the access.
+            if response.status_code not in (201, 409):
+                raise _error(response, 'DreamLake project create')
+        elif found.status_code != 200:
+            raise _error(found, 'DreamLake project read')
         self._project_ready = True
 
     def _session_token(self, mode: str = 'write') -> str:

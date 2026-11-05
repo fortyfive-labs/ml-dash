@@ -408,6 +408,8 @@ def test_native_default_namespace_and_project_create_refusal(tmp_path, monkeypat
     assert NativeConnection.default_namespace(config_dir=str(tmp_path)) == 'team-lab'
 
     def handle(request):
+        if request.url.path == '/namespaces/team-lab/projects/scratch':
+            return httpx.Response(404, json={'error': 'not found'})  # missing: only then is a create sent
         if request.url.path == '/namespaces/team-lab/projects':
             return httpx.Response(403, json={'error': 'forbidden'})
         raise AssertionError('nothing else may be called after a refused create: ' + request.url.path)
@@ -419,6 +421,38 @@ def test_native_default_namespace_and_project_create_refusal(tmp_path, monkeypat
         connection.client().set_parameters('a' * 24, {'x': 1})
     assert refused.value.status == 403
 
+
+
+def test_native_project_bootstrap_uses_an_existing_project_and_never_runs_for_an_explicit_writer(monkeypatch):
+    """A WRITE collaborator (no namespace create) writes to the existing project with no create; an explicit writer
+    never uses the login to look up or create a project, even with auto_create_project."""
+    calls = []
+
+    def handle(request):
+        calls.append((request.method, request.url.path, request.headers.get('authorization')))
+        if request.url.path == '/namespaces/team-lab/projects/scratch':
+            return httpx.Response(200, json={'id': 'f' * 24, 'name': 'scratch'})
+        if request.url.path.startswith('/namespaces/'):
+            return httpx.Response(403, json={'error': 'no namespace create'})
+        if request.url.path.endswith('/session'):
+            body = json.loads(request.content)
+            return httpx.Response(200, json={'token': 'w', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test/native-experiments/ns/team-lab/projects/scratch',
+                                             'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1})
+        return httpx.Response(200, json={'parameters': {}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    NativeConnection('https://dreamlake.test', 'team-lab', 'scratch', lambda: 'user-login', auto_create_project=True) \
+        .client().set_parameters('a' * 24, {'x': 1})
+    assert [c[:2] for c in calls if c[1].startswith('/namespaces/')] == [('GET', '/namespaces/team-lab/projects/scratch')]
+    assert calls[-1][:2] == ('POST', '/native-experiments/ns/team-lab/projects/scratch/runs/' + 'a' * 24 + '/parameters')
+
+    calls.clear()
+    writer = '0b0b0b0b-0000-4000-8000-000000000003'
+    NativeConnection('https://dreamlake.test', 'team-lab', 'scratch', lambda: 'user-login', auto_create_project=True,
+                     workload_id=writer).client().set_parameters('a' * 24, {'x': 2})
+    assert not [c for c in calls if c[1].startswith('/namespaces/')]
+    assert [c[1].rsplit('/', 1)[-1] for c in calls] == ['session', 'parameters']
 
 def test_native_read_session_and_anonymous_public_reads(tmp_path):
     """A READ grant reads through a read session; an anonymous connection reads a public project, never writes."""
