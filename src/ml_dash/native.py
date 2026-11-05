@@ -104,6 +104,9 @@ class NativeConnection:
         self.workload_id = None if workload_id is None else _workload_id(workload_id, 'workload_id')
         self.idempotency_key = None if idempotency_key is None else _workload_id(idempotency_key, 'idempotency_key')
         self.run_id = run_id
+        # Interactive: the person's own run, opened with no writer option. Only then may the SDK use the
+        # person's session for a person's action (``_write_protected=True``); the server decides finally.
+        self._interactive = workload_id is None and idempotency_key is None and run_id is None
 
     @classmethod
     def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None, **writer):
@@ -167,6 +170,12 @@ class NativeConnection:
         """End the writer: its sessions stop and no new one is issued."""
         return self._manage('POST', '/credentials', 'Native credential retire', json={'operation': 'retire',
             'credentialId': _workload_id(credential_id, 'credential_id'), 'expectedGeneration': expected_generation})['credential']
+
+
+def _segment(value) -> bool:
+    """A folder or run name as the server takes it: not blank, not ``.``/``..``, no ``/`` or control character."""
+    return (isinstance(value, str) and value.strip() != '' and value not in ('.', '..') and '/' not in value
+            and not re.search(r'[\x00-\x1f\x7f]', value))
 
 
 def _error(response: httpx.Response, action: str) -> NativeExperimentError:
@@ -275,30 +284,94 @@ class NativeRemoteClient:
 
     def create_or_update_experiment(self, project, name, prefix=None, description=None, tags=None,
                                     bindrs=None, write_protected=False, metadata=None, **kwargs):
-        """Create the run, or return the existing one with this key.
+        """Create the run at ``prefix`` (``namespace/project/[folders/]name``), or return the one there.
 
-        ``description``/``tags`` of None leave the stored value unchanged; ``""``
-        clears the description and ``[]`` clears the tags (``Experiment(readme=...,
-        tags=...)``).
+        Folders are created as needed and names may be any Unicode (as ml-dash's). ``description``/``tags``
+        of None leave the stored value unchanged; ``""`` clears the description and ``[]`` the tags.
+        ``metadata`` (a dict) replaces the run's metadata. ``write_protected`` (``Experiment(_write_protected=
+        True)``) creates the run protected, with its metadata, in one server transaction, as ml-dash; it is a
+        person's action, so only an interactive connection asks for it, over the person's own session.
         """
         connection = self.connection
-        if (project != connection.project or not isinstance(name, str) or not _KEY.fullmatch(name)
-                or prefix != f'{connection.namespace}/{connection.project}/{name}'):
-            raise ValueError('Native prefix must be the selected namespace/project/run (no nested folders)')
-        if write_protected or bindrs or metadata:
-            raise ValueError('Native runs do not support bindrs, run metadata or write protection from the SDK')
+        head = f'{connection.namespace}/{connection.project}/'
+        segments = prefix[len(head):].split('/') if isinstance(prefix, str) and prefix.startswith(head) else []
+        if (project != connection.project or not segments or segments[-1] != name
+                or not all(_segment(segment) for segment in segments)):
+            raise ValueError('Native prefix must be the selected namespace/project, then folders and the run name')
+        if bindrs:
+            raise ValueError('Native runs do not support bindrs from the SDK')
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError('Native run metadata must be a dict')
+        if write_protected and not connection._interactive:
+            # Never the person's login behind an explicit writer: protection is the person's own action.
+            raise ValueError('Write protection is a person\'s action: use a NativeConnection without '
+                             'workload_id, idempotency_key or run_id')
         body = {}
         if description is not None:
             body['description'] = description
         if tags is not None:
             body['tags'] = list(tags)
+        if metadata is not None:
+            body['metadata'] = metadata
         if connection.run_id:
             # A writer bound to a run opens that run by id, never by key: a renamed run or a reused
-            # key cannot redirect it. Its description/tags are updated in place.
+            # key cannot redirect it. Its description/tags/metadata are updated in place.
             if body:
                 return self._json('PATCH', self._run(connection.run_id), 'Native run update', json=body)
             return self._json('GET', self._run(connection.run_id), 'Native run read')
-        return self._json('PUT', f'/runs/{quote(name, safe="")}', 'Native run create', json=body)
+        # A root ASCII key keeps today's route (no run lifecycle needed); any other path is a run path.
+        path = (f'/runs/{quote(name, safe="")}' if len(segments) == 1 and _KEY.fullmatch(name)
+                else '/run-paths/' + '/'.join(quote(segment, safe='') for segment in segments))
+        if write_protected:
+            body['writeProtected'] = True
+            return self._person_json('PUT', path, 'Native run create', json=body)
+        return self._json('PUT', path, 'Native run create', json=body)
+
+    def _person_session(self) -> str:
+        """A plain project write session of the person (no writer), for one person's action; never cached."""
+        try:
+            response = self._http.post(self.connection._root + '/session', json={'mode': 'write'},
+                headers={'Authorization': _authorization(self.connection._provider())})
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake native session unavailable') from None
+        if response.status_code != 200:
+            raise _error(response, 'DreamLake native write session')
+        try:
+            result = response.json()
+            token, api_url = result['token'], result['apiUrl']
+            # Only ever sent to this connection's own server and project route, and a person's session only.
+            advertised, own = urlsplit(_url(api_url)), urlsplit(self.connection.dreamlake_url)
+            if ((advertised.scheme, advertised.netloc, advertised.path) != (own.scheme, own.netloc, self.connection._path)
+                    or result.get('workloadId') is not None):
+                raise ValueError
+            _authorization(token)
+        except (ValueError, KeyError, TypeError):
+            raise NativeExperimentError(None, 'Invalid DreamLake native session response') from None
+        return token
+
+    def _person_json(self, method: str, path: str, action: str, **kwargs) -> dict:
+        """One request under a fresh person's session: a 401 (decided before any write) renews it once; any
+        other failure is not replayed. A refusal is final: there is no fallback to a writer's session."""
+        for attempt in range(2):
+            token = self._person_session()
+            try:
+                response = self._http.request(method, self.connection._root + path,
+                    headers={'Authorization': _authorization(token)}, **kwargs)
+            except httpx.HTTPError:
+                raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable; '
+                                                  'reconcile before retrying writes') from None
+            if response.status_code == 401 and attempt == 0:
+                continue
+            if not response.is_success:
+                raise _error(response, action)
+            try:
+                result = response.json()
+                if not isinstance(result, dict):
+                    raise TypeError
+                return result
+            except (ValueError, TypeError):
+                raise NativeExperimentError(None, f'{action} returned an invalid response') from None
+        raise AssertionError('unreachable')
 
     def update_experiment_status(self, experiment_id, status):
         return self._json('POST', self._run(experiment_id) + '/status', 'Native run status',

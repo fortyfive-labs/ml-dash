@@ -121,6 +121,46 @@ def test_native_run_bound_writer_opens_its_run_by_id(monkeypatch):
         NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'x', workload_id='not-a-uuid')
 
 
+def test_native_explicit_writer_never_asks_for_protection(monkeypatch):
+    """An explicit writer's write_protected is refused before any request: never the person's login behind it."""
+    state = {'generation': 1, 'active': True}
+    calls = _writer_server(monkeypatch, state)
+    writer = '0b0b0b0b-0000-4000-8000-000000000002'
+    for options in ({'workload_id': writer}, {'idempotency_key': writer}, {'run_id': RUN_ID}):
+        connection = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'ci-login', **options)
+        with pytest.raises(ValueError, match="person's action"):
+            Experiment(prefix='lab/research/folder/probe', managed=connection, _write_protected=True).run.start()
+    assert calls == []
+
+
+def test_native_protected_create_uses_one_person_session_pinned_to_its_server(monkeypatch):
+    """Interactive write_protected: one plain person's session, minted for the create only, pinned to the project route."""
+    calls, advertised = [], ['https://dreamlake.test' + ROOT]
+
+    def handle(request):
+        body = json.loads(request.content) if request.content else None
+        calls.append((request.method, request.url.raw_path.decode(), request.headers.get('authorization'), body))
+        if request.url.path == ROOT + '/session':
+            return httpx.Response(200, json={'token': 'person-session', 'expiresAt': 0, 'apiUrl': advertised[0]})
+        return httpx.Response(200, json={'experiment': {'id': RUN_ID, **body}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+    result = client.create_or_update_experiment('research', '实验 1', prefix='lab/research/2026-11-05/实验 1',
+                                                write_protected=True, metadata={'seed': 1})
+    assert result['experiment']['writeProtected'] is True
+    assert calls[0] == ('POST', ROOT + '/session', 'Bearer user-login', {'mode': 'write'})
+    assert calls[1][:3] == ('PUT', ROOT + '/run-paths/2026-11-05/%E5%AE%9E%E9%AA%8C%201', 'Bearer person-session')
+    assert calls[1][3] == {'metadata': {'seed': 1}, 'writeProtected': True}
+    # A session advertised for another server is never used.
+    from ml_dash.native import NativeExperimentError
+    advertised[0] = 'https://elsewhere.test' + ROOT
+    with pytest.raises(NativeExperimentError):
+        client.create_or_update_experiment('research', 'p', prefix='lab/research/p', write_protected=True)
+    assert [c[0] for c in calls[2:]] == ['POST']
+
+
 def _local_server():
     path = os.environ.get('ML_DASH_NATIVE_TEST_ENV')
     if not path:
@@ -377,3 +417,37 @@ def test_native_workload_credentials_against_local_server(tmp_path):
     with pytest.raises(NativeExperimentError) as mismatch:
         bound.client().set_parameters(other_id, {'seed': 6})
     assert mismatch.value.code == 'NATIVE_RUN_SCOPE_MISMATCH'
+
+
+def test_native_nested_paths_metadata_and_protection_against_local_server():
+    """Against an isolated dreamlake-server with the run lifecycle: nested Unicode (and date) prefixes, metadata, protection."""
+    import uuid
+
+    from ml_dash.native import NativeExperimentError
+
+    env = _local_server()
+    ns, project, base = env['namespace'], env['project'], env['base_url']
+    connection = NativeConnection(base, ns, project, lambda: env['writer_token'])
+    prefix = f'{ns}/{project}/2026-11-05/扫描 {uuid.uuid4().hex[:6]}/训练 α'
+    with Experiment(prefix=prefix, managed=connection, metadata={'seed': 7}).run as exp:
+        run_id = exp.id
+        exp.params.set(lr=0.1)
+    with Experiment(prefix=prefix, managed=connection).run as again:
+        assert again.id == run_id
+    client = connection.client()
+    view = client._json('GET', f'/runs/{run_id}', 'read')['experiment']
+    assert view['path'] == prefix.split('/', 2)[2] and view['metadata'] == {'seed': 7}
+
+    # A person's protected create: born protected with its metadata; the next data write is refused.
+    protected = client.create_or_update_experiment(project, '冻结', prefix=f'{ns}/{project}/final {uuid.uuid4().hex[:6]}/冻结',
+                                                   metadata={'tag': 'final'}, write_protected=True)['experiment']
+    assert (protected['writeProtected'], protected['metadata']) == (True, {'tag': 'final'})
+    with pytest.raises(NativeExperimentError) as refused:
+        client.set_parameters(protected['id'], {'lr': 1})
+    assert refused.value.code == 'NATIVE_RUN_WRITE_PROTECTED'
+
+    # A writer bound to the first run updates its metadata in place, by id.
+    bound = NativeConnection(base, ns, project, lambda: env['writer_token'], run_id=run_id)
+    with Experiment(prefix=f'{ns}/{project}/any', managed=bound, metadata={'seed': 8}).run as exp:
+        assert exp.id == run_id
+    assert client._json('GET', f'/runs/{run_id}', 'read')['experiment']['metadata'] == {'seed': 8}
