@@ -24,6 +24,7 @@ import httpx
 from .exceptions import MetricRowsError, MlDashError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
+from .utils import _serialize_value
 
 _KEY = re.compile(r'[A-Za-z0-9_-]{1,128}')
 _ID = re.compile(r'[0-9a-f]{24}')
@@ -296,11 +297,51 @@ class NativeRemoteClient:
         return self._json('DELETE', self._run(experiment_id) + '/parameters', 'Native parameters delete')['parameters']
 
     # -- tracks -------------------------------------------------------------------
+    # ml-dash tracks (``exp.tracks(topic)``) on the run's native track store. Runs homed in main before the
+    # Dash store answer 409 ``NATIVE_TRACKS_UNAVAILABLE``.
 
-    def _tracks_unsupported(self, *args, **kwargs):
-        raise NativeExperimentError(None, 'Native runs do not support tracks yet; use metrics or files', 'NATIVE_UNSUPPORTED')
+    def _track(self, experiment_id, topic):
+        if not isinstance(topic, str) or not topic or any(not part for part in topic.split('/')):
+            raise ValueError('Track topic must be non-empty "/"-separated segments')
+        return self._run(experiment_id) + f'/tracks/{quote(topic, safe="")}'
 
-    create_track = append_to_track = append_batch_to_track = get_track_data = list_tracks = _tracks_unsupported
+    def create_track(self, experiment_id, topic, description=None, tags=None, metadata=None):
+        """Create the topic with its description/tags/metadata, or return the existing track unchanged."""
+        self._track(experiment_id, topic)
+        body = {'topic': topic}
+        for key, value in (('description', description), ('tags', tags), ('metadata', metadata)):
+            if value:
+                body[key] = value
+        return self._json('POST', self._run(experiment_id) + '/tracks', 'Native track create', json=body)
+
+    def append_to_track(self, experiment_id, topic, timestamp, data):
+        return self._json('POST', self._track(experiment_id, topic) + '/append', 'Native track write',
+                          json={'timestamp': timestamp, 'data': _serialize_value(data)})
+
+    def append_batch_to_track(self, experiment_id, topic, entries):
+        """Entries ``{timestamp, ...fields}`` in one commit (at most 10000)."""
+        return self._json('POST', self._track(experiment_id, topic) + '/append_batch', 'Native track write',
+                          json={'entries': [_serialize_value(entry) for entry in entries]})
+
+    def get_track_data(self, experiment_id, topic, start_timestamp=None, end_timestamp=None, columns=None, format='json'):
+        """As ``RemoteClient.get_track_data``: dict for json, bytes for jsonl, parquet (Arrow IPC) and mcap. An mcap
+        topic with no exact track exports every track under ``topic/``."""
+        params = {'format': format}
+        if start_timestamp is not None:
+            params['start_timestamp'] = str(start_timestamp)
+        if end_timestamp is not None:
+            params['end_timestamp'] = str(end_timestamp)
+        if columns:
+            params['columns'] = ','.join(columns)
+        path = self._track(experiment_id, topic) + '/data'
+        if format in ('jsonl', 'parquet', 'mcap'):
+            return self._send('GET', path, 'Native track read', params=params).content
+        return self._json('GET', path, 'Native track read', params=params)
+
+    def list_tracks(self, experiment_id, topic_filter=None):
+        """Tracks of the run: all, an exact topic, or ``prefix/*``."""
+        params = {'topic': topic_filter} if topic_filter else {}
+        return self._json('GET', self._run(experiment_id) + '/tracks', 'Native track list', params=params)['tracks']
 
     # -- files ------------------------------------------------------------------
 
