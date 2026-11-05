@@ -183,3 +183,39 @@ def test_native_run_data_edits_against_local_server(tmp_path):
         errors = client.query_logs(exp.id, level=['error'])['logs']
         assert [entry['message'] for entry in errors] == ['nan detected']
         assert [e['message'] for e in client.query_logs(exp.id, search='epoch', order='asc')['logs']] == ['epoch 1 started']
+
+
+def test_native_tracks_against_local_server():
+    """ml-dash tracks through the public API: append/flush, ranged reads, slice and findByTime floor match."""
+    import uuid
+
+    from ml_dash.exceptions import StorageError
+
+    env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'tracks-{uuid.uuid4().hex[:8]}'
+    connection = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=connection).run as exp:
+        pose = exp.tracks('robot/pose')
+        for ts in (1.0, 3.0, 5.0, 7.0):
+            pose.append(q=[ts, ts + 0.5], ee={'x': ts}, _ts=ts)
+        exp.tracks('camera/left').append(width=640, _ts=-1)  # inherits the last timestamp, 7.0
+        exp.tracks.flush()
+
+        entries = pose.list_entries()
+        assert [e['timestamp'] for e in entries] == [1.0, 3.0, 5.0, 7.0]
+        assert entries[0] == {'timestamp': 1.0, 'q': [1.0, 1.5], 'ee.x': 1.0}
+        ranged = pose.read(start_timestamp=3.0, end_timestamp=5.0, columns=['q'])
+        assert ranged['count'] == 2 and ranged['entries'][0] == {'timestamp': 3.0, 'q': [3.0, 3.5]}
+        assert pose.read(format='jsonl').count(b'\n') == 3
+
+        window = pose.slice(start_timestamp=1.0, end_timestamp=7.0)
+        assert len(window) == 4 and [e['timestamp'] for e in window] == [1.0, 3.0, 5.0, 7.0]
+        assert window.findByTime(5.5)['timestamp'] == 5.0
+        assert [e['timestamp'] for e in window.findByTime([1.0, 3.5, 9.0])] == [1.0, 3.0, 7.0]
+        with pytest.raises(StorageError):
+            window.findByTime(0.5)
+
+        client = exp._client
+        assert [t['topic'] for t in client.list_tracks(exp.id, 'robot/*')] == ['robot/pose']
+        camera = client.get_track_data(exp.id, 'camera/left')
+        assert camera['entries'] == [{'timestamp': 7.0, 'width': 640}]
