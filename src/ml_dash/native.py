@@ -219,6 +219,48 @@ def _segment(value) -> bool:
             and not re.search(r'[\x00-\x1f\x7f]', value))
 
 
+_ITEM_KINDS = ('metric', 'file', 'parameters')
+
+
+def _bindr_names(bindrs):
+    if bindrs is None:
+        return []
+    if isinstance(bindrs, str) or not all(isinstance(name, str) and name.strip() for name in bindrs):
+        raise ValueError('bindrs must be a list of non-empty bindr names')
+    return list(dict.fromkeys(name.strip() for name in bindrs))
+
+
+def _item_kind(kind):
+    if kind not in _ITEM_KINDS:
+        raise ValueError('item_kind must be metric, file or parameters')
+    return kind
+
+
+def _native_id(value, name):
+    if not isinstance(value, str) or not _ID.fullmatch(value):
+        raise ValueError(f'{name} must be a native id')
+    return value
+
+
+def _bindr_target(name, bindr_id, item_kind, item_id):
+    if (name is None) == (bindr_id is None):
+        raise ValueError('Pass a bindr name or a bindr_id')
+    body = {'name': _bindr_names([name])[0]} if name is not None else {'bindrId': _native_id(bindr_id, 'bindr_id')}
+    if item_kind is not None or item_id is not None:
+        body['item'] = {'kind': _item_kind(item_kind), 'id': _native_id(item_id, 'item_id')}
+    return body
+
+
+def _confirmed_bindrs(result, names):
+    """A create that asked for bindrs must answer every one of them attached; anything less is a failed create."""
+    if names:
+        attached = {bindr.get('name') for bindr in result.get('bindrs') or [] if isinstance(bindr, dict)}
+        missing = [name for name in names if name not in attached]
+        if missing:
+            raise NativeExperimentError(None, f'The server did not confirm the run\'s bindrs {missing}')
+    return result
+
+
 def _error(response: httpx.Response, action: str) -> NativeExperimentError:
     try:
         body = response.json()
@@ -397,8 +439,7 @@ class NativeRemoteClient:
         if (project != connection.project or not segments or segments[-1] != name
                 or not all(_segment(segment) for segment in segments)):
             raise ValueError('Native prefix must be the selected namespace/project, then folders and the run name')
-        if bindrs:
-            raise ValueError('Native runs do not support bindrs from the SDK')
+        names = _bindr_names(bindrs)
         if metadata is not None and not isinstance(metadata, dict):
             raise ValueError('Native run metadata must be a dict')
         # Interactive means no writer option at all (`_explicit_writer`); the server decides finally.
@@ -415,17 +456,52 @@ class NativeRemoteClient:
             body['metadata'] = metadata
         if connection.run_id:
             # A writer bound to a run opens that run by id, never by key: a renamed run or a reused
-            # key cannot redirect it. Its description/tags/metadata are updated in place.
-            if body:
-                return self._json('PATCH', self._run(connection.run_id), 'Native run update', json=body)
-            return self._json('GET', self._run(connection.run_id), 'Native run read')
+            # key cannot redirect it. Its description/tags/metadata are updated in place; its bindrs are attached.
+            result = (self._json('PATCH', self._run(connection.run_id), 'Native run update', json=body) if body
+                      else self._json('GET', self._run(connection.run_id), 'Native run read'))
+            for name in names:
+                self.attach_bindr(connection.run_id, name=name)
+            return result
+        if names:
+            # Found, or created at the top level, and attached with the create (before a protected birth), as ml-dash.
+            body['bindrs'] = names
         # A root ASCII key keeps today's route (no run lifecycle needed); any other path is a run path.
         path = (f'/runs/{quote(name, safe="")}' if len(segments) == 1 and _KEY.fullmatch(name)
                 else '/run-paths/' + '/'.join(quote(segment, safe='') for segment in segments))
         if write_protected:
             body['writeProtected'] = True
-            return self._person_json('PUT', path, 'Native run create', json=body)
-        return self._json('PUT', path, 'Native run create', json=body)
+            return _confirmed_bindrs(self._person_json('PUT', path, 'Native run create', json=body), names)
+        return _confirmed_bindrs(self._json('PUT', path, 'Native run create', json=body), names)
+
+    # -- bindrs (canonical labels of a run or of one of its items) ---------------------------------------------
+
+    def run_bindrs(self, experiment_id, item_kind=None, item_id=None):
+        """The bindrs a run (or one item of it: ``item_kind`` metric | file | parameters, ``item_id``) is in:
+        ``[{id, name, parent}]``. Read with the connection's read session (a selected writer's own, within its run)."""
+        params = {}
+        if item_kind is not None or item_id is not None:
+            params = {'itemKind': _item_kind(item_kind), 'itemId': _native_id(item_id, 'item_id')}
+        return self._json('GET', self._run(experiment_id) + '/bindrs', 'Native run bindrs', params=params)['bindrs']
+
+    def attach_bindr(self, experiment_id, name=None, bindr_id=None, item_kind=None, item_id=None):
+        """Attach the run (or one item) to a bindr, by ``name`` (found, or created at the top level) or ``bindr_id``.
+        Idempotent: ``attached`` is False when it already was. A writer may, within its project and run."""
+        body = _bindr_target(name, bindr_id, item_kind, item_id)
+        return self._json('POST', self._run(experiment_id) + '/bindrs', 'Native bindr attach', json=body)
+
+    def detach_bindr(self, experiment_id, name=None, bindr_id=None, item_kind=None, item_id=None):
+        """Detach the run (or one item) from a bindr (the bindr stays). ``detached`` is False when it was not attached."""
+        body = _bindr_target(name, bindr_id, item_kind, item_id)
+        return self._json('DELETE', self._run(experiment_id) + '/bindrs', 'Native bindr detach', json=body)
+
+    def files_in_bindr(self, experiment_id, bindr_name):
+        """``experiment.bindrs(name).list()``: the run's files labelled with that bindr (each file with its ``bindrs`` names)."""
+        found = []
+        for file in self.list_files(experiment_id, limit=100000)['files']:
+            names = [bindr['name'] for bindr in self.run_bindrs(experiment_id, 'file', file['id'])]
+            if bindr_name in names:
+                found.append({**file, 'bindrs': names})
+        return found
 
     def _person_session(self) -> str:
         """A plain project write session of the person (no writer), for one person's action; never cached."""
@@ -492,6 +568,11 @@ class NativeRemoteClient:
     def get_parameters(self, experiment_id):
         result = self._json('GET', self._run(experiment_id) + '/parameters', 'Native parameters read')
         return (result.get('parameters') or {}).get('data') or None
+
+    def parameters_id(self, experiment_id):
+        """The id of the run's current parameters (the ``parameters`` item of its bindr labels), or None before any."""
+        result = self._json('GET', self._run(experiment_id) + '/parameters', 'Native parameters read')
+        return (result.get('parameters') or {}).get('id')
 
     def create_log_entries(self, experiment_id, logs):
         return self._json('POST', self._run(experiment_id) + '/logs', 'Native log write',
