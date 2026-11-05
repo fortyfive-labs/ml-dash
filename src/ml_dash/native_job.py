@@ -53,6 +53,9 @@ class NativeJobDataClient(NativeRemoteClient):
         self._lock = threading.RLock()
         # '' = no request refused yet; None = the server refused the last session (401): renew it.
         self._token = ''
+        # The base `_send` clears its per-mode session cache on a 401 or a retired credential. This client
+        # never fills it (its one broker session is `_token`), but it must exist for those paths to reach renewal.
+        self._sessions = {}
 
     def _session_token(self) -> str:
         with self._lock:
