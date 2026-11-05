@@ -13,7 +13,8 @@ from ml_dash.managed import ManagedConnection
 
 @pytest.fixture
 def broker(monkeypatch):
-    state = {'calls': [], 'override': {}, 'status': 200}
+    # 'refuse': (status, body) answers for the next data POSTs, before any write.
+    state = {'calls': [], 'override': {}, 'status': 200, 'refuse': []}
     artifact = {'id': 'b'*24, 'filename': 'model.txt', 'prefix': '/models',
                 'checksum': hashlib.sha256(b'model state').hexdigest()}
     class Handler(BaseHTTPRequestHandler):
@@ -36,6 +37,8 @@ def broker(monkeypatch):
             else:
                 assert self.headers.get('authorization') == 'Bearer synthetic-lease'
                 result, status = (artifact if self.path.endswith('/files') else {'count': 1}), 200
+                if state['refuse']:
+                    status, result = state['refuse'].pop(0)
             payload = json.dumps(result).encode()
             self.send_response(status)
             self.send_header('Content-Type', 'application/json')
@@ -223,6 +226,22 @@ def test_native_job_data_methods_use_the_broker_session_and_only_the_platform_ru
     assert [c[0] for c in data] == [root + '/runs/fixed-run/tracks/robot%2Fpose/append_batch', root + '/runs/fixed-run/metrics/loss']
     assert data[1][1] == {'dataPoints': [{'v': 1}], 'description': 'loss'}
     assert all(auth == 'Bearer synthetic-lease' for _, _, auth in data)
+
+    # A pre-write 401 renews the job's lease through the broker exactly once, then the request succeeds.
+    sessions = sum(p == '/session' for p, _, _ in broker['calls'])
+    broker['refuse'].append((401, {}))
+    client.append_batch_to_metric('fixed-run', 'loss', [{'v': 2}])
+    assert sum(p == '/session' for p, _, _ in broker['calls']) == sessions + 1
+    metric = root + '/runs/fixed-run/metrics/loss'
+    assert [c[:2] for c in broker['calls'][-3:]] == [(metric, {'dataPoints': [{'v': 2}]}), ('/session', {}),
+                                                    (metric, {'dataPoints': [{'v': 2}]})]
+    # A retired credential is the server's refusal, raised as it is; nothing is replayed.
+    from ml_dash.native import NativeExperimentError
+    calls = len(broker['calls'])
+    broker['refuse'].append((403, {'error': {'code': 'NATIVE_CREDENTIAL_RETIRED'}}))
+    with pytest.raises(NativeExperimentError) as retired:
+        client.append_batch_to_metric('fixed-run', 'loss', [{'v': 3}])
+    assert retired.value.code == 'NATIVE_CREDENTIAL_RETIRED' and len(broker['calls']) == calls + 1
     client.close()
 
 
