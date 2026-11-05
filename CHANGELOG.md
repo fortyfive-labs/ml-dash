@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified). Nested folders, bindrs, run metadata, write protection, metric metadata and metric reads are refused or not yet available on this path.
+## [0.13.0] - 2026-11-05
+
+- Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified).
+- Native run data parity with the Dash API (requires a DreamLake server with native run-data edits): a metric's description, tags and metadata are stored with its first points in one request (later appends never change them; `update_metric` edits them); `stats()`, `list_all()`, and `read_rows()`/`iter_row_blocks()` with the canonical metric id, limit 1-10000, an exact cursor and typed cells (nested values are refused, `unsupported_cell`); file `update()` and `delete()`; `query_logs()` filters by level, time range, substring and order; `delete_parameters()`.
+- Not yet on native runs: tracks (`NATIVE_UNSUPPORTED`), nested folders, bindrs, run metadata and write protection.
 
 ## [0.12.0] - 2026-11-01
 
