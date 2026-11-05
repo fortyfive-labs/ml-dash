@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Native metric names follow ml-dash's rule (requires a DreamLake server with the matching native routes): any name of 1-256 characters without `/` (not `.`/`..`), sent percent-encoded as one path segment, so names such as `训练` or `training loss` work as they did with ml-dash. The SDK previously refused anything outside `[A-Za-z0-9_.-]{1,128}`.
+
 ## [0.14.0] - 2026-11-05
 
 - Tracks on native runs, whichever store holds the run (requires a DreamLake server with native tracks): `exp.tracks(topic)` appends (single and batched `flush()`), `read()`/`list_entries()` with inclusive `start_timestamp`/`end_timestamp` and `columns`, `slice()`/`findByTime()`, and the client's `create_track`, `list_tracks` (all, an exact topic, or `prefix/*`) and `get_track_data`. Entries are flattened to dot keys (arrays kept) and returned in timestamp order. Formats: `json` (dict), and as bytes `jsonl`, `parquet` (an Arrow IPC file, as Dash: `timestamp` first, objects and arrays as JSON text; a column mixing value types is refused) and `mcap` (one topic, or every topic under a prefix; camera topics embed the run's images). A numeric `timestamp` field in an entry's data is that entry's timestamp; a non-numeric one is refused.
