@@ -185,6 +185,60 @@ def test_native_run_data_edits_against_local_server(tmp_path):
         assert [e['message'] for e in client.query_logs(exp.id, search='epoch', order='asc')['logs']] == ['epoch 1 started']
 
 
+def test_native_tracks_against_local_server():
+    """ml-dash tracks through the public API: append/flush, ranged reads, slice and findByTime floor match."""
+    import uuid
+
+    from ml_dash.exceptions import StorageError
+
+    env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'tracks-{uuid.uuid4().hex[:8]}'
+    connection = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=connection).run as exp:
+        pose = exp.tracks('robot/pose')
+        for ts in (1.0, 3.0, 5.0, 7.0):
+            pose.append(q=[ts, ts + 0.5], ee={'x': ts}, _ts=ts)
+        exp.tracks('camera/left').append(width=640, _ts=-1)  # inherits the last timestamp, 7.0
+        exp.tracks.flush()
+
+        entries = pose.list_entries()
+        assert [e['timestamp'] for e in entries] == [1.0, 3.0, 5.0, 7.0]
+        assert entries[0] == {'timestamp': 1.0, 'q': [1.0, 1.5], 'ee.x': 1.0}
+        ranged = pose.read(start_timestamp=3.0, end_timestamp=5.0, columns=['q'])
+        assert ranged['count'] == 2 and ranged['entries'][0] == {'timestamp': 3.0, 'q': [3.0, 3.5]}
+        assert pose.read(format='jsonl').count(b'\n') == 3
+
+        window = pose.slice(start_timestamp=1.0, end_timestamp=7.0)
+        assert len(window) == 4 and [e['timestamp'] for e in window] == [1.0, 3.0, 5.0, 7.0]
+        assert window.findByTime(5.5)['timestamp'] == 5.0
+        assert [e['timestamp'] for e in window.findByTime([1.0, 3.5, 9.0])] == [1.0, 3.0, 7.0]
+        with pytest.raises(StorageError):
+            window.findByTime(0.5)
+
+        # Sparse and nested fields round-trip flattened; time selection through slice.
+        imu = exp.tracks('robot/imu')
+        imu.append(acc={'x': 0.1, 'y': 0.2}, _ts=10.0)
+        imu.append(gyro=[1, 2, 3], _ts=11.0)
+        imu.append(acc={'x': 0.3}, temp=36.5, _ts=12.0)
+        exp.tracks.flush()
+        assert imu.list_entries() == [{'timestamp': 10.0, 'acc.x': 0.1, 'acc.y': 0.2}, {'timestamp': 11.0, 'gyro': [1, 2, 3]},
+                                      {'timestamp': 12.0, 'acc.x': 0.3, 'temp': 36.5}]
+        assert [e['timestamp'] for e in imu.slice(start_timestamp=11.0, end_timestamp=12.0)] == [11.0, 12.0]
+
+        client = exp._client
+        assert [t['topic'] for t in client.list_tracks(exp.id, 'robot/*')] == ['robot/pose', 'robot/imu']
+        listed = {t['topic']: t for t in client.list_tracks(exp.id)}
+        assert listed['robot/imu']['columns'] == ['acc.x', 'acc.y', 'gyro', 'temp'] and listed['robot/imu']['totalEntries'] == 3
+        camera = client.get_track_data(exp.id, 'camera/left')
+        assert camera == {'entries': [{'timestamp': 7.0, 'width': 640}], 'count': 1}
+        created = client.create_track(exp.id, 'robot/pose', description='ignored')
+        assert created['topic'] == 'robot/pose' and created['experimentId'] == exp.id
+        # Binary exports, as ml-dash: bytes. MCAP starts with its magic; a prefix exports every topic under it.
+        assert pose.read(format='mcap').startswith(b'\x89MCAP0\r\n')
+        assert client.get_track_data(exp.id, 'robot', format='mcap').startswith(b'\x89MCAP0\r\n')
+        assert pose.read(format='parquet')[:6] == b'ARROW1'
+
+
 def test_native_graphql_helpers_against_local_server(monkeypatch):
     """ml-dash's GraphQL helpers and raw queries reach DreamLake's native compatibility endpoint."""
     import uuid

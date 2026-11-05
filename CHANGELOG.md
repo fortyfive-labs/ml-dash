@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Platform jobs on DreamLake-native runs (`Experiment()` inside a job, through the local job broker) can now use the native run data methods the job capability permits: tracks (`exp.tracks(...)` append/read in json, jsonl, parquet and mcap, `create_track`, `list_tracks`), metric descriptors, `stats()`, `list_metrics`, `read_rows()` (paged past 1000), `update_metric`, `query_logs`, `delete_parameters`, and file `get_file`/`update()`/`delete()`. They reuse `NativeRemoteClient` over the job's own broker session and only for the job's run; another run is refused before any request. Run creation, status, metadata and credentials stay platform- or human-controlled; managed (non-native) jobs keep their previous refusals.
+
 ## [0.13.0] - 2026-11-05
 
 - Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified).

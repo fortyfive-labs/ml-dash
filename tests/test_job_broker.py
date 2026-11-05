@@ -200,3 +200,38 @@ def test_job_page_requires_one_exact_run_query(broker, query):
     broker['override']['experimentUrl'] = broker['url'] + '/lab/projects/research/experiments' + ('?' + query if query else '')
     with pytest.raises(ValueError, match='job experiment session'):
         ManagedConnection.from_job()
+
+
+def test_native_job_data_methods_use_the_broker_session_and_only_the_platform_run(broker):
+    from ml_dash.managed import JobManagedConnection
+    from ml_dash.native_job import NATIVE_JOB_DATA_METHODS
+    root = '/native-experiments/ns/lab/projects/research'
+    broker['override'].update(instanceId='dreamlake-native-v1', apiUrl=broker['url'] + root)
+    client = JobManagedConnection().client()
+    sessions = len(broker['calls'])
+    # Attribute probes and repr never reach the broker; every permitted data method is a real method.
+    repr(client), hasattr(client, '_not_a_method'), hasattr(client, 'list_credentials')
+    assert len(broker['calls']) == sessions
+    assert all(callable(getattr(client, name)) for name in NATIVE_JOB_DATA_METHODS)
+    assert not hasattr(client, 'list_credentials') and not hasattr(client, 'retire_credential')
+
+    client.append_batch_to_track('fixed-run', 'robot/pose', [{'timestamp': 1, 'x': 1}])
+    client.append_batch_to_metric('fixed-run', 'loss', [{'v': 1}], description='loss')
+    with pytest.raises(ValueError, match='platform run'):
+        client.append_to_track('other-run', 'robot/pose', 2, {'x': 2})
+    data = [c for c in broker['calls'] if c[0] != '/session']
+    assert [c[0] for c in data] == [root + '/runs/fixed-run/tracks/robot%2Fpose/append_batch', root + '/runs/fixed-run/metrics/loss']
+    assert data[1][1] == {'dataPoints': [{'v': 1}], 'description': 'loss'}
+    assert all(auth == 'Bearer synthetic-lease' for _, _, auth in data)
+    client.close()
+
+
+def test_managed_job_keeps_its_refusals_for_native_only_data(broker):
+    from ml_dash.managed import JobManagedConnection
+    client = JobManagedConnection().client()
+    with pytest.raises(ValueError, match='native platform run'):
+        client.get_track_data('fixed-run', 'robot/pose')
+    with pytest.raises(ValueError, match='metric metadata'):
+        client.append_batch_to_metric('fixed-run', 'loss', [{'v': 1}], description='loss')
+    assert all(p == '/session' for p, _, _ in broker['calls'])
+    client.close()
