@@ -99,6 +99,8 @@ writer = connection.create_credential(idempotency_key="7f0b…uuid")  # or let a
 # CI: a fresh process with an explicitly provided DREAMLAKE_API_KEY (and DREAMLAKE_REMOTE)
 ci = NativeConnection.from_login("my-namespace", "my-project", workload_id=writer["id"])
 bound = NativeConnection.from_login("my-namespace", "my-project", run_id=RUN_ID)  # writes only that run, opened by id
+# reuse a run-bound writer: pass its run too (without it the session is rejected; scope is never widened)
+bound_ci = NativeConnection.from_login("my-namespace", "my-project", workload_id=writer["id"], run_id=RUN_ID)
 
 connection.list_credentials()
 connection.rotate_credential(writer["id"], expected_generation=1)  # older sessions stop

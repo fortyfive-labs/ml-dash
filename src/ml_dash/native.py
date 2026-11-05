@@ -78,6 +78,8 @@ class NativeConnection:
       replacement is ever registered;
     - ``run_id`` binds the writer to that one existing run: the experiment opens that run
       by id, and no other run is written or created.
+    - a writer bound to a run is reused with both: ``workload_id=ID, run_id=RUN``. Without
+      ``run_id`` its session is rejected as invalid; the SDK never widens or infers the scope.
 
     The credential is metadata only: sessions come from the login, last 60 seconds, and
     use the person's current project role. Manage writers with ``list_credentials``,
