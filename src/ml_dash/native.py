@@ -21,7 +21,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MlDashError
+from .exceptions import MetricRowsError, MlDashError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 
@@ -30,8 +30,10 @@ _ID = re.compile(r'[0-9a-f]{24}')
 _METRIC = re.compile(r'[A-Za-z0-9_.-]{1,128}')
 # The server's sessions live 60 s; renew well before so a request never races expiry.
 _SESSION_SECONDS = 50
-# The native metric rows route returns at most this many rows per page.
-_ROWS_PAGE_MAX = 1000
+# The native metric rows route returns at most this many rows per request; ml-dash's rows read
+# allows a page of up to 10000 (default 1000), which is filled from several requests.
+_ROWS_REQUEST_MAX = 1000
+_ROWS_DEFAULT, _ROWS_MAX = 1000, 10000
 
 
 class NativeExperimentError(MlDashError):
@@ -103,8 +105,6 @@ class NativeRemoteClient:
         self._lock = threading.RLock()
         self._token = None
         self._renew_at = 0.0
-        # (run id, metric name) -> the description/tags/metadata last stored, so each is sent once.
-        self._metric_meta = {}
 
     # -- session ----------------------------------------------------------------
 
@@ -211,16 +211,15 @@ class NativeRemoteClient:
 
     def append_batch_to_metric(self, experiment_id, metric_name, data_points, description=None,
                                tags=None, metadata=None, **kwargs):
-        """Append points; the metric's description, tags and metadata are stored once, after its first points."""
-        path = self._metric(experiment_id, metric_name)
-        result = self._json('POST', path, 'Native metric write', json={'dataPoints': data_points})
-        meta = {key: value for key, value in (('description', description), ('tags', list(tags) if tags else None),
-                                              ('metadata', metadata)) if value}
-        key = (experiment_id, metric_name)
-        if meta and self._metric_meta.get(key) != meta:
-            self._json('PATCH', path, 'Native metric metadata write', json=meta)
-            self._metric_meta[key] = meta
-        return result
+        """Append points in one request. As in ml-dash, ``description``/``tags``/``metadata`` are the metric's
+        descriptor: the server stores them with the points, in the same commit, only when this append creates
+        the metric; later appends never change them (use ``update_metric``). An invalid descriptor is refused
+        with nothing written."""
+        body = {'dataPoints': data_points}
+        for key, value in (('description', description), ('tags', list(tags) if tags else None), ('metadata', metadata)):
+            if value:
+                body[key] = value
+        return self._json('POST', self._metric(experiment_id, metric_name), 'Native metric write', json=body)
 
     def append_to_metric(self, experiment_id, metric_name, data, **kwargs):
         return self.append_batch_to_metric(experiment_id, metric_name, [data], **kwargs)
@@ -247,27 +246,39 @@ class NativeRemoteClient:
         raise _index_read_unsupported('read_metric_data')
 
     def read_metric_rows(self, experiment_id, metric_name, limit=None, cursor=None):
-        """One page of a metric's committed rows as a ``MetricRowsPage``.
+        """One page of a metric's committed rows as a ``MetricRowsPage``, as ``RemoteClient.read_metric_rows``.
 
-        Native rows are JSON objects; consecutive rows with the same fields and value types form one
-        block. Numbers are float64 or int64, ``true``/``false`` bool, strings utf8; a nested object
-        or list is returned as its JSON text (utf8). Pages hold at most 1000 rows.
+        ``limit``: 1-10000 rows (default 1000); the page is filled from as many native requests as it needs,
+        so no row is skipped. ``cursor`` is opaque. ``metric_id`` is the metric's canonical id. Consecutive rows
+        with the same fields form a block; numbers are int64 (promoted to float64 when a column mixes them),
+        float64, bool or utf8, ``null`` a None cell. A nested object or list has no ml-dash cell type and is
+        refused (``MetricRowsError``, code ``unsupported_cell``), never converted.
         """
-        params = {'limit': str(min(limit or _ROWS_PAGE_MAX, _ROWS_PAGE_MAX))}
-        if cursor is not None:
-            params['cursor'] = cursor
-        result = self._json('GET', self._metric(experiment_id, metric_name), 'Native metric read', params=params)
-        blocks = []
-        for row in result.get('rows') or []:
-            columns = tuple(MetricColumn(name, _wire_type(value)) for name, value in row.items())
-            cells = [_cell(value) for value in row.values()]
-            if blocks and blocks[-1].columns == columns:
-                blocks[-1].rows.append(cells)
-            else:
-                blocks.append(MetricRowBlock(columns, [cells]))
-        next_cursor = result.get('nextCursor')
-        return MetricRowsPage(metric_id=f'{experiment_id}/{metric_name}', blocks=blocks,
-                              returned=sum(len(block.rows) for block in blocks), has_more=next_cursor is not None,
+        if limit is None:
+            limit = _ROWS_DEFAULT
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= _ROWS_MAX:
+            raise MetricRowsError(f'limit must be an integer between 1 and {_ROWS_MAX}', 400, 'invalid_limit')
+        if cursor is not None and (not isinstance(cursor, str) or not cursor.isdigit()):
+            raise MetricRowsError('Invalid cursor; pass next_cursor from the previous page', 400, 'invalid_cursor')
+        rows, metric_id, next_cursor = [], None, cursor
+        while True:
+            params = {'limit': str(min(limit - len(rows), _ROWS_REQUEST_MAX))}
+            if next_cursor is not None:
+                params['cursor'] = next_cursor
+            try:
+                result = self._json('GET', self._metric(experiment_id, metric_name), 'Native metric read', params=params)
+            except NativeExperimentError as error:
+                raise MetricRowsError(str(error), error.status or 0,
+                                      'metric_not_found' if error.status == 404 else error.code) from None
+            metric_id = result.get('metricId')
+            rows.extend(result.get('rows') or [])
+            next_cursor = result.get('nextCursor')
+            if next_cursor is None or len(rows) >= limit:
+                break
+        if not isinstance(metric_id, str):
+            raise MetricRowsError('Malformed metric rows response: metricId missing', 200)
+        blocks = _blocks(rows)
+        return MetricRowsPage(metric_id=metric_id, blocks=blocks, returned=len(rows), has_more=next_cursor is not None,
                               next_cursor=next_cursor, visibility='committed', order='storage')
 
     # -- logs -------------------------------------------------------------------
@@ -337,7 +348,8 @@ class NativeRemoteClient:
         return self._json('GET', self._file(experiment_id, file_id), 'Native file read')['file']
 
     def delete_file(self, experiment_id, file_id):
-        """Remove the file and its stored bytes: ``{id, deleted}``."""
+        """Delete the file, as ml-dash: it leaves every listing and read at once and cannot be restored
+        (re-uploading the same path creates it anew). Returns ``{id, nodeId, deleted}``."""
         return self._json('DELETE', self._file(experiment_id, file_id), 'Native file delete')
 
     def update_file(self, experiment_id, file_id, description=None, tags=None, metadata=None):
@@ -362,17 +374,51 @@ class NativeRemoteClient:
         self._http.close()
 
 
-def _wire_type(value):
+
+def _cell_type(value):
+    """The ml-dash wire type of a JSON value, None for a null cell; a nested value has none."""
+    if value is None:
+        return None
     if isinstance(value, bool):
         return 'bool'
     if isinstance(value, int):
         return 'int64'
     if isinstance(value, float):
         return 'float64'
-    return 'utf8'
+    if isinstance(value, str):
+        return 'utf8'
+    raise MetricRowsError('Metric row holds a nested value, which has no ml-dash cell type', 200, 'unsupported_cell')
 
 
-def _cell(value):
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    return json.dumps(value, separators=(',', ':'))
+def _blocks(rows):
+    """Group rows into blocks of one schema: same field names; a column's type is fixed by its first
+    non-null cell (int64 widens to float64); any other type change starts a new block."""
+    blocks = []  # [names, types, rows]
+    for row in rows:
+        names, cells = tuple(row), list(row.values())
+        kinds = [_cell_type(value) for value in cells]
+        current = blocks[-1] if blocks and blocks[-1][0] == names else None
+        if current is not None:
+            merged = []
+            for have, got in zip(current[1], kinds):
+                if have is None or got is None or have == got:
+                    merged.append(have or got)
+                elif {have, got} == {'int64', 'float64'}:
+                    merged.append('float64')
+                else:
+                    current = None
+                    break
+            if current is not None:
+                current[1] = merged
+                current[2].append(cells)
+                continue
+        blocks.append([names, kinds, [cells]])
+    result = []
+    for names, kinds, block_rows in blocks:
+        kinds = [kind or 'float64' for kind in kinds]
+        for row in block_rows:
+            for i, kind in enumerate(kinds):
+                if kind == 'float64' and isinstance(row[i], int) and not isinstance(row[i], bool):
+                    row[i] = float(row[i])
+        result.append(MetricRowBlock(tuple(MetricColumn(name, kind) for name, kind in zip(names, kinds)), block_rows))
+    return result
