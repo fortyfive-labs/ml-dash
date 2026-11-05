@@ -87,6 +87,31 @@ Runs are stored by DreamLake (not a managed Dash instance) and use the same
 Not yet available on native runs: tracks, nested folders, bindrs, run metadata
 and write protection.
 
+### Native writers (workload credentials)
+
+Native writes go through a writer, as with `ManagedConnection`: each client
+registers one writer on its first session and renews by its id. A writer is
+metadata only. Its sessions come from your DreamLake login, last 60 seconds and
+use your current project role. Only you can see or change your writers.
+
+```python
+writer = connection.create_credential(idempotency_key="7f0b…uuid")  # or let a client register one
+# CI: a fresh process with an explicitly provided DREAMLAKE_API_KEY (and DREAMLAKE_REMOTE)
+ci = NativeConnection.from_login("my-namespace", "my-project", workload_id=writer["id"])
+bound = NativeConnection.from_login("my-namespace", "my-project", run_id=RUN_ID)  # writes only that run, opened by id
+# reuse a run-bound writer: pass its run too (without it the session is rejected; scope is never widened)
+bound_ci = NativeConnection.from_login("my-namespace", "my-project", workload_id=writer["id"], run_id=RUN_ID)
+
+connection.list_credentials()
+connection.rotate_credential(writer["id"], expected_generation=1)  # older sessions stop
+connection.retire_credential(writer["id"], expected_generation=2)  # the writer stops; nothing replaces it
+```
+
+A rotated writer's old session gets `NATIVE_CREDENTIAL_RETIRED` once, and the
+next call renews under the new generation. A retired writer is never silently
+replaced. This requires a DreamLake server whose native `status` lists
+`workload-credentials`.
+
 ## DreamLake job lifecycle (explicit opt-in)
 
 `JobLifecycle` reports application outcomes through the existing authenticated

@@ -21,7 +21,8 @@ def test_native_experiment_writes_only_native_routes_with_project_sessions(monke
         if path == ROOT + '/session':
             issued[0] += 1
             return httpx.Response(200, json={'token': f'session-{issued[0]}', 'expiresAt': 0,
-                                             'apiUrl': 'https://dreamlake.test' + ROOT})
+                                             'apiUrl': 'https://dreamlake.test' + ROOT,
+                                             'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1})
         if path.endswith('/parameters') and not rejected:
             rejected.append(auth)  # an expired session: refused before any write
             return httpx.Response(401, json={'error': {'code': 'NATIVE_LOGIN_REQUIRED'}})
@@ -52,6 +53,72 @@ def test_native_experiment_writes_only_native_routes_with_project_sessions(monke
     assert written['logs']['entries'][0]['message'] == 'hello'
     assert written['train']['dataPoints'][0]['loss'] == 0.5
     assert written['status'] == {'status': 'COMPLETED'}
+    # One writer per client, as ManagedConnection: registered once, then renewed by its id.
+    sessions = [c[4] for c in calls if c[2].endswith('/session')]
+    assert set(sessions[0]) == {'mode', 'idempotencyKey'} and sessions[1] == {'mode': 'write', 'workloadId': sessions[0]['idempotencyKey']}
+
+
+def _writer_server(monkeypatch, state):
+    """A native server double for writer sessions: generation, retirement and the bound run."""
+    calls = []
+
+    def handle(request):
+        path = request.url.path
+        body = json.loads(request.content) if request.content else None
+        calls.append((request.method, path, request.headers.get('authorization'), body))
+        if path == ROOT + '/session':
+            writer = body.get('workloadId') or body.get('idempotencyKey')
+            if not state['active']:
+                return httpx.Response(403, json={'error': {'code': 'NATIVE_CREDENTIAL_RETIRED'}})
+            return httpx.Response(200, json={'token': f'gen-{state["generation"]}', 'expiresAt': 0,
+                                             'apiUrl': 'https://dreamlake.test' + ROOT, 'workloadId': writer,
+                                             'generation': state['generation'], **({'runId': body['runId']} if 'runId' in body else {})})
+        if request.headers.get('authorization') != f'Bearer gen-{state["generation"]}' or not state['active']:
+            return httpx.Response(403, json={'error': {'code': 'NATIVE_CREDENTIAL_RETIRED'}})
+        if request.method in ('GET', 'PATCH') and path == f'{ROOT}/runs/{RUN_ID}':
+            return httpx.Response(200, json={'experiment': {'id': RUN_ID, 'name': 'renamed'}})
+        return httpx.Response(200, json={'count': 1})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    return calls
+
+
+def test_native_writer_renews_after_rotation_and_is_never_replaced_once_retired(monkeypatch):
+    from ml_dash.native import NativeExperimentError
+    state = {'generation': 1, 'active': True}
+    calls = _writer_server(monkeypatch, state)
+    writer = '0b0b0b0b-0000-4000-8000-000000000001'
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'ci-login', workload_id=writer).client()
+    client.set_parameters(RUN_ID, {'lr': 1})
+    state['generation'] = 2  # rotated: the old session is refused once, the next call renews under generation 2
+    with pytest.raises(NativeExperimentError) as refused:
+        client.set_parameters(RUN_ID, {'lr': 2})
+    assert refused.value.code == 'NATIVE_CREDENTIAL_RETIRED'
+    client.set_parameters(RUN_ID, {'lr': 3})
+    state['active'] = False  # retired
+    with pytest.raises(NativeExperimentError):
+        client.set_parameters(RUN_ID, {'lr': 4})
+    with pytest.raises(NativeExperimentError) as ended:
+        client.set_parameters(RUN_ID, {'lr': 5})
+    assert ended.value.code == 'NATIVE_CREDENTIAL_RETIRED'
+    sessions = [c[3] for c in calls if c[1].endswith('/session')]
+    # Every session names the given writer; none registers a replacement.
+    assert sessions and all(s == {'mode': 'write', 'workloadId': writer} for s in sessions)
+    assert {'data': {'lr': 3}} in [c[3] for c in calls if c[1].endswith('/parameters')]
+
+
+def test_native_run_bound_writer_opens_its_run_by_id(monkeypatch):
+    state = {'generation': 1, 'active': True}
+    calls = _writer_server(monkeypatch, state)
+    connection = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'ci-login', run_id=RUN_ID)
+    client = connection.client()
+    assert client.create_or_update_experiment('research', 'probe', prefix='lab/research/probe')['experiment']['id'] == RUN_ID
+    assert not any(c[0] == 'PUT' for c in calls)
+    session = next(c[3] for c in calls if c[1].endswith('/session'))
+    assert session['runId'] == RUN_ID and set(session) == {'mode', 'idempotencyKey', 'runId'}
+    with pytest.raises(ValueError):
+        NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'x', workload_id='not-a-uuid')
 
 
 def _local_server():
@@ -309,6 +376,10 @@ def test_native_default_namespace_and_project_create_refusal(tmp_path, monkeypat
 
 def test_native_read_session_and_anonymous_public_reads(tmp_path):
     """A READ grant reads through a read session; an anonymous connection reads a public project, never writes."""
+def test_native_workload_credentials_against_local_server(tmp_path):
+    """Writers against an isolated dreamlake-server: register, write, rotate, a fresh CI process, retire, bound run."""
+    import subprocess
+    import sys
     import uuid
 
     from ml_dash.native import NativeExperimentError
@@ -334,3 +405,87 @@ def test_native_read_session_and_anonymous_public_reads(tmp_path):
     with pytest.raises(NativeExperimentError) as local:
         anonymous.set_parameters(env['public_run'], {'x': 1})
     assert local.value.code == 'NATIVE_LOGIN_REQUIRED'
+    ns, project, base = env['namespace'], env['project'], env['base_url']
+    connection = NativeConnection(base, ns, project, lambda: env['writer_token'])
+    known = {c['id'] for c in connection.list_credentials(limit=100)['credentials']}
+    source = tmp_path / 'weights.bin'
+    source.write_bytes(os.urandom(2048))
+
+    # Default: the client registers one writer on its first session and writes through it.
+    with Experiment(prefix=f'{ns}/{project}/writer-{uuid.uuid4().hex[:8]}', managed=connection).run as exp:
+        run_id = exp.id
+        exp.params.set(lr=0.1)
+        exp.metrics('train').log(step=0, loss=1.0)
+        exp.files('ckpt').upload(str(source))
+        exp.flush()
+    (writer,) = {c['id'] for c in connection.list_credentials(limit=100)['credentials']} - known
+    credential = connection.get_credential(writer)
+    assert sorted(credential) == ['active', 'createdAt', 'generation', 'id', 'namespaceId', 'projectId', 'runId', 'updatedAt']
+    assert (credential['runId'], credential['generation'], credential['active']) == (None, 1, True)
+
+    client = NativeConnection(base, ns, project, lambda: env['writer_token'], workload_id=writer).client()
+    client.set_parameters(run_id, {'seed': 1})
+    assert connection.rotate_credential(writer, 1)['generation'] == 2
+    assert connection.rotate_credential(writer, 1)['generation'] == 2  # the exact retry is unchanged
+    with pytest.raises(NativeExperimentError) as stale:
+        client.set_parameters(run_id, {'seed': 2})
+    assert stale.value.code == 'NATIVE_CREDENTIAL_RETIRED'
+    client.set_parameters(run_id, {'seed': 3})  # renewed under generation 2
+
+    # CI: a new process with no saved login, only an explicit DREAMLAKE_API_KEY and the writer id.
+    script = ('import sys; from ml_dash import NativeConnection; '
+              'c = NativeConnection.from_login(sys.argv[1], sys.argv[2], workload_id=sys.argv[3]).client(); '
+              'c.append_batch_to_metric(sys.argv[4], "ci", [{"v": 1}]); print(c.workload_id)')
+    ci = subprocess.run([sys.executable, '-c', script, ns, project, writer, run_id], capture_output=True, text=True,
+                        env={'PATH': os.environ['PATH'], 'HOME': str(tmp_path), 'ML_DASH_MANAGED_CONFIG_DIR': str(tmp_path / 'none'),
+                             'DREAMLAKE_REMOTE': base, 'DREAMLAKE_API_KEY': env['writer_token']})
+    assert ci.returncode == 0, ci.stderr[-2000:]
+    assert ci.stdout.strip() == writer
+
+    retired = connection.retire_credential(writer, 2)
+    assert (retired['generation'], retired['active']) == (3, False)
+    with pytest.raises(NativeExperimentError):
+        client.set_parameters(run_id, {'seed': 4})
+    with pytest.raises(NativeExperimentError) as ended:
+        NativeConnection(base, ns, project, lambda: env['writer_token'], workload_id=writer).client().set_parameters(run_id, {'seed': 5})
+    assert ended.value.code == 'NATIVE_CREDENTIAL_RETIRED'
+    assert {c['id'] for c in connection.list_credentials(limit=100)['credentials']} - known == {writer}  # no replacement
+
+    with httpx.Client(base_url=base + f'/native-experiments/ns/{ns}/projects/{project}',
+                      headers={'Authorization': 'Bearer ' + env['writer_token']}) as http:
+        assert http.get(f'/runs/{run_id}/parameters').json()['parameters']['data'] == {'lr': 0.1, 'seed': 3}
+        assert http.get(f'/runs/{run_id}/metrics/ci').json()['rows'] == [{'v': 1}]
+        assert len(http.get(f'/runs/{run_id}/files').json()['files']) == 1
+
+    # A writer bound to a run opens it by id whatever key the experiment names, and writes no other run.
+    with Experiment(prefix=f'{ns}/{project}/other-{uuid.uuid4().hex[:8]}', managed=connection).run as other:
+        other_id = other.id
+    bound = NativeConnection(base, ns, project, lambda: env['writer_token'], run_id=run_id)
+    with Experiment(prefix=f'{ns}/{project}/any-name', managed=bound).run as exp:
+        assert exp.id == run_id
+        exp.metrics('bound').log(step=0, v=1)
+    with pytest.raises(NativeExperimentError) as mismatch:
+        bound.client().set_parameters(other_id, {'seed': 6})
+    assert mismatch.value.code == 'NATIVE_RUN_SCOPE_MISMATCH'
+
+
+def test_native_graphql_uses_an_explicit_writers_session(monkeypatch):
+    """With an explicit writer, raw GraphQL is sent with that writer's scoped session, never the user's login."""
+    seen = []
+
+    def handle(request):
+        if request.url.path.endswith('/session'):
+            body = json.loads(request.content)
+            return httpx.Response(200, json={'token': 'writer-session', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT,
+                                             'workloadId': body.get('workloadId'), 'generation': 1})
+        seen.append((request.url.path, request.headers.get('authorization')))
+        return httpx.Response(200, json={'data': {'me': None}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    writer = '0b7f3a9e-1c2d-4e5f-8a9b-0c1d2e3f4a5b'
+    scoped = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login', workload_id=writer).client()
+    scoped.graphql_query('query { me { id } }')
+    human = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+    human.graphql_query('query { me { id } }')
+    assert seen == [('/native-dash/graphql', 'Bearer writer-session'), ('/native-dash/graphql', 'Bearer user-login')]
