@@ -593,3 +593,75 @@ def test_native_graphql_uses_an_explicit_writers_session(monkeypatch):
     human = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
     human.graphql_query('query { me { id } }')
     assert seen == [('/native-dash/graphql', 'Bearer writer-session'), ('/native-dash/graphql', 'Bearer user-login')]
+
+
+def test_native_delete_project_uses_dreamlakes_project_delete_with_native_purge(monkeypatch):
+    """delete_project: DreamLake's project delete, pinned to the project id read first, with the native data purged."""
+    from ml_dash.native import NativeExperimentError
+    project_id = 'b' * 24
+    calls = []
+
+    def handle(request):
+        calls.append((request.method, request.url.path, dict(request.url.params), request.headers.get('authorization')))
+        if request.method == 'GET' and request.url.path == '/namespaces/lab/projects/research':
+            return httpx.Response(200, json={'id': project_id, 'slug': 'research'})
+        if request.method == 'GET' and request.url.path == '/namespaces/lab/projects/missing':
+            return httpx.Response(404, json={'error': 'not found'})
+        if request.method == 'DELETE' and request.url.path == '/namespaces/lab/projects/research':
+            return httpx.Response(200, json={'deleted': True, 'project': {'id': project_id}, 'nativeCleanup': {'accepted': True, 'homes': []}})
+        raise AssertionError(f'unexpected {request.method} {request.url.path}')
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+    result = client.delete_project('research')
+    assert result['projectId'] == project_id and result['deleted'] is True and result['nativeCleanup'] == {'accepted': True, 'homes': []}
+    assert calls[-1][:3] == ('DELETE', '/namespaces/lab/projects/research', {'expectedProjectId': project_id, 'nativeExperiments': 'purge'})
+    assert calls[-1][3] == 'Bearer user-login'
+    with pytest.raises(NativeExperimentError) as missing:
+        client.delete_project('missing')
+    assert missing.value.status == 404
+    # A selected writer or an anonymous connection never deletes a project, and calls nothing.
+    calls.clear()
+    for connection in (NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login', workload_id='00000000-0000-4000-8000-000000000001'),
+                       NativeConnection.anonymous('https://dreamlake.test', 'lab', 'research')):
+        with pytest.raises(NativeExperimentError) as refused:
+            connection.client().delete_project()
+        assert refused.value.status == 403
+    assert calls == []
+
+
+def test_native_explicit_writer_graphql_against_local_server():
+    """Real SDK -> gateway: a run-bound writer's raw GraphQL uses its scoped session (never the login), reads its own
+    run only, and is refused (403) once the writer is retired; a new session is refused too."""
+    import uuid
+
+    from ml_dash.native import NativeExperimentError
+
+    env = _local_server()
+    ns, project = env['namespace'], env['project']
+    human = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    keys = [f'writer-own-{uuid.uuid4().hex[:6]}', f'writer-other-{uuid.uuid4().hex[:6]}']
+    ids = []
+    for key in keys:
+        with Experiment(prefix=f'{ns}/{project}/{key}', managed=human).run as exp:
+            ids.append(exp.id)
+    writer = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'],
+                              idempotency_key=str(uuid.uuid4()), run_id=ids[0]).client()
+    query = 'query ($id: ID!) { experimentById(id: $id) { id name } }'
+    assert writer.graphql_query(query, {'id': ids[0]})['experimentById'] == {'id': ids[0], 'name': keys[0]}
+    assert writer.graphql_query(query, {'id': ids[1]})['experimentById'] is None
+    assert writer.graphql_query('query { me { id } }')['me'] is None
+    listed = writer.graphql_query('query ($p: String!, $n: String) { experimentsPaginated(namespaceSlug: $n, projectSlug: $p) { totalCount experiments { id } } }',
+                                  {'p': project, 'n': ns})['experimentsPaginated']
+    assert listed == {'totalCount': 1, 'experiments': [{'id': ids[0]}]}
+
+    credential = human.get_credential(writer.workload_id)
+    human.retire_credential(credential['id'], credential['generation'])
+    with pytest.raises(httpx.HTTPStatusError) as retired:
+        writer.graphql_query(query, {'id': ids[0]})
+    assert retired.value.response.status_code == 403
+    writer._sessions.clear()
+    with pytest.raises(NativeExperimentError) as refused:
+        writer.graphql_query(query, {'id': ids[0]})
+    assert refused.value.status == 403
