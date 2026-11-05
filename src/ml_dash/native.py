@@ -358,10 +358,12 @@ class NativeRemoteClient:
             if response.is_success:
                 return response
             if stream:
+                # The refusal body carries its code; a body that cannot be read is never parsed.
                 try:
-                    response.read()  # the refusal body carries its code
+                    response.read()
                 except httpx.HTTPError:
-                    pass
+                    raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable (HTTP {response.status_code}); '
+                                                      'reconcile before retrying writes') from None
                 finally:
                     response.close()
             error = _error(response, action)
@@ -694,25 +696,99 @@ class NativeRemoteClient:
             raise ValueError('Invalid native file id')
         return self._run(experiment_id) + f'/files/{file_id}'
 
+    # -- files: a run's, or the project's (ml-dash's file methods take any file of the project) -------------
+
+    def _pinned_run(self):
+        """The one run this client may touch without being told (a job's), or None."""
+        return None
+
+    def _file_route(self, experiment_id, file_id):
+        """The route of a file of the selected project. ml-dash's ``experiment_id`` is optional (its file methods
+        address any file node by id): given, the file is that run's (a job or a run-bound writer still only its own
+        run); None, the file is located by id within the selected project, a run's or the project's own (README,
+        ``.dashrc``), with this client's scoped session, never the login."""
+        if not isinstance(file_id, str) or not _ID.fullmatch(file_id):
+            raise ValueError('Invalid native file id')
+        if experiment_id is None:
+            experiment_id = self._pinned_run()
+        if experiment_id is not None:
+            return self._file(experiment_id, file_id)
+        found = self._locate_file(file_id)
+        return self._file(found, file_id) if found else f'/project-files/{file_id}'
+
+    def _locate_file(self, file_id):
+        """The run id of a file of the selected project, or None for a project file; NATIVE_FILE_NOT_FOUND otherwise.
+        ml-dash's ``node(nodeId)``, sent with the session this client reads with (a project session sees only its
+        project; anonymous: a public project), and pinned to the selected namespace and project."""
+        connection = self.connection
+        anonymous = getattr(connection, '_provider', True) is None
+        mode = 'write' if self._explicit_writer() else 'read'
+        headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
+        query = 'query($id: String!) { node(nodeId: $id) { id type experimentId project { slug namespace { slug } } } }'
+        try:
+            response = self._http.post(connection.dreamlake_url + '/native-dash/graphql',
+                                       json={'query': query, 'variables': {'id': file_id}}, headers=headers)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'Native file lookup failed: DreamLake unavailable') from None
+        if response.status_code != 200:
+            raise _error(response, 'Native file lookup')
+        try:
+            body = response.json()
+            node = (body.get('data') or {}).get('node')
+            project = (node or {}).get('project') or {}
+        except (ValueError, AttributeError):
+            raise NativeExperimentError(None, 'Native file lookup returned an invalid response') from None
+        if (not node or body.get('errors') or node.get('type') != 'FILE' or node.get('id') != file_id
+                or project.get('slug') != connection.project or (project.get('namespace') or {}).get('slug') != connection.namespace):
+            raise NativeExperimentError(404, 'Native file not found in the selected project', 'NATIVE_FILE_NOT_FOUND')
+        run_id = node.get('experimentId')
+        if run_id is not None and not (isinstance(run_id, str) and _ID.fullmatch(run_id)):
+            raise NativeExperimentError(None, 'Native file lookup returned an invalid response')
+        return run_id
+
+    @staticmethod
+    def _file_view(view):
+        """The native file, plus the fields ml-dash's node answer had (``name``, ``type``, ``physicalFile``)."""
+        if not isinstance(view, dict):
+            return view
+        return {**view, 'name': view.get('filename'), 'type': 'FILE', 'physicalFile': {key: view.get(key)
+                for key in ('filename', 'checksum', 'sizeBytes', 'contentType')}}
+
     def get_file(self, experiment_id, file_id):
-        return self._json('GET', self._file(experiment_id, file_id), 'Native file read')['file']
+        """A file of the selected project: a run's (``experiment_id``) or, with None, any of the project's."""
+        return self._file_view(self._json('GET', self._file_route(experiment_id, file_id), 'Native file read')['file'])
+
+    def _project_file_change(self, method, route, action, **kwargs):
+        """A project file is changed only by a person (the server takes no session for it): explicit management with
+        this connection's own login. A selected writer, a job or an anonymous connection is refused before any
+        request; none ever falls back to the login."""
+        if self._explicit_writer() or getattr(self.connection, '_provider', None) is None:
+            raise NativeExperimentError(403, f'{action}: a project file is changed with a DreamLake login, not a writer '
+                                             'or job session', 'NATIVE_FORBIDDEN')
+        return self.connection._manage(method, route, action, **kwargs)
 
     def delete_file(self, experiment_id, file_id):
         """Delete the file, as ml-dash: it leaves every listing and read at once and cannot be restored
         (re-uploading the same path creates it anew). Returns ``{id, nodeId, deleted}``."""
-        return self._json('DELETE', self._file(experiment_id, file_id), 'Native file delete')
+        route = self._file_route(experiment_id, file_id)
+        if route.startswith('/project-files/'):
+            return self._project_file_change('DELETE', route, 'Native project file delete')
+        return self._json('DELETE', route, 'Native file delete')
 
     def update_file(self, experiment_id, file_id, description=None, tags=None, metadata=None):
         """Set description, tags and/or metadata (None leaves a field unchanged)."""
         body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
                 if value is not None}
-        return self._json('PATCH', self._file(experiment_id, file_id), 'Native file update', json=body)['file']
+        route = self._file_route(experiment_id, file_id)
+        if route.startswith('/project-files/'):
+            return self._file_view(self._project_file_change('PATCH', route, 'Native project file update', json=body)['file'])
+        return self._file_view(self._json('PATCH', route, 'Native file update', json=body)['file'])
 
     def download_file_streaming(self, experiment_id, file_id, dest_path):
         """As ``RemoteClient.download_file_streaming``: the file streamed to ``dest_path`` (never held in memory),
         verified against its stored sha256 before it appears there; a mismatch raises ``StorageError`` and leaves
         nothing at ``dest_path``. Returns ``dest_path``. An aborted or failed transfer leaves no partial file."""
-        path = self._file(experiment_id, file_id)
+        path = self._file_route(experiment_id, file_id)
         checksum = self._json('GET', path, 'Native file read')['file']['checksum']
         target = Path(dest_path)
         temp = target.with_name(f'.{target.name}.{uuid.uuid4().hex}.part')
@@ -759,7 +835,7 @@ class NativeRemoteClient:
             raise NetworkError('Failed to fetch current user from server: invalid response') from None
 
     def download_file(self, experiment_id, file_id, dest_path=None):
-        path = self._file(experiment_id, file_id)
+        path = self._file_route(experiment_id, file_id)
         info = self._json('GET', path, 'Native file read')['file']
         content = self._send('GET', path + '/download', 'Native file download', timeout=300).content
         if hashlib.sha256(content).hexdigest() != info['checksum']:

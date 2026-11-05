@@ -773,3 +773,76 @@ def test_native_public_client_methods_download_stream_current_user_and_index_rea
         with pytest.raises(ConfigurationError):
             getattr(client, method)(*args)
     assert calls == []
+
+
+def test_native_stream_refusal_whose_body_cannot_be_read_is_unavailable(monkeypatch, tmp_path):
+    """A refused streamed download whose body breaks mid-read raises the native 'unavailable' error, never ResponseNotRead."""
+    from ml_dash.native import NativeExperimentError
+
+    class Broken(httpx.SyncByteStream):
+        def __iter__(self):
+            raise httpx.ReadError('connection reset')
+
+    def handle(request):
+        if request.url.path.endswith('/session'):
+            body = json.loads(request.content)
+            writer = {} if body['mode'] == 'read' else {'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1}
+            return httpx.Response(200, json={'token': 's', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT, **writer})
+        if request.url.path.endswith('/download'):
+            return httpx.Response(503, stream=Broken())
+        return httpx.Response(200, json={'file': {'id': 'f' * 24, 'filename': 'w.bin', 'checksum': '0' * 64}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+    with pytest.raises(NativeExperimentError) as failed:
+        client.download_file_streaming(RUN_ID, 'f' * 24, str(tmp_path / 'w.bin'))
+    assert failed.value.status is None and 'unavailable' in str(failed.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_native_file_methods_reach_any_file_of_the_project_against_local_server(tmp_path):
+    """ml-dash's file methods take any file of the project: with experiment_id None, a project file (README) or a
+    run file is located by id; the person reads, streams, edits and deletes it; a writer cannot touch a project file."""
+    import hashlib
+    import uuid
+
+    from ml_dash.native import NativeExperimentError
+
+    env = _local_server()
+    ns, project, base = env['namespace'], env['project'], env['base_url']
+    root = f'{base}/native-experiments/ns/{ns}/projects/{project}'
+    readme = '# 项目\nhello\n'.encode()
+    name = f'README-{uuid.uuid4().hex[:6]}.md'
+    with httpx.Client(headers={'Authorization': 'Bearer ' + env['writer_token']}) as http:
+        uploaded = http.post(root + '/project-files', files=[('sizeBytes', (None, str(len(readme)))),
+            ('checksum', (None, hashlib.sha256(readme).hexdigest())), ('file', (name, readme, 'text/markdown'))])
+    assert uploaded.status_code == 200, uploaded.text
+    project_file = uploaded.json()['file']['id']
+
+    connection = NativeConnection(base, ns, project, lambda: env['writer_token'])
+    client = connection.client()
+    got = client.get_file(None, project_file)
+    assert (got['id'], got['name'], got['type'], got['physicalFile']['checksum']) == (project_file, name, 'FILE', hashlib.sha256(readme).hexdigest())
+    assert client.download_file_streaming(None, project_file, str(tmp_path / 'README.md')) == str(tmp_path / 'README.md')
+    assert (tmp_path / 'README.md').read_bytes() == readme
+    assert client.update_file(None, project_file, description='the readme')['description'] == 'the readme'
+
+    weights = tmp_path / 'weights.bin'
+    weights.write_bytes(os.urandom(4096))
+    with Experiment(prefix=f'{ns}/{project}/files-{uuid.uuid4().hex[:6]}', managed=connection).run as exp:
+        run_id = exp.id
+        exp.files('ckpt').upload(str(weights))
+        exp.flush()
+    run_file = client.list_files(run_id)['files'][0]['id']
+    located = client.get_file(None, run_file)  # no run named: located within the project
+    assert located['id'] == run_file and located['physicalFile']['checksum'] == hashlib.sha256(weights.read_bytes()).hexdigest()
+
+    writer = NativeConnection(base, ns, project, lambda: env['writer_token'], idempotency_key=str(uuid.uuid4())).client()
+    with pytest.raises(NativeExperimentError) as refused:  # never the login behind a writer
+        writer.update_file(None, project_file, description='by a writer')
+    assert refused.value.code == 'NATIVE_FORBIDDEN'
+    assert client.delete_file(None, project_file)
+    with pytest.raises(NativeExperimentError) as gone:
+        client.get_file(None, project_file)
+    assert gone.value.code == 'NATIVE_FILE_NOT_FOUND'
