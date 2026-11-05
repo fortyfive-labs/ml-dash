@@ -23,7 +23,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MetricRowsError, MlDashError, NetworkError
+from .exceptions import MetricRowsError, MlDashError, NetworkError, StorageError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .utils import _serialize_value
@@ -329,7 +329,9 @@ class NativeRemoteClient:
         return bool(getattr(connection, 'workload_id', None) or getattr(connection, 'idempotency_key', None)
                     or getattr(connection, 'run_id', None))
 
-    def _send(self, method: str, path: str, action: str, **kwargs) -> httpx.Response:
+    def _send(self, method: str, path: str, action: str, stream: bool = False, **kwargs) -> httpx.Response:
+        """One request with the right session; a 401 renews it once. ``stream``: the body is left unread for the
+        caller, who must close the response."""
         read = method == 'GET'
         # A connection without a login provider is anonymous; one without the attribute (a job's broker
         # destination, `native_job._BrokerDestination`) carries its own session.
@@ -341,18 +343,27 @@ class NativeRemoteClient:
         for attempt in range(2):
             headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
             try:
-                response = self._http.request(method, self.connection._root + path, headers=headers, **kwargs)
+                response = self._http.send(self._http.build_request(method, self.connection._root + path, headers=headers, **kwargs),
+                                           stream=stream)
             except httpx.HTTPError:
                 raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable; '
                                                   'reconcile before retrying writes') from None
             if response.status_code == 401 and attempt == 0 and not anonymous:
                 # 401 is decided before any write, so one retry with a fresh session is safe.
+                response.close()
                 with self._lock:
                     self._sessions.pop(mode, None)
                     self._token = None  # a subclass session (`NativeJobDataClient`) renews on this
                 continue
             if response.is_success:
                 return response
+            if stream:
+                try:
+                    response.read()  # the refusal body carries its code
+                except httpx.HTTPError:
+                    pass
+                finally:
+                    response.close()
             error = _error(response, action)
             if error.code == 'NATIVE_CREDENTIAL_RETIRED':
                 # Rotated: the next explicit call renews under the new generation. Retired: that
@@ -533,6 +544,18 @@ class NativeRemoteClient:
         from .client import _index_read_unsupported
         raise _index_read_unsupported('read_metric_data')
 
+    def get_metric_data(self, experiment_id, metric_name, start_index=None, limit=None, buffer_only=False):
+        """As ``RemoteClient.get_metric_data``: unsupported for remote metrics (no server-assigned indices);
+        raises ``ConfigurationError`` without a request. Use ``read_metric_rows``."""
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('get_metric_data')
+
+    def download_metric_chunk(self, experiment_id, metric_name, chunk_number):
+        """As ``RemoteClient.download_metric_chunk``: unsupported for remote metrics (no chunk numbers);
+        raises ``ConfigurationError`` without a request. Use ``read_metric_rows``."""
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('download_metric_chunk')
+
     def read_metric_rows(self, experiment_id, metric_name, limit=None, cursor=None):
         """One page of a metric's committed rows as a ``MetricRowsPage``, as ``RemoteClient.read_metric_rows``.
 
@@ -684,6 +707,56 @@ class NativeRemoteClient:
         body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
                 if value is not None}
         return self._json('PATCH', self._file(experiment_id, file_id), 'Native file update', json=body)['file']
+
+    def download_file_streaming(self, experiment_id, file_id, dest_path):
+        """As ``RemoteClient.download_file_streaming``: the file streamed to ``dest_path`` (never held in memory),
+        verified against its stored sha256 before it appears there; a mismatch raises ``StorageError`` and leaves
+        nothing at ``dest_path``. Returns ``dest_path``. An aborted or failed transfer leaves no partial file."""
+        path = self._file(experiment_id, file_id)
+        checksum = self._json('GET', path, 'Native file read')['file']['checksum']
+        target = Path(dest_path)
+        temp = target.with_name(f'.{target.name}.{uuid.uuid4().hex}.part')
+        response = self._send('GET', path + '/download', 'Native file download', stream=True, timeout=300)
+        digest = hashlib.sha256()
+        try:
+            with open(temp, 'xb') as out:
+                for chunk in response.iter_bytes(chunk_size=65536):
+                    digest.update(chunk)
+                    out.write(chunk)
+            if digest.hexdigest() != checksum:
+                raise StorageError(f'Checksum verification failed for file {file_id}')
+            os.replace(temp, target)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'Native file download failed: DreamLake unavailable') from None
+        finally:
+            response.close()
+            temp.unlink(missing_ok=True)
+        return dest_path
+
+    def get_current_user(self):
+        """As ``RemoteClient.get_current_user``: the DreamLake login's profile ``{id, username, email, name, given_name,
+        family_name, picture}`` (``username``: the login's namespace), from DreamLake's ``/auth/me``. Explicit
+        management with the person's own login: an anonymous connection, or a job's broker client, has none and
+        raises ``AuthenticationError``; a selected writer's session is never used for it."""
+        from .auth.exceptions import AuthenticationError
+        provider = getattr(self.connection, '_provider', None)
+        if provider is None:
+            raise AuthenticationError('Not authenticated: get_current_user needs a DreamLake login')
+        try:
+            response = self._http.get(self.connection.dreamlake_url + '/auth/me', headers={'Authorization': _authorization(provider())})
+        except httpx.HTTPError as error:
+            raise NetworkError(f'Failed to fetch current user from server: {type(error).__name__}') from None
+        if response.status_code == 401:
+            raise AuthenticationError('Not authenticated: the DreamLake login was refused')
+        if response.status_code != 200:
+            raise NetworkError(f'Failed to fetch current user from server: HTTP {response.status_code}')
+        try:
+            me = response.json()
+            return {'id': me['id'], 'username': (me.get('namespace') or {}).get('slug'), 'email': me.get('email'),
+                    'name': me.get('name'), 'given_name': me.get('given_name'), 'family_name': me.get('family_name'),
+                    'picture': me.get('picture')}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise NetworkError('Failed to fetch current user from server: invalid response') from None
 
     def download_file(self, experiment_id, file_id, dest_path=None):
         path = self._file(experiment_id, file_id)

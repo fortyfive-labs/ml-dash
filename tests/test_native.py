@@ -719,3 +719,57 @@ def test_native_explicit_writer_graphql_against_local_server():
     with pytest.raises(NativeExperimentError) as refused:
         writer.graphql_query(query, {'id': ids[0]})
     assert refused.value.status == 403
+
+
+def test_native_public_client_methods_download_stream_current_user_and_index_reads(monkeypatch, tmp_path):
+    """RemoteClient's download_file_streaming, get_current_user, get_metric_data and download_metric_chunk on native."""
+    import hashlib
+
+    from ml_dash.auth.exceptions import AuthenticationError
+    from ml_dash.exceptions import ConfigurationError, StorageError
+
+    payload = os.urandom(300_000)
+    state = {'checksum': hashlib.sha256(payload).hexdigest(), 'expired': True}
+    calls = []
+
+    def handle(request):
+        path, auth = request.url.path, request.headers.get('authorization')
+        calls.append((request.method, path, auth))
+        if path.endswith('/session'):
+            body = json.loads(request.content)
+            writer = {} if body['mode'] == 'read' else {'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1}
+            return httpx.Response(200, json={'token': f'session-{len(calls)}', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT, **writer})
+        if path == '/auth/me':
+            assert auth == 'Bearer user-login'
+            return httpx.Response(200, json={'id': 'u1', 'sub': 's', 'email': 'a@b.c', 'name': 'Ada', 'given_name': 'Ada',
+                                             'family_name': None, 'picture': None, 'namespace': {'id': 'n1', 'slug': 'ada'}})
+        if path.endswith('/download'):
+            if state['expired']:  # an expired session, refused before any byte: renewed once
+                state['expired'] = False
+                return httpx.Response(401, json={'error': {'code': 'NATIVE_LOGIN_REQUIRED'}})
+            return httpx.Response(200, stream=httpx.ByteStream(payload))
+        return httpx.Response(200, json={'file': {'id': 'f' * 24, 'filename': 'w.bin', 'checksum': state['checksum']}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+
+    dest = tmp_path / 'weights.bin'
+    assert client.download_file_streaming(RUN_ID, 'f' * 24, str(dest)) == str(dest)
+    assert dest.read_bytes() == payload and [p.name for p in tmp_path.iterdir()] == ['weights.bin']
+    downloads = [c for c in calls if c[1].endswith('/download')]
+    assert len(downloads) == 2 and downloads[0][2] != downloads[1][2]  # renewed session after the 401
+    state['checksum'] = '0' * 64
+    with pytest.raises(StorageError):
+        client.download_file_streaming(RUN_ID, 'f' * 24, str(tmp_path / 'bad.bin'))
+    assert [p.name for p in tmp_path.iterdir()] == ['weights.bin']  # nothing left behind
+
+    assert client.get_current_user() == {'id': 'u1', 'username': 'ada', 'email': 'a@b.c', 'name': 'Ada', 'given_name': 'Ada',
+                                         'family_name': None, 'picture': None}
+    calls.clear()
+    with pytest.raises(AuthenticationError):
+        NativeConnection.anonymous('https://dreamlake.test', 'lab', 'research').client().get_current_user()
+    for method, args in (('get_metric_data', (RUN_ID, 'loss')), ('download_metric_chunk', (RUN_ID, 'loss', 0))):
+        with pytest.raises(ConfigurationError):
+            getattr(client, method)(*args)
+    assert calls == []
