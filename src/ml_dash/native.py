@@ -324,7 +324,8 @@ class NativeRemoteClient:
                           json={'entries': [_serialize_value(entry) for entry in entries]})
 
     def get_track_data(self, experiment_id, topic, start_timestamp=None, end_timestamp=None, columns=None, format='json'):
-        """As ``RemoteClient.get_track_data``: dict for json, bytes for jsonl/parquet. mcap is not served natively yet."""
+        """As ``RemoteClient.get_track_data``: dict for json, bytes for jsonl, parquet (Arrow IPC) and mcap. An mcap
+        topic with no exact track exports every track under ``topic/``."""
         params = {'format': format}
         if start_timestamp is not None:
             params['start_timestamp'] = str(start_timestamp)

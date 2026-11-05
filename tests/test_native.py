@@ -215,7 +215,25 @@ def test_native_tracks_against_local_server():
         with pytest.raises(StorageError):
             window.findByTime(0.5)
 
+        # Sparse and nested fields round-trip flattened; time selection through slice.
+        imu = exp.tracks('robot/imu')
+        imu.append(acc={'x': 0.1, 'y': 0.2}, _ts=10.0)
+        imu.append(gyro=[1, 2, 3], _ts=11.0)
+        imu.append(acc={'x': 0.3}, temp=36.5, _ts=12.0)
+        exp.tracks.flush()
+        assert imu.list_entries() == [{'timestamp': 10.0, 'acc.x': 0.1, 'acc.y': 0.2}, {'timestamp': 11.0, 'gyro': [1, 2, 3]},
+                                      {'timestamp': 12.0, 'acc.x': 0.3, 'temp': 36.5}]
+        assert [e['timestamp'] for e in imu.slice(start_timestamp=11.0, end_timestamp=12.0)] == [11.0, 12.0]
+
         client = exp._client
-        assert [t['topic'] for t in client.list_tracks(exp.id, 'robot/*')] == ['robot/pose']
+        assert [t['topic'] for t in client.list_tracks(exp.id, 'robot/*')] == ['robot/pose', 'robot/imu']
+        listed = {t['topic']: t for t in client.list_tracks(exp.id)}
+        assert listed['robot/imu']['columns'] == ['acc.x', 'acc.y', 'gyro', 'temp'] and listed['robot/imu']['totalEntries'] == 3
         camera = client.get_track_data(exp.id, 'camera/left')
-        assert camera['entries'] == [{'timestamp': 7.0, 'width': 640}]
+        assert camera == {'entries': [{'timestamp': 7.0, 'width': 640}], 'count': 1}
+        created = client.create_track(exp.id, 'robot/pose', description='ignored')
+        assert created['topic'] == 'robot/pose' and created['experimentId'] == exp.id
+        # Binary exports, as ml-dash: bytes. MCAP starts with its magic; a prefix exports every topic under it.
+        assert pose.read(format='mcap').startswith(b'\x89MCAP0\r\n')
+        assert client.get_track_data(exp.id, 'robot', format='mcap').startswith(b'\x89MCAP0\r\n')
+        assert pose.read(format='parquet')[:6] == b'ARROW1'
