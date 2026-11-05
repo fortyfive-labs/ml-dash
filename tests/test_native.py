@@ -377,3 +377,27 @@ def test_native_workload_credentials_against_local_server(tmp_path):
     with pytest.raises(NativeExperimentError) as mismatch:
         bound.client().set_parameters(other_id, {'seed': 6})
     assert mismatch.value.code == 'NATIVE_RUN_SCOPE_MISMATCH'
+
+
+def test_native_metric_names_follow_ml_dash_single_segment_rule(monkeypatch):
+    """ml-dash 0.13.0 sent any name as one percent-encoded path segment; `/` and dot segments never routed."""
+    seen = []
+
+    def handle(request):
+        seen.append(request.url.raw_path.decode())
+        if request.url.path.endswith('/session'):
+            body = json.loads(request.content)  # the writer session contract: echo the writer asked for
+            return httpx.Response(200, json={'token': 's', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT,
+                                             'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1})
+        return httpx.Response(200, json={'metric': {'name': 'x'}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'login').client()
+    for name in ('训练 loss', 'a' * 256, 'acc?x#y'):
+        client.get_metric_stats(RUN_ID, name)
+    assert seen[-3:] == [f'{ROOT}/runs/{RUN_ID}/metrics/%E8%AE%AD%E7%BB%83%20loss/stats',
+                         f'{ROOT}/runs/{RUN_ID}/metrics/{"a" * 256}/stats', f'{ROOT}/runs/{RUN_ID}/metrics/acc%3Fx%23y/stats']
+    for bad in ('', 'a/b', '.', '..', 'a' * 257, None):
+        with pytest.raises(ValueError):
+            client.get_metric_stats(RUN_ID, bad)
