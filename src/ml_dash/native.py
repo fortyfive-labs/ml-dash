@@ -23,12 +23,15 @@ import httpx
 
 from .exceptions import MlDashError
 from .managed import _authorization, _login_provider, _url
+from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 
 _KEY = re.compile(r'[A-Za-z0-9_-]{1,128}')
 _ID = re.compile(r'[0-9a-f]{24}')
 _METRIC = re.compile(r'[A-Za-z0-9_.-]{1,128}')
 # The server's sessions live 60 s; renew well before so a request never races expiry.
 _SESSION_SECONDS = 50
+# The native metric rows route returns at most this many rows per page.
+_ROWS_PAGE_MAX = 1000
 
 
 class NativeExperimentError(MlDashError):
@@ -100,6 +103,8 @@ class NativeRemoteClient:
         self._lock = threading.RLock()
         self._token = None
         self._renew_at = 0.0
+        # (run id, metric name) -> the description/tags/metadata last stored, so each is sent once.
+        self._metric_meta = {}
 
     # -- session ----------------------------------------------------------------
 
@@ -206,15 +211,85 @@ class NativeRemoteClient:
 
     def append_batch_to_metric(self, experiment_id, metric_name, data_points, description=None,
                                tags=None, metadata=None, **kwargs):
-        if not isinstance(metric_name, str) or not _METRIC.fullmatch(metric_name):
-            raise ValueError('Native metric names are 1-128 letters, digits, ".", "_" or "-"')
-        if description or tags or metadata:
-            raise ValueError('Native metrics do not support description, tags or metadata')
-        return self._json('POST', self._run(experiment_id) + f'/metrics/{quote(metric_name, safe="")}',
-                          'Native metric write', json={'dataPoints': data_points})
+        """Append points; the metric's description, tags and metadata are stored once, after its first points."""
+        path = self._metric(experiment_id, metric_name)
+        result = self._json('POST', path, 'Native metric write', json={'dataPoints': data_points})
+        meta = {key: value for key, value in (('description', description), ('tags', list(tags) if tags else None),
+                                              ('metadata', metadata)) if value}
+        key = (experiment_id, metric_name)
+        if meta and self._metric_meta.get(key) != meta:
+            self._json('PATCH', path, 'Native metric metadata write', json=meta)
+            self._metric_meta[key] = meta
+        return result
 
     def append_to_metric(self, experiment_id, metric_name, data, **kwargs):
         return self.append_batch_to_metric(experiment_id, metric_name, [data], **kwargs)
+
+    def _metric(self, experiment_id, metric_name):
+        if not isinstance(metric_name, str) or not _METRIC.fullmatch(metric_name):
+            raise ValueError('Native metric names are 1-128 letters, digits, ".", "_" or "-"')
+        return self._run(experiment_id) + f'/metrics/{quote(metric_name, safe="")}'
+
+    def list_metrics(self, experiment_id):
+        return self._json('GET', self._run(experiment_id) + '/metrics', 'Native metric list')['metrics']
+
+    def get_metric_stats(self, experiment_id, metric_name):
+        return self._json('GET', self._metric(experiment_id, metric_name) + '/stats', 'Native metric stats')['metric']
+
+    def update_metric(self, experiment_id, metric_name, description=None, tags=None, metadata=None):
+        """Set an existing metric's description, tags and/or metadata (None leaves a field unchanged)."""
+        body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
+                if value is not None}
+        return self._json('PATCH', self._metric(experiment_id, metric_name), 'Native metric metadata write', json=body)['metric']
+
+    def read_metric_data(self, experiment_id, metric_name, start_index=0, limit=1000):
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('read_metric_data')
+
+    def read_metric_rows(self, experiment_id, metric_name, limit=None, cursor=None):
+        """One page of a metric's committed rows as a ``MetricRowsPage``.
+
+        Native rows are JSON objects; consecutive rows with the same fields and value types form one
+        block. Numbers are float64 or int64, ``true``/``false`` bool, strings utf8; a nested object
+        or list is returned as its JSON text (utf8). Pages hold at most 1000 rows.
+        """
+        params = {'limit': str(min(limit or _ROWS_PAGE_MAX, _ROWS_PAGE_MAX))}
+        if cursor is not None:
+            params['cursor'] = cursor
+        result = self._json('GET', self._metric(experiment_id, metric_name), 'Native metric read', params=params)
+        blocks = []
+        for row in result.get('rows') or []:
+            columns = tuple(MetricColumn(name, _wire_type(value)) for name, value in row.items())
+            cells = [_cell(value) for value in row.values()]
+            if blocks and blocks[-1].columns == columns:
+                blocks[-1].rows.append(cells)
+            else:
+                blocks.append(MetricRowBlock(columns, [cells]))
+        next_cursor = result.get('nextCursor')
+        return MetricRowsPage(metric_id=f'{experiment_id}/{metric_name}', blocks=blocks,
+                              returned=sum(len(block.rows) for block in blocks), has_more=next_cursor is not None,
+                              next_cursor=next_cursor, visibility='committed', order='storage')
+
+    # -- logs -------------------------------------------------------------------
+
+    def query_logs(self, experiment_id, limit=None, offset=None, order_by=None, order=None, level=None,
+                   start_time=None, end_time=None, search=None):
+        """Filtered log page: ``{logs, hasMore, nextCursor}``; ``offset`` is the previous ``nextCursor``."""
+        params = {key: str(value) for key, value in (('limit', limit), ('cursor', offset), ('orderBy', order_by),
+                  ('order', order), ('startTime', start_time), ('endTime', end_time), ('search', search)) if value is not None}
+        if level:
+            params['level'] = ','.join([level] if isinstance(level, str) else level)
+        return self._json('GET', self._run(experiment_id) + '/logs', 'Native log read', params=params)
+
+    def delete_parameters(self, experiment_id):
+        return self._json('DELETE', self._run(experiment_id) + '/parameters', 'Native parameters delete')['parameters']
+
+    # -- tracks -------------------------------------------------------------------
+
+    def _tracks_unsupported(self, *args, **kwargs):
+        raise NativeExperimentError(None, 'Native runs do not support tracks yet; use metrics or files', 'NATIVE_UNSUPPORTED')
+
+    create_track = append_to_track = append_batch_to_track = get_track_data = list_tracks = _tracks_unsupported
 
     # -- files ------------------------------------------------------------------
 
@@ -253,10 +328,26 @@ class NativeRemoteClient:
                 matches.append({**file, 'path': path})
         return matches[:limit]
 
-    def download_file(self, experiment_id, file_id, dest_path=None):
+    def _file(self, experiment_id, file_id):
         if not isinstance(file_id, str) or not _ID.fullmatch(file_id):
             raise ValueError('Invalid native file id')
-        path = self._run(experiment_id) + f'/files/{file_id}'
+        return self._run(experiment_id) + f'/files/{file_id}'
+
+    def get_file(self, experiment_id, file_id):
+        return self._json('GET', self._file(experiment_id, file_id), 'Native file read')['file']
+
+    def delete_file(self, experiment_id, file_id):
+        """Remove the file and its stored bytes: ``{id, deleted}``."""
+        return self._json('DELETE', self._file(experiment_id, file_id), 'Native file delete')
+
+    def update_file(self, experiment_id, file_id, description=None, tags=None, metadata=None):
+        """Set description, tags and/or metadata (None leaves a field unchanged)."""
+        body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
+                if value is not None}
+        return self._json('PATCH', self._file(experiment_id, file_id), 'Native file update', json=body)['file']
+
+    def download_file(self, experiment_id, file_id, dest_path=None):
+        path = self._file(experiment_id, file_id)
         info = self._json('GET', path, 'Native file read')['file']
         content = self._send('GET', path + '/download', 'Native file download', timeout=300).content
         if hashlib.sha256(content).hexdigest() != info['checksum']:
@@ -269,3 +360,19 @@ class NativeRemoteClient:
         with self._lock:
             self._token = None
         self._http.close()
+
+
+def _wire_type(value):
+    if isinstance(value, bool):
+        return 'bool'
+    if isinstance(value, int):
+        return 'int64'
+    if isinstance(value, float):
+        return 'float64'
+    return 'utf8'
+
+
+def _cell(value):
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return json.dumps(value, separators=(',', ':'))

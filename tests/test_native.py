@@ -106,3 +106,46 @@ def test_interactive_native_run_against_local_server(tmp_path):
         counts = subprocess.run(['docker', 'exec', env['mongo_container'], 'mongosh', '--quiet', '--eval', script],
                                 capture_output=True, text=True, check=True).stdout.split()
         assert counts == ['1', '0']
+
+
+def test_native_run_data_edits_against_local_server(tmp_path):
+    """Metric metadata/stats/rows, file update/delete and filtered logs through the public API."""
+    import uuid
+
+    env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'edits-{uuid.uuid4().hex[:8]}'
+    connection = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    source = tmp_path / 'notes.txt'
+    source.write_text('draft')
+
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=connection).run as exp:
+        loss = exp.metrics('train', description='training loss', tags=['train'], metadata={'unit': 'nats'})
+        loss.log(step=0, loss=0.5, tag='warmup')
+        loss.log(step=1, loss=0.25, tag='main')
+        exp.log('epoch 1 started')
+        exp.log('nan detected', level='error')
+        exp.files('reports').upload(str(source))
+        exp.flush()
+
+        stats = loss.stats()
+        assert stats['description'] == 'training loss' and stats['tags'] == ['train']
+        assert stats['metadata'] == {'unit': 'nats'} and stats['totalDataPoints'] == 2
+        assert [m['name'] for m in loss.list_all()] == ['train']
+        page = loss.read_rows()
+        assert page.returned == 2 and not page.has_more
+        # Rows as stored: the SDK's points also carry their `_ts` timestamp.
+        assert [(c.name, c.type) for c in page.blocks[0].columns] == [
+            ('step', 'int64'), ('loss', 'float64'), ('tag', 'utf8'), ('_ts', 'float64')]
+        assert [row[:3] for row in page.blocks[0].rows] == [[0, 0.5, 'warmup'], [1, 0.25, 'main']]
+
+        listed = exp.files('reports').list()
+        assert [f['filename'] for f in listed] == ['notes.txt']
+        updated = exp.files(file_id=listed[0]['id'], description='final', tags=['report'], metadata={'pages': 1}).update()
+        assert updated['description'] == 'final' and updated['tags'] == ['report'] and updated['metadata'] == {'pages': 1}
+        assert exp.files('reports/notes.txt').delete()['deleted'] is True
+        assert exp.files('reports').list() == []
+
+        client = exp._client
+        errors = client.query_logs(exp.id, level=['error'])['logs']
+        assert [entry['message'] for entry in errors] == ['nan detected']
+        assert [e['message'] for e in client.query_logs(exp.id, search='epoch', order='asc')['logs']] == ['epoch 1 started']
