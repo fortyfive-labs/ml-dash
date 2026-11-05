@@ -287,12 +287,55 @@ class JobManagedConnection(ManagedConnection):
         raise ValueError('Job experiment is provisioned by the platform')
 
 
+def _native_job_data(name, legacy=None):
+    """A job client method that is ``NativeRemoteClient.<name>`` on a native platform run (``native_job.py``):
+    the same request, paging and errors, over the job's broker session and only for its run. On a managed
+    (legacy) platform run it is ``legacy``, or refused as before."""
+    def method(self, *args, **kwargs):
+        if self._native:
+            return getattr(self._native_data(), name)(*args, **kwargs)
+        if legacy is None:
+            raise ValueError(f'Job experiment {name} requires a native platform run')
+        return legacy(self, *args, **kwargs)
+    method.__name__ = method.__qualname__ = name
+    method.__doc__ = f'``NativeRemoteClient.{name}`` on the platform run (native job runs).'
+    return method
+
+
 class JobManagedRemoteClient(ManagedRemoteClient):
     def __init__(self, connection):
         super().__init__(connection)
         self._http.close()
         # A local broker credential must never reach an environment proxy.
         self._http = httpx.Client(follow_redirects=False, trust_env=False, timeout=30)
+        self._native = False
+        self._data = None
+
+    def _native_data(self):
+        """``NativeJobDataClient`` for this job (created once; it holds no session of its own)."""
+        if self._data is None:
+            from .native_job import NativeJobDataClient
+            self._data = NativeJobDataClient(self)
+        return self._data
+
+    # Native run data permitted to a job capability (`native_job.NATIVE_JOB_DATA_METHODS`).
+    append_batch_to_metric = _native_job_data('append_batch_to_metric', ManagedRemoteClient.append_batch_to_metric)
+    append_to_metric = _native_job_data('append_to_metric', ManagedRemoteClient.append_to_metric)
+    read_metric_rows = _native_job_data('read_metric_rows', ManagedRemoteClient.read_metric_rows)
+    read_metric_data = _native_job_data('read_metric_data')
+    list_metrics = _native_job_data('list_metrics')
+    get_metric_stats = _native_job_data('get_metric_stats')
+    update_metric = _native_job_data('update_metric')
+    query_logs = _native_job_data('query_logs')
+    delete_parameters = _native_job_data('delete_parameters')
+    create_track = _native_job_data('create_track')
+    append_to_track = _native_job_data('append_to_track')
+    append_batch_to_track = _native_job_data('append_batch_to_track')
+    get_track_data = _native_job_data('get_track_data')
+    list_tracks = _native_job_data('list_tracks')
+    get_file = _native_job_data('get_file')
+    update_file = _native_job_data('update_file')
+    delete_file = _native_job_data('delete_file')
 
     def _acquire_session(self):
         try:
