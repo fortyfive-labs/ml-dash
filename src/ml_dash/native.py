@@ -336,7 +336,8 @@ class NativeRemoteClient:
         anonymous = getattr(self.connection, '_provider', True) is None
         if anonymous and not read:
             raise NativeExperimentError(401, f'{action} needs a DreamLake login (this connection is anonymous)', 'NATIVE_LOGIN_REQUIRED')
-        mode = 'read' if read else 'write'
+        # The session mode actually used (an explicit writer reads with its write session), so a 401 clears that one.
+        mode = 'write' if not read or self._explicit_writer() else 'read'
         for attempt in range(2):
             headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
             try:

@@ -73,10 +73,14 @@ def _writer_server(monkeypatch, state):
             return httpx.Response(200, json={'token': f'gen-{state["generation"]}', 'expiresAt': 0,
                                              'apiUrl': 'https://dreamlake.test' + ROOT, 'workloadId': writer,
                                              'generation': state['generation'], **({'runId': body['runId']} if 'runId' in body else {})})
+        if request.headers.get('authorization') == state.get('expired'):
+            return httpx.Response(401, json={'error': {'code': 'NATIVE_SESSION_EXPIRED'}})
         if request.headers.get('authorization') != f'Bearer gen-{state["generation"]}' or not state['active']:
             return httpx.Response(403, json={'error': {'code': 'NATIVE_CREDENTIAL_RETIRED'}})
         if request.method in ('GET', 'PATCH') and path == f'{ROOT}/runs/{RUN_ID}':
             return httpx.Response(200, json={'experiment': {'id': RUN_ID, 'name': 'renamed'}})
+        if request.method == 'GET' and path == f'{ROOT}/runs/{RUN_ID}/metrics':
+            return httpx.Response(200, json={'metrics': []})
         return httpx.Response(200, json={'count': 1})
 
     real_client = httpx.Client
@@ -106,6 +110,22 @@ def test_native_writer_renews_after_rotation_and_is_never_replaced_once_retired(
     # Every session names the given writer; none registers a replacement.
     assert sessions and all(s == {'mode': 'write', 'workloadId': writer} for s in sessions)
     assert {'data': {'lr': 3}} in [c[3] for c in calls if c[1].endswith('/parameters')]
+
+
+def test_native_explicit_writer_read_renews_its_writer_session_once_on_401(monkeypatch):
+    state = {'generation': 1, 'active': True}
+    calls = _writer_server(monkeypatch, state)
+    writer = '0b0b0b0b-0000-4000-8000-000000000001'
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'ci-login', workload_id=writer).client()
+    client.set_parameters(RUN_ID, {'lr': 1})
+    # The writer's cached session expires: its read is refused (401) once, renews that writer's session, then succeeds.
+    state.update(expired='Bearer gen-1', generation=2)
+    del calls[:]
+    assert client.list_metrics(RUN_ID) == []
+    metrics = f'{ROOT}/runs/{RUN_ID}/metrics'
+    assert [(c[0], c[1], c[2]) for c in calls] == [('GET', metrics, 'Bearer gen-1'), ('POST', ROOT + '/session', 'Bearer ci-login'),
+                                                   ('GET', metrics, 'Bearer gen-2')]
+    assert calls[1][3] == {'mode': 'write', 'workloadId': writer}
 
 
 def test_native_run_bound_writer_opens_its_run_by_id(monkeypatch):
