@@ -84,8 +84,15 @@ with Experiment(prefix="my-namespace/my-project/run-1", managed=connection).run 
 Runs are stored by DreamLake (not a managed Dash instance) and use the same
 `Experiment` API: parameters, logs (`query_logs` filters), metrics (descriptor,
 `stats()`, `read_rows()`), and file upload, download, `update()` and `delete()`.
-Not yet available on native runs: tracks, nested folders, bindrs, run metadata
-and write protection.
+Since 0.14.0 also tracks (`exp.tracks(topic)`: append, ranged reads, `slice()`,
+and `jsonl`/`parquet`/`mcap` exports) on every native run, and inside platform
+jobs the run data methods their capability permits, through the job's broker.
+Prefixes may name folders (`ns/project/sweeps/lr 0.1/run`, any Unicode names;
+folders are created as needed), `metadata=` is stored with the run, and
+`_write_protected=True` creates the run protected, with its metadata, in one
+server step. Protection is a person's action: it is refused for an explicit
+`workload_id`/`idempotency_key`/`run_id` writer. Not yet available on native
+runs: bindrs.
 
 ### Native writers (workload credentials)
 
