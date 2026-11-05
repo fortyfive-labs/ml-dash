@@ -634,6 +634,42 @@ class NativeRemoteClient:
             raise NetworkError('; '.join(error.get('message', str(error)) for error in result['errors']))
         return result.get('data') or {}
 
+    def delete_project(self, project_slug=None):
+        """As ``RemoteClient.delete_project``: the project with all its runs, metrics, files and logs. Natively this is
+        DreamLake's project delete (the person's login and ``project:delete`` role) with the native experiment data
+        accepted for permanent deletion in the same transaction (``nativeExperiments=purge``), purged in the background
+        as ml-dash's delete was; ``expectedProjectId`` makes it refuse (409) if the slug meanwhile names another project.
+
+        Returns ``{projectId, deleted, message, ...}`` with DreamLake's reply (``project``, ``nativeCleanup``, counts).
+        A selected writer, a job session or an anonymous connection never deletes a project.
+        """
+        connection = self.connection
+        provider = getattr(connection, '_provider', None)
+        if provider is None or self._explicit_writer():
+            raise NativeExperimentError(403, 'Deleting a project needs the DreamLake login, not a writer or job session', 'NATIVE_FORBIDDEN')
+        slug = project_slug or connection.project
+        url = f'{connection.dreamlake_url}/namespaces/{quote(connection.namespace, safe="")}/projects/{quote(slug, safe="")}'
+        try:
+            found = self._http.get(url, headers={'Authorization': _authorization(provider())})
+            if found.status_code == 404:
+                raise NativeExperimentError(404, f"Project '{slug}' not found in namespace '{connection.namespace}'", 'NATIVE_PROJECT_NOT_FOUND')
+            if found.status_code != 200:
+                raise _error(found, 'DreamLake project read')
+            project_id = (found.json() or {}).get('id')
+            if not isinstance(project_id, str) or not _ID.fullmatch(project_id):
+                raise NativeExperimentError(None, 'DreamLake project read returned an invalid response')
+            response = self._http.delete(url, params={'expectedProjectId': project_id, 'nativeExperiments': 'purge'},
+                                         headers={'Authorization': _authorization(provider())})
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake unavailable while deleting the project') from None
+        if response.status_code != 200:
+            raise _error(response, 'DreamLake project delete')
+        body = response.json()
+        if not isinstance(body, dict):
+            raise NativeExperimentError(None, 'DreamLake project delete returned an invalid response')
+        return {**body, 'projectId': project_id, 'deleted': body.get('deleted', True),
+                'message': f"Project '{slug}' deleted; its experiment data is purged in the background"}
+
     def close(self):
         with self._lock:
             self._sessions.clear()
