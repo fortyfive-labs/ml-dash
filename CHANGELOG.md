@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Native writers (workload credentials, requires a DreamLake server listing `workload-credentials`): `NativeConnection` writes through a writer as `ManagedConnection` does. It registers one per client and renews by id, or uses `idempotency_key`, `workload_id` (CI with an explicit `DREAMLAKE_API_KEY`) or `run_id` (only that run, opened by id, never by key). A retired writer is an error and never replaced. Add `list_credentials`, `get_credential`, `create_credential`, `rotate_credential` and `retire_credential` (metadata only, with your login).
+
 ## [0.13.0] - 2026-11-05
 
 - Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified).
