@@ -29,7 +29,6 @@ from .utils import _serialize_value
 
 _KEY = re.compile(r'[A-Za-z0-9_-]{1,128}')
 _ID = re.compile(r'[0-9a-f]{24}')
-_METRIC = re.compile(r'[A-Za-z0-9_.-]{1,128}')
 # A workload credential id: its creating intent's UUID, lower-case.
 _WORKLOAD = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
 # The server's sessions live 60 s; renew well before so a request never races expiry.
@@ -38,6 +37,13 @@ _SESSION_SECONDS = 50
 # allows a page of up to 10000 (default 1000), which is filled from several requests.
 _ROWS_REQUEST_MAX = 1000
 _ROWS_DEFAULT, _ROWS_MAX = 1000, 10000
+
+
+def _metric_name(value) -> bool:
+    """A metric name as ml-dash accepts it: one URL path segment (sent percent-encoded) of at most 256
+    characters: anything but ``/``, other than ``.``/``..``. Unicode and spaces are fine."""
+    return (isinstance(value, str) and 0 < len(value) <= 256 and '/' not in value
+            and value not in ('.', '..'))
 
 
 class NativeExperimentError(MlDashError):
@@ -407,8 +413,8 @@ class NativeRemoteClient:
         return self.append_batch_to_metric(experiment_id, metric_name, [data], **kwargs)
 
     def _metric(self, experiment_id, metric_name):
-        if not isinstance(metric_name, str) or not _METRIC.fullmatch(metric_name):
-            raise ValueError('Native metric names are 1-128 letters, digits, ".", "_" or "-"')
+        if not _metric_name(metric_name):
+            raise ValueError('Native metric names are 1-256 characters without "/" (not "." or "..")')
         return self._run(experiment_id) + f'/metrics/{quote(metric_name, safe="")}'
 
     def list_metrics(self, experiment_id):
