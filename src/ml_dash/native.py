@@ -303,8 +303,7 @@ class NativeRemoteClient:
         return self._json('DELETE', self._run(experiment_id) + '/parameters', 'Native parameters delete')['parameters']
 
     # -- tracks -------------------------------------------------------------------
-    # ml-dash tracks (``exp.tracks(topic)``) on the run's native track store. Runs homed in main before the
-    # Dash store answer 409 ``NATIVE_TRACKS_UNAVAILABLE``.
+    # ml-dash tracks (``exp.tracks(topic)``) on the run's native track store, whichever home holds the run.
 
     def _track(self, experiment_id, topic):
         if not isinstance(topic, str) or not topic or any(not part for part in topic.split('/')):
