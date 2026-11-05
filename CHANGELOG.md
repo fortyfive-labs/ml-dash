@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Native metric names follow ml-dash's rule (requires a DreamLake server with the matching native routes): any name of 1-256 characters without `/` (not `.`/`..`), sent percent-encoded as one path segment, so names such as `训练` or `training loss` work as they did with ml-dash. The SDK previously refused anything outside `[A-Za-z0-9_.-]{1,128}`.
 - Native writers (workload credentials, requires a DreamLake server listing `workload-credentials`): `NativeConnection` writes through a writer as `ManagedConnection` does. It registers one per client and renews by id, or uses `idempotency_key`, `workload_id` (CI with an explicit `DREAMLAKE_API_KEY`) or `run_id` (only that run, opened by id, never by key). A retired writer is an error and never replaced. Add `list_credentials`, `get_credential`, `create_credential`, `rotate_credential` and `retire_credential` (metadata only, with your login).
+- Native run paths, metadata and protection (requires a DreamLake server with native run paths and protected creation): `Experiment(prefix="ns/project/folders.../name")` opens the run at that path, creating its folders, with Unicode names; `metadata=` is stored with the run; `_write_protected=True` creates it protected, with its metadata, in one server transaction, as a person's action over a plain session (an explicit `workload_id`/`idempotency_key`/`run_id` writer is refused before any request). bindrs stay unsupported.
 
 ## [0.14.0] - 2026-11-05
 
