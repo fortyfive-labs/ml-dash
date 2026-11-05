@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Native metric names follow ml-dash's rule (requires a DreamLake server with the matching native routes): any name of 1-256 characters without `/` (not `.`/`..`), sent percent-encoded as one path segment, so names such as `训练` or `training loss` work as they did with ml-dash. The SDK previously refused anything outside `[A-Za-z0-9_.-]{1,128}`.
+
 - Platform jobs on DreamLake-native runs (`Experiment()` inside a job, through the local job broker) can now use the native run data methods the job capability permits: tracks (`exp.tracks(...)` append/read in json, jsonl, parquet and mcap, `create_track`, `list_tracks`), metric descriptors, `stats()`, `list_metrics`, `read_rows()` (paged past 1000), `update_metric`, `query_logs`, `delete_parameters`, and file `get_file`/`update()`/`delete()`. They reuse `NativeRemoteClient` over the job's own broker session and only for the job's run; another run is refused before any request. Run creation, status, metadata and credentials stay platform- or human-controlled; managed (non-native) jobs keep their previous refusals.
 
 ## [0.13.0] - 2026-11-05
