@@ -42,7 +42,18 @@ from .config import DEFAULT_API_URL
 from .experiment import Experiment
 
 _owner = getpass.getuser()
-rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", dash_url=DEFAULT_API_URL)
+import os
+
+if os.environ.get("ML_DASH_BACKEND") == "native":
+  # DreamLake-native: the run is stored by DreamLake through the existing `dreamlake login`, in
+  # ML_DASH_NATIVE_NAMESPACE (default: the OS user name) / ML_DASH_NATIVE_PROJECT (default: scratch).
+  # The project must already exist in DreamLake.
+  from .native import NativeConnection
+  _namespace = os.environ.get("ML_DASH_NATIVE_NAMESPACE") or _owner
+  _project = os.environ.get("ML_DASH_NATIVE_PROJECT") or "scratch"
+  rdxp = Experiment(prefix=f"{_namespace}/{_project}/rdxp", managed=NativeConnection.from_login(_namespace, _project))
+else:
+  rdxp = Experiment(prefix=f"{_owner}/scratch/rdxp", dash_url=DEFAULT_API_URL)
 
 
 # Register cleanup handler to complete experiment on Python exit (if still open)

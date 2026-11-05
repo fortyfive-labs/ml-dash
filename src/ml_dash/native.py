@@ -21,7 +21,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MetricRowsError, MlDashError
+from .exceptions import MetricRowsError, MlDashError, NetworkError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 
@@ -368,6 +368,30 @@ class NativeRemoteClient:
         target.write_bytes(content)
         return str(target)
 
+    # -- GraphQL (ml-dash's API, served natively at /native-dash/graphql) -------------
+
+    @property
+    def namespace(self):
+        return self.connection.namespace
+
+    def graphql_query(self, query, variables=None):
+        """Run an ml-dash GraphQL query or mutation against DreamLake's native compatibility endpoint.
+
+        Sent with the user's DreamLake login (not the project session): ml-dash queries may span projects,
+        and every project is authorized by the server. Errors raise ``NetworkError`` as ``RemoteClient`` does.
+        """
+        try:
+            response = self._http.post(self.connection.dreamlake_url + '/native-dash/graphql',
+                                       json={'query': query, 'variables': variables or {}},
+                                       headers={'Authorization': _authorization(self.connection._provider())})
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake native GraphQL unavailable') from None
+        response.raise_for_status()
+        result = response.json()
+        if result.get('errors'):
+            raise NetworkError('; '.join(error.get('message', str(error)) for error in result['errors']))
+        return result.get('data') or {}
+
     def close(self):
         with self._lock:
             self._token = None
@@ -422,3 +446,12 @@ def _blocks(rows):
                     row[i] = float(row[i])
         result.append(MetricRowBlock(tuple(MetricColumn(name, kind) for name, kind in zip(names, kinds)), block_rows))
     return result
+
+
+# ml-dash's GraphQL helpers run unchanged on the native endpoint: they only call graphql_query and namespace.
+from .client import RemoteClient as _RemoteClient  # noqa: E402
+
+for _name in ('list_projects_graphql', 'list_experiments_graphql', 'get_experiment_graphql',
+              'get_experiment_by_path_graphql', 'search_experiments_graphql'):
+    setattr(NativeRemoteClient, _name, getattr(_RemoteClient, _name))
+del _name

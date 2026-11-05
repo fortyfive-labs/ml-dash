@@ -183,3 +183,46 @@ def test_native_run_data_edits_against_local_server(tmp_path):
         errors = client.query_logs(exp.id, level=['error'])['logs']
         assert [entry['message'] for entry in errors] == ['nan detected']
         assert [e['message'] for e in client.query_logs(exp.id, search='epoch', order='asc')['logs']] == ['epoch 1 started']
+
+
+def test_native_graphql_helpers_against_local_server(monkeypatch):
+    """ml-dash's GraphQL helpers and raw queries reach DreamLake's native compatibility endpoint."""
+    import uuid
+
+    from ml_dash.exceptions import NetworkError
+
+    env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'gql-{uuid.uuid4().hex[:8]}'
+    connection = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=connection, readme='graphql', tags=['g']).run as exp:
+        exp.params.set(lr=0.1)
+        exp.metrics('loss').log(step=0, loss=1.0)
+        exp.flush()
+        client = exp._client
+        projects = client.list_projects_graphql(ns)['projects']
+        assert any(p['slug'] == project for p in projects)
+        runs = client.list_experiments_graphql(project, namespace_slug=ns)['experiments']
+        assert any(r['name'] == key and r['displayPath'] == f'{ns}/{project}/{key}' for r in runs)
+        detail = client.get_experiment_graphql(project, key, namespace_slug=ns)
+        assert detail['id'] == exp.id and detail['parameters']['data'] == {'lr': 0.1} and detail['metrics'] == [{'name': 'loss'}]
+        found = client.search_experiments_graphql(f'{ns}/{project}/{key}')
+        assert [e['id'] for e in found['experiments']] == [exp.id]
+        raw = client.graphql_query('query ($id: ID!) { experimentById(id: $id) { name tags project { slug } } }', {'id': exp.id})
+        assert raw['experimentById'] == {'name': key, 'tags': ['g'], 'project': {'slug': project}}
+        with pytest.raises(NetworkError):
+            client.graphql_query('mutation { deleteNode(nodeId: "x") { id } }')
+
+    # rdxp, opted into the native backend.
+    monkeypatch.setenv('ML_DASH_BACKEND', 'native')
+    monkeypatch.setenv('ML_DASH_NATIVE_NAMESPACE', ns)
+    monkeypatch.setenv('ML_DASH_NATIVE_PROJECT', project)
+    import importlib
+    import sys
+
+    import ml_dash.native as native
+    monkeypatch.setattr(native, '_login_provider', lambda url, config: (env['base_url'], lambda: env['writer_token']))
+    sys.modules.pop('ml_dash.remote_auto_start', None)
+    rdxp = importlib.import_module('ml_dash.remote_auto_start').rdxp
+    with rdxp.run:
+        rdxp.log('native rdxp')
+    assert rdxp.id
