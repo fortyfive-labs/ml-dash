@@ -10,6 +10,7 @@ the server's decision.
 from __future__ import annotations
 
 import fnmatch
+import os
 import hashlib
 import json
 import re
@@ -61,7 +62,7 @@ class NativeConnection:
     platform_controls_status = False
 
     def __init__(self, dreamlake_url: str, namespace: str, project: str,
-                 token_provider: Callable[[], str]):
+                 token_provider: Callable[[], str], auto_create_project: bool = False):
         if not namespace or not project or '/' in namespace or '/' in project:
             raise ValueError('Native namespace and project must be individual slugs')
         self.namespace, self.project = namespace, project
@@ -70,16 +71,46 @@ class NativeConnection:
         self._path = f'/native-experiments/ns/{quote(namespace, safe="")}/projects/{quote(project, safe="")}'
         self._root = self.dreamlake_url + self._path
         self._experiment_url = None
+        # As ml-dash's remote experiments: a missing project is created (private) before the first write, through
+        # DreamLake's project API and the user's own permission there; an existing one is used as is.
+        self.auto_create_project = auto_create_project
+
+    @staticmethod
+    def default_namespace(dreamlake_url=None, config_dir=None) -> str:
+        """The namespace of the DreamLake login on this machine: ``ML_DASH_NATIVE_NAMESPACE``, else the active
+        profile's ``namespace`` (``~/.dreamlake/config.json``, for the login's server), else ``/auth/me``."""
+        explicit = os.environ.get('ML_DASH_NATIVE_NAMESPACE')
+        if explicit:
+            return explicit
+        selected, provider = _login_provider(dreamlake_url, config_dir)
+        directory = Path(config_dir or os.environ.get('ML_DASH_MANAGED_CONFIG_DIR') or Path.home() / '.dreamlake')
+        try:
+            config = json.loads((directory / 'config.json').read_text())
+        except (OSError, ValueError):
+            config = {}
+        if isinstance(config, dict) and isinstance(config.get('namespace'), str) and config['namespace'] \
+                and _url(config.get('remote_url') or 'https://api.dreamlake.ai') == selected:
+            return config['namespace']
+        try:
+            response = httpx.get(selected + '/auth/me', headers={'Authorization': _authorization(provider())}, timeout=30)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake unavailable while resolving the login namespace') from None
+        if response.status_code != 200:
+            raise _error(response, 'DreamLake login namespace')
+        slug = ((response.json() or {}).get('namespace') or {}).get('slug')
+        if not isinstance(slug, str) or not slug:
+            raise NativeExperimentError(None, 'The DreamLake login has no namespace; set ML_DASH_NATIVE_NAMESPACE')
+        return slug
 
     @classmethod
-    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None):
+    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None, auto_create_project=False):
         """Use the DreamLake login already on this machine (``~/.dreamlake``).
 
         Same login source and server-pinning rules as
         ``ManagedConnection.from_login``. Does not write files or start a login.
         """
         selected, provider = _login_provider(dreamlake_url, config_dir)
-        return cls(selected, namespace, project, provider)
+        return cls(selected, namespace, project, provider, auto_create_project=auto_create_project)
 
     def client(self):
         return NativeRemoteClient(self)
@@ -88,7 +119,9 @@ class NativeConnection:
 def _error(response: httpx.Response, action: str) -> NativeExperimentError:
     try:
         body = response.json()
-        code = body.get('error', {}).get('code') if isinstance(body, dict) else None
+        error = body.get('error') if isinstance(body, dict) else None
+        # Native routes answer {error: {code}}; DreamLake's other routes (project create) {error: "message"}.
+        code = error.get('code') if isinstance(error, dict) else None
     except ValueError:
         code = None
     code = code if isinstance(code, str) else None
@@ -105,11 +138,27 @@ class NativeRemoteClient:
         self._lock = threading.RLock()
         self._token = None
         self._renew_at = 0.0
+        self._project_ready = not connection.auto_create_project
 
     # -- session ----------------------------------------------------------------
 
+    def _ensure_project(self):
+        """Create the selected project (private) if it does not exist: 201 created, 409 already there."""
+        connection = self.connection
+        try:
+            response = self._http.post(f'{connection.dreamlake_url}/namespaces/{quote(connection.namespace, safe="")}/projects',
+                                       json={'name': connection.project, 'slug': connection.project, 'visibility': 'private'},
+                                       headers={'Authorization': _authorization(connection._provider())})
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'DreamLake unavailable while creating the project') from None
+        if response.status_code not in (201, 409):
+            raise _error(response, 'DreamLake project create')
+        self._project_ready = True
+
     def _session_token(self) -> str:
         with self._lock:
+            if not self._project_ready:
+                self._ensure_project()
             if self._token and time.time() < self._renew_at:
                 return self._token
             self._token = None

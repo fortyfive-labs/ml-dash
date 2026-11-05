@@ -215,7 +215,8 @@ def test_native_graphql_helpers_against_local_server(monkeypatch):
     # rdxp, opted into the native backend.
     monkeypatch.setenv('ML_DASH_BACKEND', 'native')
     monkeypatch.setenv('ML_DASH_NATIVE_NAMESPACE', ns)
-    monkeypatch.setenv('ML_DASH_NATIVE_PROJECT', project)
+    scratch = f'scratch-{uuid.uuid4().hex[:6]}'
+    monkeypatch.setenv('ML_DASH_NATIVE_PROJECT', scratch)  # absent: rdxp creates it (private), as ml-dash's does
     import importlib
     import sys
 
@@ -226,3 +227,27 @@ def test_native_graphql_helpers_against_local_server(monkeypatch):
     with rdxp.run:
         rdxp.log('native rdxp')
     assert rdxp.id
+    with httpx.Client(base_url=env['base_url'], headers={'Authorization': 'Bearer ' + env['writer_token']}) as http:
+        created = http.get(f'/native-experiments/ns/{ns}/projects/{scratch}/runs/{rdxp.id}')
+    assert created.status_code == 200 and created.json()['experiment']['name'] == 'rdxp'
+
+
+def test_native_default_namespace_and_project_create_refusal(tmp_path, monkeypatch):
+    """The login's namespace comes from the active profile (not the OS user); a refused create raises."""
+    from ml_dash.native import NativeExperimentError
+    monkeypatch.delenv('ML_DASH_NATIVE_NAMESPACE', raising=False)
+    (tmp_path / 'config.json').write_text(json.dumps({'remote_url': 'https://dreamlake.test', 'namespace': 'team-lab'}))
+    (tmp_path / 'tokens.json').write_text(json.dumps({'dreamlake-token': 'user-login'}))
+    assert NativeConnection.default_namespace(config_dir=str(tmp_path)) == 'team-lab'
+
+    def handle(request):
+        if request.url.path == '/namespaces/team-lab/projects':
+            return httpx.Response(403, json={'error': 'forbidden'})
+        raise AssertionError('nothing else may be called after a refused create: ' + request.url.path)
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    connection = NativeConnection('https://dreamlake.test', 'team-lab', 'scratch', lambda: 'user-login', auto_create_project=True)
+    with pytest.raises(NativeExperimentError) as refused:
+        connection.client().set_parameters('a' * 24, {'x': 1})
+    assert refused.value.status == 403
