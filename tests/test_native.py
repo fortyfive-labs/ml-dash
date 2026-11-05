@@ -106,3 +106,80 @@ def test_interactive_native_run_against_local_server(tmp_path):
         counts = subprocess.run(['docker', 'exec', env['mongo_container'], 'mongosh', '--quiet', '--eval', script],
                                 capture_output=True, text=True, check=True).stdout.split()
         assert counts == ['1', '0']
+
+
+def test_native_run_data_edits_against_local_server(tmp_path):
+    """Metric descriptor/stats/rows, file update/delete and filtered logs through the public API."""
+    import uuid
+
+    from ml_dash import MetricRowsError
+    from ml_dash.native import NativeExperimentError
+
+    env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'edits-{uuid.uuid4().hex[:8]}'
+    connection = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    source = tmp_path / 'notes.txt'
+    source.write_text('draft')
+
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=connection).run as exp:
+        client = exp._client
+        # An invalid descriptor is refused with nothing written: the metric does not exist afterwards.
+        with pytest.raises(NativeExperimentError) as refused:
+            client.append_batch_to_metric(exp.id, 'bad', [{'x': 1}], metadata=['not', 'an', 'object'])
+        assert refused.value.status == 400
+        with pytest.raises(NativeExperimentError) as missing:
+            client.get_metric_stats(exp.id, 'bad')
+        assert missing.value.status == 404
+
+        loss = exp.metrics('train', description='training loss', tags=['train'], metadata={'unit': 'nats'})
+        loss.log(step=0, loss=1, tag='warmup')
+        loss.log(step=1, loss=0.25, tag='main')
+        exp.flush()
+        # The descriptor came with the first points; a later append's descriptor never changes it.
+        client.append_batch_to_metric(exp.id, 'train', [{'step': 2, 'loss': 0.2, 'tag': 'main'}], description='ignored')
+        for step in range(1205):
+            exp.metrics('big').log(step=step)
+        exp.metrics('nested').log(step=0, config={'depth': 4})
+        exp.log('epoch 1 started')
+        exp.log('nan detected', level='error')
+        exp.files('reports').upload(str(source))
+        exp.flush()
+
+        stats = loss.stats()
+        assert stats['description'] == 'training loss' and stats['tags'] == ['train']
+        assert stats['metadata'] == {'unit': 'nats'} and stats['totalDataPoints'] == 3
+        assert stats['schema']['fields'][:3] == ['step', 'loss', 'tag']
+        assert {m['name']: m['metricId'] for m in loss.list_all()}['train'] == stats['metricId']
+
+        page = loss.read_rows()
+        assert page.metric_id == stats['metricId'] and page.returned == 3 and not page.has_more
+        # int and float cells of one column share a float64 column; `_ts` is the SDK's timestamp field.
+        assert [(c.name, c.type) for c in page.blocks[0].columns][:3] == [('step', 'int64'), ('loss', 'float64'), ('tag', 'utf8')]
+        assert [row[:3] for row in page.blocks[0].rows][:2] == [[0, 1.0, 'warmup'], [1, 0.25, 'main']]
+
+        # A page larger than one native request is filled completely, and the cursor resumes exactly.
+        big = exp.metrics('big')
+        first = big.read_rows(limit=1100)
+        assert first.returned == 1100 and first.has_more
+        rest = big.read_rows(limit=1100, cursor=first.next_cursor)
+        steps = [row[0] for page_ in (first, rest) for block in page_.blocks for row in block.rows]
+        assert steps == list(range(1205)) and not rest.has_more
+        assert len(list(big.iter_row_blocks(limit=500))) >= 1
+        with pytest.raises(MetricRowsError) as invalid:
+            big.read_rows(limit=10001)
+        assert invalid.value.code == 'invalid_limit'
+        # A nested value has no ml-dash cell type: refused, not stringified.
+        with pytest.raises(MetricRowsError) as nested:
+            exp.metrics('nested').read_rows()
+        assert nested.value.code == 'unsupported_cell'
+
+        listed = exp.files('reports').list()
+        assert [f['filename'] for f in listed] == ['notes.txt']
+        updated = exp.files(file_id=listed[0]['id'], description='final', tags=['report'], metadata={'pages': 1}).update()
+        assert updated['description'] == 'final' and updated['tags'] == ['report'] and updated['metadata'] == {'pages': 1}
+        assert exp.files('reports/notes.txt').delete()['deleted'] is True
+        assert exp.files('reports').list() == []
+
+        errors = client.query_logs(exp.id, level=['error'])['logs']
+        assert [entry['message'] for entry in errors] == ['nan detected']
+        assert [e['message'] for e in client.query_logs(exp.id, search='epoch', order='asc')['logs']] == ['epoch 1 started']

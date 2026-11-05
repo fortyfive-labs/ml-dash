@@ -21,14 +21,19 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MlDashError
+from .exceptions import MetricRowsError, MlDashError
 from .managed import _authorization, _login_provider, _url
+from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 
 _KEY = re.compile(r'[A-Za-z0-9_-]{1,128}')
 _ID = re.compile(r'[0-9a-f]{24}')
 _METRIC = re.compile(r'[A-Za-z0-9_.-]{1,128}')
 # The server's sessions live 60 s; renew well before so a request never races expiry.
 _SESSION_SECONDS = 50
+# The native metric rows route returns at most this many rows per request; ml-dash's rows read
+# allows a page of up to 10000 (default 1000), which is filled from several requests.
+_ROWS_REQUEST_MAX = 1000
+_ROWS_DEFAULT, _ROWS_MAX = 1000, 10000
 
 
 class NativeExperimentError(MlDashError):
@@ -206,15 +211,96 @@ class NativeRemoteClient:
 
     def append_batch_to_metric(self, experiment_id, metric_name, data_points, description=None,
                                tags=None, metadata=None, **kwargs):
-        if not isinstance(metric_name, str) or not _METRIC.fullmatch(metric_name):
-            raise ValueError('Native metric names are 1-128 letters, digits, ".", "_" or "-"')
-        if description or tags or metadata:
-            raise ValueError('Native metrics do not support description, tags or metadata')
-        return self._json('POST', self._run(experiment_id) + f'/metrics/{quote(metric_name, safe="")}',
-                          'Native metric write', json={'dataPoints': data_points})
+        """Append points in one request. As in ml-dash, ``description``/``tags``/``metadata`` are the metric's
+        descriptor: the server stores them with the points, in the same commit, only when this append creates
+        the metric; later appends never change them (use ``update_metric``). An invalid descriptor is refused
+        with nothing written."""
+        body = {'dataPoints': data_points}
+        for key, value in (('description', description), ('tags', list(tags) if tags else None), ('metadata', metadata)):
+            if value:
+                body[key] = value
+        return self._json('POST', self._metric(experiment_id, metric_name), 'Native metric write', json=body)
 
     def append_to_metric(self, experiment_id, metric_name, data, **kwargs):
         return self.append_batch_to_metric(experiment_id, metric_name, [data], **kwargs)
+
+    def _metric(self, experiment_id, metric_name):
+        if not isinstance(metric_name, str) or not _METRIC.fullmatch(metric_name):
+            raise ValueError('Native metric names are 1-128 letters, digits, ".", "_" or "-"')
+        return self._run(experiment_id) + f'/metrics/{quote(metric_name, safe="")}'
+
+    def list_metrics(self, experiment_id):
+        return self._json('GET', self._run(experiment_id) + '/metrics', 'Native metric list')['metrics']
+
+    def get_metric_stats(self, experiment_id, metric_name):
+        return self._json('GET', self._metric(experiment_id, metric_name) + '/stats', 'Native metric stats')['metric']
+
+    def update_metric(self, experiment_id, metric_name, description=None, tags=None, metadata=None):
+        """Set an existing metric's description, tags and/or metadata (None leaves a field unchanged)."""
+        body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
+                if value is not None}
+        return self._json('PATCH', self._metric(experiment_id, metric_name), 'Native metric metadata write', json=body)['metric']
+
+    def read_metric_data(self, experiment_id, metric_name, start_index=0, limit=1000):
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('read_metric_data')
+
+    def read_metric_rows(self, experiment_id, metric_name, limit=None, cursor=None):
+        """One page of a metric's committed rows as a ``MetricRowsPage``, as ``RemoteClient.read_metric_rows``.
+
+        ``limit``: 1-10000 rows (default 1000); the page is filled from as many native requests as it needs,
+        so no row is skipped. ``cursor`` is opaque. ``metric_id`` is the metric's canonical id. Consecutive rows
+        with the same fields form a block; numbers are int64 (promoted to float64 when a column mixes them),
+        float64, bool or utf8, ``null`` a None cell. A nested object or list has no ml-dash cell type and is
+        refused (``MetricRowsError``, code ``unsupported_cell``), never converted.
+        """
+        if limit is None:
+            limit = _ROWS_DEFAULT
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= _ROWS_MAX:
+            raise MetricRowsError(f'limit must be an integer between 1 and {_ROWS_MAX}', 400, 'invalid_limit')
+        if cursor is not None and (not isinstance(cursor, str) or not cursor.isdigit()):
+            raise MetricRowsError('Invalid cursor; pass next_cursor from the previous page', 400, 'invalid_cursor')
+        rows, metric_id, next_cursor = [], None, cursor
+        while True:
+            params = {'limit': str(min(limit - len(rows), _ROWS_REQUEST_MAX))}
+            if next_cursor is not None:
+                params['cursor'] = next_cursor
+            try:
+                result = self._json('GET', self._metric(experiment_id, metric_name), 'Native metric read', params=params)
+            except NativeExperimentError as error:
+                raise MetricRowsError(str(error), error.status or 0,
+                                      'metric_not_found' if error.status == 404 else error.code) from None
+            metric_id = result.get('metricId')
+            rows.extend(result.get('rows') or [])
+            next_cursor = result.get('nextCursor')
+            if next_cursor is None or len(rows) >= limit:
+                break
+        if not isinstance(metric_id, str):
+            raise MetricRowsError('Malformed metric rows response: metricId missing', 200)
+        blocks = _blocks(rows)
+        return MetricRowsPage(metric_id=metric_id, blocks=blocks, returned=len(rows), has_more=next_cursor is not None,
+                              next_cursor=next_cursor, visibility='committed', order='storage')
+
+    # -- logs -------------------------------------------------------------------
+
+    def query_logs(self, experiment_id, limit=None, offset=None, order_by=None, order=None, level=None,
+                   start_time=None, end_time=None, search=None):
+        """Filtered log page: ``{logs, hasMore, nextCursor}``; ``offset`` is the previous ``nextCursor``."""
+        params = {key: str(value) for key, value in (('limit', limit), ('cursor', offset), ('orderBy', order_by),
+                  ('order', order), ('startTime', start_time), ('endTime', end_time), ('search', search)) if value is not None}
+        if level:
+            params['level'] = ','.join([level] if isinstance(level, str) else level)
+        return self._json('GET', self._run(experiment_id) + '/logs', 'Native log read', params=params)
+
+    def delete_parameters(self, experiment_id):
+        return self._json('DELETE', self._run(experiment_id) + '/parameters', 'Native parameters delete')['parameters']
+
+    # -- tracks -------------------------------------------------------------------
+
+    def _tracks_unsupported(self, *args, **kwargs):
+        raise NativeExperimentError(None, 'Native runs do not support tracks yet; use metrics or files', 'NATIVE_UNSUPPORTED')
+
+    create_track = append_to_track = append_batch_to_track = get_track_data = list_tracks = _tracks_unsupported
 
     # -- files ------------------------------------------------------------------
 
@@ -253,10 +339,27 @@ class NativeRemoteClient:
                 matches.append({**file, 'path': path})
         return matches[:limit]
 
-    def download_file(self, experiment_id, file_id, dest_path=None):
+    def _file(self, experiment_id, file_id):
         if not isinstance(file_id, str) or not _ID.fullmatch(file_id):
             raise ValueError('Invalid native file id')
-        path = self._run(experiment_id) + f'/files/{file_id}'
+        return self._run(experiment_id) + f'/files/{file_id}'
+
+    def get_file(self, experiment_id, file_id):
+        return self._json('GET', self._file(experiment_id, file_id), 'Native file read')['file']
+
+    def delete_file(self, experiment_id, file_id):
+        """Delete the file, as ml-dash: it leaves every listing and read at once and cannot be restored
+        (re-uploading the same path creates it anew). Returns ``{id, nodeId, deleted}``."""
+        return self._json('DELETE', self._file(experiment_id, file_id), 'Native file delete')
+
+    def update_file(self, experiment_id, file_id, description=None, tags=None, metadata=None):
+        """Set description, tags and/or metadata (None leaves a field unchanged)."""
+        body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
+                if value is not None}
+        return self._json('PATCH', self._file(experiment_id, file_id), 'Native file update', json=body)['file']
+
+    def download_file(self, experiment_id, file_id, dest_path=None):
+        path = self._file(experiment_id, file_id)
         info = self._json('GET', path, 'Native file read')['file']
         content = self._send('GET', path + '/download', 'Native file download', timeout=300).content
         if hashlib.sha256(content).hexdigest() != info['checksum']:
@@ -269,3 +372,53 @@ class NativeRemoteClient:
         with self._lock:
             self._token = None
         self._http.close()
+
+
+
+def _cell_type(value):
+    """The ml-dash wire type of a JSON value, None for a null cell; a nested value has none."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 'bool'
+    if isinstance(value, int):
+        return 'int64'
+    if isinstance(value, float):
+        return 'float64'
+    if isinstance(value, str):
+        return 'utf8'
+    raise MetricRowsError('Metric row holds a nested value, which has no ml-dash cell type', 200, 'unsupported_cell')
+
+
+def _blocks(rows):
+    """Group rows into blocks of one schema: same field names; a column's type is fixed by its first
+    non-null cell (int64 widens to float64); any other type change starts a new block."""
+    blocks = []  # [names, types, rows]
+    for row in rows:
+        names, cells = tuple(row), list(row.values())
+        kinds = [_cell_type(value) for value in cells]
+        current = blocks[-1] if blocks and blocks[-1][0] == names else None
+        if current is not None:
+            merged = []
+            for have, got in zip(current[1], kinds):
+                if have is None or got is None or have == got:
+                    merged.append(have or got)
+                elif {have, got} == {'int64', 'float64'}:
+                    merged.append('float64')
+                else:
+                    current = None
+                    break
+            if current is not None:
+                current[1] = merged
+                current[2].append(cells)
+                continue
+        blocks.append([names, kinds, [cells]])
+    result = []
+    for names, kinds, block_rows in blocks:
+        kinds = [kind or 'float64' for kind in kinds]
+        for row in block_rows:
+            for i, kind in enumerate(kinds):
+                if kind == 'float64' and isinstance(row[i], int) and not isinstance(row[i], bool):
+                    row[i] = float(row[i])
+        result.append(MetricRowBlock(tuple(MetricColumn(name, kind) for name, kind in zip(names, kinds)), block_rows))
+    return result
