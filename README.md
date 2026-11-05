@@ -69,6 +69,24 @@ the worker-to-SDK flow is covered by local integration tests. Source-backed
 storage remains outside this increment. The explicit application `JobLifecycle`
 contract below is separate and unchanged.
 
+## DreamLake-native interactive runs (0.13.0)
+
+```python
+from ml_dash import Experiment, NativeConnection
+
+connection = NativeConnection.from_login("my-namespace", "my-project")  # existing `dreamlake login`
+with Experiment(prefix="my-namespace/my-project/run-1", managed=connection).run as exp:
+    exp.params.set(lr=1e-3)
+    exp.metrics("train", description="training loss").log(step=0, loss=0.5)
+    exp.files("ckpt").upload("weights.bin")
+```
+
+Runs are stored by DreamLake (not a managed Dash instance) and use the same
+`Experiment` API: parameters, logs (`query_logs` filters), metrics (descriptor,
+`stats()`, `read_rows()`), and file upload, download, `update()` and `delete()`.
+Not yet available on native runs: tracks, nested folders, bindrs, run metadata
+and write protection.
+
 ## DreamLake job lifecycle (explicit opt-in)
 
 `JobLifecycle` reports application outcomes through the existing authenticated
