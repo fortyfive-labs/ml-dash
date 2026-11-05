@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Platform jobs on DreamLake-native runs (`Experiment()` inside a job, through the local job broker) can now use the native run data methods the job capability permits: tracks (`exp.tracks(...)` append/read in json, jsonl, parquet and mcap, `create_track`, `list_tracks`), metric descriptors, `stats()`, `list_metrics`, `read_rows()` (paged past 1000), `update_metric`, `query_logs`, `delete_parameters`, and file `get_file`/`update()`/`delete()`. They reuse `NativeRemoteClient` over the job's own broker session and only for the job's run; another run is refused before any request. Run creation, status, metadata and credentials stay platform- or human-controlled; managed (non-native) jobs keep their previous refusals.
+- Native writers (workload credentials, requires a DreamLake server listing `workload-credentials`): `NativeConnection` writes through a writer as `ManagedConnection` does. It registers one per client and renews by id, or uses `idempotency_key`, `workload_id` (CI with an explicit `DREAMLAKE_API_KEY`) or `run_id` (only that run, opened by id, never by key). A retired writer is an error and never replaced. Add `list_credentials`, `get_credential`, `create_credential`, `rotate_credential` and `retire_credential` (metadata only, with your login).
 
 ## [0.13.0] - 2026-11-05
 

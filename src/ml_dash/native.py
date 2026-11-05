@@ -15,6 +15,7 @@ import json
 import re
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Callable
 from urllib.parse import quote, urlsplit
@@ -29,6 +30,8 @@ from .utils import _serialize_value
 _KEY = re.compile(r'[A-Za-z0-9_-]{1,128}')
 _ID = re.compile(r'[0-9a-f]{24}')
 _METRIC = re.compile(r'[A-Za-z0-9_.-]{1,128}')
+# A workload credential id: its creating intent's UUID, lower-case.
+_WORKLOAD = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
 # The server's sessions live 60 s; renew well before so a request never races expiry.
 _SESSION_SECONDS = 50
 # The native metric rows route returns at most this many rows per request; ml-dash's rows read
@@ -52,38 +55,118 @@ class NativeExperimentError(MlDashError):
         self.code = code
 
 
+def _workload_id(value, name):
+    if not isinstance(value, str) or not _WORKLOAD.fullmatch(value.lower()):
+        raise ValueError(f'{name} must be a UUID')
+    return value.lower()
+
+
 class NativeConnection:
     """Select a DreamLake project whose runs use DreamLake-native storage.
 
     Pass it as ``Experiment(prefix="namespace/project/run", managed=connection)``.
     ``token_provider`` returns the user's current DreamLake login; it is called
-    whenever a project session must be minted, so a renewed login is picked up.
+    whenever a session must be minted, so a renewed login is picked up.
+
+    Writes go through a workload credential (a writer), as ``ManagedConnection``'s do:
+
+    - by default each client registers one writer on its first session, under a fresh
+      intent UUID, and renews with that writer's id;
+    - ``idempotency_key`` registers (or reuses) the writer of that intent instead;
+    - ``workload_id`` uses an existing writer, for example in CI with an explicitly
+      provided ``DREAMLAKE_API_KEY``. A retired or unknown writer is an error; no
+      replacement is ever registered;
+    - ``run_id`` binds the writer to that one existing run: the experiment opens that run
+      by id, and no other run is written or created.
+    - a writer bound to a run is reused with both: ``workload_id=ID, run_id=RUN``. Without
+      ``run_id`` its session is rejected as invalid; the SDK never widens or infers the scope.
+
+    The credential is metadata only: sessions come from the login, last 60 seconds, and
+    use the person's current project role. Manage writers with ``list_credentials``,
+    ``get_credential``, ``create_credential``, ``rotate_credential`` and ``retire_credential``.
     """
     platform_controls_status = False
 
     def __init__(self, dreamlake_url: str, namespace: str, project: str,
-                 token_provider: Callable[[], str]):
+                 token_provider: Callable[[], str], *, workload_id=None, idempotency_key=None, run_id=None):
         if not namespace or not project or '/' in namespace or '/' in project:
             raise ValueError('Native namespace and project must be individual slugs')
+        if workload_id is not None and idempotency_key is not None:
+            raise ValueError('Pass a workload_id or an idempotency_key, not both')
+        if run_id is not None and (not isinstance(run_id, str) or not _ID.fullmatch(run_id)):
+            raise ValueError('run_id must be a native run id')
         self.namespace, self.project = namespace, project
         self.dreamlake_url = _url(dreamlake_url)
         self._provider = token_provider
         self._path = f'/native-experiments/ns/{quote(namespace, safe="")}/projects/{quote(project, safe="")}'
         self._root = self.dreamlake_url + self._path
         self._experiment_url = None
+        self.workload_id = None if workload_id is None else _workload_id(workload_id, 'workload_id')
+        self.idempotency_key = None if idempotency_key is None else _workload_id(idempotency_key, 'idempotency_key')
+        self.run_id = run_id
 
     @classmethod
-    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None):
-        """Use the DreamLake login already on this machine (``~/.dreamlake``).
+    def from_login(cls, namespace: str, project: str, dreamlake_url=None, config_dir=None, **writer):
+        """Use the DreamLake login already on this machine (``~/.dreamlake``), or an
+        explicitly provided ``DREAMLAKE_API_KEY`` for ``DREAMLAKE_REMOTE``.
 
         Same login source and server-pinning rules as
         ``ManagedConnection.from_login``. Does not write files or start a login.
+        ``writer`` takes the ``workload_id``/``idempotency_key``/``run_id`` options.
         """
         selected, provider = _login_provider(dreamlake_url, config_dir)
-        return cls(selected, namespace, project, provider)
+        return cls(selected, namespace, project, provider, **writer)
 
     def client(self):
         return NativeRemoteClient(self)
+
+    # -- workload credentials (metadata only; the person's login) --------------------
+
+    def _manage(self, method: str, path: str, action: str, **kwargs) -> dict:
+        try:
+            with httpx.Client(follow_redirects=False, timeout=30) as http:
+                response = http.request(method, self._root + path,
+                                        headers={'Authorization': _authorization(self._provider())}, **kwargs)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable') from None
+        if response.status_code != 200:
+            raise _error(response, action)
+        try:
+            result = response.json()
+            if not isinstance(result, dict):
+                raise TypeError
+            return result
+        except (ValueError, TypeError):
+            raise NativeExperimentError(None, f'{action} returned an invalid response') from None
+
+    def list_credentials(self, cursor=None, limit=None) -> dict:
+        """Your writers in this project: ``{credentials, hasMore, nextCursor}``."""
+        params = {}
+        if cursor is not None:
+            params['cursor'] = _workload_id(cursor, 'cursor')
+        if limit is not None:
+            params['limit'] = str(int(limit))
+        return self._manage('GET', '/credentials', 'Native credential list', params=params)
+
+    def get_credential(self, credential_id) -> dict:
+        return self._manage('GET', f'/credentials/{_workload_id(credential_id, "credential_id")}', 'Native credential inspect')['credential']
+
+    def create_credential(self, idempotency_key, run_id=None) -> dict:
+        """Register the writer of this intent (or return the one it registered)."""
+        body = {'operation': 'create', 'idempotencyKey': _workload_id(idempotency_key, 'idempotency_key')}
+        if run_id is not None:
+            body['runId'] = run_id
+        return self._manage('POST', '/credentials', 'Native credential create', json=body)['credential']
+
+    def rotate_credential(self, credential_id, expected_generation) -> dict:
+        """End the writer's current sessions; its next session uses the new generation."""
+        return self._manage('POST', '/credentials', 'Native credential rotate', json={'operation': 'rotate',
+            'credentialId': _workload_id(credential_id, 'credential_id'), 'expectedGeneration': expected_generation})['credential']
+
+    def retire_credential(self, credential_id, expected_generation) -> dict:
+        """End the writer: its sessions stop and no new one is issued."""
+        return self._manage('POST', '/credentials', 'Native credential retire', json={'operation': 'retire',
+            'credentialId': _workload_id(credential_id, 'credential_id'), 'expectedGeneration': expected_generation})['credential']
 
 
 def _error(response: httpx.Response, action: str) -> NativeExperimentError:
@@ -106,6 +189,9 @@ class NativeRemoteClient:
         self._lock = threading.RLock()
         self._token = None
         self._renew_at = 0.0
+        # As ManagedRemoteClient: one creation intent per client, then the writer it registered.
+        self.workload_id = connection.workload_id
+        self._creation_key = connection.idempotency_key or str(uuid.uuid4())
 
     # -- session ----------------------------------------------------------------
 
@@ -115,7 +201,11 @@ class NativeRemoteClient:
                 return self._token
             self._token = None
             try:
-                response = self._http.post(self.connection._root + '/session', json={'mode': 'write'},
+                body = {'mode': 'write', **({'workloadId': self.workload_id} if self.workload_id
+                                            else {'idempotencyKey': self._creation_key})}
+                if self.connection.run_id:
+                    body['runId'] = self.connection.run_id
+                response = self._http.post(self.connection._root + '/session', json=body,
                     headers={'Authorization': _authorization(self.connection._provider())})
             except httpx.HTTPError:
                 raise NativeExperimentError(None, 'DreamLake native session unavailable') from None
@@ -129,8 +219,14 @@ class NativeRemoteClient:
                 if urlsplit(_url(api_url)).path != self.connection._path:
                     raise ValueError
                 _authorization(token)
+                # The session must be for exactly the writer (and run) asked for.
+                writer = result['workloadId']
+                if (writer != (self.workload_id or self._creation_key) or not isinstance(result['generation'], int)
+                        or result.get('runId') != self.connection.run_id):
+                    raise ValueError
             except (ValueError, KeyError, TypeError):
                 raise NativeExperimentError(None, 'Invalid DreamLake native session response') from None
+            self.workload_id = writer
             self._token, self._renew_at = token, time.time() + _SESSION_SECONDS
             return token
 
@@ -150,7 +246,13 @@ class NativeRemoteClient:
                 continue
             if response.is_success:
                 return response
-            raise _error(response, action)
+            error = _error(response, action)
+            if error.code == 'NATIVE_CREDENTIAL_RETIRED':
+                # Rotated: the next explicit call renews under the new generation. Retired: that
+                # renewal is refused. Nothing is replayed here (the failed write stays failed).
+                with self._lock:
+                    self._token = None
+            raise error
         raise AssertionError('unreachable')
 
     def _json(self, method: str, path: str, action: str, **kwargs) -> dict:
@@ -190,6 +292,12 @@ class NativeRemoteClient:
             body['description'] = description
         if tags is not None:
             body['tags'] = list(tags)
+        if connection.run_id:
+            # A writer bound to a run opens that run by id, never by key: a renamed run or a reused
+            # key cannot redirect it. Its description/tags are updated in place.
+            if body:
+                return self._json('PATCH', self._run(connection.run_id), 'Native run update', json=body)
+            return self._json('GET', self._run(connection.run_id), 'Native run read')
         return self._json('PUT', f'/runs/{quote(name, safe="")}', 'Native run create', json=body)
 
     def update_experiment_status(self, experiment_id, status):
