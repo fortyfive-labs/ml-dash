@@ -251,3 +251,32 @@ def test_native_default_namespace_and_project_create_refusal(tmp_path, monkeypat
     with pytest.raises(NativeExperimentError) as refused:
         connection.client().set_parameters('a' * 24, {'x': 1})
     assert refused.value.status == 403
+
+
+def test_native_read_session_and_anonymous_public_reads(tmp_path):
+    """A READ grant reads through a read session; an anonymous connection reads a public project, never writes."""
+    import uuid
+
+    from ml_dash.native import NativeExperimentError
+
+    env = _local_server()
+    if not env.get('reader_token'):
+        pytest.skip('harness without a READ-grant user')
+    ns, project, key = env['namespace'], env['project'], f'reads-{uuid.uuid4().hex[:8]}'
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])).run as exp:
+        exp.params.set(lr=0.1)
+        exp.metrics('loss').log(step=0, loss=1.0)
+        exp.flush()
+        run_id = exp.id
+    reader = NativeConnection(env['base_url'], ns, project, lambda: env['reader_token']).client()
+    assert reader.get_parameters(run_id) == {'lr': 0.1}
+    assert [m['name'] for m in reader.list_metrics(run_id)] == ['loss']
+    with pytest.raises(NativeExperimentError) as refused:
+        reader.set_parameters(run_id, {'lr': 0.2})
+    assert refused.value.status == 403
+    anonymous = NativeConnection.anonymous(env['base_url'], ns, env['public_project']).client()
+    assert isinstance(anonymous.list_files(env['public_run'])['files'], list)
+    assert anonymous.graphql_query('query ($id: ID!) { experimentById(id: $id) { id } }', {'id': env['public_run']})['experimentById'] == {'id': env['public_run']}
+    with pytest.raises(NativeExperimentError) as local:
+        anonymous.set_parameters(env['public_run'], {'x': 1})
+    assert local.value.code == 'NATIVE_LOGIN_REQUIRED'
