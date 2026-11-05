@@ -84,8 +84,10 @@ with Experiment(prefix="my-namespace/my-project/run-1", managed=connection).run 
 Runs are stored by DreamLake (not a managed Dash instance) and use the same
 `Experiment` API: parameters, logs (`query_logs` filters), metrics (descriptor,
 `stats()`, `read_rows()`), and file upload, download, `update()` and `delete()`.
-Not yet available on native runs: tracks, nested folders, bindrs, run metadata
-and write protection.
+Since 0.14.0 also tracks (`exp.tracks(topic)`: append, ranged reads, `slice()`,
+and `jsonl`/`parquet`/`mcap` exports), except on runs created before the
+server's native run store (`NATIVE_TRACKS_UNAVAILABLE`). Not yet available on
+native runs: nested folders, bindrs, run metadata and write protection.
 
 ## DreamLake job lifecycle (explicit opt-in)
 

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-05
+
+- Tracks on native runs (requires a DreamLake server with native tracks): `exp.tracks(topic)` appends (single and batched `flush()`), `read()`/`list_entries()` with inclusive `start_timestamp`/`end_timestamp` and `columns`, `slice()`/`findByTime()`, and the client's `create_track`, `list_tracks` (all, an exact topic, or `prefix/*`) and `get_track_data`. Entries are flattened to dot keys (arrays kept) and returned in timestamp order. Formats: `json` (dict), and as bytes `jsonl`, `parquet` (an Arrow IPC file, as Dash: `timestamp` first, objects and arrays as JSON text; a column mixing value types is refused) and `mcap` (one topic, or every topic under a prefix; camera topics embed the run's images). A numeric `timestamp` field in an entry's data is that entry's timestamp; a non-numeric one is refused.
+- Runs homed in DreamLake before its native run store have no tracks: their track calls answer `NATIVE_TRACKS_UNAVAILABLE`.
+- Not yet on native runs: nested folders, bindrs, run metadata and write protection. The existing `Experiment` and Dash client interfaces are unchanged.
+
 ## [0.13.0] - 2026-11-05
 
 - Add `NativeConnection` for interactive DreamLake-native runs: `Experiment(prefix="ns/project/run", managed=NativeConnection.from_login("ns", "project"))` uses the existing DreamLake login to mint short-lived project write sessions and writes only to the server's `/native-experiments` routes. It creates or reopens a run, sets or clears its description and tags (`readme=""`, `tags=[]` clear), writes parameters, logs and metrics, sets the final status, and uploads, lists and downloads files (sha256-verified).
