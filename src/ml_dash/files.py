@@ -1527,6 +1527,10 @@ class BindrsBuilder:
         if not self._experiment._is_open:
             raise RuntimeError("Experiment not open. Use experiment.open() or context manager.")
 
+        # A native run asks its labels (`NativeRemoteClient.files_in_bindr`); otherwise filter the file list.
+        client = getattr(self._experiment, '_client', None)
+        if client is not None and hasattr(client, 'files_in_bindr'):
+            return client.files_in_bindr(self._experiment._experiment_id, self._bindr_name)
         # Get all files and filter by bindr
         all_files = self._experiment._list_files(prefix=None, tags=None)
         return [f for f in all_files if self._bindr_name in f.get('bindrs', [])]

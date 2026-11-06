@@ -721,6 +721,11 @@ def test_native_explicit_writer_graphql_against_local_server():
     assert refused.value.status == 403
 
 
+def test_native_bindrs_against_local_server(tmp_path):
+    """Real SDK -> gateway (DREAMLAKE_NATIVE_RUN_BINDRS on): `bindrs=` at create and its retry (no duplicates),
+    `experiment.bindrs(name).list()`, item labels (a file, the parameters), and a run-bound writer's scope."""
+
+
 def test_native_public_client_methods_download_stream_current_user_and_index_reads(monkeypatch, tmp_path):
     """RemoteClient's download_file_streaming, get_current_user, get_metric_data and download_metric_chunk on native."""
     import hashlib
@@ -810,6 +815,42 @@ def test_native_file_methods_reach_any_file_of_the_project_against_local_server(
     from ml_dash.native import NativeExperimentError
 
     env = _local_server()
+    ns, project, key = env['namespace'], env['project'], f'labels-{uuid.uuid4().hex[:6]}'
+    human = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'])
+    source = tmp_path / 'curve.txt'
+    source.write_text('curve')
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=human, bindrs=['best']).run as exp:
+        exp.params.set(lr=0.1)
+        exp.files().upload(str(source))
+        exp.flush()
+        client, run_id = exp._client, exp.id
+        assert [b['name'] for b in client.run_bindrs(run_id)] == ['best']
+        file_id = client.list_files(run_id)['files'][0]['id']
+        figures = client.attach_bindr(run_id, name='figures', item_kind='file', item_id=file_id)['bindr']
+        # A retry by name keeps one membership; by id the answer says whether it changed anything.
+        client.attach_bindr(run_id, name='figures', item_kind='file', item_id=file_id)
+        assert client.attach_bindr(run_id, bindr_id=figures['id'], item_kind='file', item_id=file_id)['attached'] is False
+        assert [b['name'] for b in client.run_bindrs(run_id, 'file', file_id)] == ['figures']
+        assert [f['id'] for f in exp.bindrs('figures').list()] == [file_id]
+        assert exp.bindrs('best').list() == []
+        params_id = client.parameters_id(run_id)
+        client.attach_bindr(run_id, name='sweep', item_kind='parameters', item_id=params_id)
+        assert [b['name'] for b in client.run_bindrs(run_id, 'parameters', params_id)] == ['sweep']
+    # The same create again (an SDK retry): the run keeps exactly one membership of `best`.
+    with Experiment(prefix=f'{ns}/{project}/{key}', managed=human, bindrs=['best']).run as again:
+        assert again.id == run_id
+        assert [b['name'] for b in again._client.run_bindrs(run_id)] == ['best']
+    # A run-bound writer labels its own run only, with its scoped session.
+    other = human.client().create_or_update_experiment(project, f'{key}-other', prefix=f'{ns}/{project}/{key}-other')['experiment']['id']
+    writer = NativeConnection(env['base_url'], ns, project, lambda: env['writer_token'], idempotency_key=str(uuid.uuid4()), run_id=run_id).client()
+    assert writer.attach_bindr(run_id, name='writer-made')['bindr']['name'] == 'writer-made'
+    with pytest.raises(NativeExperimentError) as refused:
+        writer.attach_bindr(other, name='writer-made')
+    assert refused.value.status == 403
+    assert {b['name'] for b in human.client().run_bindrs(run_id)} == {'best', 'writer-made'}
+    assert human.client().detach_bindr(run_id, name='writer-made')['detached'] is True
+
+
     ns, project, base = env['namespace'], env['project'], env['base_url']
     root = f'{base}/native-experiments/ns/{ns}/projects/{project}'
     readme = '# 项目\nhello\n'.encode()
