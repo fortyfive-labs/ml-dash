@@ -69,7 +69,7 @@ the worker-to-SDK flow is covered by local integration tests. Source-backed
 storage remains outside this increment. The explicit application `JobLifecycle`
 contract below is separate and unchanged.
 
-## DreamLake-native interactive runs (0.13.0)
+## DreamLake-native interactive runs (0.15.0)
 
 ```python
 from ml_dash import Experiment, NativeConnection
@@ -91,8 +91,11 @@ Prefixes may name folders (`ns/project/sweeps/lr 0.1/run`, any Unicode names;
 folders are created as needed), `metadata=` is stored with the run, and
 `_write_protected=True` creates the run protected, with its metadata, in one
 server step. Protection is a person's action: it is refused for an explicit
-`workload_id`/`idempotency_key`/`run_id` writer. Not yet available on native
-runs: bindrs.
+`workload_id`/`idempotency_key`/`run_id` writer.
+Since 0.15.0, native bindrs label runs and their metrics, files and parameters
+through canonical DreamLake bindrs; use `bindrs=` on creation or
+the native client's run/item label methods. These additions require the
+matching backend capabilities; installing this package does not activate them.
 
 ### Native writers (workload credentials)
 

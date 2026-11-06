@@ -11,11 +11,15 @@ All notable changes to ML-Dash will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.15.0] - 2026-11-07
 
 - Native metric names follow ml-dash's rule (requires a DreamLake server with the matching native routes): any name of 1-256 characters without `/` (not `.`/`..`), sent percent-encoded as one path segment, so names such as `训练` or `training loss` work as they did with ml-dash. The SDK previously refused anything outside `[A-Za-z0-9_.-]{1,128}`.
 - Native writers (workload credentials, requires a DreamLake server listing `workload-credentials`): `NativeConnection` writes through a writer as `ManagedConnection` does. It registers one per client and renews by id, or uses `idempotency_key`, `workload_id` (CI with an explicit `DREAMLAKE_API_KEY`) or `run_id` (only that run, opened by id, never by key). A retired writer is an error and never replaced. Add `list_credentials`, `get_credential`, `create_credential`, `rotate_credential` and `retire_credential` (metadata only, with your login).
-- Native run paths, metadata and protection (requires a DreamLake server with native run paths and protected creation): `Experiment(prefix="ns/project/folders.../name")` opens the run at that path, creating its folders, with Unicode names; `metadata=` is stored with the run; `_write_protected=True` creates it protected, with its metadata, in one server transaction, as a person's action over a plain session (an explicit `workload_id`/`idempotency_key`/`run_id` writer is refused before any request). bindrs stay unsupported.
+- Native run paths, metadata and protection (requires a DreamLake server with native run paths and protected creation): `Experiment(prefix="ns/project/folders.../name")` opens the run at that path, creating its folders, with Unicode names; `metadata=` is stored with the run; `_write_protected=True` creates it protected, with its metadata, in one server transaction, as a person's action over a plain session (an explicit `workload_id`/`idempotency_key`/`run_id` writer is refused before any request). bindrs are supported as described below.
+
+- Native bindrs: attach/detach run, metric, file and parameters labels using canonical DreamLake bindrs; creation confirms every requested label. Requires the server's native bindr capability and permissions.
+- Native GraphQL reads, project/experiment lookup and current-user inspection use DreamLake visibility and credential scope. Native file lookup supports the Files API; streaming downloads verify size/SHA-256 before replacing a destination.
+- These additions require matching DreamLake backend capabilities. Installing the SDK does not enable server rollout flags or change historical run storage.
 
 ## [0.14.0] - 2026-11-05
 
