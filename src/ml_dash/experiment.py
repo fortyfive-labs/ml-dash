@@ -386,9 +386,11 @@ class Experiment:
     base = self._managed_connection._experiment_url
     if not base:
       return None
-    from urllib.parse import urlsplit, urlencode, urlunsplit
+    from urllib.parse import urlsplit, urlencode, urlunsplit, parse_qsl
     parts = urlsplit(base)
-    return urlunsplit(parts._replace(query=urlencode({'run': str(self._experiment_id)})))
+    query = dict(parse_qsl(parts.query))
+    query['run'] = str(self._experiment_id)
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
   def _print_startup_banner(self) -> None:
     """Print experiment started message with URL after successful remote open."""
