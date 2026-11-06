@@ -23,7 +23,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .exceptions import MetricRowsError, MlDashError, NetworkError
+from .exceptions import MetricRowsError, MlDashError, NetworkError, StorageError
 from .managed import _authorization, _login_provider, _url
 from .metric_rows import MetricColumn, MetricRowBlock, MetricRowsPage
 from .utils import _serialize_value
@@ -371,7 +371,9 @@ class NativeRemoteClient:
         return bool(getattr(connection, 'workload_id', None) or getattr(connection, 'idempotency_key', None)
                     or getattr(connection, 'run_id', None))
 
-    def _send(self, method: str, path: str, action: str, **kwargs) -> httpx.Response:
+    def _send(self, method: str, path: str, action: str, stream: bool = False, **kwargs) -> httpx.Response:
+        """One request with the right session; a 401 renews it once. ``stream``: the body is left unread for the
+        caller, who must close the response."""
         read = method == 'GET'
         # A connection without a login provider is anonymous; one without the attribute (a job's broker
         # destination, `native_job._BrokerDestination`) carries its own session.
@@ -383,18 +385,29 @@ class NativeRemoteClient:
         for attempt in range(2):
             headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
             try:
-                response = self._http.request(method, self.connection._root + path, headers=headers, **kwargs)
+                response = self._http.send(self._http.build_request(method, self.connection._root + path, headers=headers, **kwargs),
+                                           stream=stream)
             except httpx.HTTPError:
                 raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable; '
                                                   'reconcile before retrying writes') from None
             if response.status_code == 401 and attempt == 0 and not anonymous:
                 # 401 is decided before any write, so one retry with a fresh session is safe.
+                response.close()
                 with self._lock:
                     self._sessions.pop(mode, None)
                     self._token = None  # a subclass session (`NativeJobDataClient`) renews on this
                 continue
             if response.is_success:
                 return response
+            if stream:
+                # The refusal body carries its code; a body that cannot be read is never parsed.
+                try:
+                    response.read()
+                except httpx.HTTPError:
+                    raise NativeExperimentError(None, f'{action} failed: DreamLake unavailable (HTTP {response.status_code}); '
+                                                      'reconcile before retrying writes') from None
+                finally:
+                    response.close()
             error = _error(response, action)
             if error.code == 'NATIVE_CREDENTIAL_RETIRED':
                 # Rotated: the next explicit call renews under the new generation. Retired: that
@@ -614,6 +627,18 @@ class NativeRemoteClient:
         from .client import _index_read_unsupported
         raise _index_read_unsupported('read_metric_data')
 
+    def get_metric_data(self, experiment_id, metric_name, start_index=None, limit=None, buffer_only=False):
+        """As ``RemoteClient.get_metric_data``: unsupported for remote metrics (no server-assigned indices);
+        raises ``ConfigurationError`` without a request. Use ``read_metric_rows``."""
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('get_metric_data')
+
+    def download_metric_chunk(self, experiment_id, metric_name, chunk_number):
+        """As ``RemoteClient.download_metric_chunk``: unsupported for remote metrics (no chunk numbers);
+        raises ``ConfigurationError`` without a request. Use ``read_metric_rows``."""
+        from .client import _index_read_unsupported
+        raise _index_read_unsupported('download_metric_chunk')
+
     def read_metric_rows(self, experiment_id, metric_name, limit=None, cursor=None):
         """One page of a metric's committed rows as a ``MetricRowsPage``, as ``RemoteClient.read_metric_rows``.
 
@@ -752,22 +777,146 @@ class NativeRemoteClient:
             raise ValueError('Invalid native file id')
         return self._run(experiment_id) + f'/files/{file_id}'
 
+    # -- files: a run's, or the project's (ml-dash's file methods take any file of the project) -------------
+
+    def _pinned_run(self):
+        """The one run this client may touch without being told (a job's), or None."""
+        return None
+
+    def _file_route(self, experiment_id, file_id):
+        """The route of a file of the selected project. ml-dash's ``experiment_id`` is optional (its file methods
+        address any file node by id): given, the file is that run's (a job or a run-bound writer still only its own
+        run); None, the file is located by id within the selected project, a run's or the project's own (README,
+        ``.dashrc``), with this client's scoped session, never the login."""
+        if not isinstance(file_id, str) or not _ID.fullmatch(file_id):
+            raise ValueError('Invalid native file id')
+        if experiment_id is None:
+            experiment_id = self._pinned_run()
+        if experiment_id is not None:
+            return self._file(experiment_id, file_id)
+        found = self._locate_file(file_id)
+        return self._file(found, file_id) if found else f'/project-files/{file_id}'
+
+    def _locate_file(self, file_id):
+        """The run id of a file of the selected project, or None for a project file; NATIVE_FILE_NOT_FOUND otherwise.
+        ml-dash's ``node(nodeId)``, sent with the session this client reads with (a project session sees only its
+        project; anonymous: a public project), and pinned to the selected namespace and project."""
+        connection = self.connection
+        anonymous = getattr(connection, '_provider', True) is None
+        mode = 'write' if self._explicit_writer() else 'read'
+        headers = {} if anonymous else {'Authorization': _authorization(self._token_for(mode))}
+        query = 'query($id: String!) { node(nodeId: $id) { id type experimentId project { slug namespace { slug } } } }'
+        try:
+            response = self._http.post(connection.dreamlake_url + '/native-dash/graphql',
+                                       json={'query': query, 'variables': {'id': file_id}}, headers=headers)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'Native file lookup failed: DreamLake unavailable') from None
+        if response.status_code != 200:
+            raise _error(response, 'Native file lookup')
+        try:
+            body = response.json()
+            node = (body.get('data') or {}).get('node')
+            project = (node or {}).get('project') or {}
+        except (ValueError, AttributeError):
+            raise NativeExperimentError(None, 'Native file lookup returned an invalid response') from None
+        if (not node or body.get('errors') or node.get('type') != 'FILE' or node.get('id') != file_id
+                or project.get('slug') != connection.project or (project.get('namespace') or {}).get('slug') != connection.namespace):
+            raise NativeExperimentError(404, 'Native file not found in the selected project', 'NATIVE_FILE_NOT_FOUND')
+        run_id = node.get('experimentId')
+        if run_id is not None and not (isinstance(run_id, str) and _ID.fullmatch(run_id)):
+            raise NativeExperimentError(None, 'Native file lookup returned an invalid response')
+        return run_id
+
+    @staticmethod
+    def _file_view(view):
+        """The native file, plus the fields ml-dash's node answer had (``name``, ``type``, ``physicalFile``)."""
+        if not isinstance(view, dict):
+            return view
+        return {**view, 'name': view.get('filename'), 'type': 'FILE', 'physicalFile': {key: view.get(key)
+                for key in ('filename', 'checksum', 'sizeBytes', 'contentType')}}
+
     def get_file(self, experiment_id, file_id):
-        return self._json('GET', self._file(experiment_id, file_id), 'Native file read')['file']
+        """A file of the selected project: a run's (``experiment_id``) or, with None, any of the project's."""
+        return self._file_view(self._json('GET', self._file_route(experiment_id, file_id), 'Native file read')['file'])
+
+    def _project_file_change(self, method, route, action, **kwargs):
+        """A project file is changed only by a person (the server takes no session for it): explicit management with
+        this connection's own login. A selected writer, a job or an anonymous connection is refused before any
+        request; none ever falls back to the login."""
+        if self._explicit_writer() or getattr(self.connection, '_provider', None) is None:
+            raise NativeExperimentError(403, f'{action}: a project file is changed with a DreamLake login, not a writer '
+                                             'or job session', 'NATIVE_FORBIDDEN')
+        return self.connection._manage(method, route, action, **kwargs)
 
     def delete_file(self, experiment_id, file_id):
         """Delete the file, as ml-dash: it leaves every listing and read at once and cannot be restored
         (re-uploading the same path creates it anew). Returns ``{id, nodeId, deleted}``."""
-        return self._json('DELETE', self._file(experiment_id, file_id), 'Native file delete')
+        route = self._file_route(experiment_id, file_id)
+        if route.startswith('/project-files/'):
+            return self._project_file_change('DELETE', route, 'Native project file delete')
+        return self._json('DELETE', route, 'Native file delete')
 
     def update_file(self, experiment_id, file_id, description=None, tags=None, metadata=None):
         """Set description, tags and/or metadata (None leaves a field unchanged)."""
         body = {key: value for key, value in (('description', description), ('tags', tags), ('metadata', metadata))
                 if value is not None}
-        return self._json('PATCH', self._file(experiment_id, file_id), 'Native file update', json=body)['file']
+        route = self._file_route(experiment_id, file_id)
+        if route.startswith('/project-files/'):
+            return self._file_view(self._project_file_change('PATCH', route, 'Native project file update', json=body)['file'])
+        return self._file_view(self._json('PATCH', route, 'Native file update', json=body)['file'])
+
+    def download_file_streaming(self, experiment_id, file_id, dest_path):
+        """As ``RemoteClient.download_file_streaming``: the file streamed to ``dest_path`` (never held in memory),
+        verified against its stored sha256 before it appears there; a mismatch raises ``StorageError`` and leaves
+        nothing at ``dest_path``. Returns ``dest_path``. An aborted or failed transfer leaves no partial file."""
+        path = self._file_route(experiment_id, file_id)
+        checksum = self._json('GET', path, 'Native file read')['file']['checksum']
+        target = Path(dest_path)
+        temp = target.with_name(f'.{target.name}.{uuid.uuid4().hex}.part')
+        response = self._send('GET', path + '/download', 'Native file download', stream=True, timeout=300)
+        digest = hashlib.sha256()
+        try:
+            with open(temp, 'xb') as out:
+                for chunk in response.iter_bytes(chunk_size=65536):
+                    digest.update(chunk)
+                    out.write(chunk)
+            if digest.hexdigest() != checksum:
+                raise StorageError(f'Checksum verification failed for file {file_id}')
+            os.replace(temp, target)
+        except httpx.HTTPError:
+            raise NativeExperimentError(None, 'Native file download failed: DreamLake unavailable') from None
+        finally:
+            response.close()
+            temp.unlink(missing_ok=True)
+        return dest_path
+
+    def get_current_user(self):
+        """As ``RemoteClient.get_current_user``: the DreamLake login's profile ``{id, username, email, name, given_name,
+        family_name, picture}`` (``username``: the login's namespace), from DreamLake's ``/auth/me``. Explicit
+        management with the person's own login: an anonymous connection, or a job's broker client, has none and
+        raises ``AuthenticationError``; a selected writer's session is never used for it."""
+        from .auth.exceptions import AuthenticationError
+        provider = getattr(self.connection, '_provider', None)
+        if provider is None:
+            raise AuthenticationError('Not authenticated: get_current_user needs a DreamLake login')
+        try:
+            response = self._http.get(self.connection.dreamlake_url + '/auth/me', headers={'Authorization': _authorization(provider())})
+        except httpx.HTTPError as error:
+            raise NetworkError(f'Failed to fetch current user from server: {type(error).__name__}') from None
+        if response.status_code == 401:
+            raise AuthenticationError('Not authenticated: the DreamLake login was refused')
+        if response.status_code != 200:
+            raise NetworkError(f'Failed to fetch current user from server: HTTP {response.status_code}')
+        try:
+            me = response.json()
+            return {'id': me['id'], 'username': (me.get('namespace') or {}).get('slug'), 'email': me.get('email'),
+                    'name': me.get('name'), 'given_name': me.get('given_name'), 'family_name': me.get('family_name'),
+                    'picture': me.get('picture')}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise NetworkError('Failed to fetch current user from server: invalid response') from None
 
     def download_file(self, experiment_id, file_id, dest_path=None):
-        path = self._file(experiment_id, file_id)
+        path = self._file_route(experiment_id, file_id)
         info = self._json('GET', path, 'Native file read')['file']
         content = self._send('GET', path + '/download', 'Native file download', timeout=300).content
         if hashlib.sha256(content).hexdigest() != info['checksum']:

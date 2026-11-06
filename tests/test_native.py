@@ -724,6 +724,92 @@ def test_native_explicit_writer_graphql_against_local_server():
 def test_native_bindrs_against_local_server(tmp_path):
     """Real SDK -> gateway (DREAMLAKE_NATIVE_RUN_BINDRS on): `bindrs=` at create and its retry (no duplicates),
     `experiment.bindrs(name).list()`, item labels (a file, the parameters), and a run-bound writer's scope."""
+
+
+def test_native_public_client_methods_download_stream_current_user_and_index_reads(monkeypatch, tmp_path):
+    """RemoteClient's download_file_streaming, get_current_user, get_metric_data and download_metric_chunk on native."""
+    import hashlib
+
+    from ml_dash.auth.exceptions import AuthenticationError
+    from ml_dash.exceptions import ConfigurationError, StorageError
+
+    payload = os.urandom(300_000)
+    state = {'checksum': hashlib.sha256(payload).hexdigest(), 'expired': True}
+    calls = []
+
+    def handle(request):
+        path, auth = request.url.path, request.headers.get('authorization')
+        calls.append((request.method, path, auth))
+        if path.endswith('/session'):
+            body = json.loads(request.content)
+            writer = {} if body['mode'] == 'read' else {'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1}
+            return httpx.Response(200, json={'token': f'session-{len(calls)}', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT, **writer})
+        if path == '/auth/me':
+            assert auth == 'Bearer user-login'
+            return httpx.Response(200, json={'id': 'u1', 'sub': 's', 'email': 'a@b.c', 'name': 'Ada', 'given_name': 'Ada',
+                                             'family_name': None, 'picture': None, 'namespace': {'id': 'n1', 'slug': 'ada'}})
+        if path.endswith('/download'):
+            if state['expired']:  # an expired session, refused before any byte: renewed once
+                state['expired'] = False
+                return httpx.Response(401, json={'error': {'code': 'NATIVE_LOGIN_REQUIRED'}})
+            return httpx.Response(200, stream=httpx.ByteStream(payload))
+        return httpx.Response(200, json={'file': {'id': 'f' * 24, 'filename': 'w.bin', 'checksum': state['checksum']}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+
+    dest = tmp_path / 'weights.bin'
+    assert client.download_file_streaming(RUN_ID, 'f' * 24, str(dest)) == str(dest)
+    assert dest.read_bytes() == payload and [p.name for p in tmp_path.iterdir()] == ['weights.bin']
+    downloads = [c for c in calls if c[1].endswith('/download')]
+    assert len(downloads) == 2 and downloads[0][2] != downloads[1][2]  # renewed session after the 401
+    state['checksum'] = '0' * 64
+    with pytest.raises(StorageError):
+        client.download_file_streaming(RUN_ID, 'f' * 24, str(tmp_path / 'bad.bin'))
+    assert [p.name for p in tmp_path.iterdir()] == ['weights.bin']  # nothing left behind
+
+    assert client.get_current_user() == {'id': 'u1', 'username': 'ada', 'email': 'a@b.c', 'name': 'Ada', 'given_name': 'Ada',
+                                         'family_name': None, 'picture': None}
+    calls.clear()
+    with pytest.raises(AuthenticationError):
+        NativeConnection.anonymous('https://dreamlake.test', 'lab', 'research').client().get_current_user()
+    for method, args in (('get_metric_data', (RUN_ID, 'loss')), ('download_metric_chunk', (RUN_ID, 'loss', 0))):
+        with pytest.raises(ConfigurationError):
+            getattr(client, method)(*args)
+    assert calls == []
+
+
+def test_native_stream_refusal_whose_body_cannot_be_read_is_unavailable(monkeypatch, tmp_path):
+    """A refused streamed download whose body breaks mid-read raises the native 'unavailable' error, never ResponseNotRead."""
+    from ml_dash.native import NativeExperimentError
+
+    class Broken(httpx.SyncByteStream):
+        def __iter__(self):
+            raise httpx.ReadError('connection reset')
+
+    def handle(request):
+        if request.url.path.endswith('/session'):
+            body = json.loads(request.content)
+            writer = {} if body['mode'] == 'read' else {'workloadId': body.get('workloadId') or body['idempotencyKey'], 'generation': 1}
+            return httpx.Response(200, json={'token': 's', 'expiresAt': 0, 'apiUrl': 'https://dreamlake.test' + ROOT, **writer})
+        if request.url.path.endswith('/download'):
+            return httpx.Response(503, stream=Broken())
+        return httpx.Response(200, json={'file': {'id': 'f' * 24, 'filename': 'w.bin', 'checksum': '0' * 64}})
+
+    real_client = httpx.Client
+    monkeypatch.setattr('ml_dash.native.httpx.Client', lambda **kw: real_client(transport=httpx.MockTransport(handle), **kw))
+    client = NativeConnection('https://dreamlake.test', 'lab', 'research', lambda: 'user-login').client()
+    with pytest.raises(NativeExperimentError) as failed:
+        client.download_file_streaming(RUN_ID, 'f' * 24, str(tmp_path / 'w.bin'))
+    assert failed.value.status is None and 'unavailable' in str(failed.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_native_file_methods_reach_any_file_of_the_project_against_local_server(tmp_path):
+    """ml-dash's file methods take any file of the project: with experiment_id None, a project file (README) or a
+    run file is located by id; the person reads, streams, edits and deletes it; a writer cannot touch a project file."""
+    import hashlib
     import uuid
 
     from ml_dash.native import NativeExperimentError
@@ -763,3 +849,41 @@ def test_native_bindrs_against_local_server(tmp_path):
     assert refused.value.status == 403
     assert {b['name'] for b in human.client().run_bindrs(run_id)} == {'best', 'writer-made'}
     assert human.client().detach_bindr(run_id, name='writer-made')['detached'] is True
+
+
+    ns, project, base = env['namespace'], env['project'], env['base_url']
+    root = f'{base}/native-experiments/ns/{ns}/projects/{project}'
+    readme = '# 项目\nhello\n'.encode()
+    name = f'README-{uuid.uuid4().hex[:6]}.md'
+    with httpx.Client(headers={'Authorization': 'Bearer ' + env['writer_token']}) as http:
+        uploaded = http.post(root + '/project-files', files=[('sizeBytes', (None, str(len(readme)))),
+            ('checksum', (None, hashlib.sha256(readme).hexdigest())), ('file', (name, readme, 'text/markdown'))])
+    assert uploaded.status_code == 200, uploaded.text
+    project_file = uploaded.json()['file']['id']
+
+    connection = NativeConnection(base, ns, project, lambda: env['writer_token'])
+    client = connection.client()
+    got = client.get_file(None, project_file)
+    assert (got['id'], got['name'], got['type'], got['physicalFile']['checksum']) == (project_file, name, 'FILE', hashlib.sha256(readme).hexdigest())
+    assert client.download_file_streaming(None, project_file, str(tmp_path / 'README.md')) == str(tmp_path / 'README.md')
+    assert (tmp_path / 'README.md').read_bytes() == readme
+    assert client.update_file(None, project_file, description='the readme')['description'] == 'the readme'
+
+    weights = tmp_path / 'weights.bin'
+    weights.write_bytes(os.urandom(4096))
+    with Experiment(prefix=f'{ns}/{project}/files-{uuid.uuid4().hex[:6]}', managed=connection).run as exp:
+        run_id = exp.id
+        exp.files('ckpt').upload(str(weights))
+        exp.flush()
+    run_file = client.list_files(run_id)['files'][0]['id']
+    located = client.get_file(None, run_file)  # no run named: located within the project
+    assert located['id'] == run_file and located['physicalFile']['checksum'] == hashlib.sha256(weights.read_bytes()).hexdigest()
+
+    writer = NativeConnection(base, ns, project, lambda: env['writer_token'], idempotency_key=str(uuid.uuid4())).client()
+    with pytest.raises(NativeExperimentError) as refused:  # never the login behind a writer
+        writer.update_file(None, project_file, description='by a writer')
+    assert refused.value.code == 'NATIVE_FORBIDDEN'
+    assert client.delete_file(None, project_file)
+    with pytest.raises(NativeExperimentError) as gone:
+        client.get_file(None, project_file)
+    assert gone.value.code == 'NATIVE_FILE_NOT_FOUND'

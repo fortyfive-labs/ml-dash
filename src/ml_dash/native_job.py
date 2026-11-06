@@ -69,6 +69,10 @@ class NativeJobDataClient(NativeRemoteClient):
             self._token = session['token']
             return self._token
 
+    def _pinned_run(self):
+        # A file named without its run is the job's own run's: never located, never a project file.
+        return self._job.connection.run_id
+
     def _run(self, experiment_id: str) -> str:
         # The run pinned by the validated broker session (`JobManagedRemoteClient._validate_session`), and only it.
         run_id = self._job.connection.run_id
