@@ -109,6 +109,11 @@ class NativeConnection:
         self._path = f'/native-experiments/ns/{quote(namespace, safe="")}/projects/{quote(project, safe="")}'
         self._root = self.dreamlake_url + self._path
         self._experiment_url = None
+        # The official API has a known web origin. Custom deployments keep the
+        # existing fallback rather than sending people to an unrelated site.
+        if self.dreamlake_url == 'https://api.dreamlake.ai':
+            self._experiment_url = (f'https://dreamlake.ai/{quote(namespace, safe="")}/projects/'
+                                    f'{quote(project, safe="")}/experiments?provider=dreamlake-native-v1')
         self.workload_id = None if workload_id is None else _workload_id(workload_id, 'workload_id')
         self.idempotency_key = None if idempotency_key is None else _workload_id(idempotency_key, 'idempotency_key')
         self.run_id = run_id
